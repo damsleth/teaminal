@@ -82,6 +82,13 @@ export type ConnectionState =
   | 'authError'
   | 'rateLimited'
 
+// Where keystrokes are routed when the App's useInput fires.
+//   list     - cursor navigation in ChatList
+//   composer - text editing in Composer
+// Distinct from `focus` (which conv is open). Composer is only meaningful
+// when focus is a chat or channel.
+export type InputZone = 'list' | 'composer'
+
 export type AppState = {
   me?: Me
   capabilities?: Capabilities
@@ -90,6 +97,7 @@ export type AppState = {
   channelsByTeam: Record<string, Channel[]>
   messagesByConvo: Record<ConvKey, ChatMessage[]>
   focus: Focus
+  inputZone: InputZone
   // Cursor index over the flat selectable list (chats, then teams + their
   // channels). The selectable list is computed on demand from chats + teams
   // + channelsByTeam; the cursor is bounded against it at render time so
@@ -108,6 +116,7 @@ export function initialAppState(): AppState {
     channelsByTeam: {},
     messagesByConvo: {},
     focus: { kind: 'list' },
+    inputZone: 'list',
     cursor: 0,
     memberPresence: {},
     conn: 'connecting',

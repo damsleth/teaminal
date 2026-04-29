@@ -66,23 +66,12 @@ export function ChatList() {
   const cursor = useAppState((s) => s.cursor)
   const me = useAppState((s) => s.me)
   const conn = useAppState((s) => s.conn)
-  const focus = useAppState((s) => s.focus)
 
   // Build selectables from individual slices so the hook only re-runs on
   // the data we actually depend on. (useAppState's selectors guarantee
   // referential stability of the store, not derived data, so we recompute
   // on every render - cheap given the list sizes.)
-  const items = buildSelectableList({
-    me,
-    chats,
-    teams,
-    channelsByTeam,
-    cursor,
-    messagesByConvo: {},
-    focus,
-    memberPresence: {},
-    conn,
-  })
+  const items = buildSelectableList({ me, chats, teams, channelsByTeam })
 
   const safeCursor = clampCursor(cursor, items.length)
   const rows = buildRows(items)

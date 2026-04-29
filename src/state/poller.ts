@@ -93,6 +93,30 @@ function shouldNotifyMention(msg: ChatMessage, myUserId: string): boolean {
   return mentions.some((m) => m.mentioned?.user?.id === myUserId)
 }
 
+// When the active loop overwrites messagesByConvo with a server response,
+// any optimistic message the user just sent (and any that failed to send)
+// would be lost if we replaced the array wholesale. Preserve them:
+//   - _sending: still in flight, append after server messages so the user
+//               sees their bubble until the server ack arrives
+//   - _sendError: failed sends with no server-side counterpart; keep so
+//                  the user can see the error
+// Server-confirmed messages take precedence wherever ids overlap.
+export function mergeWithOptimistic(
+  existing: ChatMessage[],
+  server: ChatMessage[],
+): ChatMessage[] {
+  const serverIds = new Set(server.map((m) => m.id))
+  const carry: ChatMessage[] = []
+  for (const m of existing) {
+    if (m._sending) {
+      carry.push(m)
+    } else if (m._sendError && !serverIds.has(m.id)) {
+      carry.push(m)
+    }
+  }
+  return [...server, ...carry]
+}
+
 type Sleeper = {
   sleep(ms: number): Promise<void>
   wake(): void
@@ -204,7 +228,10 @@ export function startPoller(opts: PollerOpts): PollerHandle {
           }
           seen.set(conv, seenSet)
           store.set((s) => ({
-            messagesByConvo: { ...s.messagesByConvo, [conv]: messages },
+            messagesByConvo: {
+              ...s.messagesByConvo,
+              [conv]: mergeWithOptimistic(s.messagesByConvo[conv] ?? [], messages),
+            },
           }))
           for (const msg of newMentions) {
             onMention?.({ conv, message: msg, source: 'active' })

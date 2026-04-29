@@ -45,6 +45,7 @@ export function App() {
   const teams = useAppState((s) => s.teams)
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
   const me = useAppState((s) => s.me)
+  const inputZone = useAppState((s) => s.inputZone)
 
   // Hydrate members for the focused chat once - they make the header label
   // useful for 1:1 chats with no topic.
@@ -83,10 +84,19 @@ export function App() {
     }
   }, [focus, hydrated, store])
 
+  // App's global useInput owns list-mode keys; Composer's own useInput
+  // handles composer-mode keys. The two are mutually exclusive via the
+  // isActive gates below, so a single keystroke is never delivered twice.
   useInput(
     (input, key) => {
       if (key.ctrl && input === 'c') {
         exit()
+        return
+      }
+
+      // Tab moves into the composer when there's an open chat/channel.
+      if (key.tab && focus.kind !== 'list') {
+        store.set({ inputZone: 'composer' })
         return
       }
 
@@ -96,17 +106,7 @@ export function App() {
           exit()
           return
         }
-        const items = buildSelectableList({
-          me,
-          chats,
-          teams,
-          channelsByTeam,
-          cursor,
-          focus,
-          messagesByConvo: {},
-          memberPresence: {},
-          conn,
-        })
+        const items = buildSelectableList({ me, chats, teams, channelsByTeam })
         if (items.length === 0) return
         const safe = clampCursor(cursor, items.length)
         if (input === 'j' || key.downArrow) {
@@ -132,12 +132,14 @@ export function App() {
         }
       }
 
-      // From any non-list focus, Esc returns to the list view.
+      // From any non-list focus (and non-composer input zone), Esc returns
+      // to the list view. (Composer handles its own Esc to leave compose
+      // mode without changing focus.)
       if (focus.kind !== 'list' && key.escape) {
-        store.set({ focus: { kind: 'list' } })
+        store.set({ focus: { kind: 'list' }, inputZone: 'list' })
       }
     },
-    { isActive: isRawModeSupported },
+    { isActive: isRawModeSupported && inputZone === 'list' },
   )
 
   return (
