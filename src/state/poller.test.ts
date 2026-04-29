@@ -391,6 +391,174 @@ describe('stop', () => {
   })
 })
 
+describe('cross-chat mention detection', () => {
+  type Phase = 'before' | 'after'
+  let phase: Phase = 'before'
+
+  function setupChatList(): { chatId: string; previewBefore: string; previewAfter: string } {
+    const chatId = 'chat-x'
+    const previewBefore = 'preview-before'
+    const previewAfter = 'preview-after'
+
+    installTransport(
+      makeHandlers({
+        '/chats': () =>
+          jsonResponse({
+            value: [
+              {
+                id: chatId,
+                chatType: 'group',
+                createdDateTime: '2026-04-29T08:00:00Z',
+                lastMessagePreview:
+                  phase === 'before'
+                    ? {
+                        id: previewBefore,
+                        createdDateTime: '2026-04-29T08:00:00Z',
+                        body: { contentType: 'text', content: 'previous' },
+                        from: { user: { id: 'other-1', displayName: 'Other' } },
+                      }
+                    : {
+                        id: previewAfter,
+                        createdDateTime: '2026-04-29T09:00:00Z',
+                        body: { contentType: 'text', content: '@me hi' },
+                        from: { user: { id: 'other-1', displayName: 'Other' } },
+                      },
+              },
+            ],
+          }),
+        chatMessages: () =>
+          jsonResponse({
+            value: [
+              {
+                id: previewAfter,
+                createdDateTime: '2026-04-29T09:00:00Z',
+                body: { contentType: 'text', content: '@me hi' },
+                from: { user: { id: 'other-1', displayName: 'Other' } },
+                mentions: mentionedMe(ME.id),
+              },
+            ],
+          }),
+      }),
+    )
+    return { chatId, previewBefore, previewAfter }
+  }
+
+  test('fires list-diff mention for non-active chat with @ to me from non-self', async () => {
+    primeAuth()
+    phase = 'before'
+    setupChatList()
+    const store = createAppStore()
+    store.set({ me: ME, focus: { kind: 'list' } })
+    const events: MentionEvent[] = []
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
+      onMention: (e) => events.push(e),
+    })
+    await waitFor(() => store.get().chats.length > 0)
+    // First list poll seeded prevPreviewIds; no notification yet.
+    expect(events).toHaveLength(0)
+    phase = 'after'
+    await waitFor(() => events.length > 0)
+    expect(events[0]?.source).toBe('list-diff')
+    expect(events[0]?.conv).toBe('chat:chat-x')
+    expect(events[0]?.message.id).toBe('preview-after')
+  })
+
+  test('does not fire when the new preview is from self', async () => {
+    primeAuth()
+    let p: 'before' | 'after' = 'before'
+    installTransport(
+      makeHandlers({
+        '/chats': () =>
+          jsonResponse({
+            value: [
+              {
+                id: 'c',
+                chatType: 'group',
+                createdDateTime: '2026-04-29T08:00:00Z',
+                lastMessagePreview: {
+                  id: p === 'before' ? 'preview-1' : 'preview-2',
+                  createdDateTime:
+                    p === 'before' ? '2026-04-29T08:00:00Z' : '2026-04-29T09:00:00Z',
+                  body: { contentType: 'text', content: 'hi' },
+                  from: { user: { id: ME.id, displayName: 'Me' } },
+                },
+              },
+            ],
+          }),
+        chatMessages: () => {
+          throw new Error('chat messages should not be probed when sender is self')
+        },
+      }),
+    )
+    const store = createAppStore()
+    store.set({ me: ME, focus: { kind: 'list' } })
+    const events: MentionEvent[] = []
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
+      onMention: (e) => events.push(e),
+    })
+    await waitFor(() => store.get().chats.length > 0)
+    p = 'after'
+    await Bun.sleep(180)
+    expect(events).toHaveLength(0)
+  })
+
+  test('does not fire when the chat is the currently active focus', async () => {
+    primeAuth()
+    let p: 'before' | 'after' = 'before'
+    installTransport(
+      makeHandlers({
+        '/chats': () =>
+          jsonResponse({
+            value: [
+              {
+                id: 'active-chat',
+                chatType: 'group',
+                createdDateTime: '2026-04-29T08:00:00Z',
+                lastMessagePreview: {
+                  id: p === 'before' ? 'preview-1' : 'preview-2',
+                  createdDateTime:
+                    p === 'before' ? '2026-04-29T08:00:00Z' : '2026-04-29T09:00:00Z',
+                  body: { contentType: 'text', content: 'hi' },
+                  from: { user: { id: 'other', displayName: 'Other' } },
+                },
+              },
+            ],
+          }),
+        chatMessages: () =>
+          jsonResponse({
+            value: [
+              {
+                id: 'preview-2',
+                createdDateTime: '2026-04-29T09:00:00Z',
+                body: { contentType: 'text', content: '@me hi' },
+                from: { user: { id: 'other', displayName: 'Other' } },
+                mentions: mentionedMe(ME.id),
+              },
+            ],
+          }),
+      }),
+    )
+    const store = createAppStore()
+    store.set({ me: ME, focus: { kind: 'chat', chatId: 'active-chat' } })
+    const events: MentionEvent[] = []
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
+      onMention: (e) => events.push(e),
+    })
+    await waitFor(() => store.get().chats.length > 0)
+    p = 'after'
+    await Bun.sleep(180)
+    // The list-diff scan must skip the active chat - any mention there
+    // is the active loop's responsibility.
+    expect(events.some((e) => e.source === 'list-diff')).toBe(false)
+  })
+})
+
 describe('mergeWithOptimistic', () => {
   const m = (id: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({
     id,
