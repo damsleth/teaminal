@@ -63,3 +63,15 @@ export function clampCursor(cursor: number, listLength: number): number {
   if (cursor >= listLength) return listLength - 1
   return cursor
 }
+
+// Case-insensitive substring match against the displayed label (chat
+// label, team displayName, or channel displayName). Used by both the
+// chat-list filter input handler and the ChatList render so navigation
+// and rendering stay aligned.
+export function itemMatchesFilter(item: SelectableItem, filter: string): boolean {
+  if (!filter) return true
+  const needle = filter.toLowerCase()
+  if (item.kind === 'chat') return item.label.toLowerCase().includes(needle)
+  if (item.kind === 'team') return item.team.displayName.toLowerCase().includes(needle)
+  return item.channel.displayName.toLowerCase().includes(needle)
+}

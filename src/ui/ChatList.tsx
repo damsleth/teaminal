@@ -11,7 +11,12 @@
 
 import { Box, Text } from 'ink'
 import { useRef } from 'react'
-import { buildSelectableList, clampCursor, type SelectableItem } from '../state/selectables'
+import {
+  buildSelectableList,
+  clampCursor,
+  itemMatchesFilter,
+  type SelectableItem,
+} from '../state/selectables'
 import { theme } from './theme'
 import { useAppState } from './StoreContext'
 
@@ -66,12 +71,15 @@ export function ChatList() {
   const cursor = useAppState((s) => s.cursor)
   const me = useAppState((s) => s.me)
   const conn = useAppState((s) => s.conn)
+  const filter = useAppState((s) => s.filter)
+  const inputZone = useAppState((s) => s.inputZone)
 
   // Build selectables from individual slices so the hook only re-runs on
   // the data we actually depend on. (useAppState's selectors guarantee
   // referential stability of the store, not derived data, so we recompute
   // on every render - cheap given the list sizes.)
-  const items = buildSelectableList({ me, chats, teams, channelsByTeam })
+  const all = buildSelectableList({ me, chats, teams, channelsByTeam })
+  const items = filter ? all.filter((i) => itemMatchesFilter(i, filter)) : all
 
   const safeCursor = clampCursor(cursor, items.length)
   const rows = buildRows(items)
@@ -92,17 +100,38 @@ export function ChatList() {
 
   const visible = rows.slice(viewStart, viewStart + ROWS_VISIBLE)
 
+  // Filter banner: shown while typing a filter, and when a filter is
+  // applied but the user isn't actively editing it.
+  const filterBanner =
+    inputZone === 'filter' ? (
+      <Text>
+        <Text color="cyan">{'/ '}</Text>
+        <Text>{filter}</Text>
+        <Text color="cyan">█</Text>
+      </Text>
+    ) : filter ? (
+      <Text color="gray">{`/ ${filter}  (Esc to clear)`}</Text>
+    ) : null
+
   if (items.length === 0) {
     return (
       <Box flexDirection="column" paddingX={1}>
+        {filterBanner}
         <Text bold>Chats</Text>
-        <Text color="gray">{conn === 'connecting' ? '  loading...' : '  (none)'}</Text>
+        <Text color="gray">
+          {filter
+            ? '  no matches'
+            : conn === 'connecting'
+              ? '  loading...'
+              : '  (none)'}
+        </Text>
       </Box>
     )
   }
 
   return (
     <Box flexDirection="column" paddingX={1}>
+      {filterBanner}
       {visible.map((row, i) => {
         if (row.kind === 'header') {
           return (

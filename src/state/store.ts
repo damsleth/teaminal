@@ -85,9 +85,9 @@ export type ConnectionState =
 // Where keystrokes are routed when the App's useInput fires.
 //   list     - cursor navigation in ChatList
 //   composer - text editing in Composer
-// Distinct from `focus` (which conv is open). Composer is only meaningful
-// when focus is a chat or channel.
-export type InputZone = 'list' | 'composer'
+//   filter   - typing into the chat-list filter buffer
+// Distinct from `focus` (which conv is open).
+export type InputZone = 'list' | 'composer' | 'filter'
 
 export type AppState = {
   me?: Me
@@ -103,6 +103,9 @@ export type AppState = {
   // + channelsByTeam; the cursor is bounded against it at render time so
   // a stale value is not a bug, just a clamp.
   cursor: number
+  // Case-insensitive substring filter applied to the chat list. Empty
+  // string means no filter.
+  filter: string
   myPresence?: Presence
   // Keyed by user id, populated only for currently visible chat members.
   memberPresence: Record<string, Presence>
@@ -118,6 +121,7 @@ export function initialAppState(): AppState {
     focus: { kind: 'list' },
     inputZone: 'list',
     cursor: 0,
+    filter: '',
     memberPresence: {},
     conn: 'connecting',
   }
