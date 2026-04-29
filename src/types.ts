@@ -79,3 +79,28 @@ export type ChatMessage = {
   replyToId?: string | null
   subject?: string | null
 }
+
+export type Team = {
+  id: string
+  displayName: string
+  description?: string | null
+  isArchived?: boolean
+  createdDateTime?: string
+  visibility?: 'private' | 'public' | 'hiddenMembership' | 'unknownFutureValue'
+}
+
+export type ChannelMembershipType = 'standard' | 'private' | 'shared' | 'unknownFutureValue'
+
+export type Channel = {
+  id: string
+  displayName: string
+  description?: string | null
+  membershipType?: ChannelMembershipType
+  isArchived?: boolean
+  webUrl?: string
+}
+
+// Channel messages share the ChatMessage shape in Graph; reuse to avoid a
+// near-duplicate type. The replyToId / subject fields on ChatMessage are
+// the channel-specific extras.
+export type ChannelMessage = ChatMessage
