@@ -4,10 +4,10 @@
   "description": "Lightweight terminal Microsoft Teams client",
   "type": "module",
   "bin": {
-    "teaminal": "./bin/teaminal.ts"
+    "teaminal": "./bin/teaminal.tsx"
   },
   "scripts": {
-    "dev": "bun run bin/teaminal.ts",
+    "dev": "bun run bin/teaminal.tsx",
     "build": "bash scripts/build.sh",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit",
