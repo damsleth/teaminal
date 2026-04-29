@@ -4,9 +4,11 @@ import { render } from 'ink'
 import { probeCapabilities } from '../src/graph/capabilities'
 import { setActiveProfile } from '../src/graph/client'
 import { getMe } from '../src/graph/me'
+import { notifyMention } from '../src/notify/notify'
 import { startPoller } from '../src/state/poller'
 import { createAppStore } from '../src/state/store'
 import { App } from '../src/ui/App'
+import { htmlToText } from '../src/ui/html'
 import { StoreProvider } from '../src/ui/StoreContext'
 import { debug, warn } from '../src/log'
 
@@ -114,6 +116,16 @@ const ink = render(<StoreProvider store={store}><App /></StoreProvider>)
     const handle = startPoller({
       store,
       onError: (loop, err) => warn(`poller[${loop}]:`, err.message),
+      onMention: (event) => {
+        const sender = event.message.from?.user?.displayName ?? 'someone'
+        const raw = event.message.body.content ?? ''
+        const preview =
+          event.message.body.contentType === 'text'
+            ? raw.replace(/\s+/g, ' ').trim()
+            : htmlToText(raw)
+        const scope = event.conv.startsWith('chat:') ? 'chat' : 'channel'
+        notifyMention(sender, preview.slice(0, 120), scope)
+      },
     })
 
     await ink.waitUntilExit()
