@@ -1,0 +1,4 @@
+# Bun configuration. See https://bun.sh/docs/runtime/bunfig
+
+[test]
+# bun test discovers *.test.ts files automatically; add config here as needed
