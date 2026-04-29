@@ -90,6 +90,11 @@ export type AppState = {
   channelsByTeam: Record<string, Channel[]>
   messagesByConvo: Record<ConvKey, ChatMessage[]>
   focus: Focus
+  // Cursor index over the flat selectable list (chats, then teams + their
+  // channels). The selectable list is computed on demand from chats + teams
+  // + channelsByTeam; the cursor is bounded against it at render time so
+  // a stale value is not a bug, just a clamp.
+  cursor: number
   myPresence?: Presence
   // Keyed by user id, populated only for currently visible chat members.
   memberPresence: Record<string, Presence>
@@ -103,6 +108,7 @@ export function initialAppState(): AppState {
     channelsByTeam: {},
     messagesByConvo: {},
     focus: { kind: 'list' },
+    cursor: 0,
     memberPresence: {},
     conn: 'connecting',
   }
