@@ -104,3 +104,42 @@ export type Channel = {
 // near-duplicate type. The replyToId / subject fields on ChatMessage are
 // the channel-specific extras.
 export type ChannelMessage = ChatMessage
+
+export type PresenceAvailability =
+  | 'Available'
+  | 'AvailableIdle'
+  | 'Away'
+  | 'BeRightBack'
+  | 'Busy'
+  | 'BusyIdle'
+  | 'DoNotDisturb'
+  | 'Offline'
+  | 'OutOfOffice'
+  | 'PresenceUnknown'
+
+export type PresenceActivity =
+  | 'Available'
+  | 'Away'
+  | 'BeRightBack'
+  | 'Busy'
+  | 'DoNotDisturb'
+  | 'InACall'
+  | 'InAConferenceCall'
+  | 'Inactive'
+  | 'InAMeeting'
+  | 'Offline'
+  | 'OffWork'
+  | 'OutOfOffice'
+  | 'PresenceUnknown'
+  | 'Presenting'
+  | 'UrgentInterruptionsOnly'
+  // Some clients return strings outside the documented enum; tolerate them
+  | (string & {})
+
+export type Presence = {
+  // For /me/presence Graph returns the user's id; for bulk lookup the id is
+  // each requested user id.
+  id: string
+  availability: PresenceAvailability
+  activity: PresenceActivity
+}
