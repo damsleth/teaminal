@@ -60,17 +60,30 @@ function MessageRow(props: { message: ChatMessage; myUserId?: string }) {
   const senderTrimmed = sender.length > SENDER_COL_WIDTH ? sender.slice(0, SENDER_COL_WIDTH - 1) + '…' : sender
   const isSystem = m.messageType === 'systemEventMessage' || sender === '(system)'
   const isSelf = !!props.myUserId && m.from?.user?.id === props.myUserId
+  const isSending = m._sending === true
+  const sendError = m._sendError
 
   const bodyText = previewBody(m)
 
+  // Status precedence: error first (red), then sending (gray dim), then
+  // system / self colors.
   let color: string | undefined
-  if (isSystem) color = theme.systemEvent
+  if (sendError) color = theme.errorText
+  else if (isSending) color = theme.systemEvent
+  else if (isSystem) color = theme.systemEvent
   else if (isSelf) color = theme.selfMessage
 
+  const statusMarker = sendError ? '✗' : isSending ? '…' : ' '
+
   return (
-    <Text color={color}>
-      {`  ${time}  ${senderTrimmed.padEnd(SENDER_COL_WIDTH)}  ${bodyText}`}
-    </Text>
+    <>
+      <Text color={color}>
+        {`${statusMarker} ${time}  ${senderTrimmed.padEnd(SENDER_COL_WIDTH)}  ${bodyText}`}
+      </Text>
+      {sendError && (
+        <Text color={theme.warnText}>{`     send failed: ${sendError.slice(0, 120)}`}</Text>
+      )}
+    </>
   )
 }
 

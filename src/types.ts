@@ -78,6 +78,13 @@ export type ChatMessage = {
   reactions?: unknown[]
   replyToId?: string | null
   subject?: string | null
+  // Local-only fields used by the optimistic-send flow. Underscore prefix
+  // marks them as never set by Graph; they're always undefined on
+  // server-confirmed messages. Once the server response replaces the
+  // optimistic message, all three are absent.
+  _tempId?: string
+  _sending?: boolean
+  _sendError?: string
 }
 
 export type Team = {

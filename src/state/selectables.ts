@@ -15,7 +15,9 @@ export type SelectableItem =
   | { kind: 'team'; team: Team }
   | { kind: 'channel'; team: Team; channel: Channel; label: string }
 
-export function buildSelectableList(state: AppState): SelectableItem[] {
+export type SelectableInput = Pick<AppState, 'chats' | 'teams' | 'channelsByTeam' | 'me'>
+
+export function buildSelectableList(state: SelectableInput): SelectableItem[] {
   const items: SelectableItem[] = []
   for (const chat of state.chats) {
     items.push({ kind: 'chat', chat, label: chatLabel(chat, state.me?.id) })

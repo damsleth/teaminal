@@ -7,7 +7,7 @@ import { __resetForTests, __setTransportForTests } from '../graph/client'
 import type { Capabilities } from '../graph/capabilities'
 import type { Chat, ChatMessage, Mention } from '../types'
 import { createAppStore, focusKey } from './store'
-import { type MentionEvent, type PollerHandle, startPoller } from './poller'
+import { mergeWithOptimistic, type MentionEvent, type PollerHandle, startPoller } from './poller'
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -388,5 +388,52 @@ describe('stop', () => {
     await Bun.sleep(120)
     expect(chatsCalls).toBe(before)
     activeHandle = null
+  })
+})
+
+describe('mergeWithOptimistic', () => {
+  const m = (id: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({
+    id,
+    createdDateTime: '2026-04-29T09:00:00Z',
+    body: { contentType: 'text', content: id },
+    ...extra,
+  })
+
+  test('returns the server list verbatim when there are no optimistic msgs', () => {
+    const merged = mergeWithOptimistic([m('a'), m('b')], [m('a'), m('b'), m('c')])
+    expect(merged.map((x) => x.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  test('preserves still-sending optimistic messages at the end', () => {
+    const opt = m('temp-1', { _tempId: 'temp-1', _sending: true })
+    const merged = mergeWithOptimistic([m('a'), opt], [m('a')])
+    expect(merged.map((x) => x.id)).toEqual(['a', 'temp-1'])
+    expect(merged[1]?._sending).toBe(true)
+  })
+
+  test('preserves _sendError messages that have no server-id match', () => {
+    const failed = m('temp-2', { _tempId: 'temp-2', _sendError: 'forbidden' })
+    const merged = mergeWithOptimistic([m('a'), failed], [m('a')])
+    expect(merged.map((x) => x.id)).toEqual(['a', 'temp-2'])
+    expect(merged[1]?._sendError).toBe('forbidden')
+  })
+
+  test('drops _sendError messages whose ids now exist in the server list', () => {
+    // Edge case: after the user retries, the failed clone may have been
+    // replaced by a server-confirmed message with the same id. Drop the
+    // local error entry to avoid showing duplicates.
+    const failed = m('server-x', { _sendError: 'forbidden' })
+    const merged = mergeWithOptimistic([failed], [m('server-x')])
+    expect(merged.map((x) => x.id)).toEqual(['server-x'])
+    expect(merged[0]?._sendError).toBeUndefined()
+  })
+
+  test('does not duplicate when an optimistic message becomes server-confirmed', () => {
+    // After Composer replaces optimistic with the server response, the
+    // _sending flag is gone. The next poller fetch returns that server msg
+    // - merge should not carry anything extra.
+    const confirmed = m('server-1') // no _sending flag
+    const merged = mergeWithOptimistic([m('a'), confirmed], [m('a'), m('server-1')])
+    expect(merged.map((x) => x.id)).toEqual(['a', 'server-1'])
   })
 })
