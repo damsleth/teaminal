@@ -3,15 +3,14 @@
 // Renders messages in chronological order (poller already reverses Graph's
 // descending API result). System messages (messageType=systemEventMessage)
 // are styled gray and labeled. Self messages get a subtle color cue.
-//
-// HTML message bodies are still raw at this step - step 12 wires the
-// htmlparser2 -> ANSI/text conversion. For now we strip a tiny set of
-// tags inline so the placeholder doesn't read as garbage.
+// HTML bodies are converted via src/ui/html.htmlToText so <at>, <emoji>,
+// <a>, and entity refs render correctly.
 
 import { Box, Text } from 'ink'
 import { chatLabel } from '../state/selectables'
 import { focusKey } from '../state/store'
 import type { Chat, ChatMessage, Channel, Team } from '../types'
+import { htmlToText } from './html'
 import { theme } from './theme'
 import { useAppState } from './StoreContext'
 
@@ -87,30 +86,15 @@ function MessageRow(props: { message: ChatMessage; myUserId?: string }) {
   )
 }
 
-// Crude text extraction for HTML bodies. Step 12 replaces this with a
-// proper htmlparser2 + entities pass. Until then this keeps the row from
-// reading as <p>...</p> tags but doesn't promise correct rendering of
-// <at>, <emoji>, <a>, etc.
 function previewBody(m: ChatMessage): string {
   if (m.messageType === 'systemEventMessage') {
     return '(system event)'
   }
   const raw = m.body.content ?? ''
-  if (m.body.contentType === 'text') return raw.replace(/\s+/g, ' ').trim().slice(0, 200)
-  // very rough HTML strip; keeps content readable in v1
-  const stripped = raw
-    .replace(/<\/?(?:p|br)\s*\/?>/gi, ' ')
-    .replace(/<emoji[^>]*alt="([^"]*)"[^>]*>/gi, '$1')
-    .replace(/<at[^>]*>(.*?)<\/at>/gi, '$1')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/\s+/g, ' ')
-    .trim()
-  return stripped.slice(0, 200)
+  if (m.body.contentType === 'text') {
+    return raw.replace(/\s+/g, ' ').trim().slice(0, 200)
+  }
+  return htmlToText(raw).slice(0, 200)
 }
 
 function headerForFocus(
