@@ -8,7 +8,9 @@ import { notifyMention } from '../src/notify/notify'
 import { startPoller } from '../src/state/poller'
 import { createAppStore } from '../src/state/store'
 import { App } from '../src/ui/App'
+import { ErrorBoundary } from '../src/ui/ErrorBoundary'
 import { htmlToText } from '../src/ui/html'
+import { PollerProvider, type PollerHandleRef } from '../src/ui/PollerContext'
 import { StoreProvider } from '../src/ui/StoreContext'
 import { debug, warn } from '../src/log'
 
@@ -90,9 +92,22 @@ if (!process.stdin.isTTY) {
 const store = createAppStore()
 if (profile) setActiveProfile(profile)
 
+// PollerHandleRef is mutated by the bootstrap below once startPoller
+// resolves; the App reads ref.current inside event handlers, so it
+// observes the assignment without needing a re-render.
+const pollerHandleRef: PollerHandleRef = { current: null }
+
 // Start the UI immediately so the user sees a frame within hundreds of
 // milliseconds; data fills in as auth + capability probe + poller complete.
-const ink = render(<StoreProvider store={store}><App /></StoreProvider>)
+const ink = render(
+  <ErrorBoundary>
+    <StoreProvider store={store}>
+      <PollerProvider handleRef={pollerHandleRef}>
+        <App />
+      </PollerProvider>
+    </StoreProvider>
+  </ErrorBoundary>,
+)
 
 // Background bootstrap. Errors update the store (conn) so the StatusBar
 // reflects them; fatal auth issues print to stderr and exit.
@@ -127,8 +142,10 @@ const ink = render(<StoreProvider store={store}><App /></StoreProvider>)
         notifyMention(sender, preview.slice(0, 120), scope)
       },
     })
+    pollerHandleRef.current = handle
 
     await ink.waitUntilExit()
+    pollerHandleRef.current = null
     await handle.stop()
   } catch (err) {
     ink.unmount()

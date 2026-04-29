@@ -24,10 +24,11 @@ import { Box, Text, useApp, useInput, useStdin } from 'ink'
 import { useEffect, useState } from 'react'
 import { getChat } from '../graph/chats'
 import { GraphError } from '../graph/client'
-import { buildSelectableList, clampCursor } from '../state/selectables'
+import { buildSelectableList, clampCursor, itemMatchesFilter } from '../state/selectables'
 import { ChatList } from './ChatList'
 import { Composer } from './Composer'
 import { MessagePane } from './MessagePane'
+import { usePollerHandleRef } from './PollerContext'
 import { StatusBar } from './StatusBar'
 import { useAppState, useAppStore } from './StoreContext'
 import { warn } from '../log'
@@ -38,6 +39,7 @@ export function App() {
   const { exit } = useApp()
   const { isRawModeSupported } = useStdin()
   const store = useAppStore()
+  const pollerRef = usePollerHandleRef()
   const conn = useAppState((s) => s.conn)
   const focus = useAppState((s) => s.focus)
   const cursor = useAppState((s) => s.cursor)
@@ -46,6 +48,7 @@ export function App() {
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
   const me = useAppState((s) => s.me)
   const inputZone = useAppState((s) => s.inputZone)
+  const filter = useAppState((s) => s.filter)
 
   // Hydrate members for the focused chat once - they make the header label
   // useful for 1:1 chats with no topic.
@@ -85,8 +88,9 @@ export function App() {
   }, [focus, hydrated, store])
 
   // App's global useInput owns list-mode keys; Composer's own useInput
-  // handles composer-mode keys. The two are mutually exclusive via the
-  // isActive gates below, so a single keystroke is never delivered twice.
+  // handles composer-mode keys; the filter useInput below handles
+  // chat-list filtering. All three are mutually exclusive via isActive
+  // gates so a single keystroke is never delivered twice.
   useInput(
     (input, key) => {
       if (key.ctrl && input === 'c') {
@@ -100,6 +104,20 @@ export function App() {
         return
       }
 
+      // r forces an immediate refresh of the active conv + chat list.
+      if (input === 'r') {
+        pollerRef.current?.refresh()
+        return
+      }
+
+      // / enters filter mode when in list focus. Useful when the chat list
+      // is long; filter applies to the chat label, team name, and channel
+      // displayName via case-insensitive substring match.
+      if (focus.kind === 'list' && input === '/') {
+        store.set({ inputZone: 'filter' })
+        return
+      }
+
       // List-focus navigation (cursor + open).
       if (focus.kind === 'list') {
         if (input === 'q') {
@@ -107,18 +125,19 @@ export function App() {
           return
         }
         const items = buildSelectableList({ me, chats, teams, channelsByTeam })
-        if (items.length === 0) return
-        const safe = clampCursor(cursor, items.length)
+        const visible = filter ? items.filter((it) => itemMatchesFilter(it, filter)) : items
+        if (visible.length === 0) return
+        const safe = clampCursor(cursor, visible.length)
         if (input === 'j' || key.downArrow) {
-          store.set({ cursor: clampCursor(safe + 1, items.length) })
+          store.set({ cursor: clampCursor(safe + 1, visible.length) })
           return
         }
         if (input === 'k' || key.upArrow) {
-          store.set({ cursor: clampCursor(safe - 1, items.length) })
+          store.set({ cursor: clampCursor(safe - 1, visible.length) })
           return
         }
         if (key.return) {
-          const it = items[safe]
+          const it = visible[safe]
           if (!it) return
           if (it.kind === 'chat') {
             store.set({ focus: { kind: 'chat', chatId: it.chat.id } })
@@ -140,6 +159,30 @@ export function App() {
       }
     },
     { isActive: isRawModeSupported && inputZone === 'list' },
+  )
+
+  // Filter-mode keys: typing builds the filter buffer, Backspace deletes,
+  // Esc clears + exits filter mode, Enter accepts and exits but keeps
+  // the filter applied so the user can navigate the filtered list.
+  useInput(
+    (input, key) => {
+      if (key.escape) {
+        store.set({ filter: '', inputZone: 'list', cursor: 0 })
+        return
+      }
+      if (key.return) {
+        store.set({ inputZone: 'list', cursor: 0 })
+        return
+      }
+      if (key.backspace || key.delete) {
+        store.set({ filter: filter.slice(0, -1) })
+        return
+      }
+      if (input && !key.ctrl && !key.meta) {
+        store.set({ filter: filter + input })
+      }
+    },
+    { isActive: isRawModeSupported && inputZone === 'filter' },
   )
 
   return (

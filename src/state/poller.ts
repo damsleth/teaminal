@@ -69,6 +69,10 @@ export type PollerHandle = {
   // Returns once the loops have observed the stop flag and exited their
   // current iteration. In-flight fetches are aborted via AbortController.
   stop: () => Promise<void>
+  // Wake the active and list sleepers immediately so the next iteration
+  // runs without waiting out the current interval. Useful when the user
+  // hits a manual-refresh key.
+  refresh: () => void
 }
 
 function jitter(ms: number): number {
@@ -440,6 +444,10 @@ export function startPoller(opts: PollerOpts): PollerHandle {
       listSleeper.wake()
       presenceSleeper.wake()
       await loops
+    },
+    refresh() {
+      activeSleeper.wake()
+      listSleeper.wake()
     },
   }
 }

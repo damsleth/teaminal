@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { Chat, Team, Channel } from '../types'
-import { buildSelectableList, chatLabel, clampCursor } from './selectables'
+import { buildSelectableList, chatLabel, clampCursor, itemMatchesFilter } from './selectables'
 import { initialAppState } from './store'
 
 const team = (id: string, displayName: string): Team => ({ id, displayName })
@@ -119,5 +119,37 @@ describe('clampCursor', () => {
 
   test('passes through valid indices', () => {
     expect(clampCursor(2, 5)).toBe(2)
+  })
+})
+
+describe('itemMatchesFilter', () => {
+  test('returns true for an empty filter (no narrowing)', () => {
+    expect(itemMatchesFilter({ kind: 'chat', chat: chat('c'), label: 'Anything' }, '')).toBe(
+      true,
+    )
+  })
+
+  test('matches chat label case-insensitively', () => {
+    const item = { kind: 'chat' as const, chat: chat('c'), label: 'Crayon Eng' }
+    expect(itemMatchesFilter(item, 'cray')).toBe(true)
+    expect(itemMatchesFilter(item, 'ENG')).toBe(true)
+    expect(itemMatchesFilter(item, 'standup')).toBe(false)
+  })
+
+  test('matches team displayName', () => {
+    const item = { kind: 'team' as const, team: team('t', 'Crayon Eng') }
+    expect(itemMatchesFilter(item, 'cray')).toBe(true)
+    expect(itemMatchesFilter(item, 'design')).toBe(false)
+  })
+
+  test('matches channel displayName', () => {
+    const item = {
+      kind: 'channel' as const,
+      team: team('t', 'X'),
+      channel: channel('c', 'General'),
+      label: 'General',
+    }
+    expect(itemMatchesFilter(item, 'gen')).toBe(true)
+    expect(itemMatchesFilter(item, 'random')).toBe(false)
   })
 })
