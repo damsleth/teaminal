@@ -40,7 +40,7 @@ function cacheKey(profile?: string): string {
   return profile ?? DEFAULT_KEY
 }
 
-export function decodeJwtExp(token: string): number {
+export function decodeJwtClaims(token: string): Record<string, unknown> {
   const parts = token.split('.')
   if (parts.length !== 3) {
     throw new OwaPiggyError('malformed token: expected 3 dot-separated parts')
@@ -58,7 +58,12 @@ export function decodeJwtExp(token: string): number {
   if (typeof payload !== 'object' || payload === null) {
     throw new OwaPiggyError('malformed token: payload is not an object')
   }
-  const exp = (payload as Record<string, unknown>).exp
+  return payload as Record<string, unknown>
+}
+
+export function decodeJwtExp(token: string): number {
+  const claims = decodeJwtClaims(token)
+  const exp = claims.exp
   if (typeof exp !== 'number' || !Number.isFinite(exp)) {
     throw new OwaPiggyError('malformed token: missing or non-numeric exp')
   }

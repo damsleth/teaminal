@@ -7,7 +7,13 @@ import { __resetForTests, __setTransportForTests } from '../graph/client'
 import type { Capabilities } from '../graph/capabilities'
 import type { Chat, ChatMessage, Mention } from '../types'
 import { createAppStore, focusKey } from './store'
-import { mergeWithOptimistic, type MentionEvent, type PollerHandle, startPoller } from './poller'
+import {
+  mergeChatMembers,
+  mergeWithOptimistic,
+  type MentionEvent,
+  type PollerHandle,
+  startPoller,
+} from './poller'
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -48,6 +54,7 @@ type MutableHandlers = {
   channelMessages: (init: RequestInit) => Response
   chatMessages: (chatId: string, init: RequestInit) => Response
   channels: (teamId: string, init: RequestInit) => Response
+  getChat: (chatId: string, init: RequestInit) => Response
 }
 
 function makeHandlers(overrides?: Partial<MutableHandlers>): MutableHandlers {
@@ -59,6 +66,8 @@ function makeHandlers(overrides?: Partial<MutableHandlers>): MutableHandlers {
     channelMessages: () => jsonResponse({ value: [] }),
     chatMessages: () => jsonResponse({ value: [] }),
     channels: () => jsonResponse({ value: [] }),
+    getChat: (chatId) =>
+      jsonResponse({ id: chatId, chatType: 'oneOnOne', createdDateTime: '2026-04-29T08:00:00Z' }),
     ...overrides,
   }
 }
@@ -78,6 +87,10 @@ function installTransport(handlers: MutableHandlers): void {
     if (channelMessagesMatch) return handlers.channelMessages(init)
     const channelsMatch = url.match(/\/v1\.0\/teams\/([^/]+)\/channels/)
     if (channelsMatch) return handlers.channels(decodeURIComponent(channelsMatch[1]!), init)
+    // GET /chats/{id} (with or without query string) - distinct from /messages
+    // and from the bulk /chats? listing.
+    const getChatMatch = url.match(/\/v1\.0\/chats\/([^/?]+)(?:\?|$)/)
+    if (getChatMatch) return handlers.getChat(decodeURIComponent(getChatMatch[1]!), init)
     throw new Error(`unhandled URL in poller test transport: ${url}`)
   })
 }
@@ -290,6 +303,29 @@ describe('list loop', () => {
     await waitFor(() => store.get().chats.length > 0)
     expect(store.get().chats[0]?.id).toBe('chat-1')
     expect(store.get().conn).toBe('online')
+  })
+
+  test('sets lastListPollAt on a successful list poll', async () => {
+    primeAuth()
+    installTransport(
+      makeHandlers({
+        '/chats': () =>
+          jsonResponse({
+            value: [
+              { id: 'c1', chatType: 'oneOnOne', createdDateTime: '2026-04-29T08:00:00Z' },
+            ],
+          }),
+      }),
+    )
+    const store = createAppStore()
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
+    })
+    await waitFor(() => store.get().lastListPollAt !== undefined)
+    const t = store.get().lastListPollAt!
+    expect(t instanceof Date).toBe(true)
+    expect(Date.now() - t.getTime()).toBeLessThan(2_000)
   })
 
   test('marks conn=offline on a 5xx error', async () => {
@@ -556,6 +592,155 @@ describe('cross-chat mention detection', () => {
     // The list-diff scan must skip the active chat - any mention there
     // is the active loop's responsibility.
     expect(events.some((e) => e.source === 'list-diff')).toBe(false)
+  })
+})
+
+describe('member hydration', () => {
+  test('hydrates members for chats lacking them after a list poll', async () => {
+    primeAuth()
+    const chat: Chat = {
+      id: 'c1',
+      chatType: 'oneOnOne',
+      createdDateTime: '2026-04-29T08:00:00Z',
+    }
+    installTransport(
+      makeHandlers({
+        '/chats': () => jsonResponse({ value: [chat] }),
+        getChat: (chatId) =>
+          jsonResponse({
+            id: chatId,
+            chatType: 'oneOnOne',
+            createdDateTime: '2026-04-29T08:00:00Z',
+            members: [
+              { id: 'mem-me', userId: 'me-id', displayName: 'Me' },
+              { id: 'mem-iver', userId: 'iver-id', displayName: 'Daljord, Iver' },
+            ],
+          }),
+      }),
+    )
+    const store = createAppStore()
+    store.set({ me: ME })
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
+    })
+    await waitFor(() => (store.get().chats[0]?.members?.length ?? 0) > 0)
+    const c = store.get().chats[0]!
+    expect(c.members?.find((m) => m.userId === 'iver-id')?.displayName).toBe('Daljord, Iver')
+  })
+
+  test('preserves hydrated members across subsequent list polls', async () => {
+    primeAuth()
+    const chat: Chat = {
+      id: 'c1',
+      chatType: 'oneOnOne',
+      createdDateTime: '2026-04-29T08:00:00Z',
+    }
+    let getChatCalls = 0
+    installTransport(
+      makeHandlers({
+        '/chats': () => jsonResponse({ value: [chat] }),
+        getChat: (chatId) => {
+          getChatCalls++
+          return jsonResponse({
+            id: chatId,
+            chatType: 'oneOnOne',
+            createdDateTime: '2026-04-29T08:00:00Z',
+            members: [
+              { id: 'mem-me', userId: 'me-id', displayName: 'Me' },
+              { id: 'mem-other', userId: 'other-id', displayName: 'Other Person' },
+            ],
+          })
+        },
+      }),
+    )
+    const store = createAppStore()
+    store.set({ me: ME })
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
+    })
+    await waitFor(() => (store.get().chats[0]?.members?.length ?? 0) > 0)
+    const callsAfterFirstHydrate = getChatCalls
+    // Wait long enough for several more list-poll iterations.
+    await Bun.sleep(180)
+    const c = store.get().chats[0]!
+    // Members must still be hydrated even though the list poll has run
+    // again - mergeChatMembers carries them forward.
+    expect(c.members?.find((m) => m.userId === 'other-id')?.displayName).toBe('Other Person')
+    // And subsequent polls should not re-issue getChat for already-hydrated chats.
+    expect(getChatCalls).toBe(callsAfterFirstHydrate)
+  })
+
+  test('skips hydration for chats whose label comes from topic', async () => {
+    primeAuth()
+    const chat: Chat = {
+      id: 'group-1',
+      chatType: 'group',
+      topic: 'NOCOS/IAM/HELPDESK',
+      createdDateTime: '2026-04-29T08:00:00Z',
+    }
+    let getChatCalls = 0
+    installTransport(
+      makeHandlers({
+        '/chats': () => jsonResponse({ value: [chat] }),
+        getChat: (chatId) => {
+          getChatCalls++
+          return jsonResponse({
+            id: chatId,
+            chatType: 'group',
+            topic: 'NOCOS/IAM/HELPDESK',
+            createdDateTime: '2026-04-29T08:00:00Z',
+            members: [],
+          })
+        },
+      }),
+    )
+    const store = createAppStore()
+    store.set({ me: ME })
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
+    })
+    await waitFor(() => store.get().chats.length > 0)
+    await Bun.sleep(120)
+    expect(getChatCalls).toBe(0)
+  })
+})
+
+describe('mergeChatMembers', () => {
+  const c = (id: string, members?: Chat['members']): Chat => ({
+    id,
+    chatType: 'oneOnOne',
+    createdDateTime: '2026-04-29T08:00:00Z',
+    members,
+  })
+
+  test('returns next as-is when prev is empty', () => {
+    const next = [c('a'), c('b')]
+    expect(mergeChatMembers([], next)).toBe(next)
+  })
+
+  test('carries forward members from prev when next has none', () => {
+    const prev = [c('a', [{ id: 'm1', userId: 'u1', displayName: 'Alice' }])]
+    const next = [c('a')]
+    const merged = mergeChatMembers(prev, next)
+    expect(merged[0]?.members?.[0]?.displayName).toBe('Alice')
+  })
+
+  test('prefers next.members when both have them', () => {
+    const prev = [c('a', [{ id: 'm1', userId: 'u1', displayName: 'old' }])]
+    const next = [c('a', [{ id: 'm2', userId: 'u2', displayName: 'new' }])]
+    const merged = mergeChatMembers(prev, next)
+    expect(merged[0]?.members?.[0]?.displayName).toBe('new')
+  })
+
+  test('passes through chats not in prev', () => {
+    const prev = [c('a', [{ id: 'm1', userId: 'u1', displayName: 'Alice' }])]
+    const next = [c('b')]
+    const merged = mergeChatMembers(prev, next)
+    expect(merged[0]?.id).toBe('b')
+    expect(merged[0]?.members).toBeUndefined()
   })
 })
 

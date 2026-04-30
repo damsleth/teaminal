@@ -20,13 +20,16 @@
 //
 // Composer keybinds (step 11) and refresh / filter (step 15) land later.
 
-import { Box, Text, useApp, useInput, useStdin } from 'ink'
+import { Box, Text, useApp, useInput, useStdin, useStdout } from 'ink'
 import { useEffect, useState } from 'react'
 import { getChat } from '../graph/chats'
 import { GraphError } from '../graph/client'
 import { buildSelectableList, clampCursor, itemMatchesFilter } from '../state/selectables'
 import { ChatList } from './ChatList'
 import { Composer } from './Composer'
+import { DiagnosticsModal } from './DiagnosticsModal'
+import { KeybindsModal, openKeybinds } from './KeybindsModal'
+import { MenuModal, openMenu } from './MenuModal'
 import { MessagePane } from './MessagePane'
 import { usePollerHandleRef } from './PollerContext'
 import { StatusBar } from './StatusBar'
@@ -38,8 +41,25 @@ const LIST_PANE_WIDTH = 30
 export function App() {
   const { exit } = useApp()
   const { isRawModeSupported } = useStdin()
+  const { stdout } = useStdout()
   const store = useAppStore()
   const pollerRef = usePollerHandleRef()
+
+  // Track real terminal rows. Ink's height="100%" resolves against the
+  // intrinsic content height, not the terminal, so it lets the layout
+  // shrink/grow with content (e.g. switching between chats with different
+  // message counts visibly jumps the box). Setting an explicit row count
+  // pins the layout. When the user picks 'full', use stdout.rows and
+  // re-render on resize.
+  const [terminalRows, setTerminalRows] = useState<number>(stdout?.rows ?? 24)
+  useEffect(() => {
+    if (!stdout) return
+    const onResize = () => setTerminalRows(stdout.rows ?? 24)
+    stdout.on('resize', onResize)
+    return () => {
+      stdout.off('resize', onResize)
+    }
+  }, [stdout])
   const conn = useAppState((s) => s.conn)
   const focus = useAppState((s) => s.focus)
   const cursor = useAppState((s) => s.cursor)
@@ -49,6 +69,8 @@ export function App() {
   const me = useAppState((s) => s.me)
   const inputZone = useAppState((s) => s.inputZone)
   const filter = useAppState((s) => s.filter)
+  const modal = useAppState((s) => s.modal)
+  const windowHeight = useAppState((s) => s.settings.windowHeight)
 
   // Hydrate members for the focused chat once - they make the header label
   // useful for 1:1 chats with no topic.
@@ -118,6 +140,12 @@ export function App() {
         return
       }
 
+      // ? opens the keybindings reference (any focus, list inputZone).
+      if (input === '?') {
+        openKeybinds(store)
+        return
+      }
+
       // List-focus navigation (cursor + open).
       if (focus.kind === 'list') {
         if (input === 'q') {
@@ -151,11 +179,17 @@ export function App() {
         }
       }
 
-      // From any non-list focus (and non-composer input zone), Esc returns
-      // to the list view. (Composer handles its own Esc to leave compose
-      // mode without changing focus.)
-      if (focus.kind !== 'list' && key.escape) {
-        store.set({ focus: { kind: 'list' }, inputZone: 'list' })
+      // Esc behavior depends on what's open:
+      //   - chat/channel focused: leave it, return to chat list
+      //   - already at chat list: open the modal pause-menu
+      // Composer/filter handle their own Esc.
+      if (key.escape) {
+        if (focus.kind !== 'list') {
+          store.set({ focus: { kind: 'list' }, inputZone: 'list' })
+        } else {
+          openMenu(store)
+        }
+        return
       }
     },
     { isActive: isRawModeSupported && inputZone === 'list' },
@@ -185,18 +219,45 @@ export function App() {
     { isActive: isRawModeSupported && inputZone === 'filter' },
   )
 
+  // Modal rendering: header / composer / status bar stay visible; the
+  // central row (ChatList + MessagePane) is replaced by the modal box.
+  // Ink has no z-index so this is the closest "overlay" we can do.
+  //
+  // windowHeight: 0 means "fill the terminal" - we resolve to the live
+  // stdout.rows count so the layout pins to terminal height (height="100%"
+  // shrinks with content, which makes the box jump when switching between
+  // chats with different message counts). Any other value is an explicit
+  // row count, useful when the user wants to keep prior terminal
+  // scrollback visible above the app.
+  const heightProp: number = windowHeight > 0 ? windowHeight : terminalRows
+
   return (
-    <Box flexDirection="column" height="100%">
+    <Box flexDirection="column" height={heightProp}>
       <Box borderStyle="round" borderColor="gray" paddingX={1}>
         <Text bold>teaminal</Text>
         <Text color="gray">{`  conn: ${conn}`}</Text>
       </Box>
       <Box flexDirection="row" flexGrow={1}>
-        <Box width={LIST_PANE_WIDTH} borderStyle="round" borderColor="gray">
+        <Box
+          width={LIST_PANE_WIDTH}
+          flexShrink={0}
+          borderStyle="round"
+          borderColor="gray"
+        >
           <ChatList />
         </Box>
-        <Box flexGrow={1} borderStyle="round" borderColor="gray">
-          <MessagePane />
+        <Box flexGrow={1} flexShrink={1} minWidth={0} borderStyle="round" borderColor="gray">
+          {modal ? (
+            modal.kind === 'menu' ? (
+              <MenuModal />
+            ) : modal.kind === 'keybinds' ? (
+              <KeybindsModal />
+            ) : (
+              <DiagnosticsModal />
+            )
+          ) : (
+            <MessagePane />
+          )}
         </Box>
       </Box>
       <Box borderStyle="round" borderColor="gray">

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests,
   __setRunnerForTests,
+  decodeJwtClaims,
   decodeJwtExp,
   getToken,
   invalidate,
@@ -48,6 +49,25 @@ describe('decodeJwtExp', () => {
   test('throws when exp is not a number', () => {
     const jwt = makeJwt({ exp: 'soon' })
     expect(() => decodeJwtExp(jwt)).toThrow(/missing or non-numeric exp/)
+  })
+})
+
+describe('decodeJwtClaims', () => {
+  test('returns the payload object verbatim', () => {
+    const jwt = makeJwt({
+      exp: FAR_FUTURE,
+      tid: '11111111-2222-3333-4444-555555555555',
+      scp: 'Chat.Read Channel.ReadBasic.All',
+      upn: 'a@b.com',
+    })
+    const claims = decodeJwtClaims(jwt)
+    expect(claims.tid).toBe('11111111-2222-3333-4444-555555555555')
+    expect(claims.scp).toBe('Chat.Read Channel.ReadBasic.All')
+    expect(claims.upn).toBe('a@b.com')
+  })
+
+  test('throws on a malformed token', () => {
+    expect(() => decodeJwtClaims('only.two')).toThrow(OwaPiggyError)
   })
 })
 

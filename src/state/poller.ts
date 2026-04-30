@@ -24,7 +24,7 @@
 // Focus change wakes the active loop's interruptable sleep and aborts any
 // in-flight active fetch so opening a chat is responsive even mid-poll.
 
-import { listChats, listMessages } from '../graph/chats'
+import { getChat, listChats, listMessages } from '../graph/chats'
 import { GraphError, RateLimitError } from '../graph/client'
 import { getMyPresence } from '../graph/presence'
 import { listChannelMessages, listChannels, listJoinedTeams } from '../graph/teams'
@@ -122,6 +122,23 @@ export function mergeWithOptimistic(
     }
   }
   return [...server, ...carry]
+}
+
+// /chats does not return members on the bulk list call ($expand=members is
+// capped at 25 with a different shape). Each list-poll iteration would
+// therefore overwrite previously-hydrated members with undefined and chat
+// labels would flip back to "(1:1)". Carry forward members from the prior
+// store snapshot so labels stay stable.
+export function mergeChatMembers(prev: Chat[], next: Chat[]): Chat[] {
+  if (prev.length === 0) return next
+  const prevById = new Map(prev.map((c) => [c.id, c]))
+  return next.map((c) => {
+    const p = prevById.get(c.id)
+    if (p?.members && p.members.length > 0 && (!c.members || c.members.length === 0)) {
+      return { ...c, members: p.members }
+    }
+    return c
+  })
 }
 
 type Sleeper = {
@@ -349,6 +366,52 @@ export function startPoller(opts: PollerOpts): PollerHandle {
   const prevPreviewIds = new Map<string, string>()
   let firstListPoll = true
 
+  // Tracks chat IDs we've already issued a getChat($expand=members) call
+  // for; once a chat is hydrated its members are carried forward via
+  // mergeChatMembers, so re-fetching on every list poll is wasted work.
+  const memberHydrated = new Set<string>()
+  const hydrateAbort = new AbortController()
+
+  // Background member hydration. /chats does not return members on the
+  // bulk list; without this, every 1:1 row would render as "(1:1)" until
+  // focused. Runs after each list poll, capped concurrency, no-op once
+  // every chat has been seen.
+  async function hydrateMissingMembers(chats: Chat[]): Promise<void> {
+    const targets = chats.filter((c) => {
+      if (memberHydrated.has(c.id)) return false
+      if (c.topic) return false // group chat with explicit topic uses topic as label
+      if (c.members && c.members.length > 0) return false
+      return true
+    })
+    if (targets.length === 0) return
+    const CONCURRENCY = 5
+    for (let i = 0; i < targets.length; i += CONCURRENCY) {
+      if (stopped || hydrateAbort.signal.aborted) return
+      const batch = targets.slice(i, i + CONCURRENCY)
+      await Promise.all(
+        batch.map(async (chat) => {
+          try {
+            const full = await getChat(chat.id, {
+              members: true,
+              signal: hydrateAbort.signal,
+            })
+            memberHydrated.add(chat.id)
+            if (full.members && full.members.length > 0) {
+              store.set((s) => ({
+                chats: s.chats.map((c) =>
+                  c.id === chat.id ? { ...c, members: full.members } : c,
+                ),
+              }))
+            }
+          } catch (err) {
+            if (isAbortError(err)) return
+            reportError('list', err)
+          }
+        }),
+      )
+    }
+  }
+
   async function runListLoop(): Promise<void> {
     let consecutiveErrors = 0
     // Bookkeeping AbortController per iteration so stop() can cancel.
@@ -361,11 +424,18 @@ export function startPoller(opts: PollerOpts): PollerHandle {
           fetchTeamsAndChannels(listAbort.signal),
         ])
         if (stopped) return
-        store.set({
-          chats,
+        store.set((s) => ({
+          chats: mergeChatMembers(s.chats, chats),
           teams: teamsAndChannels.teams,
           channelsByTeam: teamsAndChannels.channelsByTeam,
           conn: 'online',
+          lastListPollAt: new Date(),
+        }))
+
+        // Fire-and-forget: don't block the next list-poll iteration on
+        // member hydration. Concurrency-capped inside the function.
+        hydrateMissingMembers(chats).catch((err) => {
+          if (!isAbortError(err)) reportError('list', err)
         })
 
         const myId = store.get().me?.id
@@ -440,6 +510,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
       stopped = true
       unsubscribe()
       activeAbort?.abort()
+      hydrateAbort.abort()
       activeSleeper.wake()
       listSleeper.wake()
       presenceSleeper.wake()

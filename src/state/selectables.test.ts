@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { Chat, Team, Channel } from '../types'
-import { buildSelectableList, chatLabel, clampCursor, itemMatchesFilter } from './selectables'
+import { buildSelectableList, chatLabel, clampCursor, itemMatchesFilter, shortName } from './selectables'
 import { initialAppState } from './store'
 
 const team = (id: string, displayName: string): Team => ({ id, displayName })
@@ -102,6 +102,35 @@ describe('chatLabel', () => {
     expect(chatLabel(chat('c', { chatType: 'group' }))).toBe('(group)')
     expect(chatLabel(chat('c', { chatType: 'meeting' }))).toBe('(chat)')
   })
+
+  test('compact mode returns first name only for 1:1 chats', () => {
+    const c = chat('c', {
+      chatType: 'oneOnOne',
+      members: [
+        { id: 'm1', userId: 'me', displayName: 'Me' },
+        { id: 'm2', userId: 'other', displayName: 'Nordling, Finn Saethre' },
+      ],
+    })
+    expect(chatLabel(c, 'me', { compact: true })).toBe('Finn')
+    expect(chatLabel(c, 'me')).toBe('Nordling, Finn Saethre')
+  })
+
+  test('compact mode shortens each member in groups', () => {
+    const c = chat('c', {
+      chatType: 'group',
+      members: [
+        { id: 'm1', userId: 'me', displayName: 'Me' },
+        { id: 'm2', userId: 'a', displayName: 'Aas, Anna' },
+        { id: 'm3', userId: 'b', displayName: 'Bjorn Hansen' },
+        { id: 'm4', userId: 'c', displayName: 'Carlsen, Carl' },
+      ],
+    })
+    expect(chatLabel(c, 'me', { compact: true })).toBe('Anna, Bjorn, +1')
+  })
+
+  test('compact mode does not change topic-driven labels', () => {
+    expect(chatLabel(chat('c', { topic: 'Standup' }), undefined, { compact: true })).toBe('Standup')
+  })
 })
 
 describe('clampCursor', () => {
@@ -151,5 +180,32 @@ describe('itemMatchesFilter', () => {
     }
     expect(itemMatchesFilter(item, 'gen')).toBe(true)
     expect(itemMatchesFilter(item, 'random')).toBe(false)
+  })
+})
+
+describe('shortName', () => {
+  test('takes the part after the comma in "Surname, First Last"', () => {
+    expect(shortName('Nordling, Finn Saethre')).toBe('Finn')
+    expect(shortName('Damsleth, Carl Joakim')).toBe('Carl')
+  })
+
+  test('returns the first word when not comma-formatted', () => {
+    expect(shortName('Carl Damsleth')).toBe('Carl')
+    expect(shortName('Maria de la Cruz')).toBe('Maria')
+  })
+
+  test('returns the whole name when single-word', () => {
+    expect(shortName('Mononym')).toBe('Mononym')
+  })
+
+  test('handles missing or empty input', () => {
+    expect(shortName(undefined)).toBe('?')
+    expect(shortName(null)).toBe('?')
+    expect(shortName('')).toBe('?')
+    expect(shortName('   ')).toBe('?')
+  })
+
+  test('preserves diacritics', () => {
+    expect(shortName('Mørch, Gustav Meyer')).toBe('Gustav')
   })
 })

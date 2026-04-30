@@ -13,12 +13,15 @@ import { Box, Text } from 'ink'
 import { useRef } from 'react'
 import {
   buildSelectableList,
+  chatLabel,
   clampCursor,
   itemMatchesFilter,
   type SelectableItem,
 } from '../state/selectables'
-import { theme } from './theme'
-import { useAppState } from './StoreContext'
+import type { ChatListDensity } from '../state/store'
+import type { Presence } from '../types'
+import { useAppState, useTheme } from './StoreContext'
+import type { PresenceColorKey, Theme } from './theme'
 
 const ROWS_VISIBLE = 18
 
@@ -27,7 +30,7 @@ type Row =
   | { kind: 'item'; item: SelectableItem; index: number }
   | { kind: 'spacer' }
 
-function buildRows(items: SelectableItem[]): Row[] {
+function buildRows(items: SelectableItem[], density: ChatListDensity): Row[] {
   const rows: Row[] = []
   let firstChatEmitted = false
   let lastTeamId: string | null = null
@@ -38,7 +41,9 @@ function buildRows(items: SelectableItem[]): Row[] {
       firstChatEmitted = true
     }
     if (it.kind === 'team') {
-      if (rows.length > 0) rows.push({ kind: 'spacer' })
+      // 'cozy' density: blank row between Chats and Teams sections.
+      // 'compact': skip the spacer so more rows fit in the viewport.
+      if (rows.length > 0 && density === 'cozy') rows.push({ kind: 'spacer' })
       rows.push({ kind: 'header', label: 'Teams' })
       lastTeamId = it.team.id
     }
@@ -52,8 +57,12 @@ function buildRows(items: SelectableItem[]): Row[] {
   return rows
 }
 
-function rowLabel(item: SelectableItem): string {
-  if (item.kind === 'chat') return item.label
+function rowLabel(item: SelectableItem, myUserId?: string, shortNames = false): string {
+  // Chat rows respect the user's `chatListShortNames` setting. Default
+  // (false) renders the full member display name; turning it on
+  // collapses to first names. The MessagePane header always uses the
+  // full form regardless.
+  if (item.kind === 'chat') return chatLabel(item.chat, myUserId, { compact: shortNames })
   if (item.kind === 'team') return item.team.displayName
   return `# ${item.label}`
 }
@@ -62,6 +71,27 @@ function rowIndent(item: SelectableItem): string {
   if (item.kind === 'channel') return '    '
   if (item.kind === 'team') return '  '
   return '  '
+}
+
+// Presence dot for the "other" 1:1 chat member (or null when not a 1:1
+// or when the user has hidden presence). Green/yellow/red/gray per theme.
+function presenceForChatItem(
+  item: SelectableItem,
+  myUserId: string | undefined,
+  memberPresence: Record<string, Presence>,
+  theme: Theme,
+): { dot: string; color: string } | null {
+  if (item.kind !== 'chat') return null
+  const chat = item.chat
+  if (chat.chatType !== 'oneOnOne') return null
+  const other = (chat.members ?? []).find((m) => m.userId && m.userId !== myUserId)
+  const userId = other?.userId
+  if (!userId) return null
+  const p = memberPresence[userId]
+  if (!p) return null
+  const key = p.availability as PresenceColorKey
+  const color = theme.presence[key] ?? theme.presence.PresenceUnknown
+  return { dot: '●', color }
 }
 
 export function ChatList() {
@@ -73,6 +103,11 @@ export function ChatList() {
   const conn = useAppState((s) => s.conn)
   const filter = useAppState((s) => s.filter)
   const inputZone = useAppState((s) => s.inputZone)
+  const density = useAppState((s) => s.settings.chatListDensity)
+  const shortNames = useAppState((s) => s.settings.chatListShortNames)
+  const showPresence = useAppState((s) => s.settings.showPresenceInList)
+  const memberPresence = useAppState((s) => s.memberPresence)
+  const theme = useTheme()
 
   // Build selectables from individual slices so the hook only re-runs on
   // the data we actually depend on. (useAppState's selectors guarantee
@@ -82,7 +117,7 @@ export function ChatList() {
   const items = filter ? all.filter((i) => itemMatchesFilter(i, filter)) : all
 
   const safeCursor = clampCursor(cursor, items.length)
-  const rows = buildRows(items)
+  const rows = buildRows(items, density)
 
   // Find the visual index of the row holding the cursor item, then keep it
   // on-screen by sliding a window of size ROWS_VISIBLE.
@@ -144,10 +179,17 @@ export function ChatList() {
         const isSelected = row.index === safeCursor
         const indent = rowIndent(row.item)
         const marker = isSelected ? '>' : ' '
-        const label = rowLabel(row.item)
+        const label = rowLabel(row.item, me?.id, shortNames)
+        const presence = showPresence
+          ? presenceForChatItem(row.item, me?.id, memberPresence, theme)
+          : null
+        // Reserve 2 chars for the presence column when enabled so labels
+        // align across rows that do/don't have a dot.
+        const presencePad = showPresence ? 2 : 0
+        const labelBudget = 24 - indent.length - presencePad
         const truncated =
-          label.length > 24 - indent.length
-            ? label.slice(0, 24 - indent.length - 1) + '…'
+          label.length > labelBudget
+            ? label.slice(0, Math.max(0, labelBudget - 1)) + '…'
             : label
         return (
           <Text
@@ -155,7 +197,15 @@ export function ChatList() {
             color={isSelected ? theme.selected : undefined}
             bold={isSelected}
           >
-            {`${marker}${indent.slice(1)}${truncated}`}
+            {`${marker}${indent.slice(1)}`}
+            {showPresence ? (
+              presence ? (
+                <Text color={presence.color}>{`${presence.dot} `}</Text>
+              ) : (
+                <Text>{'  '}</Text>
+              )
+            ) : null}
+            {truncated}
           </Text>
         )
       })}

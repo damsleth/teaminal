@@ -22,6 +22,23 @@ teaminal is a lightweight terminal Microsoft Teams client written in TypeScript.
 2. **Polling, not pushing:** All data freshness comes from `src/state/poller.ts`. UI components never call `src/graph/*` directly; they read from the store.
 3. **Auth boundary:** Only `src/auth/owaPiggy.ts` spawns subprocesses. Only `src/graph/client.ts` injects `Authorization` headers.
 
+## Release Hygiene
+
+After every meaningful set of changes (new feature, bug fix that affects users, breaking change, security fix):
+
+1. **Update `CHANGELOG.md`** under the `## [Unreleased]` section. Follow the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format with `Added` / `Changed` / `Fixed` / `Removed` / `Security` subsections. Internal refactors with no user-facing impact don't need an entry.
+2. **Bump the version** in both `package.json` (`"version"`) and `bin/teaminal.tsx` (`const VERSION`) following [Semantic Versioning](https://semver.org/):
+   - `MAJOR` for breaking CLI / config / behavior changes
+   - `MINOR` for new user-facing features
+   - `PATCH` for bug fixes and tightening
+3. **Promote the Unreleased section** to the new version on tagged releases: rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add a fresh empty `## [Unreleased]` above it, and update the comparison links at the bottom.
+
+Trivial commits (typo fixes, comment-only edits, README polish) do not need a changelog entry or version bump.
+
+## Repo Conventions
+
+- **`.plans/` is gitignored on purpose.** It holds private planning notes, status reports, and TODO scratchpads that should not be published to the repo. Do not remove `.plans/` from `.gitignore`. If you need to share a plan, copy the relevant content into a tracked doc (CHANGELOG, README, ADR) instead of un-ignoring the directory.
+
 ## Code Patterns
 
 ### Do This

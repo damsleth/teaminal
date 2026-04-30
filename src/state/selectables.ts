@@ -37,19 +37,30 @@ export function buildSelectableList(state: SelectableInput): SelectableItem[] {
 //   1. The user-set topic, if any.
 //   2. Hydrated members - "Other Person" for 1:1, "A, B, +N" for groups.
 //   3. A typed fallback so the row is at least navigable.
-export function chatLabel(chat: Chat, myUserId?: string): string {
+//
+// `compact` runs each member's displayName through `shortName` (first
+// name only). The sidebar uses compact; the message-pane header uses
+// the full form so users can disambiguate "Carl Damsleth" from
+// "Carl Joakim Damsleth" / "Carl Boberg" at a glance.
+export function chatLabel(
+  chat: Chat,
+  myUserId?: string,
+  opts?: { compact?: boolean },
+): string {
+  const compact = opts?.compact ?? false
+  const fmt = (n: string | null | undefined): string =>
+    compact ? shortName(n) : (n ?? '?')
+
   if (chat.topic) return chat.topic
   const others = (chat.members ?? []).filter((m) => m.userId !== myUserId)
-  if (others.length === 1) return others[0]?.displayName ?? '(unknown)'
+  if (others.length === 1) {
+    return compact ? shortName(others[0]?.displayName) : others[0]?.displayName ?? '(unknown)'
+  }
   if (others.length === 2) {
-    const a = others[0]?.displayName ?? '?'
-    const b = others[1]?.displayName ?? '?'
-    return `${a}, ${b}`
+    return `${fmt(others[0]?.displayName)}, ${fmt(others[1]?.displayName)}`
   }
   if (others.length > 2) {
-    const first = others[0]?.displayName ?? '?'
-    const second = others[1]?.displayName ?? '?'
-    return `${first}, ${second}, +${others.length - 2}`
+    return `${fmt(others[0]?.displayName)}, ${fmt(others[1]?.displayName)}, +${others.length - 2}`
   }
   // Fall back to chat type when we have nothing else (members not hydrated yet)
   return chat.chatType === 'oneOnOne' ? '(1:1)' : chat.chatType === 'group' ? '(group)' : '(chat)'
@@ -62,6 +73,23 @@ export function clampCursor(cursor: number, listLength: number): number {
   if (cursor < 0) return 0
   if (cursor >= listLength) return listLength - 1
   return cursor
+}
+
+// Short, message-row-friendly form of a display name. Strategy:
+//   1. If formatted "Surname, Firstname [Middle...]" (common in corporate
+//      AD), take the part after the comma. Otherwise use the name as-is.
+//   2. Take the first whitespace-separated token from that.
+// "Nordling, Finn Saethre" -> "Finn"; "Carl Damsleth" -> "Carl".
+// Used in MessagePane so message rows show "Finn" / "Carl" instead of
+// truncated "Nordling, Finn ..." / "Damsleth, Carl ..." columns.
+export function shortName(displayName: string | null | undefined): string {
+  if (!displayName) return '?'
+  const trimmed = displayName.trim()
+  if (!trimmed) return '?'
+  const commaIdx = trimmed.indexOf(',')
+  const afterSurname = commaIdx >= 0 ? trimmed.slice(commaIdx + 1).trim() : trimmed
+  const first = afterSurname.split(/\s+/)[0]
+  return first || trimmed
 }
 
 // Case-insensitive substring match against the displayed label (chat

@@ -86,8 +86,50 @@ export type ConnectionState =
 //   list     - cursor navigation in ChatList
 //   composer - text editing in Composer
 //   filter   - typing into the chat-list filter buffer
+//   menu     - navigating the modal pause-menu (MenuModal owns input)
 // Distinct from `focus` (which conv is open).
-export type InputZone = 'list' | 'composer' | 'filter'
+export type InputZone = 'list' | 'composer' | 'filter' | 'menu'
+
+// Active modal overlay. When set, App renders the modal in the central pane
+// area (replacing chat list + message pane) and inputZone is 'menu'. Add
+// new `kind` variants here when introducing more modal surfaces.
+export type ModalState =
+  | { kind: 'menu'; path: string[]; cursor: number }
+  | { kind: 'keybinds' }
+  | { kind: 'diagnostics' }
+
+export type ThemeMode = 'dark' | 'light'
+export type ChatListDensity = 'cozy' | 'compact'
+
+// Window height is the number of terminal rows teaminal renders into.
+// 0 is the sentinel for "fill the terminal" (height="100%"). The menu
+// cycles through a small preset list; bespoke values can be added by
+// extending WINDOW_HEIGHT_PRESETS in src/ui/menu.ts.
+export type WindowHeight = number
+
+export type Settings = {
+  theme: ThemeMode
+  chatListDensity: ChatListDensity
+  // When true, sidebar chat rows render the first name only ("Finn",
+  // "Anna, Bjorn, +1") instead of the full corporate-AD form
+  // ("Nordling, Finn Saethre"). The MessagePane header always uses the
+  // full form regardless. Default false (full names) so disambiguation
+  // is preserved out of the box; users with mostly-internal contacts
+  // can flip this on.
+  chatListShortNames: boolean
+  showPresenceInList: boolean
+  showTimestampsInPane: boolean
+  windowHeight: WindowHeight
+}
+
+export const defaultSettings: Settings = {
+  theme: 'dark',
+  chatListDensity: 'cozy',
+  chatListShortNames: false,
+  showPresenceInList: true,
+  showTimestampsInPane: true,
+  windowHeight: 0,
+}
 
 export type AppState = {
   me?: Me
@@ -110,6 +152,15 @@ export type AppState = {
   // Keyed by user id, populated only for currently visible chat members.
   memberPresence: Record<string, Presence>
   conn: ConnectionState
+  // Active modal overlay (e.g. pause menu). null = no modal.
+  modal: ModalState | null
+  // User-tunable display preferences. Persisted to disk later (TODO);
+  // for now just in-process.
+  settings: Settings
+  // Wall-clock timestamp of the last successful list-poll. Drives the
+  // "updated Ns ago" hint in the StatusBar; undefined while we have not
+  // yet completed an initial poll.
+  lastListPollAt?: Date
 }
 
 export function initialAppState(): AppState {
@@ -124,6 +175,8 @@ export function initialAppState(): AppState {
     filter: '',
     memberPresence: {},
     conn: 'connecting',
+    modal: null,
+    settings: { ...defaultSettings },
   }
 }
 

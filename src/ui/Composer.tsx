@@ -23,8 +23,7 @@ import { sendMessage } from '../graph/chats'
 import { sendChannelMessage } from '../graph/teams'
 import { focusKey } from '../state/store'
 import type { ChatMessage } from '../types'
-import { useAppState, useAppStore } from './StoreContext'
-import { theme } from './theme'
+import { useAppState, useAppStore, useTheme } from './StoreContext'
 
 function makeTempId(): string {
   return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -35,6 +34,7 @@ export function Composer() {
   const { isRawModeSupported } = useStdin()
   const focus = useAppState((s) => s.focus)
   const inputZone = useAppState((s) => s.inputZone)
+  const theme = useTheme()
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
 
