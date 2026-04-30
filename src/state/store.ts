@@ -381,6 +381,17 @@ export function setMessageCursor(
   }
 }
 
+// Real-time transport connection state, shown in the header bar.
+export type RealtimeState = 'off' | 'connecting' | 'connected' | 'reconnecting' | 'error'
+
+// Per-user typing indicator with expiry timestamp.
+export type TypingIndicator = {
+  userId: string
+  displayName: string
+  /** Date.now() when the indicator was last refreshed. */
+  startedAt: number
+}
+
 export type AppState = {
   me?: Me
   capabilities?: Capabilities
@@ -407,6 +418,12 @@ export type AppState = {
   // Keyed by user id, populated only for currently visible chat members.
   memberPresence: Record<string, Presence>
   conn: ConnectionState
+  // Real-time push transport state. 'off' when not configured or not
+  // attempted; other values reflect the trouter/SSE connection lifecycle.
+  realtimeState: RealtimeState
+  // Active typing indicators per conversation, keyed by ConvKey.
+  // Entries expire after ~8s of inactivity (cleaned by a timer).
+  typingByConvo: Record<ConvKey, TypingIndicator[]>
   // Active modal overlay (e.g. pause menu). null = no modal.
   modal: ModalState | null
   // User-tunable display preferences. Persisted to disk later (TODO);
@@ -433,6 +450,8 @@ export function initialAppState(): AppState {
     filter: '',
     memberPresence: {},
     conn: 'connecting',
+    realtimeState: 'off',
+    typingByConvo: {},
     modal: null,
     settings: { ...defaultSettings },
   }

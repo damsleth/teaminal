@@ -6,8 +6,12 @@ import { probeCapabilities } from '../src/graph/capabilities'
 import { setActiveProfile } from '../src/graph/client'
 import { getMe } from '../src/graph/me'
 import { notifyMention } from '../src/notify/notify'
+import { RealtimeEventBus } from '../src/realtime/events'
+import { TrouterTransport } from '../src/realtime/trouter'
 import { startPoller } from '../src/state/poller'
+import { startRealtimeBridge } from '../src/state/realtimeBridge'
 import { createAppStore } from '../src/state/store'
+import { getToken } from '../src/auth/owaPiggy'
 import { App } from '../src/ui/App'
 import { ErrorBoundary } from '../src/ui/ErrorBoundary'
 import { htmlToText } from '../src/ui/html'
@@ -15,7 +19,7 @@ import { PollerProvider, type PollerHandleRef } from '../src/ui/PollerContext'
 import { StoreProvider } from '../src/ui/StoreContext'
 import { debug, warn } from '../src/log'
 
-const VERSION = '0.5.0'
+const VERSION = '0.6.0'
 
 const HELP = `teaminal ${VERSION}
 
@@ -156,7 +160,48 @@ const ink = render(
     })
     pollerHandleRef.current = handle
 
+    // Real-time push layer (Option E hybrid). The event bus and bridge
+    // run immediately; the trouter transport connects in the background.
+    // If trouter fails, the app degrades to polling-only — no user-facing
+    // error beyond the header indicator changing from green to gray.
+    debug('bootstrap: startRealtimeBridge()')
+    const bus = new RealtimeEventBus()
+    const bridge = startRealtimeBridge({
+      bus,
+      store,
+      getPoller: () => pollerHandleRef.current,
+    })
+
+    debug('bootstrap: trouter transport')
+    const transport = new TrouterTransport({
+      bus,
+      getToken: () => getToken(profile),
+      profile,
+    })
+    transport.onStateChange((state) => {
+      debug('trouter: state ->', state)
+      store.set({
+        realtimeState:
+          state === 'disconnected'
+            ? 'off'
+            : state === 'connecting'
+              ? 'connecting'
+              : state === 'connected'
+                ? 'connected'
+                : state === 'reconnecting'
+                  ? 'reconnecting'
+                  : 'error',
+      })
+    })
+    // Connect in the background — never block the main bootstrap.
+    transport.connect().catch((err) => {
+      warn('trouter: initial connect failed:', err instanceof Error ? err.message : String(err))
+    })
+
     await ink.waitUntilExit()
+    transport.disconnect()
+    bridge.stop()
+    bus.clear()
     pollerHandleRef.current = null
     await handle.stop()
   } catch (err) {

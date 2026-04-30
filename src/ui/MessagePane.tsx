@@ -8,7 +8,7 @@
 
 import { Box, Text } from 'ink'
 import { chatLabel, shortName } from '../state/selectables'
-import { focusKey } from '../state/store'
+import { focusKey, type TypingIndicator } from '../state/store'
 import type { Chat, ChatMessage, Channel, Team } from '../types'
 import { htmlToText } from './html'
 import {
@@ -19,6 +19,8 @@ import {
 } from './messageRows'
 import type { Theme } from './theme'
 import { useAppState, useTheme } from './StoreContext'
+
+const TYPING_DOT = '…'
 
 const ROWS_VISIBLE = 20
 // Narrow column - message rows show first name / nick only. The chat /
@@ -41,6 +43,7 @@ export function MessagePane(props: {
   const density = useAppState((s) => s.settings.chatListDensity)
   const focusIndicatorVisible = useAppState((s) => s.settings.messageFocusIndicatorEnabled)
   const focusIndicatorChar = useAppState((s) => s.settings.messageFocusIndicatorChar)
+  const typingByConvo = useAppState((s) => s.typingByConvo)
   const theme = useTheme()
 
   if (focus.kind === 'list') {
@@ -83,27 +86,30 @@ export function MessagePane(props: {
         {messages.length === 0 ? (
           <Text color="gray"> loading...</Text>
         ) : (
-          rows.map((row) => (
-            <TimelineRow
-              key={
-                row.kind === 'message'
-                  ? row.message.id
-                  : row.kind === 'date'
-                    ? row.key
-                    : 'load-more'
-              }
-              row={row}
-              focused={
-                row.kind === 'message' &&
-                showFocusIndicator &&
-                row.message.id === props.focusedMessageId
-              }
-              focusIndicatorChar={focusIndicatorChar}
-              myUserId={me?.id}
-              showTimestamp={showTimestamps}
-              theme={theme}
-            />
-          ))
+          <>
+            {rows.map((row) => (
+              <TimelineRow
+                key={
+                  row.kind === 'message'
+                    ? row.message.id
+                    : row.kind === 'date'
+                      ? row.key
+                      : 'load-more'
+                }
+                row={row}
+                focused={
+                  row.kind === 'message' &&
+                  showFocusIndicator &&
+                  row.message.id === props.focusedMessageId
+                }
+                focusIndicatorChar={focusIndicatorChar}
+                myUserId={me?.id}
+                showTimestamp={showTimestamps}
+                theme={theme}
+              />
+            ))}
+            <TypingLine typing={conv ? (typingByConvo[conv] ?? []) : []} theme={theme} />
+          </>
         )}
       </Box>
     </Box>
@@ -248,6 +254,21 @@ function visibleStart(total: number, focusedIndex: number, focusActive: boolean)
   if (preferred < 0) return 0
   if (preferred > total - ROWS_VISIBLE) return total - ROWS_VISIBLE
   return preferred
+}
+
+function TypingLine(props: { typing: TypingIndicator[]; theme: Theme }) {
+  if (props.typing.length === 0) return null
+  const names = props.typing.map((t) => shortName(t.displayName))
+  const text =
+    names.length === 1
+      ? `${names[0]} is typing${TYPING_DOT}`
+      : `${names.join(', ')} are typing${TYPING_DOT}`
+  return (
+    <Box>
+      <Box width={2} flexShrink={0} />
+      <Text color={props.theme.mutedText}>{text}</Text>
+    </Box>
+  )
 }
 
 function headerForFocus(
