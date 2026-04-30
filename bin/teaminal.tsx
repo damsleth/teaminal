@@ -15,7 +15,7 @@ import { PollerProvider, type PollerHandleRef } from '../src/ui/PollerContext'
 import { StoreProvider } from '../src/ui/StoreContext'
 import { debug, warn } from '../src/log'
 
-const VERSION = '0.4.0'
+const VERSION = '0.5.0'
 
 const HELP = `teaminal ${VERSION}
 
@@ -91,13 +91,14 @@ if (!process.stdin.isTTY) {
 }
 
 const store = createAppStore()
-if (profile) setActiveProfile(profile)
 
 // Load user preferences from ~/.config/teaminal/config.json (or
 // $XDG_CONFIG_HOME/teaminal/config.json). Missing file = defaults; any
 // validation warnings go to stderr under TEAMINAL_DEBUG.
 const configResult = loadSettings()
 store.set({ settings: configResult.settings })
+if (profile) setActiveProfile(profile)
+else if (configResult.settings.activeAccount) setActiveProfile(configResult.settings.activeAccount)
 if (configResult.source === 'file') {
   debug(`config: loaded from ${configResult.path}`)
 }

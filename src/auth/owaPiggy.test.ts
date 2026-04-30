@@ -6,7 +6,9 @@ import {
   decodeJwtExp,
   getToken,
   invalidate,
+  listProfilesFromStatus,
   OwaPiggyError,
+  parseStatusProfiles,
 } from './owaPiggy'
 
 function makeJwt(payload: Record<string, unknown>): string {
@@ -268,5 +270,131 @@ describe('invalidate', () => {
     await getToken('work') // re-spawn
     await getToken('home') // still cached
     expect(calls).toBe(3)
+  })
+})
+
+describe('parseStatusProfiles', () => {
+  test('parses a single-profile status stdout using the fallback profile name', () => {
+    const profiles = parseStatusProfiles(
+      [
+        'authtoken:    expires 2026-04-30T11:46:51Z',
+        'audience:     graph (00000003-0000-0000-c000-000000000000)',
+        'scope(s):     Chat.Read, Chat.ReadWrite, User.Read',
+        'refreshtoken: expires 2026-05-01T09:30:00Z',
+      ].join('\n'),
+      'work',
+    )
+    expect(profiles).toEqual([
+      {
+        profile: 'work',
+        valid: true,
+        accessTokenExpiresAt: '2026-04-30T11:46:51Z',
+        audience: 'graph (00000003-0000-0000-c000-000000000000)',
+        scopeSummary: 'Chat.Read, Chat.ReadWrite, User.Read',
+        scopes: ['Chat.Read', 'Chat.ReadWrite', 'User.Read'],
+        refreshTokenExpiresAt: '2026-05-01T09:30:00Z',
+      },
+    ])
+  })
+
+  test('parses multi-profile status stdout with valid and invalid profiles', () => {
+    const profiles = parseStatusProfiles(
+      [
+        '[profile=work]',
+        'authtoken:    expires 2026-04-30T11:46:51Z',
+        'audience:     graph (00000003-0000-0000-c000-000000000000)',
+        'scope(s):     Calendars.ReadWrite, Mail.ReadWrite, Files.ReadWrite, ... (74 scopes)',
+        'refreshtoken: expires unknown (run `owa-piggy reseed` to establish)',
+        '',
+        '[profile=personal]',
+        'no valid token',
+        'ERROR: AADSTS700084: refresh token expired',
+      ].join('\n'),
+    )
+    expect(profiles).toHaveLength(2)
+    expect(profiles[0]).toMatchObject({
+      profile: 'work',
+      valid: true,
+      accessTokenExpiresAt: '2026-04-30T11:46:51Z',
+      refreshTokenExpiresAt: 'unknown (run `owa-piggy reseed` to establish)',
+    })
+    expect(profiles[0]?.scopes).toEqual([
+      'Calendars.ReadWrite',
+      'Mail.ReadWrite',
+      'Files.ReadWrite',
+    ])
+    expect(profiles[1]).toMatchObject({
+      profile: 'personal',
+      valid: false,
+      error: 'AADSTS700084: refresh token expired',
+    })
+  })
+
+  test('returns an empty array for empty stdout', () => {
+    expect(parseStatusProfiles('')).toEqual([])
+  })
+})
+
+describe('listProfilesFromStatus', () => {
+  test('runs owa-piggy status with graph audience and parses stdout', async () => {
+    let seenArgs: string[] = []
+    __setRunnerForTests(async (args) => {
+      seenArgs = args
+      return {
+        stdout: [
+          '[profile=work]',
+          'authtoken:    expires 2026-04-30T11:46:51Z',
+          'audience:     graph (00000003-0000-0000-c000-000000000000)',
+          'scope(s):     Chat.Read',
+          'refreshtoken: expires 2026-05-01T09:30:00Z',
+        ].join('\n'),
+        stderr: '',
+        exitCode: 0,
+      }
+    })
+    const profiles = await listProfilesFromStatus()
+    expect(seenArgs).toEqual(['status', '--audience', 'graph'])
+    expect(seenArgs).not.toContain('--json')
+    expect(profiles.map((x) => x.profile)).toEqual(['work'])
+    expect(profiles[0]?.valid).toBe(true)
+  })
+
+  test('passes --profile for single-profile status', async () => {
+    let seenArgs: string[] = []
+    __setRunnerForTests(async (args) => {
+      seenArgs = args
+      return {
+        stdout: [
+          'authtoken:    expires 2026-04-30T11:46:51Z',
+          'audience:     graph (00000003-0000-0000-c000-000000000000)',
+          'scope(s):     Chat.Read',
+          'refreshtoken: expires 2026-05-01T09:30:00Z',
+        ].join('\n'),
+        stderr: '[profile=work]',
+        exitCode: 0,
+      }
+    })
+    const profiles = await listProfilesFromStatus({ profile: 'work' })
+    expect(seenArgs).toEqual(['status', '--audience', 'graph', '--profile', 'work'])
+    expect(profiles[0]?.profile).toBe('work')
+  })
+
+  test('returns parsed invalid profiles even when owa-piggy exits non-zero', async () => {
+    __setRunnerForTests(async () => ({
+      stdout: ['[profile=expired]', 'no valid token'].join('\n'),
+      stderr: '',
+      exitCode: 1,
+    }))
+    const profiles = await listProfilesFromStatus()
+    expect(profiles).toEqual([{ profile: 'expired', valid: false }])
+  })
+
+  test('throws with stderr when status exits non-zero without parseable stdout', async () => {
+    __setRunnerForTests(async () => ({
+      stdout: '',
+      stderr: 'no profiles configured. Run: owa-piggy setup --profile <alias>',
+      exitCode: 1,
+    }))
+    await expect(listProfilesFromStatus()).rejects.toThrow(/no profiles configured/)
   })
 })

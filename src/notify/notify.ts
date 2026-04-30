@@ -26,10 +26,7 @@ export function bell(): void {
 // quoted literal. Apple uses backslash escapes; we handle backslash and
 // double-quote, plus newlines (which AppleScript represents with \n).
 export function escapeAppleScript(s: string): string {
-  return s
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\r?\n/g, '\\n')
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r?\n/g, '\\n')
 }
 
 export type SpawnFn = (cmd: string, args: string[]) => Promise<{ exitCode: number }>

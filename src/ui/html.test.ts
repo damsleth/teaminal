@@ -67,9 +67,9 @@ describe('htmlToText', () => {
   })
 
   test('honors showLinkUrl=false to suppress URL annotation', () => {
-    expect(
-      htmlToText('<a href="https://example.com">click</a>', { showLinkUrl: false }),
-    ).toBe('click')
+    expect(htmlToText('<a href="https://example.com">click</a>', { showLinkUrl: false })).toBe(
+      'click',
+    )
   })
 
   test('falls back to href when anchor has no inner text', () => {
@@ -81,9 +81,7 @@ describe('htmlToText', () => {
   })
 
   test('strips remote image references', () => {
-    expect(
-      htmlToText('photo: <img src="https://example.com/img.png" alt="cat"/>'),
-    ).toBe('photo:')
+    expect(htmlToText('photo: <img src="https://example.com/img.png" alt="cat"/>')).toBe('photo:')
   })
 
   test('combines mentions, emoji, and anchors in one body', () => {

@@ -339,7 +339,12 @@ describe('error body parsing', () => {
     primeAuth()
     __setTransportForTests(async () =>
       jsonResponse(
-        { error: { code: 'Forbidden', message: 'Insufficient privileges to complete the operation.' } },
+        {
+          error: {
+            code: 'Forbidden',
+            message: 'Insufficient privileges to complete the operation.',
+          },
+        },
         { status: 403 },
       ),
     )
@@ -361,9 +366,7 @@ describe('error body parsing', () => {
 
   test('falls back to statusText when body is empty', async () => {
     primeAuth()
-    __setTransportForTests(
-      async () => new Response('', { status: 502, statusText: 'Bad Gateway' }),
-    )
+    __setTransportForTests(async () => new Response('', { status: 502, statusText: 'Bad Gateway' }))
     const err = await graph({ method: 'GET', path: '/anything' }).catch((e) => e)
     expect(err).toBeInstanceOf(GraphError)
     expect((err as GraphError).message).toMatch(/Bad Gateway/)

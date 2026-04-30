@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import type { Chat, Team, Channel } from '../types'
-import { buildSelectableList, chatLabel, clampCursor, itemMatchesFilter, shortName } from './selectables'
+import {
+  buildSelectableList,
+  chatLabel,
+  clampCursor,
+  itemMatchesFilter,
+  shortName,
+} from './selectables'
 import { initialAppState } from './store'
 
 const team = (id: string, displayName: string): Team => ({ id, displayName })
@@ -33,15 +39,7 @@ describe('buildSelectableList', () => {
     }
     const list = buildSelectableList(state)
     const kinds = list.map((i) => i.kind)
-    expect(kinds).toEqual([
-      'chat',
-      'chat',
-      'team',
-      'channel',
-      'channel',
-      'team',
-      'channel',
-    ])
+    expect(kinds).toEqual(['chat', 'chat', 'team', 'channel', 'channel', 'team', 'channel'])
   })
 
   test('skips archived channels', () => {
@@ -153,9 +151,7 @@ describe('clampCursor', () => {
 
 describe('itemMatchesFilter', () => {
   test('returns true for an empty filter (no narrowing)', () => {
-    expect(itemMatchesFilter({ kind: 'chat', chat: chat('c'), label: 'Anything' }, '')).toBe(
-      true,
-    )
+    expect(itemMatchesFilter({ kind: 'chat', chat: chat('c'), label: 'Anything' }, '')).toBe(true)
   })
 
   test('matches chat label case-insensitively', () => {

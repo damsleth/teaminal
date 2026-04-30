@@ -13,11 +13,7 @@ import { graph, GraphError } from './client'
 
 export type CapabilityArea = 'me' | 'chats' | 'joinedTeams' | 'presence'
 
-export type CapabilityFailureReason =
-  | 'unauthorized'
-  | 'unavailable'
-  | 'transient'
-  | 'unknown'
+export type CapabilityFailureReason = 'unauthorized' | 'unavailable' | 'transient' | 'unknown'
 
 export type CapabilityResult =
   | { ok: true }

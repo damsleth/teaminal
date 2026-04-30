@@ -7,7 +7,9 @@ import {
   resolveMenuPath,
   ROOT_MENU,
   type MenuItem,
+  updateSetting,
 } from './menu'
+import { createAppStore } from '../state/store'
 
 const enabled = (id: string, label = id): MenuItem => ({
   id,
@@ -99,6 +101,7 @@ describe('cycleSetting', () => {
     expect(cycleSetting('showPresenceInList', true)).toBe(false)
     expect(cycleSetting('showPresenceInList', false)).toBe(true)
     expect(cycleSetting('showTimestampsInPane', true)).toBe(false)
+    expect(cycleSetting('messageFocusIndicatorEnabled', true)).toBe(false)
   })
 
   test('cycles windowHeight through presets and wraps to full', () => {
@@ -111,6 +114,14 @@ describe('cycleSetting', () => {
   test('cycles windowHeight off-preset values back to the first preset', () => {
     expect(cycleSetting('windowHeight', 99)).toBe(0)
   })
+
+  test('cycles focused-message marker chars through presets', () => {
+    expect(cycleSetting('messageFocusIndicatorChar', '>')).toBe('|')
+    expect(cycleSetting('messageFocusIndicatorChar', '|')).toBe('*')
+    expect(cycleSetting('messageFocusIndicatorChar', '*')).toBe('-')
+    expect(cycleSetting('messageFocusIndicatorChar', '-')).toBe('>')
+    expect(cycleSetting('messageFocusIndicatorChar', '!')).toBe('>')
+  })
 })
 
 describe('renderSettingValue', () => {
@@ -122,11 +133,31 @@ describe('renderSettingValue', () => {
   test('renders booleans as on/off', () => {
     expect(renderSettingValue('showPresenceInList', true)).toBe('on')
     expect(renderSettingValue('showPresenceInList', false)).toBe('off')
+    expect(renderSettingValue('messageFocusIndicatorEnabled', false)).toBe('off')
   })
 
   test('renders windowHeight as "full" or "N rows"', () => {
     expect(renderSettingValue('windowHeight', 0)).toBe('full')
     expect(renderSettingValue('windowHeight', 30)).toBe('30 rows')
+  })
+
+  test('renders focused-message marker char', () => {
+    expect(renderSettingValue('messageFocusIndicatorChar', '|')).toBe('|')
+  })
+})
+
+describe('updateSetting', () => {
+  test('updates the store and calls the persistence hook with a patch', async () => {
+    const store = createAppStore()
+    const patches: unknown[] = []
+
+    await updateSetting(store, 'theme', 'light', async (patch) => {
+      patches.push(patch)
+      return store.get().settings
+    })
+
+    expect(store.get().settings.theme).toBe('light')
+    expect(patches).toEqual([{ theme: 'light' }])
   })
 })
 
@@ -143,7 +174,16 @@ describe('ROOT_MENU shape', () => {
       'showPresenceInList',
       'showTimestampsInPane',
       'windowHeight',
+      'messageFocusIndicatorEnabled',
+      'messageFocusIndicatorChar',
     ])
+  })
+
+  test('top-level account entry is renamed and scaffolded', () => {
+    const accounts = ROOT_MENU.find((i) => i.id === 'accounts')
+    expect(accounts?.label).toBe('Accounts')
+    expect(accounts?.action.kind).toBe('show-accounts')
+    expect(accounts?.disabled).toBeUndefined()
   })
 
   test('help submenu has a keybindings entry that triggers show-keybinds', () => {

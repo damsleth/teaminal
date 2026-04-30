@@ -13,12 +13,17 @@ import { useAppState, useAppStore, useTheme } from './StoreContext'
 type Binding = { keys: string; when: string; action: string }
 
 const BINDINGS: Binding[] = [
-  { keys: 'j / ↓', when: 'list', action: 'cursor down' },
-  { keys: 'k / ↑', when: 'list', action: 'cursor up' },
-  { keys: 'Enter', when: 'list', action: 'open chat / channel' },
+  { keys: 'j/J / ↓', when: 'list', action: 'cursor down' },
+  { keys: 'k/K / ↑', when: 'list', action: 'cursor up' },
+  { keys: 'L / Enter', when: 'list', action: 'open chat / channel' },
+  { keys: 'H', when: 'list', action: 'reserved back/no-op' },
+  { keys: 'N', when: 'list', action: 'new chat prompt' },
+  { keys: 'J/K / ↓↑', when: 'chat / channel', action: 'focus message' },
+  { keys: 'U/D', when: 'chat / channel', action: 'half-page messages' },
+  { keys: 'L', when: 'chat / channel', action: 'jump bottom / load older at top' },
+  { keys: 'H / Esc', when: 'chat / channel', action: 'back to chat list' },
   { keys: 'Tab', when: 'chat / channel', action: 'enter composer' },
   { keys: 'Esc', when: 'composer / filter', action: 'leave mode' },
-  { keys: 'Esc', when: 'chat / channel', action: 'back to chat list' },
   { keys: 'Esc', when: 'chat list', action: 'open menu' },
   { keys: 'Enter', when: 'composer', action: 'send' },
   { keys: 'Ctrl+J', when: 'composer', action: 'newline' },

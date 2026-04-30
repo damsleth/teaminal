@@ -1,10 +1,21 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  bumpChatMention,
+  clampMessageCursor,
   createAppStore,
+  emptyMessageCache,
   type Focus,
   focusKey,
   initialAppState,
+  markChatRead,
+  markChatUnread,
+  messagesFromCaches,
+  moveMessageCursor,
+  recentUnreadNotifications,
+  seedChatActivity,
+  setMessageCursor,
   Store,
+  unreadTotals,
 } from './store'
 
 describe('Store basics', () => {
@@ -97,9 +108,9 @@ describe('focusKey', () => {
   })
 
   test('encodes channel focus with team and channel ids', () => {
-    expect(
-      focusKey({ kind: 'channel', teamId: 'team-1', channelId: '19:gen' }),
-    ).toBe('channel:team-1:19:gen')
+    expect(focusKey({ kind: 'channel', teamId: 'team-1', channelId: '19:gen' })).toBe(
+      'channel:team-1:19:gen',
+    )
   })
 
   test('different focus shapes never collide', () => {
@@ -131,5 +142,102 @@ describe('createAppStore', () => {
       { kind: 'channel', teamId: 't', channelId: 'c' },
       { kind: 'list' },
     ])
+  })
+})
+
+describe('message cache helpers', () => {
+  test('emptyMessageCache seeds metadata around messages', () => {
+    const cache = emptyMessageCache([
+      {
+        id: 'm1',
+        createdDateTime: '2026-04-29T09:00:00Z',
+        body: { contentType: 'text', content: 'hi' },
+      },
+    ])
+    expect(cache.messages.map((m) => m.id)).toEqual(['m1'])
+    expect(cache.loadingOlder).toBe(false)
+    expect(cache.fullyLoaded).toBe(false)
+  })
+
+  test('messagesFromCaches keeps legacy array consumers readable', () => {
+    const caches = {
+      'chat:c1': emptyMessageCache([
+        {
+          id: 'm1',
+          createdDateTime: '2026-04-29T09:00:00Z',
+          body: { contentType: 'text', content: 'hi' },
+        },
+      ]),
+    }
+    expect(messagesFromCaches(caches)['chat:c1']?.[0]?.id).toBe('m1')
+  })
+})
+
+describe('unread helpers', () => {
+  const chat = {
+    id: 'c1',
+    chatType: 'group' as const,
+    createdDateTime: '2026-04-29T08:00:00Z',
+    lastMessagePreview: {
+      id: 'p1',
+      createdDateTime: '2026-04-29T09:00:00Z',
+      body: { contentType: 'text' as const, content: 'hello' },
+      from: { user: { id: 'u1', displayName: 'Other' } },
+    },
+  }
+
+  test('seedChatActivity records preview ids without unread counts', () => {
+    const seeded = seedChatActivity({}, [chat])
+    expect(seeded.c1?.lastSeenPreviewId).toBe('p1')
+    expect(seeded.c1?.unreadCount).toBe(0)
+    expect(seeded.c1?.mentionCount).toBe(0)
+    expect(seeded.c1?.lastSenderName).toBe('Other')
+  })
+
+  test('markChatUnread increments unread and markChatRead clears counts', () => {
+    const unread = markChatUnread(seedChatActivity({}, [chat]), {
+      ...chat,
+      lastMessagePreview: { ...chat.lastMessagePreview, id: 'p2' },
+    })
+    expect(unread.c1?.unreadCount).toBe(1)
+    const mentioned = bumpChatMention(unread, 'c1')
+    expect(mentioned.c1?.mentionCount).toBe(1)
+    const read = markChatRead(mentioned, 'c1', 'p2')
+    expect(read.c1?.unreadCount).toBe(0)
+    expect(read.c1?.mentionCount).toBe(0)
+    expect(read.c1?.lastSeenPreviewId).toBe('p2')
+  })
+
+  test('unread totals and recent notifications aggregate active chats', () => {
+    const activity = {
+      c1: {
+        unreadCount: 2,
+        mentionCount: 1,
+        lastActivityAt: '2026-04-29T10:00:00Z',
+      },
+      c2: {
+        unreadCount: 1,
+        mentionCount: 0,
+        lastActivityAt: '2026-04-29T11:00:00Z',
+      },
+      c3: { unreadCount: 0, mentionCount: 0 },
+    }
+    expect(unreadTotals(activity)).toEqual({ unreadCount: 3, mentionCount: 1, chats: 2 })
+    expect(recentUnreadNotifications(activity).map((x) => x.chatId)).toEqual(['c2', 'c1'])
+  })
+})
+
+describe('message cursor helpers', () => {
+  test('clamps cursors into message bounds', () => {
+    expect(clampMessageCursor(-10, 3)).toBe(0)
+    expect(clampMessageCursor(99, 3)).toBe(2)
+    expect(clampMessageCursor(1.8, 3)).toBe(1)
+    expect(clampMessageCursor(4, 0)).toBe(0)
+  })
+
+  test('moves from the end by default and stores clamped per-convo cursor', () => {
+    expect(moveMessageCursor(undefined, -1, 5)).toBe(3)
+    expect(moveMessageCursor(0, -1, 5)).toBe(0)
+    expect(setMessageCursor({}, 'chat:c1', 10, 4)).toEqual({ 'chat:c1': 3 })
   })
 })

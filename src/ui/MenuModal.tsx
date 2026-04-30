@@ -19,6 +19,7 @@
 import { Box, Text, useApp, useInput } from 'ink'
 import {
   cycleSetting,
+  emptyAccountManagerModal,
   firstSelectable,
   nextSelectable,
   renderSettingValue,
@@ -26,9 +27,11 @@ import {
   ROOT_MENU,
   type MenuItem,
   type ToggleKey,
+  updateSetting,
 } from './menu'
 import type { Settings } from '../state/store'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
+import { warn } from '../log'
 
 const LOGO = [
   '████████╗███████╗ █████╗ ███╗   ███╗██╗███╗   ██╗ █████╗ ██╗     ',
@@ -39,14 +42,18 @@ const LOGO = [
   '   ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝',
 ]
 
-export function openMenu(
-  store: ReturnType<typeof useAppStore>,
-  path: string[] = [],
-): void {
+export function openMenu(store: ReturnType<typeof useAppStore>, path: string[] = []): void {
   const items = resolveMenuPath(ROOT_MENU, path) ?? ROOT_MENU
   const idx = firstSelectable(items)
   store.set({
     modal: { kind: 'menu', path, cursor: idx === -1 ? 0 : idx },
+    inputZone: 'menu',
+  })
+}
+
+export function openAccounts(store: ReturnType<typeof useAppStore>): void {
+  store.set({
+    modal: emptyAccountManagerModal(),
     inputZone: 'menu',
   })
 }
@@ -115,9 +122,10 @@ export function MenuModal() {
         return
       case 'toggle-setting': {
         const key = item.action.key
-        store.set((s) => ({
-          settings: { ...s.settings, [key]: cycleSetting(key, s.settings[key]) },
-        }))
+        const next = cycleSetting(key, store.get().settings[key])
+        void updateSetting(store, key, next).catch((err) => {
+          warn(`config: failed to persist "${key}":`, errMessage(err))
+        })
         return
       }
       case 'show-keybinds':
@@ -126,7 +134,9 @@ export function MenuModal() {
       case 'show-diagnostics':
         store.set({ modal: { kind: 'diagnostics' }, inputZone: 'menu' })
         return
-      case 'switch-account':
+      case 'show-accounts':
+        openAccounts(store)
+        return
       case 'noop':
         // placeholders until backed by real flows
         return
@@ -182,6 +192,10 @@ export function MenuModal() {
       </Box>
     </Box>
   )
+}
+
+function errMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
 }
 
 function formatValueSuffix(item: MenuItem, settings: Settings): string {

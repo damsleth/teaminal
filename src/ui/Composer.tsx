@@ -111,9 +111,7 @@ export function Composer() {
       store.set((s) => ({
         messagesByConvo: {
           ...s.messagesByConvo,
-          [conv]: (s.messagesByConvo[conv] ?? []).map((m) =>
-            m._tempId === tempId ? sent : m,
-          ),
+          [conv]: (s.messagesByConvo[conv] ?? []).map((m) => (m._tempId === tempId ? sent : m)),
         },
       }))
     } catch (err) {
@@ -124,9 +122,7 @@ export function Composer() {
         messagesByConvo: {
           ...s.messagesByConvo,
           [conv]: (s.messagesByConvo[conv] ?? []).map((m) =>
-            m._tempId === tempId
-              ? { ...m, _sending: false, _sendError: errorMessage }
-              : m,
+            m._tempId === tempId ? { ...m, _sending: false, _sendError: errorMessage } : m,
           ),
         },
       }))
