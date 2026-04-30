@@ -16,10 +16,12 @@ import {
   chatLabel,
   clampCursor,
   itemMatchesFilter,
+  shortName,
   type SelectableItem,
 } from '../state/selectables'
 import type { ChatListDensity } from '../state/store'
 import type { Presence } from '../types'
+import { htmlToText } from './html'
 import { useAppState, useTheme } from './StoreContext'
 import type { PresenceColorKey, Theme } from './theme'
 
@@ -28,15 +30,20 @@ const ROWS_VISIBLE = 18
 type Row =
   | { kind: 'header'; label: string }
   | { kind: 'item'; item: SelectableItem; index: number }
+  | { kind: 'synthetic-new-chat'; query: string; index: number }
   | { kind: 'spacer' }
 
-function buildRows(items: SelectableItem[], density: ChatListDensity): Row[] {
+function buildRows(
+  items: SelectableItem[],
+  density: ChatListDensity,
+  syntheticNewChatQuery: string | null,
+): Row[] {
   const rows: Row[] = []
   let firstChatEmitted = false
   let lastTeamId: string | null = null
   for (let i = 0; i < items.length; i++) {
     const it = items[i]!
-    if (it.kind === 'chat' && !firstChatEmitted) {
+    if (it.kind === 'chat' && !firstChatEmitted && density === 'cozy') {
       rows.push({ kind: 'header', label: 'Chats' })
       firstChatEmitted = true
     }
@@ -53,6 +60,13 @@ function buildRows(items: SelectableItem[], density: ChatListDensity): Row[] {
       lastTeamId = it.team.id
     }
     rows.push({ kind: 'item', item: it, index: i })
+  }
+  if (syntheticNewChatQuery) {
+    rows.push({
+      kind: 'synthetic-new-chat',
+      query: syntheticNewChatQuery,
+      index: items.length,
+    })
   }
   return rows
 }
@@ -71,6 +85,13 @@ function rowIndent(item: SelectableItem): string {
   if (item.kind === 'channel') return '    '
   if (item.kind === 'team') return '  '
   return '  '
+}
+
+export function isNewChatQueryCandidate(filter: string): boolean {
+  const query = filter.trim()
+  if (query.length < 2) return false
+  if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(query)) return true
+  return /^[A-Za-z][A-Za-z .'-]{1,}$/.test(query)
 }
 
 // Presence dot for the "other" 1:1 chat member (or null when not a 1:1
@@ -107,6 +128,7 @@ export function ChatList() {
   const shortNames = useAppState((s) => s.settings.chatListShortNames)
   const showPresence = useAppState((s) => s.settings.showPresenceInList)
   const memberPresence = useAppState((s) => s.memberPresence)
+  const unreadByChatId = useAppState((s) => s.unreadByChatId)
   const theme = useTheme()
 
   // Build selectables from individual slices so the hook only re-runs on
@@ -115,9 +137,12 @@ export function ChatList() {
   // on every render - cheap given the list sizes.)
   const all = buildSelectableList({ me, chats, teams, channelsByTeam })
   const items = filter ? all.filter((i) => itemMatchesFilter(i, filter)) : all
+  const syntheticNewChatQuery =
+    filter && items.length === 0 && isNewChatQueryCandidate(filter) ? filter.trim() : null
 
-  const safeCursor = clampCursor(cursor, items.length)
-  const rows = buildRows(items, density)
+  const selectableCount = items.length + (syntheticNewChatQuery ? 1 : 0)
+  const safeCursor = clampCursor(cursor, selectableCount)
+  const rows = buildRows(items, density, syntheticNewChatQuery)
 
   // Find the visual index of the row holding the cursor item, then keep it
   // on-screen by sliding a window of size ROWS_VISIBLE.
@@ -148,17 +173,13 @@ export function ChatList() {
       <Text color="gray">{`/ ${filter}  (Esc to clear)`}</Text>
     ) : null
 
-  if (items.length === 0) {
+  if (selectableCount === 0) {
     return (
       <Box flexDirection="column" paddingX={1}>
         {filterBanner}
-        <Text bold>Chats</Text>
+        {density === 'cozy' && <Text bold>Chats</Text>}
         <Text color="gray">
-          {filter
-            ? '  no matches'
-            : conn === 'connecting'
-              ? '  loading...'
-              : '  (none)'}
+          {filter ? '  no matches' : conn === 'connecting' ? '  loading...' : '  (none)'}
         </Text>
       </Box>
     )
@@ -176,39 +197,82 @@ export function ChatList() {
           )
         }
         if (row.kind === 'spacer') return <Box key={`sp-${i}`} height={1} />
+
+        if (row.kind === 'synthetic-new-chat') {
+          const isSelected = row.index === safeCursor
+          return (
+            <Box key={`new-chat-${row.query}`} flexDirection="row">
+              {density === 'cozy' && (
+                <Box width={2} flexShrink={0}>
+                  <Text color={isSelected ? theme.selected : undefined}>
+                    {isSelected ? '>' : ' '}
+                  </Text>
+                </Box>
+              )}
+              <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                <Text color={isSelected ? theme.selected : 'gray'} bold={isSelected}>
+                  {`Create chat with "${row.query}"`}
+                </Text>
+              </Box>
+            </Box>
+          )
+        }
+
         const isSelected = row.index === safeCursor
-        const indent = rowIndent(row.item)
-        const marker = isSelected ? '>' : ' '
+        const indent = density === 'cozy' ? rowIndent(row.item) : ''
         const label = rowLabel(row.item, me?.id, shortNames)
-        const presence = showPresence
-          ? presenceForChatItem(row.item, me?.id, memberPresence, theme)
-          : null
-        // Reserve 2 chars for the presence column when enabled so labels
-        // align across rows that do/don't have a dot.
-        const presencePad = showPresence ? 2 : 0
-        const labelBudget = 24 - indent.length - presencePad
-        const truncated =
-          label.length > labelBudget
-            ? label.slice(0, Math.max(0, labelBudget - 1)) + '…'
-            : label
+        const presence =
+          density === 'cozy' && showPresence
+            ? presenceForChatItem(row.item, me?.id, memberPresence, theme)
+            : null
+        const unread = row.item.kind === 'chat' ? unreadByChatId[row.item.chat.id] : undefined
+        const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
+        const markerColor = isSelected ? theme.selected : presence?.color
         return (
-          <Text
+          <Box
             key={`${row.item.kind}-${row.index}`}
-            color={isSelected ? theme.selected : undefined}
-            bold={isSelected}
+            flexDirection="row"
+            marginY={density === 'cozy' && isSelected && presence ? 0 : undefined}
           >
-            {`${marker}${indent.slice(1)}`}
-            {showPresence ? (
-              presence ? (
-                <Text color={presence.color}>{`${presence.dot} `}</Text>
-              ) : (
-                <Text>{'  '}</Text>
-              )
-            ) : null}
-            {truncated}
-          </Text>
+            {density === 'cozy' && (
+              <Box width={2} flexShrink={0} flexDirection="column">
+                <Text color={markerColor}>{isSelected ? '>' : presence ? presence.dot : ' '}</Text>
+                {isSelected && presence && <Text color={presence.color}>{presence.dot}</Text>}
+              </Box>
+            )}
+            {indent && (
+              <Box width={indent.length} flexShrink={0}>
+                <Text>{indent}</Text>
+              </Box>
+            )}
+            <Box flexGrow={1} flexShrink={1} minWidth={0}>
+              <Text
+                color={isSelected ? theme.selected : hasUnread ? theme.unread : undefined}
+                bold={isSelected || hasUnread}
+              >
+                {label}
+              </Text>
+              {density === 'cozy' && hasUnread && row.item.kind === 'chat' && (
+                <Text color={theme.unread} bold>
+                  {unread?.lastSenderName
+                    ? `${shortName(unread.lastSenderName)} ${previewChat(row.item.chat)}`
+                    : previewChat(row.item.chat)}
+                </Text>
+              )}
+            </Box>
+          </Box>
         )
       })}
     </Box>
   )
+}
+
+function previewChat(chat: Extract<SelectableItem, { kind: 'chat' }>['chat']): string {
+  const body = chat.lastMessagePreview?.body
+  if (!body?.content) return ''
+  const text =
+    body.contentType === 'html'
+      ? htmlToText(body.content)
+      : body.content.replace(/\s+/g, ' ').trim()
+  return text.slice(0, 80)
 }

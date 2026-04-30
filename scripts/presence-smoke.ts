@@ -31,7 +31,6 @@ await describe('getMyPresence', () => getMyPresence())
 
 const me = await getMe()
 await describe(`getPresencesByUserId([${me.id.slice(0, 8)}...])`, () =>
-  getPresencesByUserId([me.id]),
-)
+  getPresencesByUserId([me.id]))
 
 await describe('getPresencesByUserId([])', () => getPresencesByUserId([]))

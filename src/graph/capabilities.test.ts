@@ -3,11 +3,7 @@ import {
   __resetForTests as resetAuth,
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
-import {
-  __resetForTests,
-  __setSleepForTests,
-  __setTransportForTests,
-} from './client'
+import { __resetForTests, __setSleepForTests, __setTransportForTests } from './client'
 import { probeCapabilities } from './capabilities'
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
@@ -40,7 +36,10 @@ function primeAuth(): void {
 
 type StubMap = Record<string, () => Response>
 
-function transportFromStubs(stubs: StubMap, seenUrls?: string[]): Parameters<typeof __setTransportForTests>[0] {
+function transportFromStubs(
+  stubs: StubMap,
+  seenUrls?: string[],
+): Parameters<typeof __setTransportForTests>[0] {
   return async (url) => {
     seenUrls?.push(url)
     for (const prefix of Object.keys(stubs)) {
@@ -55,7 +54,8 @@ describe('probeCapabilities', () => {
     primeAuth()
     __setTransportForTests(
       transportFromStubs({
-        'https://graph.microsoft.com/v1.0/me?': () => jsonResponse({ id: 'me-id', displayName: 'X' }),
+        'https://graph.microsoft.com/v1.0/me?': () =>
+          jsonResponse({ id: 'me-id', displayName: 'X' }),
         'https://graph.microsoft.com/v1.0/chats?': () => jsonResponse({ value: [] }),
         'https://graph.microsoft.com/v1.0/me/joinedTeams': () => jsonResponse({ value: [] }),
         'https://graph.microsoft.com/v1.0/me/presence': () =>
@@ -232,9 +232,7 @@ describe('probeCapabilities', () => {
     await probeCapabilities()
     const meUrl = seen.find((u) => u.startsWith('https://graph.microsoft.com/v1.0/me?'))
     const chatsUrl = seen.find((u) => u.startsWith('https://graph.microsoft.com/v1.0/chats?'))
-    const teamsUrl = seen.find(
-      (u) => u === 'https://graph.microsoft.com/v1.0/me/joinedTeams',
-    )
+    const teamsUrl = seen.find((u) => u === 'https://graph.microsoft.com/v1.0/me/joinedTeams')
     expect(meUrl).toContain('%24select=id%2CdisplayName')
     expect(chatsUrl).toContain('%24top=1')
     expect(chatsUrl).toContain('%24expand=lastMessagePreview')

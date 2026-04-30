@@ -190,10 +190,10 @@ export function htmlToText(html: string, opts?: HtmlToTextOpts): string {
 
   const joined = state.out.join('')
   if (opts?.preserveNewlines) {
-    return joined.replace(/\n{3,}/g, '\n\n').replace(/[ \t]+/g, ' ').trim()
+    return joined
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]+/g, ' ')
+      .trim()
   }
-  return joined
-    .replace(/\n+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return joined.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim()
 }

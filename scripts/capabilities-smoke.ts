@@ -20,6 +20,4 @@ const rows = (Object.entries(caps) as [string, (typeof caps)[keyof typeof caps]]
   },
 )
 
-process.stdout.write(
-  [`probe_total_ms=${elapsed.toFixed(1)} (parallel)`, ...rows, ''].join('\n'),
-)
+process.stdout.write([`probe_total_ms=${elapsed.toFixed(1)} (parallel)`, ...rows, ''].join('\n'))

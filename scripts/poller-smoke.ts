@@ -58,12 +58,16 @@ process.stdout.write(`conn=${s.conn}\n`)
 process.stdout.write(`chats=${s.chats.length}\n`)
 process.stdout.write(`teams=${s.teams.length}\n`)
 process.stdout.write(`channelsByTeam keys=${Object.keys(s.channelsByTeam).length}\n`)
-process.stdout.write(`messagesByConvo keys=${Object.keys(s.messagesByConvo).join(', ') || '(none)'}\n`)
+process.stdout.write(
+  `messagesByConvo keys=${Object.keys(s.messagesByConvo).join(', ') || '(none)'}\n`,
+)
 const activeKey = Object.keys(s.messagesByConvo)[0]
 if (activeKey) {
   process.stdout.write(`active conv message count=${s.messagesByConvo[activeKey]?.length ?? 0}\n`)
 }
-process.stdout.write(`myPresence=${s.myPresence ? `${s.myPresence.availability}/${s.myPresence.activity}` : '(none)'}\n`)
+process.stdout.write(
+  `myPresence=${s.myPresence ? `${s.myPresence.availability}/${s.myPresence.activity}` : '(none)'}\n`,
+)
 process.stdout.write(`onMention events=${mentions.length}\n`)
 if (errors.length > 0) {
   process.stdout.write(`errors=${errors.length}\n`)

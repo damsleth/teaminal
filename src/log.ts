@@ -16,16 +16,12 @@ export function isDebugEnabled(): boolean {
 export function debug(...args: unknown[]): void {
   if (!enabled) return
   const ts = new Date().toISOString()
-  const msg = args
-    .map((a) => (typeof a === 'string' ? a : JSON.stringify(a)))
-    .join(' ')
+  const msg = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ')
   process.stderr.write(`[${ts}] ${msg}\n`)
 }
 
 export function warn(...args: unknown[]): void {
   const ts = new Date().toISOString()
-  const msg = args
-    .map((a) => (typeof a === 'string' ? a : JSON.stringify(a)))
-    .join(' ')
+  const msg = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ')
   process.stderr.write(`[${ts}] WARN ${msg}\n`)
 }

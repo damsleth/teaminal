@@ -74,6 +74,9 @@ function makeHandlers(overrides?: Partial<MutableHandlers>): MutableHandlers {
 
 function installTransport(handlers: MutableHandlers): void {
   __setTransportForTests(async (url, init) => {
+    if (url.includes('/v1.0/https://')) {
+      throw new Error(`nextLink was not normalized before graph(): ${url}`)
+    }
     if (url.endsWith('/v1.0/me/presence')) return handlers['/me/presence'](init)
     if (url.includes('/v1.0/chats?')) return handlers['/chats'](init)
     if (url === 'https://graph.microsoft.com/v1.0/me/joinedTeams') {
@@ -143,7 +146,10 @@ describe('active loop', () => {
       intervals: { activeMs: 30, listMs: 99_999, presenceMs: 99_999 },
       onMention: (e) => events.push(e),
     })
-    await waitFor(() => focusKey(store.get().focus) !== null && Object.keys(store.get().messagesByConvo).length > 0)
+    await waitFor(
+      () =>
+        focusKey(store.get().focus) !== null && Object.keys(store.get().messagesByConvo).length > 0,
+    )
     expect(store.get().messagesByConvo['chat:c1']).toEqual(messages)
     // First fetch: seed only - no mention even though message mentions me.
     expect(events).toHaveLength(0)
@@ -280,6 +286,163 @@ describe('active loop', () => {
     await Bun.sleep(150)
     expect(chatMessageCalls).toBe(0)
   })
+
+  test('merges newest page without discarding older cached or optimistic messages', async () => {
+    primeAuth()
+    const older: ChatMessage = {
+      id: 'm-old',
+      createdDateTime: '2026-04-29T08:00:00Z',
+      body: { contentType: 'text', content: 'old' },
+    }
+    const optimistic: ChatMessage = {
+      id: 'temp-1',
+      _tempId: 'temp-1',
+      _sending: true,
+      createdDateTime: '2026-04-29T10:00:00Z',
+      body: { contentType: 'text', content: 'sending' },
+    }
+    const newest: ChatMessage = {
+      id: 'm-new',
+      createdDateTime: '2026-04-29T09:00:00Z',
+      body: { contentType: 'text', content: 'new' },
+    }
+    installTransport(
+      makeHandlers({
+        chatMessages: () =>
+          jsonResponse({
+            value: [newest],
+            '@odata.nextLink':
+              'https://graph.microsoft.com/v1.0/chats/c1/messages?$skiptoken=older',
+          }),
+      }),
+    )
+    const store = createAppStore()
+    store.set({
+      me: ME,
+      focus: { kind: 'chat', chatId: 'c1' },
+      messagesByConvo: { 'chat:c1': [older, optimistic] },
+    })
+
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 99_999 },
+    })
+    await waitFor(
+      () => store.get().messagesByConvo['chat:c1']?.some((m) => m.id === 'm-new') === true,
+    )
+    expect(store.get().messagesByConvo['chat:c1']?.map((m) => m.id)).toEqual([
+      'm-old',
+      'm-new',
+      'temp-1',
+    ])
+    expect(store.get().messageCacheByConvo['chat:c1']?.nextLink).toContain('$skiptoken=older')
+    expect(store.get().messageCacheByConvo['chat:c1']?.fullyLoaded).toBe(false)
+  })
+
+  test('loadOlderMessages prepends older pages with dedupe and fullyLoaded metadata', async () => {
+    primeAuth()
+    let calls = 0
+    installTransport(
+      makeHandlers({
+        chatMessages: () => {
+          calls++
+          if (calls === 1) {
+            return jsonResponse({
+              value: [
+                {
+                  id: 'm-new',
+                  createdDateTime: '2026-04-29T10:00:00Z',
+                  body: { contentType: 'text', content: 'new' },
+                },
+                {
+                  id: 'm-mid',
+                  createdDateTime: '2026-04-29T09:00:00Z',
+                  body: { contentType: 'text', content: 'mid' },
+                },
+              ],
+              '@odata.nextLink':
+                'https://graph.microsoft.com/v1.0/chats/c1/messages?$skiptoken=older',
+            })
+          }
+          return jsonResponse({
+            value: [
+              {
+                id: 'm-mid',
+                createdDateTime: '2026-04-29T09:00:00Z',
+                body: { contentType: 'text', content: 'mid duplicate' },
+              },
+              {
+                id: 'm-old',
+                createdDateTime: '2026-04-29T08:00:00Z',
+                body: { contentType: 'text', content: 'old' },
+              },
+            ],
+          })
+        },
+      }),
+    )
+    const store = createAppStore()
+    store.set({ me: ME, focus: { kind: 'chat', chatId: 'c1' } })
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 99_999 },
+    })
+    await waitFor(() => store.get().messageCacheByConvo['chat:c1']?.nextLink !== undefined)
+
+    const result = await activeHandle.loadOlderMessages()
+
+    expect(result).toMatchObject({ conv: 'chat:c1', added: 1, fullyLoaded: true })
+    expect(result.anchorMessageId).toBe('m-mid')
+    expect(store.get().messagesByConvo['chat:c1']?.map((m) => m.id)).toEqual([
+      'm-old',
+      'm-mid',
+      'm-new',
+    ])
+    const cache = store.get().messageCacheByConvo['chat:c1']
+    expect(cache?.loadingOlder).toBe(false)
+    expect(cache?.fullyLoaded).toBe(true)
+    expect(cache?.lastOlderLoad).toEqual({ beforeFirstId: 'm-mid', addedCount: 1 })
+  })
+
+  test('loadOlderMessages stores errors and clears loadingOlder on failure', async () => {
+    primeAuth()
+    let calls = 0
+    installTransport(
+      makeHandlers({
+        chatMessages: () => {
+          calls++
+          if (calls === 1) {
+            return jsonResponse({
+              value: [
+                {
+                  id: 'm-new',
+                  createdDateTime: '2026-04-29T10:00:00Z',
+                  body: { contentType: 'text', content: 'new' },
+                },
+              ],
+              '@odata.nextLink':
+                'https://graph.microsoft.com/v1.0/chats/c1/messages?$skiptoken=older',
+            })
+          }
+          return new Response('bad gateway', { status: 502 })
+        },
+      }),
+    )
+    const store = createAppStore()
+    store.set({ me: ME, focus: { kind: 'chat', chatId: 'c1' } })
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 99_999 },
+    })
+    await waitFor(() => store.get().messageCacheByConvo['chat:c1']?.nextLink !== undefined)
+
+    const result = await activeHandle.loadOlderMessages()
+
+    expect(result.error?.message).toContain('Graph 502')
+    const cache = store.get().messageCacheByConvo['chat:c1']
+    expect(cache?.loadingOlder).toBe(false)
+    expect(cache?.error).toContain('Graph 502')
+  })
 })
 
 describe('list loop', () => {
@@ -311,9 +474,7 @@ describe('list loop', () => {
       makeHandlers({
         '/chats': () =>
           jsonResponse({
-            value: [
-              { id: 'c1', chatType: 'oneOnOne', createdDateTime: '2026-04-29T08:00:00Z' },
-            ],
+            value: [{ id: 'c1', chatType: 'oneOnOne', createdDateTime: '2026-04-29T08:00:00Z' }],
           }),
       }),
     )
@@ -345,6 +506,115 @@ describe('list loop', () => {
     })
     await waitFor(() => store.get().conn === 'offline')
     expect(errors.some((e) => e.loop === 'list')).toBe(true)
+  })
+
+  test('seeds unread activity on first list poll without counting unread', async () => {
+    primeAuth()
+    installTransport(
+      makeHandlers({
+        '/chats': () =>
+          jsonResponse({
+            value: [
+              {
+                id: 'c1',
+                chatType: 'group',
+                createdDateTime: '2026-04-29T08:00:00Z',
+                lastMessagePreview: {
+                  id: 'p1',
+                  createdDateTime: '2026-04-29T09:00:00Z',
+                  body: { contentType: 'text', content: 'seed' },
+                  from: { user: { id: 'other', displayName: 'Other' } },
+                },
+              },
+            ],
+          }),
+      }),
+    )
+    const store = createAppStore()
+    store.set({ me: ME })
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
+    })
+    await waitFor(() => store.get().unreadByChatId.c1 !== undefined)
+    expect(store.get().unreadByChatId.c1?.lastSeenPreviewId).toBe('p1')
+    expect(store.get().unreadByChatId.c1?.unreadCount).toBe(0)
+    expect(store.get().unreadByChatId.c1?.mentionCount).toBe(0)
+  })
+
+  test('counts later non-self preview changes as unread and suppresses self messages', async () => {
+    primeAuth()
+    let phase: 'seed' | 'other' | 'self' = 'seed'
+    installTransport(
+      makeHandlers({
+        '/chats': () => {
+          const id = phase === 'seed' ? 'p1' : phase === 'other' ? 'p2' : 'p3'
+          const senderId = phase === 'self' ? ME.id : 'other'
+          return jsonResponse({
+            value: [
+              {
+                id: 'c1',
+                chatType: 'group',
+                createdDateTime: '2026-04-29T08:00:00Z',
+                lastMessagePreview: {
+                  id,
+                  createdDateTime: '2026-04-29T09:00:00Z',
+                  body: { contentType: 'text', content: id },
+                  from: { user: { id: senderId, displayName: senderId } },
+                },
+              },
+            ],
+          })
+        },
+      }),
+    )
+    const store = createAppStore()
+    store.set({ me: ME })
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
+    })
+    await waitFor(() => store.get().unreadByChatId.c1 !== undefined)
+    phase = 'other'
+    await waitFor(() => store.get().unreadByChatId.c1?.unreadCount === 1)
+    phase = 'self'
+    await waitFor(() => store.get().unreadByChatId.c1?.unreadCount === 0)
+    expect(store.get().unreadByChatId.c1?.lastSeenPreviewId).toBe('p3')
+  })
+
+  test('active chat preview changes clear unread activity', async () => {
+    primeAuth()
+    let phase: 'seed' | 'after' = 'seed'
+    installTransport(
+      makeHandlers({
+        '/chats': () =>
+          jsonResponse({
+            value: [
+              {
+                id: 'active-chat',
+                chatType: 'group',
+                createdDateTime: '2026-04-29T08:00:00Z',
+                lastMessagePreview: {
+                  id: phase === 'seed' ? 'p1' : 'p2',
+                  createdDateTime: '2026-04-29T09:00:00Z',
+                  body: { contentType: 'text', content: 'hi' },
+                  from: { user: { id: 'other', displayName: 'Other' } },
+                },
+              },
+            ],
+          }),
+      }),
+    )
+    const store = createAppStore()
+    store.set({ me: ME, focus: { kind: 'chat', chatId: 'active-chat' } })
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
+    })
+    await waitFor(() => store.get().unreadByChatId['active-chat'] !== undefined)
+    phase = 'after'
+    await waitFor(() => store.get().unreadByChatId['active-chat']?.lastSeenPreviewId === 'p2')
+    expect(store.get().unreadByChatId['active-chat']?.unreadCount).toBe(0)
   })
 })
 
@@ -499,6 +769,7 @@ describe('cross-chat mention detection', () => {
     expect(events[0]?.source).toBe('list-diff')
     expect(events[0]?.conv).toBe('chat:chat-x')
     expect(events[0]?.message.id).toBe('preview-after')
+    expect(store.get().unreadByChatId['chat-x']?.mentionCount).toBe(1)
   })
 
   test('does not fire when the new preview is from self', async () => {
@@ -515,8 +786,7 @@ describe('cross-chat mention detection', () => {
                 createdDateTime: '2026-04-29T08:00:00Z',
                 lastMessagePreview: {
                   id: p === 'before' ? 'preview-1' : 'preview-2',
-                  createdDateTime:
-                    p === 'before' ? '2026-04-29T08:00:00Z' : '2026-04-29T09:00:00Z',
+                  createdDateTime: p === 'before' ? '2026-04-29T08:00:00Z' : '2026-04-29T09:00:00Z',
                   body: { contentType: 'text', content: 'hi' },
                   from: { user: { id: ME.id, displayName: 'Me' } },
                 },
@@ -556,8 +826,7 @@ describe('cross-chat mention detection', () => {
                 createdDateTime: '2026-04-29T08:00:00Z',
                 lastMessagePreview: {
                   id: p === 'before' ? 'preview-1' : 'preview-2',
-                  createdDateTime:
-                    p === 'before' ? '2026-04-29T08:00:00Z' : '2026-04-29T09:00:00Z',
+                  createdDateTime: p === 'before' ? '2026-04-29T08:00:00Z' : '2026-04-29T09:00:00Z',
                   body: { contentType: 'text', content: 'hi' },
                   from: { user: { id: 'other', displayName: 'Other' } },
                 },

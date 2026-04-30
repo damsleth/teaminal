@@ -7,14 +7,11 @@
 import { createContext, useContext, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import type { AppState, Store } from '../state/store'
-import { getTheme, type Theme } from './theme'
+import { resolveTheme, type Theme } from './theme'
 
 const StoreContext = createContext<Store<AppState> | null>(null)
 
-export function StoreProvider(props: {
-  store: Store<AppState>
-  children: ReactNode
-}) {
+export function StoreProvider(props: { store: Store<AppState>; children: ReactNode }) {
   return <StoreContext.Provider value={props.store}>{props.children}</StoreContext.Provider>
 }
 
@@ -33,10 +30,9 @@ export function useAppState<T>(selector: (s: AppState) => T): T {
   )
 }
 
-// Active palette derived from settings.theme. Subscribes only to the
-// theme slice so toggling other settings does not re-render every Themed
-// component.
+// Active palette derived from settings. This includes theme overrides and
+// message-focus color settings loaded from config.json.
 export function useTheme(): Theme {
-  const mode = useAppState((s) => s.settings.theme)
-  return getTheme(mode)
+  const settings = useAppState((s) => s.settings)
+  return resolveTheme(settings)
 }

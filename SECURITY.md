@@ -25,13 +25,13 @@ to [`owa-piggy`](https://github.com/damsleth/owa-piggy) - a separate
 subprocess that holds Microsoft 365 refresh tokens on disk. Threats are
 shaped by that boundary:
 
-| Boundary | Owner | Notes |
-|---|---|---|
-| Refresh token storage | `owa-piggy` | teaminal never reads or writes the AAD refresh token; it only consumes the short-lived access tokens that `owa-piggy token --audience graph` prints to stdout. |
-| Access token in memory | teaminal | Cached in-process via `src/auth/owaPiggy.ts`; never logged, never sent anywhere except `https://graph.microsoft.com`. |
-| Subprocess invocation | teaminal | Always invoked **without** `--json`. The `--json` mode would emit the rotated refresh token from each FOCI exchange (see [Known Pitfalls](./AGENTS.md#known-pitfalls)). |
-| HTTP egress | teaminal | All requests go through `src/graph/client.ts`, which is the single injection point for `Authorization` headers. No other module talks to Graph. |
-| Notifications | teaminal | macOS notifications are dispatched via `osascript` with explicit AppleScript escaping (no shell interpolation, no string concatenation). See `src/notify/notify.ts`. |
+| Boundary               | Owner       | Notes                                                                                                                                                                   |
+| ---------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Refresh token storage  | `owa-piggy` | teaminal never reads or writes the AAD refresh token; it only consumes the short-lived access tokens that `owa-piggy token --audience graph` prints to stdout.          |
+| Access token in memory | teaminal    | Cached in-process via `src/auth/owaPiggy.ts`; never logged, never sent anywhere except `https://graph.microsoft.com`.                                                   |
+| Subprocess invocation  | teaminal    | Always invoked **without** `--json`. The `--json` mode would emit the rotated refresh token from each FOCI exchange (see [Known Pitfalls](./AGENTS.md#known-pitfalls)). |
+| HTTP egress            | teaminal    | All requests go through `src/graph/client.ts`, which is the single injection point for `Authorization` headers. No other module talks to Graph.                         |
+| Notifications          | teaminal    | macOS notifications are dispatched via `osascript` with explicit AppleScript escaping (no shell interpolation, no string concatenation). See `src/notify/notify.ts`.    |
 
 ## Practices the project enforces
 

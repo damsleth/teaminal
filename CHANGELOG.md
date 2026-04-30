@@ -6,6 +6,40 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Lazy message pagination/cache for active conversations with explicit
+  "load older messages" support.
+- Unread chat activity tracking, unread/mention counts in the header, and
+  bold unread sender previews in the chat list.
+- New-chat prompt and search-driven 1:1 chat creation using Microsoft Graph
+  people/user search and `POST /chats`.
+- Date headers, focused-message navigation, H/J/K/L and U/D message
+  movement, and configurable focused-message indicators.
+- JSON config persistence for all settings, theme overrides, and managed
+  account aliases under `~/.config/teaminal/config.json`.
+- Accounts modal for adding valid `owa-piggy status` profiles and removing
+  profiles from teaminal's managed account list.
+- README platform support, install, build, configuration, keybinding, and
+  `owa-piggy` prerequisite documentation.
+- Homebrew release guidance with a `teaminal` formula template and exact tap
+  update steps in `docs/release.md`.
+
+### Changed
+
+- Header bar now contains profile, tenant, presence, connection, chat count,
+  unread counts, capability hints, and last-updated status.
+- `chatListDensity: "compact"` now materially changes chat/message layout.
+- Message and chat rows use column layout so wrapped lines align under their
+  content instead of restarting at column zero.
+- `Switch account` menu entry is now `Accounts`.
+- Prepared the next minor version metadata as `0.5.0`.
+
+### Fixed
+
+- `scripts/build.sh` now fails early with a clear message for unsupported
+  hosts or targets instead of attempting unsupported Bun compile targets.
+
 ## [0.4.0] - 2026-04-30
 
 ### Added
@@ -78,7 +112,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 - `Settings.windowHeight` and a corresponding "Window height" entry under
   Settings in the modal menu. Cycles through the presets `full → 20 →
-  30 → 40 → full`; default is `full` (fills the terminal). Useful when
+30 → 40 → full`; default is `full` (fills the terminal). Useful when
   you want to keep prior terminal scrollback visible above the app.
 
 ## [0.1.0] - 2026-04-30

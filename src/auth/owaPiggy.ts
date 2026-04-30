@@ -36,6 +36,17 @@ type CacheEntry = { token: string; exp: number }
 const cache = new Map<string, CacheEntry>()
 const inFlight = new Map<string, Promise<string>>()
 
+export type OwaPiggyProfileStatus = {
+  profile: string
+  valid: boolean
+  accessTokenExpiresAt?: string
+  refreshTokenExpiresAt?: string
+  audience?: string
+  scopes?: string[]
+  scopeSummary?: string
+  error?: string
+}
+
 function cacheKey(profile?: string): string {
   return profile ?? DEFAULT_KEY
 }
@@ -109,6 +120,111 @@ export async function getToken(profile?: string): Promise<string> {
 
 export function invalidate(profile?: string): void {
   cache.delete(cacheKey(profile))
+}
+
+function splitStatusBlocks(stdout: string, fallbackProfile?: string): string[][] {
+  const lines = stdout
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim() !== '')
+  const blocks: string[][] = []
+  let current: string[] = []
+  for (const line of lines) {
+    if (/^\[profile=[^\]]+\]$/.test(line) && current.length > 0) {
+      blocks.push(current)
+      current = [line]
+      continue
+    }
+    current.push(line)
+  }
+  if (current.length > 0) blocks.push(current)
+  if (
+    blocks.length === 1 &&
+    !/^\[profile=[^\]]+\]$/.test(blocks[0]?.[0] ?? '') &&
+    fallbackProfile
+  ) {
+    blocks[0]?.unshift(`[profile=${fallbackProfile}]`)
+  }
+  return blocks
+}
+
+function parseProfileBlock(lines: string[], index: number): OwaPiggyProfileStatus | null {
+  const first = lines[0] ?? ''
+  const label = first.match(/^\[profile=([^\]]+)\]$/)
+  const profile = label?.[1] ?? (index === 0 ? DEFAULT_KEY : `profile-${index + 1}`)
+  const body = label ? lines.slice(1) : lines
+  if (body.length === 0) return null
+
+  const out: OwaPiggyProfileStatus = {
+    profile,
+    valid: false,
+  }
+  for (const line of body) {
+    const trimmed = line.trim()
+    if (trimmed === 'no valid token') {
+      out.valid = false
+      continue
+    }
+    const access = trimmed.match(/^authtoken:\s+expires\s+(.+)$/)
+    if (access) {
+      out.valid = true
+      out.accessTokenExpiresAt = access[1]
+      continue
+    }
+    const audience = trimmed.match(/^audience:\s+(.+)$/)
+    if (audience) {
+      out.audience = audience[1]
+      continue
+    }
+    const scopes = trimmed.match(/^scope\(s\):\s+(.+)$/)
+    if (scopes) {
+      const scopeSummary = scopes[1] ?? ''
+      out.scopeSummary = scopeSummary
+      out.scopes = scopeSummary
+        .split(',')
+        .map((scope) => scope.trim())
+        .filter((scope) => scope.length > 0 && !scope.startsWith('...'))
+      continue
+    }
+    const refresh = trimmed.match(/^refreshtoken:\s+expires\s+(.+)$/)
+    if (refresh) {
+      out.refreshTokenExpiresAt = refresh[1]
+      continue
+    }
+    const err = trimmed.match(/^ERROR:\s+(.+)$/)
+    if (err) {
+      out.error = err[1]
+    }
+  }
+  return out
+}
+
+export function parseStatusProfiles(
+  stdout: string,
+  fallbackProfile?: string,
+): OwaPiggyProfileStatus[] {
+  return splitStatusBlocks(stdout, fallbackProfile)
+    .map((block, index) => parseProfileBlock(block, index))
+    .filter((profile): profile is OwaPiggyProfileStatus => profile !== null)
+}
+
+export type ListProfilesFromStatusOpts = {
+  profile?: string
+}
+
+export async function listProfilesFromStatus(
+  opts?: ListProfilesFromStatusOpts,
+): Promise<OwaPiggyProfileStatus[]> {
+  const args = ['status', '--audience', 'graph']
+  if (opts?.profile) args.push('--profile', opts.profile)
+  const { stdout, stderr, exitCode } = await runner(args)
+  const profiles = parseStatusProfiles(stdout, opts?.profile)
+  if (profiles.length > 0) return profiles
+  if (exitCode !== 0) {
+    const msg = stderr.trim() || `owa-piggy status exited with code ${exitCode}`
+    throw new OwaPiggyError(msg)
+  }
+  return profiles
 }
 
 // Test-only helpers. Underscore prefix marks them as not part of the public API.

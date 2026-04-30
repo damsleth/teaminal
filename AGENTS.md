@@ -6,15 +6,15 @@ teaminal is a lightweight terminal Microsoft Teams client written in TypeScript.
 
 ## Module Responsibilities
 
-| Module | Purpose | Key Files |
-|---|---|---|
-| `src/auth` | owa-piggy subprocess wrapper, in-process token cache | `owaPiggy.ts` |
-| `src/graph` | Microsoft Graph HTTP client + per-resource calls | `client.ts`, `me.ts`, `chats.ts`, `teams.ts`, `presence.ts`, `capabilities.ts` |
-| `src/state` | Pub/sub store + adaptive polling loops | `store.ts`, `poller.ts` |
-| `src/ui` | Ink components + HTML→ANSI rendering + keybinds | `App.tsx`, `ChatList.tsx`, `MessagePane.tsx`, `Composer.tsx`, `StatusBar.tsx`, `html.ts` |
-| `src/config` | Shell-style key=value config loader | `index.ts` |
-| `src/notify` | Terminal bell + system notifications | `notify.ts` |
-| `bin` | CLI entry point | `teaminal.ts` |
+| Module       | Purpose                                              | Key Files                                                                                |
+| ------------ | ---------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `src/auth`   | owa-piggy subprocess wrapper, in-process token cache | `owaPiggy.ts`                                                                            |
+| `src/graph`  | Microsoft Graph HTTP client + per-resource calls     | `client.ts`, `me.ts`, `chats.ts`, `teams.ts`, `presence.ts`, `capabilities.ts`           |
+| `src/state`  | Pub/sub store + adaptive polling loops               | `store.ts`, `poller.ts`                                                                  |
+| `src/ui`     | Ink components + HTML→ANSI rendering + keybinds      | `App.tsx`, `ChatList.tsx`, `MessagePane.tsx`, `Composer.tsx`, `StatusBar.tsx`, `html.ts` |
+| `src/config` | JSON config loader                                   | `index.ts`                                                                               |
+| `src/notify` | Terminal bell + system notifications                 | `notify.ts`                                                                              |
+| `bin`        | CLI entry point                                      | `teaminal.tsx`                                                                           |
 
 ## Architecture Rules
 
@@ -31,7 +31,8 @@ After every meaningful set of changes (new feature, bug fix that affects users, 
    - `MAJOR` for breaking CLI / config / behavior changes
    - `MINOR` for new user-facing features
    - `PATCH` for bug fixes and tightening
-3. **Promote the Unreleased section** to the new version on tagged releases: rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add a fresh empty `## [Unreleased]` above it, and update the comparison links at the bottom.
+3. **Keep packaging in sync:** when changing the released version, supported platforms, artifact names, or install flow, update `scripts/build.sh`, `README.md`, `docs/release.md`, and the Homebrew tap formula together. The tap formula should match the release artifacts produced by `scripts/build.sh`.
+4. **Promote the Unreleased section** to the new version on tagged releases: rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add a fresh empty `## [Unreleased]` above it, and update the comparison links at the bottom.
 
 Trivial commits (typo fixes, comment-only edits, README polish) do not need a changelog entry or version bump.
 
@@ -66,13 +67,15 @@ fetch(url, { signal: ctrl.signal })
 Bun.spawn(['owa-piggy', 'token', '--json', '--audience', 'graph'])
 
 // BAD: bypass the wrapper - skips 401 retry, 429 backoff, token injection
-await fetch('https://graph.microsoft.com/v1.0/chats', { headers: { Authorization: `Bearer ${token}` } })
+await fetch('https://graph.microsoft.com/v1.0/chats', {
+  headers: { Authorization: `Bearer ${token}` },
+})
 
 // BAD: log auth secrets
 console.log('Authorization:', req.headers.Authorization)
 
 // BAD: regex-parse Teams HTML messages
-content.replace(/<[^>]+>/g, '')  // breaks on <at> mentions and entities
+content.replace(/<[^>]+>/g, '') // breaks on <at> mentions and entities
 ```
 
 ## Known Pitfalls

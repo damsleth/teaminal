@@ -37,10 +37,7 @@ export type ListChannelsOpts = {
   signal?: AbortSignal
 }
 
-export async function listChannels(
-  teamId: string,
-  opts?: ListChannelsOpts,
-): Promise<Channel[]> {
+export async function listChannels(teamId: string, opts?: ListChannelsOpts): Promise<Channel[]> {
   const res = await graph<CollectionResponse<Channel>>({
     method: 'GET',
     path: `/teams/${encodeURIComponent(teamId)}/channels`,
@@ -55,6 +52,11 @@ export type ListChannelMessagesOpts = {
   signal?: AbortSignal
 }
 
+export type ChannelMessagesPage = {
+  messages: ChannelMessage[]
+  nextLink?: string
+}
+
 // Returns root channel messages in chronological order (oldest first), so
 // the UI can append in render order without re-sorting. Graph returns
 // descending by lastModifiedDateTime; this helper reverses before returning.
@@ -66,13 +68,39 @@ export async function listChannelMessages(
   channelId: string,
   opts?: ListChannelMessagesOpts,
 ): Promise<ChannelMessage[]> {
+  return (await listChannelMessagesPage(teamId, channelId, opts)).messages
+}
+
+export async function listChannelMessagesPage(
+  teamId: string,
+  channelId: string,
+  opts?: ListChannelMessagesOpts,
+): Promise<ChannelMessagesPage> {
   const res = await graph<CollectionResponse<ChannelMessage>>({
     method: 'GET',
     path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages`,
     query: { $top: opts?.top ?? CHANNEL_MESSAGES_TOP_DEFAULT },
     signal: opts?.signal,
   })
-  return res.value.slice().reverse()
+  return {
+    messages: res.value.slice().reverse(),
+    nextLink: res['@odata.nextLink'],
+  }
+}
+
+export async function listChannelMessagesNextPage(
+  nextLink: string,
+  opts?: { signal?: AbortSignal },
+): Promise<ChannelMessagesPage> {
+  const res = await graph<CollectionResponse<ChannelMessage>>({
+    method: 'GET',
+    path: nextLink,
+    signal: opts?.signal,
+  })
+  return {
+    messages: res.value.slice().reverse(),
+    nextLink: res['@odata.nextLink'],
+  }
 }
 
 // AsyncGenerator of channel-message pages following @odata.nextLink. Each

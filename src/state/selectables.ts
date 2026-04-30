@@ -42,19 +42,14 @@ export function buildSelectableList(state: SelectableInput): SelectableItem[] {
 // name only). The sidebar uses compact; the message-pane header uses
 // the full form so users can disambiguate "Carl Damsleth" from
 // "Carl Joakim Damsleth" / "Carl Boberg" at a glance.
-export function chatLabel(
-  chat: Chat,
-  myUserId?: string,
-  opts?: { compact?: boolean },
-): string {
+export function chatLabel(chat: Chat, myUserId?: string, opts?: { compact?: boolean }): string {
   const compact = opts?.compact ?? false
-  const fmt = (n: string | null | undefined): string =>
-    compact ? shortName(n) : (n ?? '?')
+  const fmt = (n: string | null | undefined): string => (compact ? shortName(n) : (n ?? '?'))
 
   if (chat.topic) return chat.topic
   const others = (chat.members ?? []).filter((m) => m.userId !== myUserId)
   if (others.length === 1) {
-    return compact ? shortName(others[0]?.displayName) : others[0]?.displayName ?? '(unknown)'
+    return compact ? shortName(others[0]?.displayName) : (others[0]?.displayName ?? '(unknown)')
   }
   if (others.length === 2) {
     return `${fmt(others[0]?.displayName)}, ${fmt(others[1]?.displayName)}`

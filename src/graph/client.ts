@@ -27,6 +27,7 @@ export type GraphOpts = {
   method: HttpMethod
   path: string
   query?: Record<string, string | number | undefined>
+  headers?: Record<string, string | undefined>
   body?: object | string
   beta?: boolean
   signal?: AbortSignal
@@ -74,6 +75,16 @@ const realSleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setT
 let sleep: (ms: number) => Promise<void> = realSleep
 
 function buildUrl(opts: GraphOpts): string {
+  if (opts.path.startsWith(`${BASE_V1}/`) || opts.path.startsWith(`${BASE_BETA}/`)) {
+    if (!opts.query) return opts.path
+    const url = new URL(opts.path)
+    for (const [k, v] of Object.entries(opts.query)) {
+      if (v === undefined) continue
+      url.searchParams.append(k, String(v))
+    }
+    return url.toString()
+  }
+
   const base = opts.beta ? BASE_BETA : BASE_V1
   const path = opts.path.startsWith('/') ? opts.path : `/${opts.path}`
   if (!opts.query) return base + path
@@ -136,10 +147,15 @@ async function executeRequest<T>(
   retried429Count = 0,
 ): Promise<T> {
   const token = await getToken(activeProfile)
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${token}`,
+  const headers = new Headers({
     Accept: 'application/json',
+  })
+  for (const [k, v] of Object.entries(opts.headers ?? {})) {
+    if (v === undefined) continue
+    if (k.toLowerCase() === 'authorization') continue
+    headers.set(k, v)
   }
+  headers.set('Authorization', `Bearer ${token}`)
 
   let body: string | undefined
   if (opts.body !== undefined) {
@@ -147,7 +163,7 @@ async function executeRequest<T>(
       body = opts.body
     } else {
       body = JSON.stringify(opts.body)
-      headers['Content-Type'] = 'application/json'
+      headers.set('Content-Type', 'application/json')
     }
   }
 

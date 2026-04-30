@@ -15,16 +15,25 @@
 // for "coming soon" placeholders so the structure is visible without
 // implying the feature works yet.
 
-import type { Settings } from '../state/store'
+import { updateSettings } from '../config'
+import type { AccountManagerModalState, AppState, Settings, Store } from '../state/store'
 
 // Toggle-setting keys are the subset of Settings keys exposed via menu
 // toggles. Restricting at the type level keeps the menu schema honest.
-export type ToggleKey = keyof Settings
+export type ToggleKey =
+  | 'theme'
+  | 'chatListDensity'
+  | 'chatListShortNames'
+  | 'showPresenceInList'
+  | 'showTimestampsInPane'
+  | 'windowHeight'
+  | 'messageFocusIndicatorEnabled'
+  | 'messageFocusIndicatorChar'
 
 export type MenuAction =
   | { kind: 'resume' }
   | { kind: 'quit' }
-  | { kind: 'switch-account' }
+  | { kind: 'show-accounts' }
   | { kind: 'submenu' }
   | { kind: 'noop' }
   | { kind: 'toggle-setting'; key: ToggleKey }
@@ -43,11 +52,9 @@ export type MenuItem = {
 export const ROOT_MENU: MenuItem[] = [
   { id: 'resume', label: 'Resume', action: { kind: 'resume' } },
   {
-    id: 'switch-account',
-    label: 'Switch account',
-    action: { kind: 'switch-account' },
-    hint: 'coming soon',
-    disabled: true,
+    id: 'accounts',
+    label: 'Accounts',
+    action: { kind: 'show-accounts' },
   },
   {
     id: 'settings',
@@ -83,6 +90,16 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'windowHeight',
         label: 'Window height',
         action: { kind: 'toggle-setting', key: 'windowHeight' },
+      },
+      {
+        id: 'messageFocusIndicatorEnabled',
+        label: 'Focused message marker',
+        action: { kind: 'toggle-setting', key: 'messageFocusIndicatorEnabled' },
+      },
+      {
+        id: 'messageFocusIndicatorChar',
+        label: 'Focused message marker char',
+        action: { kind: 'toggle-setting', key: 'messageFocusIndicatorChar' },
       },
     ],
   },
@@ -144,6 +161,7 @@ export function nextSelectable(items: MenuItem[], from: number, dir: 1 | -1): nu
 // Add bespoke heights here; they show up automatically in the menu cycle
 // and the renderSettingValue formatter.
 export const WINDOW_HEIGHT_PRESETS = [0, 20, 30, 40] as const
+export const MESSAGE_FOCUS_MARKER_PRESETS = ['>', '|', '*', '-'] as const
 
 function cycleWindowHeight(current: number): number {
   const idx = WINDOW_HEIGHT_PRESETS.indexOf(current as (typeof WINDOW_HEIGHT_PRESETS)[number])
@@ -151,12 +169,17 @@ function cycleWindowHeight(current: number): number {
   return WINDOW_HEIGHT_PRESETS[(idx + 1) % WINDOW_HEIGHT_PRESETS.length]!
 }
 
+function cycleMessageFocusIndicatorChar(current: string): string {
+  const idx = MESSAGE_FOCUS_MARKER_PRESETS.indexOf(
+    current as (typeof MESSAGE_FOCUS_MARKER_PRESETS)[number],
+  )
+  if (idx === -1) return MESSAGE_FOCUS_MARKER_PRESETS[0]!
+  return MESSAGE_FOCUS_MARKER_PRESETS[(idx + 1) % MESSAGE_FOCUS_MARKER_PRESETS.length]!
+}
+
 // Cycle a setting to its next value. Two-valued enums flip; booleans
 // negate. Add new keys here when the Settings type grows.
-export function cycleSetting<K extends ToggleKey>(
-  key: K,
-  current: Settings[K],
-): Settings[K] {
+export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]): Settings[K] {
   switch (key) {
     case 'theme':
       return (current === 'dark' ? 'light' : 'dark') as Settings[K]
@@ -165,18 +188,33 @@ export function cycleSetting<K extends ToggleKey>(
     case 'chatListShortNames':
     case 'showPresenceInList':
     case 'showTimestampsInPane':
+    case 'messageFocusIndicatorEnabled':
       return !current as Settings[K]
     case 'windowHeight':
       return cycleWindowHeight(current as number) as Settings[K]
+    case 'messageFocusIndicatorChar':
+      return cycleMessageFocusIndicatorChar(current as string) as Settings[K]
   }
+}
+
+export async function updateSetting<K extends ToggleKey>(
+  store: Store<AppState>,
+  key: K,
+  value: Settings[K],
+  persist: (patch: Partial<Settings>) => Promise<Settings> = updateSettings,
+): Promise<Settings> {
+  let nextSettings: Settings | null = null
+  store.set((s) => {
+    nextSettings = { ...s.settings, [key]: value }
+    return { settings: nextSettings }
+  })
+  await persist({ [key]: value } as Partial<Settings>)
+  return nextSettings ?? store.get().settings
 }
 
 // Human-readable rendering of a setting's current value, used as the
 // suffix on toggle-setting menu rows.
-export function renderSettingValue<K extends ToggleKey>(
-  key: K,
-  value: Settings[K],
-): string {
+export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[K]): string {
   switch (key) {
     case 'theme':
     case 'chatListDensity':
@@ -184,8 +222,20 @@ export function renderSettingValue<K extends ToggleKey>(
     case 'chatListShortNames':
     case 'showPresenceInList':
     case 'showTimestampsInPane':
+    case 'messageFocusIndicatorEnabled':
       return value ? 'on' : 'off'
     case 'windowHeight':
       return value === 0 ? 'full' : `${value} rows`
+    case 'messageFocusIndicatorChar':
+      return String(value)
+  }
+}
+
+export function emptyAccountManagerModal(): AccountManagerModalState {
+  return {
+    kind: 'accounts',
+    mode: 'list',
+    cursor: 0,
+    accounts: [],
   }
 }

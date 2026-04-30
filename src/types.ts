@@ -87,6 +87,32 @@ export type ChatMessage = {
   _sendError?: string
 }
 
+export type ScoredEmailAddress = {
+  address?: string | null
+  relevanceScore?: number | null
+  selectionLikelihood?: string | null
+}
+
+export type Person = {
+  id: string
+  displayName?: string | null
+  userPrincipalName?: string | null
+  scoredEmailAddresses?: ScoredEmailAddress[]
+  jobTitle?: string | null
+  department?: string | null
+  officeLocation?: string | null
+}
+
+export type DirectoryUser = {
+  id: string
+  displayName?: string | null
+  userPrincipalName?: string | null
+  mail?: string | null
+  jobTitle?: string | null
+  department?: string | null
+  officeLocation?: string | null
+}
+
 export type Team = {
   id: string
   displayName: string

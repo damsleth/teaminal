@@ -24,16 +24,33 @@
 // Focus change wakes the active loop's interruptable sleep and aborts any
 // in-flight active fetch so opening a chat is responsive even mid-poll.
 
-import { getChat, listChats, listMessages } from '../graph/chats'
+import {
+  getChat,
+  listChats,
+  listMessages,
+  listMessagesNextPage,
+  listMessagesPage,
+} from '../graph/chats'
 import { GraphError, RateLimitError } from '../graph/client'
 import { getMyPresence } from '../graph/presence'
-import { listChannelMessages, listChannels, listJoinedTeams } from '../graph/teams'
+import {
+  listChannelMessagesNextPage,
+  listChannelMessagesPage,
+  listChannels,
+  listJoinedTeams,
+} from '../graph/teams'
 import type { Channel, Chat, ChatMessage } from '../types'
 import {
   type AppState,
   type ConvKey,
   type Focus,
+  bumpChatMention,
+  cacheMessagesFromLegacy,
+  emptyMessageCache,
   focusKey,
+  markChatRead,
+  markChatUnread,
+  seedChatActivity,
   type Store,
 } from './store'
 
@@ -73,6 +90,16 @@ export type PollerHandle = {
   // runs without waiting out the current interval. Useful when the user
   // hits a manual-refresh key.
   refresh: () => void
+  // Fetch one older page for the currently-focused conversation, if any.
+  loadOlderMessages: () => Promise<LoadOlderMessagesResult>
+}
+
+export type LoadOlderMessagesResult = {
+  conv: ConvKey | null
+  added: number
+  fullyLoaded: boolean
+  anchorMessageId?: string
+  error?: Error
 }
 
 function jitter(ms: number): number {
@@ -100,28 +127,94 @@ function shouldNotifyMention(msg: ChatMessage, myUserId: string): boolean {
   return mentions.some((m) => m.mentioned?.user?.id === myUserId)
 }
 
-// When the active loop overwrites messagesByConvo with a server response,
-// any optimistic message the user just sent (and any that failed to send)
-// would be lost if we replaced the array wholesale. Preserve them:
-//   - _sending: still in flight, append after server messages so the user
-//               sees their bubble until the server ack arrives
-//   - _sendError: failed sends with no server-side counterpart; keep so
-//                  the user can see the error
-// Server-confirmed messages take precedence wherever ids overlap.
-export function mergeWithOptimistic(
-  existing: ChatMessage[],
-  server: ChatMessage[],
-): ChatMessage[] {
-  const serverIds = new Set(server.map((m) => m.id))
-  const carry: ChatMessage[] = []
-  for (const m of existing) {
-    if (m._sending) {
-      carry.push(m)
-    } else if (m._sendError && !serverIds.has(m.id)) {
-      carry.push(m)
-    }
+// Merge a fresh server page with the local cache without dropping older
+// pages or optimistic sends. Server-confirmed messages take precedence
+// wherever ids overlap.
+export function mergeWithOptimistic(existing: ChatMessage[], server: ChatMessage[]): ChatMessage[] {
+  return mergeChronological(existing, server)
+}
+
+function messageTime(msg: ChatMessage): number {
+  const parsed = Date.parse(msg.createdDateTime)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function mergeChronological(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
+  const byId = new Map<string, ChatMessage>()
+  for (const msg of existing) byId.set(msg.id, msg)
+  for (const msg of incoming) byId.set(msg.id, msg)
+  return Array.from(byId.values()).sort((a, b) => messageTime(a) - messageTime(b))
+}
+
+function countNewMessages(existing: ChatMessage[], incoming: ChatMessage[]): number {
+  const ids = new Set(existing.map((m) => m.id))
+  let count = 0
+  for (const msg of incoming) {
+    if (!ids.has(msg.id)) count++
   }
-  return [...server, ...carry]
+  return count
+}
+
+type MessagesPage = {
+  messages: ChatMessage[]
+  nextLink?: string
+}
+
+function newestMessageId(messages: ChatMessage[]): string | undefined {
+  return messages[messages.length - 1]?.id
+}
+
+function mergeActivePagePatch(
+  state: AppState,
+  conv: ConvKey,
+  page: MessagesPage,
+  focus: Focus,
+): Partial<AppState> {
+  const cache = state.messageCacheByConvo[conv]
+  const legacyMessages = state.messagesByConvo[conv] ?? []
+  const existing = cache?.messages ?? legacyMessages
+  const merged = mergeWithOptimistic(existing, page.messages)
+
+  const incomingIds = new Set(page.messages.map((m) => m.id))
+  const hasCachedOlderMessages = existing.some(
+    (m) => !incomingIds.has(m.id) && !m._sending && !m._sendError,
+  )
+  const preserveOlderPaging = hasCachedOlderMessages && cache !== undefined
+  const nextLink = preserveOlderPaging ? cache.nextLink : page.nextLink
+  const fullyLoaded = preserveOlderPaging
+    ? (cache?.fullyLoaded ?? false)
+    : page.nextLink === undefined
+  const nextCaches = {
+    ...state.messageCacheByConvo,
+    [conv]: {
+      ...(cache ?? emptyMessageCache()),
+      messages: merged,
+      nextLink,
+      loadingOlder: false,
+      fullyLoaded,
+      error: undefined,
+    },
+  }
+  const prevCursor = state.messageCursorByConvo[conv]
+  const nextCursor =
+    prevCursor === undefined
+      ? Math.max(0, merged.length - 1)
+      : Math.min(prevCursor, Math.max(0, merged.length - 1))
+  const patch: Partial<AppState> = {
+    messageCacheByConvo: nextCaches,
+    messagesByConvo: {
+      ...state.messagesByConvo,
+      [conv]: merged,
+    },
+    messageCursorByConvo: {
+      ...state.messageCursorByConvo,
+      [conv]: nextCursor,
+    },
+  }
+  if (focus.kind === 'chat') {
+    patch.unreadByChatId = markChatRead(state.unreadByChatId, focus.chatId, newestMessageId(merged))
+  }
+  return patch
 }
 
 // /chats does not return members on the bulk list call ($expand=members is
@@ -168,17 +261,14 @@ function makeSleeper(): Sleeper {
   }
 }
 
-async function fetchActiveMessages(
-  focus: Focus,
-  signal: AbortSignal,
-): Promise<ChatMessage[]> {
+async function fetchActiveMessages(focus: Focus, signal: AbortSignal): Promise<MessagesPage> {
   if (focus.kind === 'chat') {
-    return listMessages(focus.chatId, { signal })
+    return listMessagesPage(focus.chatId, { signal })
   }
   if (focus.kind === 'channel') {
-    return listChannelMessages(focus.teamId, focus.channelId, { signal })
+    return listChannelMessagesPage(focus.teamId, focus.channelId, { signal })
   }
-  return []
+  return { messages: [] }
 }
 
 export function startPoller(opts: PollerOpts): PollerHandle {
@@ -222,6 +312,137 @@ export function startPoller(opts: PollerOpts): PollerHandle {
     return 0
   }
 
+  async function loadOlderMessages(): Promise<LoadOlderMessagesResult> {
+    const focus = store.get().focus
+    const conv = focusKey(focus)
+    if (!conv) return { conv: null, added: 0, fullyLoaded: true }
+
+    const initialState = store.get()
+    const initialCache =
+      initialState.messageCacheByConvo[conv] ??
+      emptyMessageCache(initialState.messagesByConvo[conv] ?? [])
+    if (initialCache.loadingOlder) {
+      return { conv, added: 0, fullyLoaded: initialCache.fullyLoaded }
+    }
+    if (initialCache.fullyLoaded) {
+      return { conv, added: 0, fullyLoaded: true }
+    }
+
+    const anchorMessageId = initialCache.messages[0]?.id
+    if (focus.kind === 'channel' && !initialCache.nextLink) {
+      store.set((s) => {
+        const cache = s.messageCacheByConvo[conv] ?? initialCache
+        const nextCaches = {
+          ...s.messageCacheByConvo,
+          [conv]: { ...cache, fullyLoaded: true, loadingOlder: false },
+        }
+        return {
+          messageCacheByConvo: nextCaches,
+          messagesByConvo: {
+            ...s.messagesByConvo,
+            [conv]: nextCaches[conv]?.messages ?? [],
+          },
+        }
+      })
+      return { conv, added: 0, fullyLoaded: true, anchorMessageId }
+    }
+
+    store.set((s) => {
+      const caches =
+        Object.keys(s.messageCacheByConvo).length === 0
+          ? cacheMessagesFromLegacy(s.messagesByConvo)
+          : s.messageCacheByConvo
+      const cache = caches[conv] ?? initialCache
+      return {
+        messageCacheByConvo: {
+          ...caches,
+          [conv]: { ...cache, loadingOlder: true, error: undefined },
+        },
+      }
+    })
+
+    const olderAbort = new AbortController()
+    try {
+      const cache = store.get().messageCacheByConvo[conv] ?? initialCache
+      let page: MessagesPage
+      if (cache.nextLink) {
+        page =
+          focus.kind === 'chat'
+            ? await listMessagesNextPage(cache.nextLink, { signal: olderAbort.signal })
+            : await listChannelMessagesNextPage(cache.nextLink, { signal: olderAbort.signal })
+      } else if (focus.kind === 'chat') {
+        const oldest = cache.messages[0]
+        if (!oldest) {
+          page = { messages: [] }
+        } else {
+          page = await listMessagesPage(focus.chatId, {
+            beforeCreatedDateTime: oldest.createdDateTime,
+            signal: olderAbort.signal,
+          })
+        }
+      } else {
+        page = { messages: [] }
+      }
+
+      let result: LoadOlderMessagesResult = {
+        conv,
+        added: 0,
+        fullyLoaded: true,
+        anchorMessageId,
+      }
+      store.set((s) => {
+        const current = s.messageCacheByConvo[conv] ?? initialCache
+        const added = countNewMessages(current.messages, page.messages)
+        const merged = mergeChronological(current.messages, page.messages)
+        const fullyLoaded = page.nextLink === undefined || page.messages.length === 0
+        const nextCaches = {
+          ...s.messageCacheByConvo,
+          [conv]: {
+            ...current,
+            messages: merged,
+            nextLink: page.nextLink,
+            loadingOlder: false,
+            fullyLoaded,
+            error: undefined,
+            lastOlderLoad: {
+              beforeFirstId: anchorMessageId,
+              addedCount: added,
+            },
+          },
+        }
+        result = { conv, added, fullyLoaded, anchorMessageId }
+        return {
+          messageCacheByConvo: nextCaches,
+          messagesByConvo: {
+            ...s.messagesByConvo,
+            [conv]: merged,
+          },
+        }
+      })
+      return result
+    } catch (err) {
+      if (isAbortError(err)) {
+        return { conv, added: 0, fullyLoaded: false, anchorMessageId }
+      }
+      const error = err instanceof Error ? err : new Error(String(err))
+      store.set((s) => {
+        const current = s.messageCacheByConvo[conv] ?? initialCache
+        return {
+          messageCacheByConvo: {
+            ...s.messageCacheByConvo,
+            [conv]: {
+              ...current,
+              loadingOlder: false,
+              error: error.message,
+            },
+          },
+        }
+      })
+      reportError('active', error)
+      return { conv, added: 0, fullyLoaded: false, anchorMessageId, error }
+    }
+  }
+
   async function runActiveLoop(): Promise<void> {
     let consecutiveErrors = 0
     while (!stopped) {
@@ -233,7 +454,8 @@ export function startPoller(opts: PollerOpts): PollerHandle {
       }
       activeAbort = new AbortController()
       try {
-        const messages = await fetchActiveMessages(focus, activeAbort.signal)
+        const page = await fetchActiveMessages(focus, activeAbort.signal)
+        const messages = page.messages
         if (stopped) return
         // Only apply if the focus is still on the same conversation - the
         // user may have moved on while we were in flight.
@@ -252,10 +474,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
           }
           seen.set(conv, seenSet)
           store.set((s) => ({
-            messagesByConvo: {
-              ...s.messagesByConvo,
-              [conv]: mergeWithOptimistic(s.messagesByConvo[conv] ?? [], messages),
-            },
+            ...mergeActivePagePatch(s, conv, page, focus),
           }))
           for (const msg of newMentions) {
             onMention?.({ conv, message: msg, source: 'active' })
@@ -313,6 +532,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
   ): Promise<void> {
     const activeKey = focusKey(store.get().focus)
     const candidates: Chat[] = []
+    let nextUnread = store.get().unreadByChatId
     for (const chat of chats) {
       const curId = chat.lastMessagePreview?.id
       const prevId = prevPreviewIds.get(chat.id)
@@ -321,29 +541,33 @@ export function startPoller(opts: PollerOpts): PollerHandle {
       if (curId === prevId) continue
       if (prevId === undefined) continue // first time seeing this chat after seed phase
       const senderId = chat.lastMessagePreview?.from?.user?.id
-      if (senderId === myId) continue
       const conv: ConvKey = `chat:${chat.id}`
-      if (conv === activeKey) continue
+      if (conv === activeKey || senderId === myId) {
+        nextUnread = markChatRead(nextUnread, chat.id, curId)
+        continue
+      }
+      nextUnread = markChatUnread(nextUnread, chat)
       candidates.push(chat)
+    }
+    if (nextUnread !== store.get().unreadByChatId) {
+      store.set({ unreadByChatId: nextUnread })
     }
     if (candidates.length === 0) return
     const CONCURRENCY = 5
     for (let i = 0; i < candidates.length; i += CONCURRENCY) {
       const batch = candidates.slice(i, i + CONCURRENCY)
       await Promise.all(
-        batch.map((chat) => probeChatForMention(chat, myId, signal).catch((err) => {
-          if (!isAbortError(err)) reportError('list', err)
-        })),
+        batch.map((chat) =>
+          probeChatForMention(chat, myId, signal).catch((err) => {
+            if (!isAbortError(err)) reportError('list', err)
+          }),
+        ),
       )
       if (signal.aborted) return
     }
   }
 
-  async function probeChatForMention(
-    chat: Chat,
-    myId: string,
-    signal: AbortSignal,
-  ): Promise<void> {
+  async function probeChatForMention(chat: Chat, myId: string, signal: AbortSignal): Promise<void> {
     const conv: ConvKey = `chat:${chat.id}`
     const targetId = chat.lastMessagePreview?.id
     if (!targetId) return
@@ -356,6 +580,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
     for (const m of messages) seenSet.add(m.id)
     seen.set(conv, seenSet)
     if (target && wasUnseen && shouldNotifyMention(target, myId)) {
+      store.set((s) => ({ unreadByChatId: bumpChatMention(s.unreadByChatId, chat.id) }))
       onMention?.({ conv, message: target, source: 'list-diff' })
     }
   }
@@ -398,9 +623,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
             memberHydrated.add(chat.id)
             if (full.members && full.members.length > 0) {
               store.set((s) => ({
-                chats: s.chats.map((c) =>
-                  c.id === chat.id ? { ...c, members: full.members } : c,
-                ),
+                chats: s.chats.map((c) => (c.id === chat.id ? { ...c, members: full.members } : c)),
               }))
             }
           } catch (err) {
@@ -449,6 +672,9 @@ export function startPoller(opts: PollerOpts): PollerHandle {
             const id = chat.lastMessagePreview?.id
             if (id) prevPreviewIds.set(chat.id, id)
           }
+          store.set((s) => ({
+            unreadByChatId: seedChatActivity(s.unreadByChatId, chats),
+          }))
         }
         consecutiveErrors = 0
       } catch (err) {
@@ -520,5 +746,6 @@ export function startPoller(opts: PollerOpts): PollerHandle {
       activeSleeper.wake()
       listSleeper.wake()
     },
+    loadOlderMessages,
   }
 }
