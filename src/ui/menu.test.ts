@@ -1,0 +1,154 @@
+import { describe, expect, test } from 'bun:test'
+import {
+  cycleSetting,
+  firstSelectable,
+  nextSelectable,
+  renderSettingValue,
+  resolveMenuPath,
+  ROOT_MENU,
+  type MenuItem,
+} from './menu'
+
+const enabled = (id: string, label = id): MenuItem => ({
+  id,
+  label,
+  action: { kind: 'noop' },
+})
+const disabled = (id: string, label = id): MenuItem => ({
+  id,
+  label,
+  action: { kind: 'noop' },
+  disabled: true,
+})
+
+describe('resolveMenuPath', () => {
+  test('returns root for empty path', () => {
+    expect(resolveMenuPath(ROOT_MENU, [])).toBe(ROOT_MENU)
+  })
+
+  test('descends into a submenu', () => {
+    const settings = ROOT_MENU.find((i) => i.id === 'settings')
+    expect(resolveMenuPath(ROOT_MENU, ['settings'])).toBe(settings?.children!)
+  })
+
+  test('returns null for an unknown id', () => {
+    expect(resolveMenuPath(ROOT_MENU, ['does-not-exist'])).toBeNull()
+  })
+
+  test('returns null when descending into a leaf', () => {
+    expect(resolveMenuPath(ROOT_MENU, ['quit'])).toBeNull()
+  })
+})
+
+describe('firstSelectable', () => {
+  test('returns first index when first item is enabled', () => {
+    expect(firstSelectable([enabled('a'), enabled('b')])).toBe(0)
+  })
+
+  test('skips disabled prefix', () => {
+    expect(firstSelectable([disabled('a'), disabled('b'), enabled('c')])).toBe(2)
+  })
+
+  test('returns -1 when all disabled', () => {
+    expect(firstSelectable([disabled('a'), disabled('b')])).toBe(-1)
+  })
+
+  test('returns -1 for empty list', () => {
+    expect(firstSelectable([])).toBe(-1)
+  })
+})
+
+describe('nextSelectable', () => {
+  test('moves forward to next enabled item', () => {
+    const items = [enabled('a'), enabled('b'), enabled('c')]
+    expect(nextSelectable(items, 0, 1)).toBe(1)
+  })
+
+  test('wraps from last to first', () => {
+    const items = [enabled('a'), enabled('b'), enabled('c')]
+    expect(nextSelectable(items, 2, 1)).toBe(0)
+  })
+
+  test('skips disabled items walking forward', () => {
+    const items = [enabled('a'), disabled('b'), enabled('c')]
+    expect(nextSelectable(items, 0, 1)).toBe(2)
+  })
+
+  test('skips disabled items walking backward', () => {
+    const items = [enabled('a'), disabled('b'), enabled('c')]
+    expect(nextSelectable(items, 2, -1)).toBe(0)
+  })
+
+  test('returns -1 when all items are disabled', () => {
+    expect(nextSelectable([disabled('a'), disabled('b')], 0, 1)).toBe(-1)
+  })
+})
+
+describe('cycleSetting', () => {
+  test('flips theme between dark and light', () => {
+    expect(cycleSetting('theme', 'dark')).toBe('light')
+    expect(cycleSetting('theme', 'light')).toBe('dark')
+  })
+
+  test('flips chat list density between cozy and compact', () => {
+    expect(cycleSetting('chatListDensity', 'cozy')).toBe('compact')
+    expect(cycleSetting('chatListDensity', 'compact')).toBe('cozy')
+  })
+
+  test('negates booleans', () => {
+    expect(cycleSetting('showPresenceInList', true)).toBe(false)
+    expect(cycleSetting('showPresenceInList', false)).toBe(true)
+    expect(cycleSetting('showTimestampsInPane', true)).toBe(false)
+  })
+
+  test('cycles windowHeight through presets and wraps to full', () => {
+    expect(cycleSetting('windowHeight', 0)).toBe(20)
+    expect(cycleSetting('windowHeight', 20)).toBe(30)
+    expect(cycleSetting('windowHeight', 30)).toBe(40)
+    expect(cycleSetting('windowHeight', 40)).toBe(0)
+  })
+
+  test('cycles windowHeight off-preset values back to the first preset', () => {
+    expect(cycleSetting('windowHeight', 99)).toBe(0)
+  })
+})
+
+describe('renderSettingValue', () => {
+  test('renders enum values verbatim', () => {
+    expect(renderSettingValue('theme', 'dark')).toBe('dark')
+    expect(renderSettingValue('chatListDensity', 'compact')).toBe('compact')
+  })
+
+  test('renders booleans as on/off', () => {
+    expect(renderSettingValue('showPresenceInList', true)).toBe('on')
+    expect(renderSettingValue('showPresenceInList', false)).toBe('off')
+  })
+
+  test('renders windowHeight as "full" or "N rows"', () => {
+    expect(renderSettingValue('windowHeight', 0)).toBe('full')
+    expect(renderSettingValue('windowHeight', 30)).toBe('30 rows')
+  })
+})
+
+describe('ROOT_MENU shape', () => {
+  test('settings submenu exposes the full toggle set', () => {
+    const settings = ROOT_MENU.find((i) => i.id === 'settings')
+    const toggleKeys = (settings?.children ?? [])
+      .map((c) => (c.action.kind === 'toggle-setting' ? c.action.key : null))
+      .filter((k): k is NonNullable<typeof k> => k !== null)
+    expect(toggleKeys).toEqual([
+      'theme',
+      'chatListDensity',
+      'chatListShortNames',
+      'showPresenceInList',
+      'showTimestampsInPane',
+      'windowHeight',
+    ])
+  })
+
+  test('help submenu has a keybindings entry that triggers show-keybinds', () => {
+    const help = ROOT_MENU.find((i) => i.id === 'help')
+    const keybinds = help?.children?.find((c) => c.id === 'keybinds')
+    expect(keybinds?.action.kind).toBe('show-keybinds')
+  })
+})

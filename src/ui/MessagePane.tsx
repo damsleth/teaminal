@@ -7,15 +7,18 @@
 // <a>, and entity refs render correctly.
 
 import { Box, Text } from 'ink'
-import { chatLabel } from '../state/selectables'
+import { chatLabel, shortName } from '../state/selectables'
 import { focusKey } from '../state/store'
 import type { Chat, ChatMessage, Channel, Team } from '../types'
 import { htmlToText } from './html'
-import { theme } from './theme'
-import { useAppState } from './StoreContext'
+import type { Theme } from './theme'
+import { useAppState, useTheme } from './StoreContext'
 
 const ROWS_VISIBLE = 20
-const SENDER_COL_WIDTH = 16
+// Narrow column - message rows show first name / nick only. The chat /
+// channel header above already shows the full display name(s), so the
+// per-row column doesn't need to disambiguate.
+const SENDER_COL_WIDTH = 10
 
 export function MessagePane() {
   const focus = useAppState((s) => s.focus)
@@ -24,6 +27,8 @@ export function MessagePane() {
   const chats = useAppState((s) => s.chats)
   const teams = useAppState((s) => s.teams)
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
+  const showTimestamps = useAppState((s) => s.settings.showTimestampsInPane)
+  const theme = useTheme()
 
   if (focus.kind === 'list') {
     return (
@@ -45,19 +50,37 @@ export function MessagePane() {
         {messages.length === 0 ? (
           <Text color="gray">  loading...</Text>
         ) : (
-          visible.map((m) => <MessageRow key={m.id} message={m} myUserId={me?.id} />)
+          visible.map((m) => (
+            <MessageRow
+              key={m.id}
+              message={m}
+              myUserId={me?.id}
+              showTimestamp={showTimestamps}
+              theme={theme}
+            />
+          ))
         )}
       </Box>
     </Box>
   )
 }
 
-function MessageRow(props: { message: ChatMessage; myUserId?: string }) {
+function MessageRow(props: {
+  message: ChatMessage
+  myUserId?: string
+  showTimestamp: boolean
+  theme: Theme
+}) {
+  const { theme } = props
   const m = props.message
   const time = m.createdDateTime.slice(11, 16)
-  const sender = m.from?.user?.displayName ?? '(system)'
-  const senderTrimmed = sender.length > SENDER_COL_WIDTH ? sender.slice(0, SENDER_COL_WIDTH - 1) + '…' : sender
-  const isSystem = m.messageType === 'systemEventMessage' || sender === '(system)'
+  const rawSender = m.from?.user?.displayName ?? '(system)'
+  const isSystem = m.messageType === 'systemEventMessage' || rawSender === '(system)'
+  const senderShort = isSystem ? '(system)' : shortName(rawSender)
+  const senderTrimmed =
+    senderShort.length > SENDER_COL_WIDTH
+      ? senderShort.slice(0, SENDER_COL_WIDTH - 1) + '…'
+      : senderShort
   const isSelf = !!props.myUserId && m.from?.user?.id === props.myUserId
   const isSending = m._sending === true
   const sendError = m._sendError
@@ -73,11 +96,12 @@ function MessageRow(props: { message: ChatMessage; myUserId?: string }) {
   else if (isSelf) color = theme.selfMessage
 
   const statusMarker = sendError ? '✗' : isSending ? '…' : ' '
+  const timeCol = props.showTimestamp ? `${time}  ` : ''
 
   return (
     <>
       <Text color={color}>
-        {`${statusMarker} ${time}  ${senderTrimmed.padEnd(SENDER_COL_WIDTH)}  ${bodyText}`}
+        {`${statusMarker} ${timeCol}${senderTrimmed.padEnd(SENDER_COL_WIDTH)}  ${bodyText}`}
       </Text>
       {sendError && (
         <Text color={theme.warnText}>{`     send failed: ${sendError.slice(0, 120)}`}</Text>
