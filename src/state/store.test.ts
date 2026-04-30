@@ -128,6 +128,8 @@ describe('createAppStore', () => {
     expect(s.get().focus).toEqual({ kind: 'list' })
     expect(s.get().chats).toEqual([])
     expect(s.get().conn).toBe('connecting')
+    expect(s.get().realtimeState).toBe('off')
+    expect(s.get().typingByConvo).toEqual({})
   })
 
   test('focus updates fire listeners', () => {

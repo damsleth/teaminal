@@ -7,6 +7,7 @@ import {
   unreadTotals,
   type ChatUnreadActivity,
   type ConnectionState,
+  type RealtimeState,
 } from '../state/store'
 import type { Chat } from '../types'
 import { useAppState, useTheme } from './StoreContext'
@@ -30,6 +31,21 @@ function connColor(conn: ConnectionState): string {
     case 'authError':
       return 'red'
     case 'connecting':
+    default:
+      return 'gray'
+  }
+}
+
+function realtimeColor(state: RealtimeState): string {
+  switch (state) {
+    case 'connected':
+      return 'green'
+    case 'connecting':
+    case 'reconnecting':
+      return 'yellow'
+    case 'error':
+      return 'red'
+    case 'off':
     default:
       return 'gray'
   }
@@ -63,6 +79,7 @@ export function HeaderBar() {
   const capabilities = useAppState((s) => s.capabilities)
   const lastListPollAt = useAppState((s) => s.lastListPollAt)
   const unreadByChatId = useAppState((s) => s.unreadByChatId)
+  const realtimeState = useAppState((s) => s.realtimeState)
   const theme = useTheme()
 
   const [now, setNow] = useState(() => Date.now())
@@ -113,6 +130,13 @@ export function HeaderBar() {
       <Text color="gray">{` ${conn}`}</Text>
       <Text color="gray">{` · ${chats.length} chats`}</Text>
       {unreadText && <Text color={theme.unread}>{` · ${unreadText}`}</Text>}
+      {realtimeState !== 'off' && (
+        <>
+          <Text color="gray">{' · '}</Text>
+          <Text color={realtimeColor(realtimeState)}>{DOT}</Text>
+          <Text color="gray">{` rt:${realtimeState}`}</Text>
+        </>
+      )}
       {updated && <Text color="gray">{` · upd ${updated}`}</Text>}
       {hints.length > 0 && !presenceUnavailable && (
         <Text color="gray">{` · ${hints.join(', ')}`}</Text>

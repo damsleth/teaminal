@@ -8,6 +8,22 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Real-time transport layer (Option E hybrid): internal event bus,
+  trouter WebSocket transport, and realtime bridge that accelerates
+  polling on push events.
+- Typing indicators in the message pane ("Alice is typing…") powered
+  by trouter push events with automatic 8-second expiry.
+- Realtime connection state indicator in the header bar (rt:connected/
+  reconnecting/error).
+- Instant presence updates via trouter push events supplement the 60s
+  polling loop.
+- New-message push signals wake the poller immediately, reducing active
+  chat latency from ~5s to <1s when trouter is connected.
+
+## [0.5.0]
+
+### Added
+
 - Lazy message pagination/cache for active conversations with explicit
   "load older messages" support.
 - Unread chat activity tracking, unread/mention counts in the header, and
