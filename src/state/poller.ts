@@ -24,23 +24,23 @@
 // Focus change wakes the active loop's interruptable sleep and aborts any
 // in-flight active fetch so opening a chat is responsive even mid-poll.
 
-import { getChat, listChats, listMessages, listMessagesPage } from '../graph/chats'
+import { listChats, listMessagesPage } from '../graph/chats'
 import { GraphError, getActiveProfile, RateLimitError } from '../graph/client'
 import { getMyPresence } from '../graph/presence'
 import { getMyTeamsPresence, TeamsPresenceError } from '../graph/teamsPresence'
-import { listChannelMessagesPage, listChannels, listJoinedTeams } from '../graph/teams'
-import type { Channel, Chat, ChatMessage, Presence } from '../types'
+import { listChannelMessagesPage } from '../graph/teams'
+import type { ChatMessage, Presence } from '../types'
 import {
   type AppState,
   type ConvKey,
   type Focus,
-  bumpChatMention,
   focusKey,
-  markChatRead,
-  markChatUnread,
   seedChatActivity,
   type Store,
 } from './store'
+import { fetchTeamsAndChannels } from './poller/teamsAndChannels'
+import { runCrossChatMentionPass } from './poller/crossChatMentions'
+import { hydrateMissingMembers } from './poller/hydrateMembers'
 import { mergeChatMembers } from './poller/chatList'
 import {
   ACTIVE_DEFAULT_MS,
@@ -210,97 +210,6 @@ export function startPoller(opts: PollerOpts): PollerHandle {
     }
   }
 
-  async function fetchTeamsAndChannels(
-    signal: AbortSignal,
-  ): Promise<{ teams: AppState['teams']; channelsByTeam: Record<string, Channel[]> }> {
-    const teams = await listJoinedTeams({ signal })
-    if (teams.length === 0) return { teams, channelsByTeam: {} }
-    const results = await Promise.all(
-      teams.map(async (team): Promise<[string, Channel[]]> => {
-        try {
-          const channels = await listChannels(team.id, { signal })
-          return [team.id, channels]
-        } catch (err) {
-          if (isAbortError(err)) throw err
-          // Per-team channel-list failures shouldn't poison the whole list
-          // refresh; keep an empty channel list and surface the error.
-          reportError('list', err)
-          return [team.id, []]
-        }
-      }),
-    )
-    const channelsByTeam: Record<string, Channel[]> = {}
-    for (const [teamId, channels] of results) channelsByTeam[teamId] = channels
-    return { teams, channelsByTeam }
-  }
-
-  // After a successful list-poll, walk chats whose lastMessagePreview.id
-  // changed since the previous poll and (a) the new message is from a
-  // non-self sender, (b) the chat is not the currently active focus.
-  // For each such chat, fetch the top 5 messages, find the one matching
-  // the new preview id, and fire onMention if it has a mention to me.
-  // Concurrency capped at 5 in flight so this does not pile up against
-  // Graph throttles.
-  async function runCrossChatMentionPass(
-    chats: Chat[],
-    myId: string,
-    signal: AbortSignal,
-  ): Promise<void> {
-    const activeKey = focusKey(store.get().focus)
-    const candidates: Chat[] = []
-    let nextUnread = store.get().unreadByChatId
-    for (const chat of chats) {
-      const curId = chat.lastMessagePreview?.id
-      const prevId = prevPreviewIds.get(chat.id)
-      if (curId) prevPreviewIds.set(chat.id, curId)
-      if (!curId) continue
-      if (curId === prevId) continue
-      if (prevId === undefined) continue // first time seeing this chat after seed phase
-      const senderId = chat.lastMessagePreview?.from?.user?.id
-      const conv: ConvKey = `chat:${chat.id}`
-      if (conv === activeKey || senderId === myId) {
-        nextUnread = markChatRead(nextUnread, chat.id, curId)
-        continue
-      }
-      nextUnread = markChatUnread(nextUnread, chat)
-      candidates.push(chat)
-    }
-    if (nextUnread !== store.get().unreadByChatId) {
-      store.set({ unreadByChatId: nextUnread })
-    }
-    if (candidates.length === 0) return
-    const CONCURRENCY = 5
-    for (let i = 0; i < candidates.length; i += CONCURRENCY) {
-      const batch = candidates.slice(i, i + CONCURRENCY)
-      await Promise.all(
-        batch.map((chat) =>
-          probeChatForMention(chat, myId, signal).catch((err) => {
-            if (!isAbortError(err)) reportError('list', err)
-          }),
-        ),
-      )
-      if (signal.aborted) return
-    }
-  }
-
-  async function probeChatForMention(chat: Chat, myId: string, signal: AbortSignal): Promise<void> {
-    const conv: ConvKey = `chat:${chat.id}`
-    const targetId = chat.lastMessagePreview?.id
-    if (!targetId) return
-    const messages = await listMessages(chat.id, { top: 5, signal })
-    const seenSet = seen.get(conv) ?? new Set<string>()
-    const target = messages.find((m) => m.id === targetId)
-    const wasUnseen = target && !seenSet.has(target.id)
-    // Seed the seen-set with everything we just fetched so a subsequent
-    // active-loop open doesn't re-notify these IDs as "new".
-    for (const m of messages) seenSet.add(m.id)
-    seen.set(conv, seenSet)
-    if (target && wasUnseen && shouldNotifyMention(target, myId)) {
-      store.set((s) => ({ unreadByChatId: bumpChatMention(s.unreadByChatId, chat.id) }))
-      onMention?.({ conv, message: target, source: 'list-diff' })
-    }
-  }
-
   // Per-chat snapshot of the last seen lastMessagePreview.id, used to
   // detect new activity in non-active chats between list polls. Seeded
   // on the very first list poll without firing any notifications.
@@ -313,44 +222,6 @@ export function startPoller(opts: PollerOpts): PollerHandle {
   const memberHydrated = new Set<string>()
   const hydrateAbort = new AbortController()
 
-  // Background member hydration. /chats does not return members on the
-  // bulk list; without this, every 1:1 row would render as "(1:1)" until
-  // focused. Runs after each list poll, capped concurrency, no-op once
-  // every chat has been seen.
-  async function hydrateMissingMembers(chats: Chat[]): Promise<void> {
-    const targets = chats.filter((c) => {
-      if (memberHydrated.has(c.id)) return false
-      if (c.topic) return false // group chat with explicit topic uses topic as label
-      if (c.members && c.members.length > 0) return false
-      return true
-    })
-    if (targets.length === 0) return
-    const CONCURRENCY = 5
-    for (let i = 0; i < targets.length; i += CONCURRENCY) {
-      if (stopped || hydrateAbort.signal.aborted) return
-      const batch = targets.slice(i, i + CONCURRENCY)
-      await Promise.all(
-        batch.map(async (chat) => {
-          try {
-            const full = await getChat(chat.id, {
-              members: true,
-              signal: hydrateAbort.signal,
-            })
-            memberHydrated.add(chat.id)
-            if (full.members && full.members.length > 0) {
-              store.set((s) => ({
-                chats: s.chats.map((c) => (c.id === chat.id ? { ...c, members: full.members } : c)),
-              }))
-            }
-          } catch (err) {
-            if (isAbortError(err)) return
-            reportError('list', err)
-          }
-        }),
-      )
-    }
-  }
-
   async function runListLoop(): Promise<void> {
     let consecutiveErrors = 0
     // Bookkeeping AbortController per iteration so stop() can cancel.
@@ -360,7 +231,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
       try {
         const [chats, teamsAndChannels] = await Promise.all([
           listChats({ signal: listAbort.signal }),
-          fetchTeamsAndChannels(listAbort.signal),
+          fetchTeamsAndChannels(listAbort.signal, (err) => reportError('list', err)),
         ])
         if (stopped) return
         store.set((s) => ({
@@ -373,7 +244,16 @@ export function startPoller(opts: PollerOpts): PollerHandle {
 
         // Fire-and-forget: don't block the next list-poll iteration on
         // member hydration. Concurrency-capped inside the function.
-        hydrateMissingMembers(chats).catch((err) => {
+        hydrateMissingMembers(
+          {
+            store,
+            hydrated: memberHydrated,
+            signal: hydrateAbort.signal,
+            isStopped: () => stopped,
+            reportError: (err) => reportError('list', err),
+          },
+          chats,
+        ).catch((err) => {
           if (!isAbortError(err)) reportError('list', err)
         })
 
@@ -381,7 +261,18 @@ export function startPoller(opts: PollerOpts): PollerHandle {
         const wasFirst = firstListPoll
         firstListPoll = false
         if (myId && !wasFirst) {
-          await runCrossChatMentionPass(chats, myId, listAbort.signal)
+          await runCrossChatMentionPass(
+            {
+              store,
+              seen,
+              prevPreviewIds,
+              onMention,
+              reportError: (err) => reportError('list', err),
+            },
+            chats,
+            myId,
+            listAbort.signal,
+          )
         } else {
           // Seed prevPreviewIds without firing anything.
           for (const chat of chats) {
