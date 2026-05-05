@@ -60,5 +60,10 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
     store.set({ focus: { kind: 'list' }, inputZone: 'list' })
     return 'handled'
   }
+  // '/' opens in-pane message search.
+  if (input === '/') {
+    store.set({ inputZone: 'message-search', messageSearchQuery: '', messageSearchFocusedId: null })
+    return 'handled'
+  }
   return 'pass'
 }
