@@ -9,18 +9,20 @@ export function StatusBar() {
   const inputZone = useAppState((s) => s.inputZone)
   const filter = useAppState((s) => s.filter)
 
-  let hint = 'j/k move · L/Enter open · / filter · N new chat · ? help · q quit'
+  let hint = 'j/k move · l/Enter open · / filter · n new chat · ? help · q quit'
   if (inputZone === 'filter') hint = 'type to filter · Enter accept · Esc clear'
   else if (inputZone === 'composer') hint = 'Enter send · Ctrl+J newline · Esc navigation'
   else if (inputZone === 'menu') hint = 'menu open'
   else if (focus.kind !== 'list') {
-    hint = 'J/K message · U/D half-page · L bottom · H back · Tab compose · r refresh'
+    hint = 'j/k msg · u/d half · u/k older top · l bottom · h back · Tab compose · r refresh'
   }
 
   return (
     <Box paddingX={1}>
-      <Text color="gray">{hint}</Text>
-      {filter && inputZone !== 'filter' && <Text color="gray">{` · / ${filter}`}</Text>}
+      <Text color="gray" wrap="truncate-end">
+        {hint}
+        {filter && inputZone !== 'filter' ? ` · / ${filter}` : ''}
+      </Text>
     </Box>
   )
 }

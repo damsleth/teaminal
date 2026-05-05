@@ -2,7 +2,7 @@
 //
 // Active when the user has a chat or channel focused AND inputZone ===
 // 'list' (i.e. the message pane has focus, not the composer or filter).
-// Owns: H/J/K/L/U/D message-cursor motion, Enter at top to load older,
+// Owns: h/j/k/l/u/d message-cursor motion, u/k-at-top to load older,
 // Esc to return to chat list. Tab to composer is handled by the
 // shared App-level dispatcher because it is identical across zones.
 
@@ -27,6 +27,7 @@ const HALF_PAGE = Math.ceil(20 / 2)
 
 export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyResult {
   const { store, moveMessageCursor, jumpMessageBottom, tryLoadOlder } = ctx
+  const ch = input.toLowerCase()
   if (ctx.focus.kind === 'list') return 'pass'
 
   // Thread-specific routing: h / Left / Esc must return to the parent
@@ -34,7 +35,7 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
   // rule below.
   if (
     ctx.focus.kind === 'thread' &&
-    (input === 'h' || input === 'H' || key.leftArrow || key.escape)
+    (ch === 'h' || key.leftArrow || key.escape)
   ) {
     store.set({
       focus: { kind: 'channel', teamId: ctx.focus.teamId, channelId: ctx.focus.channelId },
@@ -42,37 +43,38 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
     return 'handled'
   }
 
-  if (input === 'h' || input === 'H' || key.leftArrow) {
+  if (ch === 'h' || key.leftArrow) {
     store.set({ focus: { kind: 'list' }, inputZone: 'list' })
     return 'handled'
   }
-  if (input === 'j' || input === 'J' || key.downArrow) {
+  if (ch === 'j' || key.downArrow) {
     moveMessageCursor(1)
     return 'handled'
   }
-  if (input === 'k' || input === 'K' || key.upArrow) {
-    moveMessageCursor(-1)
+  if (ch === 'k' || key.upArrow) {
+    if (ctx.activeMessageCursor <= 0) tryLoadOlder()
+    else moveMessageCursor(-1)
     return 'handled'
   }
-  if (input === 'u' || input === 'U' || (key as typeof key & { pageUp?: boolean }).pageUp) {
+  if (ch === 'u' || (key as typeof key & { pageUp?: boolean }).pageUp) {
+    if (ctx.activeMessageCursor <= HALF_PAGE) {
+      moveMessageCursor(-HALF_PAGE)
+      tryLoadOlder()
+      return 'handled'
+    }
     moveMessageCursor(-HALF_PAGE)
     return 'handled'
   }
-  if (input === 'd' || input === 'D' || (key as typeof key & { pageDown?: boolean }).pageDown) {
+  if (ch === 'd' || (key as typeof key & { pageDown?: boolean }).pageDown) {
     moveMessageCursor(HALF_PAGE)
     return 'handled'
   }
-  if (input === 'l' || input === 'L' || key.rightArrow) {
-    if (ctx.activeMessageCursor === 0) tryLoadOlder()
-    else jumpMessageBottom()
-    return 'handled'
-  }
-  if (key.return && ctx.activeMessageCursor === 0) {
-    tryLoadOlder()
+  if (ch === 'l' || key.rightArrow) {
+    jumpMessageBottom()
     return 'handled'
   }
   // 't' opens the thread overlay when a channel root is focused.
-  if (input === 't' && ctx.focus.kind === 'channel' && ctx.focusedMessageId) {
+  if (ch === 't' && ctx.focus.kind === 'channel' && ctx.focusedMessageId) {
     store.set({
       focus: {
         kind: 'thread',

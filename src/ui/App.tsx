@@ -188,7 +188,7 @@ export function App() {
       }
       const raw = { input, key }
       // Chat / channel zone first when we're focused on a conversation —
-      // most chat-zone keys (J/K/L/U/D) overlap with list-zone single
+      // most chat-zone keys (j/k/l/u/d) overlap with list-zone single
       // letters and we want the chat-side meaning when a chat is open.
       if (focus.kind !== 'list') {
         const result = handleChatKeys(raw, {

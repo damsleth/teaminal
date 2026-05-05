@@ -68,6 +68,7 @@ export function MenuModal() {
 
   useInput(
     (input, key) => {
+      const ch = input.toLowerCase()
       const m = store.get().modal
       if (!m || m.kind !== 'menu') return
       const items = resolveMenuPath(ROOT_MENU, m.path) ?? ROOT_MENU
@@ -81,19 +82,19 @@ export function MenuModal() {
         return
       }
 
-      if (input === 'q' && m.path.length === 0) {
+      if (ch === 'q' && m.path.length === 0) {
         store.set({ modal: null, inputZone: 'list' })
         exit()
         return
       }
 
-      if (key.upArrow || input === 'k') {
+      if (key.upArrow || ch === 'k') {
         const next = nextSelectable(items, m.cursor, -1)
         if (next === -1) return
         store.set({ modal: { ...m, cursor: next } })
         return
       }
-      if (key.downArrow || input === 'j') {
+      if (key.downArrow || ch === 'j') {
         const next = nextSelectable(items, m.cursor, 1)
         if (next === -1) return
         store.set({ modal: { ...m, cursor: next } })

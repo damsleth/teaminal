@@ -17,6 +17,8 @@ import { searchMessages } from './messageSearch'
 import {
   buildMessageRows,
   readMessagePageState,
+  sliceMessageRowsToBudget,
+  shouldShowReactionRow,
   type LoadMoreState,
   type MessageRenderRow,
 } from './messageRows'
@@ -51,7 +53,9 @@ export function MessagePane(props: {
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
   const showTimestamps = useAppState((s) => s.settings.showTimestampsInPane)
   const density = useAppState((s) => s.settings.chatListDensity)
+  const reactionDisplayMode = useAppState((s) => s.settings.showReactions)
   const inputZone = useAppState((s) => s.inputZone)
+  const searchQuery = useAppState((s) => s.messageSearchQuery)
   const focusIndicatorVisible = useAppState((s) => s.settings.messageFocusIndicatorEnabled)
   const focusIndicatorChar = useAppState((s) => s.settings.messageFocusIndicatorChar)
   const typingByConvo = useAppState((s) => s.typingByConvo)
@@ -82,9 +86,6 @@ export function MessagePane(props: {
   const messages = messagesByConvo[conv] ?? []
   const cache = messageCacheByConvo[conv]
   const headerLabel = headerForFocus(focus, chats, teams, channelsByTeam, me?.id)
-  const focusedIndex = props.focusedMessageId
-    ? messages.findIndex((m) => m.id === props.focusedMessageId)
-    : -1
   const pageState = readMessagePageState(cache ?? messages)
   const loadMoreState =
     props.loadOlderState ??
@@ -99,30 +100,29 @@ export function MessagePane(props: {
   const cozyRows = density === 'cozy' ? 1 : 0
   const typingActive = (typingByConvo[conv] ?? []).length > 0
   const reservedDynamic = (isLoadingOlder ? 1 : 0) + (typingActive ? 1 : 0)
-  const rowsVisible = Math.max(
+  const rowBudget = Math.max(
     MIN_VISIBLE_ROWS,
     terminalRows - CHROME_RESERVED_ROWS - cozyRows - reservedDynamic,
   )
-  const start = visibleStart(
-    messages.length,
-    focusedIndex,
-    props.focusIndicatorActive === true,
-    rowsVisible,
-  )
-  const visible = messages.slice(start, start + rowsVisible)
-  const rows = buildMessageRows(visible, {
-    showLoadMoreRow: messages.length > 0 && start === 0,
+  const allRows = buildMessageRows(messages, {
+    showLoadMoreRow: messages.length > 0,
     loadMoreState,
   })
+  const rows = sliceMessageRowsToBudget(allRows, {
+    focusedMessageId: props.focusedMessageId,
+    focusActive: props.focusIndicatorActive === true,
+    reactionDisplayMode,
+    rowBudget,
+  })
+  const showingHistoryTop = rows.length > 0 && allRows.length > 0 && rows[0] === allRows[0]
   const showFocusIndicator =
     props.focusIndicatorActive === true && focusIndicatorVisible && messages.length > 0
 
   // Search bar (S1) is rendered above the timeline when active. The
   // matching messages are highlighted at the row level via the existing
   // focused-message indicator (the keys handler updates messageCursor
-  // on Enter / n / N), so the search bar itself is just an input echo.
+  // on Enter / n), so the search bar itself is just an input echo.
   const searchActive = inputZone === 'message-search'
-  const searchQuery = useAppState((s) => s.messageSearchQuery)
   const hits = searchActive ? searchMessages(messages, searchQuery) : []
 
   return (
@@ -136,12 +136,12 @@ export function MessagePane(props: {
             <Text color="cyan">█</Text>
             <Text color={theme.mutedText}>
               {'  '}
-              {hits.length} hit(s) · enter jumps · n/N step · esc closes
+              {hits.length} hit(s) · enter jumps · n step · esc closes
             </Text>
           </Text>
         </Box>
       )}
-      {isLoadingOlder && start !== 0 && (
+      {isLoadingOlder && !showingHistoryTop && (
         <Text color={theme.mutedText}>… loading older messages</Text>
       )}
       <Box flexDirection="column">
@@ -165,7 +165,9 @@ export function MessagePane(props: {
                   row.message.id === props.focusedMessageId
                 }
                 focusIndicatorChar={focusIndicatorChar}
+                focusedMessageId={props.focusedMessageId}
                 myUserId={me?.id}
+                reactionDisplayMode={reactionDisplayMode}
                 showTimestamp={showTimestamps}
                 theme={theme}
               />
@@ -182,7 +184,9 @@ function TimelineRow(props: {
   row: MessageRenderRow
   focused: boolean
   focusIndicatorChar: string
+  focusedMessageId?: string | null
   myUserId?: string
+  reactionDisplayMode: 'off' | 'current' | 'all'
   showTimestamp: boolean
   theme: Theme
 }) {
@@ -201,8 +205,8 @@ function TimelineRow(props: {
     return (
       <Box>
         <Box width={2} flexShrink={0} />
-        <Text color={active ? props.theme.selected : 'gray'}>
-          {active ? 'Enter/L ' : ''}
+        <Text color={active ? props.theme.selected : 'gray'} wrap="truncate-end">
+          {active ? 'U/K ' : ''}
           {props.row.label}
         </Text>
       </Box>
@@ -213,7 +217,9 @@ function TimelineRow(props: {
       message={props.row.message}
       focused={props.focused}
       focusIndicatorChar={props.focusIndicatorChar}
+      focusedMessageId={props.focusedMessageId}
       myUserId={props.myUserId}
+      reactionDisplayMode={props.reactionDisplayMode}
       showTimestamp={props.showTimestamp}
       theme={props.theme}
     />
@@ -224,7 +230,9 @@ function MessageRow(props: {
   message: ChatMessage
   focused: boolean
   focusIndicatorChar: string
+  focusedMessageId?: string | null
   myUserId?: string
+  reactionDisplayMode: 'off' | 'current' | 'all'
   showTimestamp: boolean
   theme: Theme
 }) {
@@ -245,7 +253,12 @@ function MessageRow(props: {
   const bodyText = previewBody(m)
   const isDeleted = isMessageDeleted(m)
   const isEdited = !isDeleted && isMessageEdited(m)
-  const reactionLine = isDeleted ? null : reactionsSummary(m.reactions)
+  const reactionLine = shouldShowReactionRow(
+    { kind: 'message', key: m.id, message: m },
+    { reactionDisplayMode: props.reactionDisplayMode, focusedMessageId: props.focusedMessageId },
+  )
+    ? reactionsSummary(m.reactions)
+    : null
 
   // Status precedence: error first (red), then sending (gray dim), then
   // system / self colors.
@@ -274,12 +287,14 @@ function MessageRow(props: {
           </Text>
         </Box>
         <Box width={statusWidth} flexShrink={0}>
-          <Text color={color}>
+          <Text color={color} wrap="truncate-end">
             {props.showTimestamp ? `${statusMarker} ${timeCol}` : `${statusMarker} `}
           </Text>
         </Box>
         <Box width={SENDER_COL_WIDTH + 2} flexShrink={0}>
-          <Text color={color}>{`${senderTrimmed.padEnd(SENDER_COL_WIDTH)}  `}</Text>
+          <Text color={color} wrap="truncate-end">
+            {`${senderTrimmed.padEnd(SENDER_COL_WIDTH)}  `}
+          </Text>
         </Box>
         <Box flexGrow={1} flexShrink={1} minWidth={0}>
           <Text
@@ -288,6 +303,7 @@ function MessageRow(props: {
             }
             italic={isDeleted}
             bold={props.focused && !isDeleted}
+            wrap="truncate-end"
           >
             {bodyText}
             {isEdited && <Text color={theme.mutedText}> (edited)</Text>}
@@ -300,7 +316,9 @@ function MessageRow(props: {
           <Box width={statusWidth} flexShrink={0} />
           <Box width={SENDER_COL_WIDTH + 2} flexShrink={0} />
           <Box flexGrow={1} flexShrink={1} minWidth={0}>
-            <Text color={theme.mutedText}>{reactionLine}</Text>
+            <Text color={theme.mutedText} wrap="truncate-end">
+              {reactionLine}
+            </Text>
           </Box>
         </Box>
       )}
@@ -310,7 +328,9 @@ function MessageRow(props: {
           <Box width={statusWidth} flexShrink={0} />
           <Box width={SENDER_COL_WIDTH + 2} flexShrink={0} />
           <Box flexGrow={1} flexShrink={1} minWidth={0}>
-            <Text color={theme.warnText}>{`send failed: ${sendError.slice(0, 120)}`}</Text>
+            <Text color={theme.warnText} wrap="truncate-end">
+              {`send failed: ${sendError.slice(0, 120)}`}
+            </Text>
           </Box>
         </Box>
       )}
@@ -355,20 +375,6 @@ export function isMessageDeleted(m: ChatMessage): boolean {
   return false
 }
 
-function visibleStart(
-  total: number,
-  focusedIndex: number,
-  focusActive: boolean,
-  rowsVisible: number,
-): number {
-  if (total <= rowsVisible) return 0
-  if (!focusActive || focusedIndex < 0) return total - rowsVisible
-  const preferred = focusedIndex - rowsVisible + 1
-  if (preferred < 0) return 0
-  if (preferred > total - rowsVisible) return total - rowsVisible
-  return preferred
-}
-
 function TypingLine(props: { typing: TypingIndicator[]; theme: Theme }) {
   if (props.typing.length === 0) return null
   const names = props.typing.map((t) => shortName(t.displayName))
@@ -379,7 +385,9 @@ function TypingLine(props: { typing: TypingIndicator[]; theme: Theme }) {
   return (
     <Box>
       <Box width={2} flexShrink={0} />
-      <Text color={props.theme.mutedText}>{text}</Text>
+      <Text color={props.theme.mutedText} wrap="truncate-end">
+        {text}
+      </Text>
     </Box>
   )
 }

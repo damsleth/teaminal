@@ -84,11 +84,12 @@ export function DiagnosticsModal() {
 
   useInput(
     (input, key) => {
+      const ch = input.toLowerCase()
       if (key.escape || key.return) {
         store.set({ modal: null, inputZone: 'list' })
         return
       }
-      if (key.ctrl && input === 'c') exit()
+      if (key.ctrl && ch === 'c') exit()
     },
     { isActive: isOpen },
   )

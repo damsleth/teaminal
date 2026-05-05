@@ -92,16 +92,40 @@ describe('handleChatKeys', () => {
     expect(a.movements).toEqual([1, 1])
   })
 
-  test('k and K move cursor up by 1', () => {
+  test('k and K move cursor up by 1 when not at top', () => {
     const a = makeCtx(CHAT_FOCUS)
     handleChatKeys({ input: 'k', key: makeKey() }, a.ctx)
-    expect(a.movements).toEqual([-1])
+    handleChatKeys({ input: 'K', key: makeKey() }, a.ctx)
+    expect(a.movements).toEqual([-1, -1])
+    expect(a.loadOlderCalls).toBe(0)
   })
 
-  test('u moves cursor up half a page', () => {
-    const a = makeCtx(CHAT_FOCUS)
+  test('k at top tries to load older', () => {
+    const a = makeCtx(CHAT_FOCUS, { activeMessageCursor: 0 })
+    handleChatKeys({ input: 'k', key: makeKey() }, a.ctx)
+    expect(a.movements).toEqual([])
+    expect(a.loadOlderCalls).toBe(1)
+  })
+
+  test('up arrow at top tries to load older', () => {
+    const a = makeCtx(CHAT_FOCUS, { activeMessageCursor: 0 })
+    handleChatKeys({ input: '', key: makeKey({ upArrow: true }) }, a.ctx)
+    expect(a.movements).toEqual([])
+    expect(a.loadOlderCalls).toBe(1)
+  })
+
+  test('u moves cursor up half a page when not reaching top', () => {
+    const a = makeCtx(CHAT_FOCUS, { activeMessageCursor: 15 })
     handleChatKeys({ input: 'u', key: makeKey() }, a.ctx)
     expect(a.movements[0]).toBe(-10)
+    expect(a.loadOlderCalls).toBe(0)
+  })
+
+  test('u tries to load older when half-page motion reaches top', () => {
+    const a = makeCtx(CHAT_FOCUS, { activeMessageCursor: 10 })
+    handleChatKeys({ input: 'u', key: makeKey() }, a.ctx)
+    expect(a.movements).toEqual([-10])
+    expect(a.loadOlderCalls).toBe(1)
   })
 
   test('d moves cursor down half a page', () => {
@@ -110,11 +134,11 @@ describe('handleChatKeys', () => {
     expect(a.movements[0]).toBe(10)
   })
 
-  test('l with cursor at top tries to load older', () => {
+  test('l jumps to bottom even with cursor at top', () => {
     const a = makeCtx(CHAT_FOCUS, { activeMessageCursor: 0 })
     handleChatKeys({ input: 'l', key: makeKey() }, a.ctx)
-    expect(a.loadOlderCalls).toBe(1)
-    expect(a.bottomCalls).toBe(0)
+    expect(a.loadOlderCalls).toBe(0)
+    expect(a.bottomCalls).toBe(1)
   })
 
   test('l with cursor mid-list jumps to bottom', () => {
@@ -124,10 +148,10 @@ describe('handleChatKeys', () => {
     expect(a.loadOlderCalls).toBe(0)
   })
 
-  test('Enter at top tries to load older', () => {
+  test('Enter at top passes through instead of loading older', () => {
     const a = makeCtx(CHAT_FOCUS, { activeMessageCursor: 0 })
-    handleChatKeys({ input: '', key: makeKey({ return: true }) }, a.ctx)
-    expect(a.loadOlderCalls).toBe(1)
+    expect(handleChatKeys({ input: '', key: makeKey({ return: true }) }, a.ctx)).toBe('pass')
+    expect(a.loadOlderCalls).toBe(0)
   })
 
   test('Enter mid-list does nothing (passes through)', () => {

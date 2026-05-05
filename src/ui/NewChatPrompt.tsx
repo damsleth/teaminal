@@ -14,6 +14,7 @@ import { isNewChatQueryCandidate } from './ChatList'
 
 const DEBOUNCE_MS = 250
 const RESULT_LIMIT = 5
+type PromptZone = 'input' | 'results'
 
 export function NewChatPrompt(props: {
   initialQuery: string
@@ -26,6 +27,7 @@ export function NewChatPrompt(props: {
   const [cursor, setCursor] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [zone, setZone] = useState<PromptZone>('input')
 
   useEffect(() => {
     const q = query.trim()
@@ -58,23 +60,34 @@ export function NewChatPrompt(props: {
     }
   }, [query])
 
+  useEffect(() => {
+    if (results.length === 0 && zone === 'results') setZone('input')
+  }, [results.length, zone])
+
   useInput(
     (input, key) => {
+      const ch = input.toLowerCase()
       if (key.escape) {
         props.onClose()
         return
       }
-      if (key.ctrl && input === 'c') {
+      if (key.ctrl && ch === 'c') {
         exit()
         return
       }
-      if (input === 'j' || input === 'J' || key.downArrow) {
-        setCursor((c) => clampCursor(c + 1, results.length))
+      if (key.tab) {
+        if (results.length > 0) setZone((z) => (z === 'input' ? 'results' : 'input'))
         return
       }
-      if (input === 'k' || input === 'K' || key.upArrow) {
-        setCursor((c) => clampCursor(c - 1, results.length))
-        return
+      if (zone === 'results') {
+        if (ch === 'j' || key.downArrow) {
+          setCursor((c) => clampCursor(c + 1, results.length))
+          return
+        }
+        if (ch === 'k' || key.upArrow) {
+          setCursor((c) => clampCursor(c - 1, results.length))
+          return
+        }
       }
       if (key.return) {
         const selected = results[clampCursor(cursor, results.length)]
@@ -88,10 +101,12 @@ export function NewChatPrompt(props: {
         return
       }
       if (key.backspace || key.delete) {
+        setZone('input')
         setQuery((q) => q.slice(0, -1))
         return
       }
       if (input && !key.ctrl && !key.meta) {
+        setZone('input')
         setQuery((q) => q + input)
       }
     },
@@ -106,7 +121,7 @@ export function NewChatPrompt(props: {
         <Text>
           <Text color="gray">To: </Text>
           {query}
-          <Text color="cyan">█</Text>
+          <Text color={zone === 'input' ? 'cyan' : 'gray'}>█</Text>
         </Text>
         {loading && <Text color="gray">Searching...</Text>}
         {error && <Text color="red">{error.slice(0, 120)}</Text>}
@@ -114,7 +129,7 @@ export function NewChatPrompt(props: {
           <Text color="gray">No matches</Text>
         )}
         {results.map((user, i) => {
-          const selected = i === clampCursor(cursor, results.length)
+          const selected = zone === 'results' && i === clampCursor(cursor, results.length)
           const detail = user.mail ?? user.userPrincipalName ?? user.id
           return (
             <Text key={user.id} color={selected ? 'cyan' : undefined} bold={selected}>
@@ -125,7 +140,7 @@ export function NewChatPrompt(props: {
           )
         })}
         <Box height={1} />
-        <Text color="gray">Enter opens selected 1:1 chat · Esc closes</Text>
+        <Text color="gray">Tab results · Enter opens selected 1:1 chat · Esc closes</Text>
       </Box>
     </Box>
   )

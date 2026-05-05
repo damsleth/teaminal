@@ -50,6 +50,7 @@ describe('loadSettings', () => {
       JSON.stringify({
         theme: 'light',
         chatListShortNames: true,
+        showReactions: 'all',
         messageFocusIndicatorChar: '|',
         messageFocusIndicatorColor: '#ff00aa',
         themeOverrides: {
@@ -62,6 +63,7 @@ describe('loadSettings', () => {
     expect(r.source).toBe('file')
     expect(r.settings.theme).toBe('light')
     expect(r.settings.chatListShortNames).toBe(true)
+    expect(r.settings.showReactions).toBe('all')
     expect(r.settings.messageFocusIndicatorChar).toBe('|')
     expect(r.settings.messageFocusIndicatorColor).toBe('#ff00aa')
     expect(r.settings.themeOverrides.timestamp).toBe('#abcdef')
@@ -106,9 +108,11 @@ describe('mergeSettings', () => {
 
   test('rejects wrong-shape values for enums', () => {
     const w: string[] = []
-    const out = mergeSettings({ theme: 'neon' }, w)
+    const out = mergeSettings({ theme: 'neon', showReactions: 'selected' }, w)
     expect(out.theme).toBe(defaultSettings.theme)
+    expect(out.showReactions).toBe(defaultSettings.showReactions)
     expect(w.some((m) => /"theme" must be/.test(m))).toBe(true)
+    expect(w.some((m) => /"showReactions" must be/.test(m))).toBe(true)
   })
 
   test('rejects non-boolean for boolean keys', () => {

@@ -5,7 +5,7 @@
 //   typed chars         build the query
 //   Backspace           edit the query
 //   Enter               jump cursor to the most-recent hit
-//   n / N               step to next / previous hit (newer / older)
+//   n                   step to next hit (case-insensitive)
 //   Esc                 close, restore previous focus
 
 import { focusKey, type AppState, type ConvKey, type Focus, type Store } from '../../state/store'
@@ -27,6 +27,7 @@ export function handleMessageSearchKeys(
   ctx: MessageSearchKeysCtx,
 ): KeyResult {
   const { store, focus, query, focusedHitId, messages } = ctx
+  const ch = input.toLowerCase()
   const conv: ConvKey | null = focusKey(focus)
   if (!conv) return 'pass'
 
@@ -52,10 +53,10 @@ export function handleMessageSearchKeys(
     return 'handled'
   }
 
-  if (input === 'n' || input === 'N') {
+  if (ch === 'n') {
     const hits = searchMessages(messages, query)
     const currentIndex = focusedHitId ? messages.findIndex((m) => m.id === focusedHitId) : -1
-    const next = stepHit(hits, currentIndex >= 0 ? currentIndex : null, input === 'n' ? 1 : -1)
+    const next = stepHit(hits, currentIndex >= 0 ? currentIndex : null, 1)
     if (next !== null) {
       const hit = messages[next]
       store.set((s) => ({

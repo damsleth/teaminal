@@ -6,8 +6,27 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Chat-list rows with presence enabled no longer grow by an extra line
+  when selected.
+- Entering a chat from list focus no longer crashes `MessagePane` with
+  "Rendered more hooks than during the previous render".
+- "Load older messages" now triggers from `U` when paging to the top
+  or `K` when already at the top, not from `Enter` or `L`.
+- Bottom chrome no longer collapses when message rows or status hints
+  would otherwise wrap into extra terminal lines.
+- Scrolling near the top of a conversation no longer leaves the bottom
+  of the message pane blank while newer rows still fit.
+- Single-letter shortcuts are now case-insensitive, including `n`/`N`
+  for New chat.
+- New-chat member search keeps printable `j`/`k` input in the search
+  box; Tab moves focus into results before `j`/`k` navigate matches.
+
 ### Added
 
+- Message reactions are now controlled by the `showReactions` setting:
+  `off`, `current` (default), or `all`.
 - **In-app event log.** New Events modal (Menu → Help → Event log) shows
   the last 500 structured event records in real time, with a type-ahead
   filter (source / level / message) and color-by-level. `src/log.ts`
@@ -51,7 +70,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 - **In-conversation message search (S1).** `/` from chat / channel
   focus opens an inline search bar at the top of MessagePane. Type to
   filter (case-insensitive across body + sender display name); Enter
-  jumps to most recent match; n / N step newer / older with wrap.
+  jumps to most recent match; `n` steps through hits with wrap.
   Closes with Esc.
 - **Channel threads M1.** New `Focus` kind 'thread'. Press `t` on a
   focused channel root message to open its thread; reads via Graph's
