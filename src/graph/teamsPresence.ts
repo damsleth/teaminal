@@ -148,12 +148,7 @@ export async function getMyTeamsPresence(
 //
 // Same token / scope as getTeamsPresenceByOid - PresenceRW covers both
 // read and write, no extra capability is needed.
-export type ForceAvailabilityValue =
-  | 'Available'
-  | 'Busy'
-  | 'Away'
-  | 'DoNotDisturb'
-  | 'BeRightBack'
+export type ForceAvailabilityValue = 'Available' | 'Busy' | 'Away' | 'DoNotDisturb' | 'BeRightBack'
 
 export async function forceMyAvailability(
   availability: ForceAvailabilityValue,

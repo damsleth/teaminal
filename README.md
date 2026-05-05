@@ -116,6 +116,8 @@ All keys are optional. Unknown keys and invalid values produce stderr warnings a
 }
 ```
 
+<!-- prettier-ignore-start -->
+
 | Key                            | Values               | Default | Description                                                                              |
 | ------------------------------ | -------------------- | ------: | ---------------------------------------------------------------------------------------- |
 | `theme`                        | `dark`, `light`      |  `dark` | Terminal color palette.                                                                  |
@@ -133,6 +135,8 @@ All keys are optional. Unknown keys and invalid values produce stderr warnings a
 | `themeOverrides`               | object               |    `{}` | Override color roles such as `text`, `mutedText`, `unread`, `timestamp`, and `presence`. |
 | `useTeamsPresence`             | boolean              |  `true` | Use the Teams unified presence endpoint (`presence.teams.microsoft.com`) for own presence. Falls back to Graph `/me/presence` automatically on 401/403/404. Set to `false` to force Graph-only in tenants that block public-client access to that host. |
 | `forceAvailableWhenFocused`    | boolean              |  `true` | While the terminal window has focus (DEC focus reporting; CSI ?1004), PUT `forceavailability=Available` to `presence.teams.microsoft.com` so Teams shows you Available, like the desktop client does for an active window. The override expires server-side after ~5 min and is refreshed inside that window. Set to `false` to leave presence to Teams' own desktop client / inactivity timer. |
+
+<!-- prettier-ignore-end -->
 
 The in-app Settings menu persists changes back to `config.json`.
 

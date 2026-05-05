@@ -106,10 +106,7 @@ export async function probeCapabilities(opts?: ProbeOpts): Promise<Capabilities>
     runProbe(async () => {
       const result = await getMyTeamsPresence({ profile: getActiveProfile(), signal })
       if (!result) {
-        throw new TeamsPresenceError(
-          0,
-          'presence.teams.microsoft.com: token had no oid claim',
-        )
+        throw new TeamsPresenceError(0, 'presence.teams.microsoft.com: token had no oid claim')
       }
       return result
     }),

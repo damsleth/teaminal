@@ -33,7 +33,11 @@ import {
 } from '../graph/chats'
 import { GraphError, getActiveProfile, RateLimitError } from '../graph/client'
 import { getMyPresence, getPresencesByUserId } from '../graph/presence'
-import { getMyTeamsPresence, getTeamsPresenceByOid, TeamsPresenceError } from '../graph/teamsPresence'
+import {
+  getMyTeamsPresence,
+  getTeamsPresenceByOid,
+  TeamsPresenceError,
+} from '../graph/teamsPresence'
 import {
   listChannelMessagesNextPage,
   listChannelMessagesPage,
@@ -814,9 +818,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
           const seen = new Set<string>()
           for (const chat of stateAfterSelf.chats) {
             if (chat.chatType !== 'oneOnOne') continue
-            const other = (chat.members ?? []).find(
-              (m) => m.userId && m.userId !== meId,
-            )
+            const other = (chat.members ?? []).find((m) => m.userId && m.userId !== meId)
             const id = other?.userId
             if (!id || seen.has(id)) continue
             seen.add(id)
