@@ -254,7 +254,9 @@ export function Composer() {
   if (focus.kind === 'list') {
     return (
       <Box paddingX={1}>
-        <Text color="gray">open a chat to compose</Text>
+        <Text color="gray" wrap="truncate-end">
+          open a chat to compose
+        </Text>
       </Box>
     )
   }
@@ -286,7 +288,7 @@ export function Composer() {
         if (!isCursorLine) {
           return (
             <Box key={lineIdx}>
-              <Text color={composerActive ? undefined : theme.infoText}>
+              <Text color={composerActive ? undefined : theme.infoText} wrap="truncate-end">
                 {prefix}
                 {line}
               </Text>
@@ -297,7 +299,7 @@ export function Composer() {
         const after = line.slice(cursorCol)
         return (
           <Box key={lineIdx}>
-            <Text>
+            <Text wrap="truncate-end">
               {prefix}
               {before}
               <Text color="cyan">█</Text>
@@ -308,12 +310,16 @@ export function Composer() {
       })}
       {!composerActive && (
         <Box>
-          <Text color="gray">Tab to compose · Esc to leave</Text>
+          <Text color="gray" wrap="truncate-end">
+            Tab to compose · Esc to leave
+          </Text>
         </Box>
       )}
       {sending && (
         <Box>
-          <Text color="gray">sending...</Text>
+          <Text color="gray" wrap="truncate-end">
+            sending...
+          </Text>
         </Box>
       )}
     </Box>

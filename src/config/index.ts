@@ -181,6 +181,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     chatListShortNames: settings.chatListShortNames,
     showPresenceInList: settings.showPresenceInList,
     showTimestampsInPane: settings.showTimestampsInPane,
+    showReactions: settings.showReactions,
     windowHeight: settings.windowHeight,
     messageFocusIndicatorEnabled: settings.messageFocusIndicatorEnabled,
     messageFocusIndicatorChar: settings.messageFocusIndicatorChar,
@@ -327,6 +328,13 @@ function validateAndAssign(
         return true
       }
       warnings.push(`config: "${key}" must be a boolean`)
+      return false
+    case 'showReactions':
+      if (value === 'off' || value === 'current' || value === 'all') {
+        out.showReactions = value
+        return true
+      }
+      warnings.push('config: "showReactions" must be "off", "current", or "all"')
       return false
     case 'windowHeight':
       if (typeof value === 'number' && Number.isInteger(value) && value >= 0) {

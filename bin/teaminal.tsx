@@ -19,7 +19,7 @@ import { SessionProvider, type SessionApi } from '../src/ui/SessionContext'
 import { StoreProvider } from '../src/ui/StoreContext'
 import { debug, warn } from '../src/log'
 
-const VERSION = '0.9.0'
+const VERSION = '0.10.0'
 
 const HELP = `teaminal ${VERSION}
 

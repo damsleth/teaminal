@@ -7,7 +7,7 @@
 //
 // Esc closes. j/k or ↓/↑ scroll. Typing builds a filter; Backspace edits.
 // The list auto-tails (newest at the bottom) until the user moves the
-// cursor; then it stays put until they hit G to jump to the bottom.
+// cursor; then it stays put until they hit g to jump to the bottom.
 
 import { Box, Text, useApp, useInput } from 'ink'
 import { useEffect, useState } from 'react'
@@ -60,23 +60,24 @@ export function EventsModal() {
 
   useInput(
     (input, key) => {
+      const ch = input.toLowerCase()
       if (key.escape) {
         store.set({ modal: null, inputZone: 'list' })
         return
       }
-      if (key.ctrl && input === 'c') {
+      if (key.ctrl && ch === 'c') {
         exit()
         return
       }
-      if (key.downArrow || input === 'j') {
+      if (key.downArrow || ch === 'j') {
         setCursor((c) => Math.min((c ?? records.length - 1) + 1, records.length - 1))
         return
       }
-      if (key.upArrow || input === 'k') {
+      if (key.upArrow || ch === 'k') {
         setCursor((c) => Math.max((c ?? records.length - 1) - 1, 0))
         return
       }
-      if (input === 'G') {
+      if (ch === 'g') {
         setCursor(null)
         return
       }
@@ -86,7 +87,7 @@ export function EventsModal() {
       }
       if (input && !key.ctrl && !key.meta && input.length === 1) {
         // Reserve some characters that already mean things in this modal.
-        if (input === 'j' || input === 'k') return
+        if (ch === 'j' || ch === 'k' || ch === 'g') return
         setFilter((f) => f + input)
       }
     },
@@ -139,7 +140,7 @@ export function EventsModal() {
         )}
         <Box height={1} />
         <Text color={theme.mutedText}>
-          filter: {filter || '(none)'} · j/k scroll · G tail · esc closes
+          filter: {filter || '(none)'} · j/k scroll · g tail · esc closes
         </Text>
       </Box>
     </Box>

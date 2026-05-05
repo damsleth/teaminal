@@ -140,6 +140,7 @@ export type AccountManagerModalState =
 
 export type ThemeMode = 'dark' | 'light'
 export type ChatListDensity = 'cozy' | 'compact'
+export type ReactionDisplayMode = 'off' | 'current' | 'all'
 export type ThemePresenceKey =
   | 'Available'
   | 'AvailableIdle'
@@ -195,6 +196,7 @@ export type Settings = {
   chatListShortNames: boolean
   showPresenceInList: boolean
   showTimestampsInPane: boolean
+  showReactions: ReactionDisplayMode
   windowHeight: WindowHeight
   messageFocusIndicatorEnabled: boolean
   messageFocusIndicatorChar: string
@@ -239,6 +241,7 @@ export const defaultSettings: Settings = {
   chatListShortNames: false,
   showPresenceInList: true,
   showTimestampsInPane: true,
+  showReactions: 'current',
   windowHeight: 0,
   messageFocusIndicatorEnabled: true,
   messageFocusIndicatorChar: '>',
@@ -471,7 +474,7 @@ export type AppState = {
   filter: string
   // In-conversation message search (S1). Empty query closes the bar.
   // focusedHitMessageId tracks the message the search bar last jumped
-  // to so n/N can step relative to it across re-renders.
+  // to so n can step relative to it across re-renders.
   messageSearchQuery: string
   messageSearchFocusedId: string | null
   myPresence?: Presence

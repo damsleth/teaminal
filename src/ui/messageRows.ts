@@ -1,4 +1,6 @@
 import type { ChatMessage } from '../types'
+import type { ReactionDisplayMode } from '../state/store'
+import { reactionsSummary } from './reactions'
 
 export type LoadMoreState = 'idle' | 'loading' | 'error' | 'unavailable'
 
@@ -69,6 +71,80 @@ export function buildMessageRows(
   }
 
   return rows
+}
+
+export function shouldShowReactionRow(
+  row: MessageRenderRow,
+  opts?: {
+    reactionDisplayMode?: ReactionDisplayMode
+    focusedMessageId?: string | null
+  },
+): boolean {
+  if (row.kind !== 'message') return false
+  if (row.message.deletedDateTime) return false
+  if (!reactionsSummary(row.message.reactions)) return false
+  const mode = opts?.reactionDisplayMode ?? 'all'
+  if (mode === 'off') return false
+  if (mode === 'current') return row.message.id === opts?.focusedMessageId
+  return true
+}
+
+export function messageRenderRowHeight(
+  row: MessageRenderRow,
+  opts?: {
+    reactionDisplayMode?: ReactionDisplayMode
+    focusedMessageId?: string | null
+  },
+): number {
+  if (row.kind !== 'message') return 1
+  let height = 1
+  if (shouldShowReactionRow(row, opts)) height++
+  if (row.message._sendError) height++
+  return height
+}
+
+export function sliceMessageRowsToBudget(
+  rows: MessageRenderRow[],
+  opts: {
+    focusedMessageId?: string | null
+    focusActive?: boolean
+    reactionDisplayMode?: ReactionDisplayMode
+    rowBudget: number
+  },
+): MessageRenderRow[] {
+  if (rows.length === 0) return []
+  const budget = Math.max(1, opts.rowBudget)
+  const focusedRowIndex =
+    opts.focusActive && opts.focusedMessageId
+      ? rows.findIndex((row) => row.kind === 'message' && row.message.id === opts.focusedMessageId)
+      : -1
+  const endExclusive = focusedRowIndex >= 0 ? focusedRowIndex + 1 : rows.length
+
+  let start = endExclusive
+  let used = 0
+  while (start > 0) {
+    const nextHeight = messageRenderRowHeight(rows[start - 1]!, {
+      reactionDisplayMode: opts.reactionDisplayMode,
+      focusedMessageId: opts.focusedMessageId,
+    })
+    if (used > 0 && used + nextHeight > budget) break
+    start--
+    used += nextHeight
+    if (used >= budget) break
+  }
+
+  let end = endExclusive
+  while (used < budget && end < rows.length) {
+    const nextHeight = messageRenderRowHeight(rows[end]!, {
+      reactionDisplayMode: opts.reactionDisplayMode,
+      focusedMessageId: opts.focusedMessageId,
+    })
+    if (used > 0 && used + nextHeight > budget) break
+    end++
+    used += nextHeight
+  }
+
+  return rows.slice(start, end)
 }
 
 function loadMoreLabel(state: LoadMoreState): string {

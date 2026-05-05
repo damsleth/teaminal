@@ -2,7 +2,7 @@
 //
 // Active when AppState.inputZone === 'list' AND the user has not opened
 // a modal. Owns: cursor up/down, Enter/h/l navigation, q to quit, /
-// to enter filter mode, N for new-chat, ? for keybinds, r for refresh.
+// to enter filter mode, n for new-chat, ? for keybinds, r for refresh.
 
 import type { Channel, Chat, Team } from '../../types'
 import type { Me } from '../../graph/me'
@@ -29,14 +29,15 @@ export type ListKeysCtx = {
 
 export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyResult {
   const { store, exit, refresh, openNewChatPrompt } = ctx
+  const ch = input.toLowerCase()
 
-  if (key.ctrl && input === 'c') {
+  if (key.ctrl && ch === 'c') {
     exit()
     return 'handled'
   }
 
   // r forces an immediate refresh of the active conv + chat list.
-  if (input === 'r') {
+  if (ch === 'r') {
     refresh()
     return 'handled'
   }
@@ -55,7 +56,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
 
   // List-focus navigation (cursor + open).
   if (ctx.focus.kind === 'list') {
-    if (input === 'q') {
+    if (ch === 'q') {
       exit()
       return 'handled'
     }
@@ -66,7 +67,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
         ? ctx.filter.trim()
         : null
     const selectableCount = visible.length + (syntheticNewChatQuery ? 1 : 0)
-    if (input === 'N') {
+    if (ch === 'n') {
       openNewChatPrompt(ctx.filter)
       return 'handled'
     }
@@ -79,20 +80,20 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       return 'pass'
     }
     const safe = clampCursor(ctx.cursor, selectableCount)
-    if (input === 'j' || input === 'J' || key.downArrow) {
+    if (ch === 'j' || key.downArrow) {
       store.set({ cursor: clampCursor(safe + 1, selectableCount) })
       return 'handled'
     }
-    if (input === 'k' || input === 'K' || key.upArrow) {
+    if (ch === 'k' || key.upArrow) {
       store.set({ cursor: clampCursor(safe - 1, selectableCount) })
       return 'handled'
     }
-    if (input === 'h' || input === 'H' || key.leftArrow) {
+    if (ch === 'h' || key.leftArrow) {
       // List is already the leftmost pane; no-op so we don't fall
       // through into the filter buffer.
       return 'handled'
     }
-    if (key.return || input === 'l' || input === 'L' || key.rightArrow) {
+    if (key.return || ch === 'l' || key.rightArrow) {
       if (syntheticNewChatQuery && safe === visible.length) {
         openNewChatPrompt(syntheticNewChatQuery)
         return 'handled'

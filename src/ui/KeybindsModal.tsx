@@ -13,17 +13,18 @@ import { useAppState, useAppStore, useTheme } from './StoreContext'
 type Binding = { keys: string; when: string; action: string }
 
 const BINDINGS: Binding[] = [
-  { keys: 'j/J / ↓', when: 'list', action: 'cursor down' },
-  { keys: 'k/K / ↑', when: 'list', action: 'cursor up' },
-  { keys: 'L / Enter', when: 'list', action: 'open chat / channel' },
-  { keys: 'H', when: 'list', action: 'reserved back/no-op' },
-  { keys: 'N', when: 'list', action: 'new chat prompt' },
-  { keys: 'J/K / ↓↑', when: 'chat / channel', action: 'focus message' },
-  { keys: 'U/D', when: 'chat / channel', action: 'half-page messages' },
-  { keys: 'L', when: 'chat / channel', action: 'jump bottom / load older at top' },
-  { keys: 'H / Esc', when: 'chat / channel', action: 'back to chat list' },
+  { keys: 'j / ↓', when: 'list', action: 'cursor down' },
+  { keys: 'k / ↑', when: 'list', action: 'cursor up' },
+  { keys: 'l / Enter', when: 'list', action: 'open chat / channel' },
+  { keys: 'h', when: 'list', action: 'reserved back/no-op' },
+  { keys: 'n', when: 'list', action: 'new chat prompt' },
+  { keys: 'j / ↓', when: 'chat / channel', action: 'focus next message' },
+  { keys: 'k / ↑', when: 'chat / channel', action: 'focus previous / load older at top' },
+  { keys: 'u/d', when: 'chat / channel', action: 'half-page messages; u loads older near top' },
+  { keys: 'l', when: 'chat / channel', action: 'jump bottom' },
+  { keys: 'h / Esc', when: 'chat / channel', action: 'back to chat list' },
   { keys: 't', when: 'channel', action: 'open thread for focused message' },
-  { keys: 'H / Esc', when: 'thread', action: 'back to channel' },
+  { keys: 'h / Esc', when: 'thread', action: 'back to channel' },
   { keys: 'Tab', when: 'chat / channel', action: 'enter composer' },
   { keys: 'Esc', when: 'composer / filter', action: 'leave mode' },
   { keys: 'Esc', when: 'chat list', action: 'open menu' },
@@ -35,7 +36,7 @@ const BINDINGS: Binding[] = [
   { keys: 'Ctrl+U / Ctrl+K', when: 'composer', action: 'delete to line start / end' },
   { keys: '/', when: 'list', action: 'filter chats' },
   { keys: '/', when: 'chat / channel', action: 'search messages' },
-  { keys: 'n / N', when: 'search', action: 'next / previous match' },
+  { keys: 'n', when: 'search', action: 'next match' },
   { keys: 'Enter', when: 'search', action: 'jump to most recent match' },
   { keys: '?', when: 'list', action: 'show this help' },
   { keys: 'r', when: 'any', action: 'refresh now' },
@@ -56,11 +57,12 @@ export function KeybindsModal() {
 
   useInput(
     (input, key) => {
+      const ch = input.toLowerCase()
       if (key.escape || key.return) {
         store.set({ modal: null, inputZone: 'list' })
         return
       }
-      if (key.ctrl && input === 'c') {
+      if (key.ctrl && ch === 'c') {
         exit()
       }
     },

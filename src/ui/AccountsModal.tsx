@@ -85,7 +85,8 @@ export function AccountsModal() {
   useInput(
     (input, key) => {
       if (!isOpen) return
-      if (key.ctrl && input === 'c') {
+      const ch = input.toLowerCase()
+      if (key.ctrl && ch === 'c') {
         exit()
         return
       }
@@ -96,7 +97,7 @@ export function AccountsModal() {
       }
       if (mode.kind === 'loading') return
       if (mode.kind === 'confirm-remove') {
-        if (input === 'y' || input === 'Y' || key.return) {
+        if (ch === 'y' || key.return) {
           void removeProfile(mode.profile).catch((err) => {
             setMode({
               kind: 'list',
@@ -104,17 +105,17 @@ export function AccountsModal() {
               error: err instanceof Error ? err.message : String(err),
             })
           })
-        } else if (input === 'n' || input === 'N') {
+        } else if (ch === 'n') {
           setMode({ kind: 'list', cursor: 0 })
         }
         return
       }
       if (mode.kind === 'pick') {
-        if (input === 'j' || key.downArrow) {
+        if (ch === 'j' || key.downArrow) {
           setMode({ ...mode, cursor: clamp(mode.cursor + 1, mode.profiles.length) })
           return
         }
-        if (input === 'k' || key.upArrow) {
+        if (ch === 'k' || key.upArrow) {
           setMode({ ...mode, cursor: clamp(mode.cursor - 1, mode.profiles.length) })
           return
         }
@@ -132,20 +133,20 @@ export function AccountsModal() {
         }
         return
       }
-      if (input === 'A') {
+      if (ch === 'a') {
         void scanProfiles()
         return
       }
       const rowCount = settings.accounts.length
-      if (input === 'j' || key.downArrow) {
+      if (ch === 'j' || key.downArrow) {
         setMode({ ...mode, cursor: clamp(mode.cursor + 1, rowCount) })
         return
       }
-      if (input === 'k' || key.upArrow) {
+      if (ch === 'k' || key.upArrow) {
         setMode({ ...mode, cursor: clamp(mode.cursor - 1, rowCount) })
         return
       }
-      if ((input === 'D' || key.delete) && settings.accounts.length > 0) {
+      if ((ch === 'd' || key.delete) && settings.accounts.length > 0) {
         const profile = settings.accounts[clamp(mode.cursor, settings.accounts.length)]
         if (profile) setMode({ kind: 'confirm-remove', profile })
         return
@@ -236,7 +237,7 @@ export function AccountsModal() {
             {mode.error && <Text color={theme.errorText}>{mode.error.slice(0, 180)}</Text>}
             <Box height={1} />
             <Text color={theme.mutedText}>
-              Enter switch · A add account · D/Delete remove · Esc close
+              Enter switch · a add account · d/Delete remove · Esc close
             </Text>
           </>
         )}

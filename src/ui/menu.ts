@@ -26,6 +26,7 @@ export type ToggleKey =
   | 'chatListShortNames'
   | 'showPresenceInList'
   | 'showTimestampsInPane'
+  | 'showReactions'
   | 'windowHeight'
   | 'messageFocusIndicatorEnabled'
   | 'messageFocusIndicatorChar'
@@ -94,6 +95,11 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'showTimestampsInPane',
         label: 'Show timestamps in messages',
         action: { kind: 'toggle-setting', key: 'showTimestampsInPane' },
+      },
+      {
+        id: 'showReactions',
+        label: 'Show reactions',
+        action: { kind: 'toggle-setting', key: 'showReactions' },
       },
       {
         id: 'notifyMuted',
@@ -186,6 +192,7 @@ export function nextSelectable(items: MenuItem[], from: number, dir: 1 | -1): nu
 // and the renderSettingValue formatter.
 export const WINDOW_HEIGHT_PRESETS = [0, 20, 30, 40] as const
 export const MESSAGE_FOCUS_MARKER_PRESETS = ['>', '|', '*', '-'] as const
+export const REACTION_DISPLAY_PRESETS = ['current', 'all', 'off'] as const
 
 function cycleWindowHeight(current: number): number {
   const idx = WINDOW_HEIGHT_PRESETS.indexOf(current as (typeof WINDOW_HEIGHT_PRESETS)[number])
@@ -201,6 +208,12 @@ function cycleMessageFocusIndicatorChar(current: string): string {
   return MESSAGE_FOCUS_MARKER_PRESETS[(idx + 1) % MESSAGE_FOCUS_MARKER_PRESETS.length]!
 }
 
+function cycleReactionDisplayMode(current: Settings['showReactions']): Settings['showReactions'] {
+  const idx = REACTION_DISPLAY_PRESETS.indexOf(current)
+  if (idx === -1) return REACTION_DISPLAY_PRESETS[0]!
+  return REACTION_DISPLAY_PRESETS[(idx + 1) % REACTION_DISPLAY_PRESETS.length]!
+}
+
 // Cycle a setting to its next value. Two-valued enums flip; booleans
 // negate. Add new keys here when the Settings type grows.
 export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]): Settings[K] {
@@ -209,6 +222,8 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
       return (current === 'dark' ? 'light' : 'dark') as Settings[K]
     case 'chatListDensity':
       return (current === 'cozy' ? 'compact' : 'cozy') as Settings[K]
+    case 'showReactions':
+      return cycleReactionDisplayMode(current as Settings['showReactions']) as Settings[K]
     case 'chatListShortNames':
     case 'showPresenceInList':
     case 'showTimestampsInPane':
@@ -245,6 +260,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
   switch (key) {
     case 'theme':
     case 'chatListDensity':
+    case 'showReactions':
       return String(value)
     case 'chatListShortNames':
     case 'showPresenceInList':

@@ -227,17 +227,13 @@ export function ChatList() {
             : null
         const unread = row.item.kind === 'chat' ? unreadByChatId[row.item.chat.id] : undefined
         const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
+        const markerText = isSelected ? '>' : presence ? presence.dot : ' '
         const markerColor = isSelected ? theme.selected : presence?.color
         return (
-          <Box
-            key={`${row.item.kind}-${row.index}`}
-            flexDirection="row"
-            marginY={density === 'cozy' && isSelected && presence ? 0 : undefined}
-          >
+          <Box key={`${row.item.kind}-${row.index}`} flexDirection="row">
             {density === 'cozy' && (
-              <Box width={2} flexShrink={0} flexDirection="column">
-                <Text color={markerColor}>{isSelected ? '>' : presence ? presence.dot : ' '}</Text>
-                {isSelected && presence && <Text color={presence.color}>{presence.dot}</Text>}
+              <Box width={2} flexShrink={0}>
+                <Text color={markerColor}>{markerText}</Text>
               </Box>
             )}
             {indent && (

@@ -122,12 +122,19 @@ describe('cycleSetting', () => {
     expect(cycleSetting('messageFocusIndicatorChar', '-')).toBe('>')
     expect(cycleSetting('messageFocusIndicatorChar', '!')).toBe('>')
   })
+
+  test('cycles reaction display mode through presets', () => {
+    expect(cycleSetting('showReactions', 'current')).toBe('all')
+    expect(cycleSetting('showReactions', 'all')).toBe('off')
+    expect(cycleSetting('showReactions', 'off')).toBe('current')
+  })
 })
 
 describe('renderSettingValue', () => {
   test('renders enum values verbatim', () => {
     expect(renderSettingValue('theme', 'dark')).toBe('dark')
     expect(renderSettingValue('chatListDensity', 'compact')).toBe('compact')
+    expect(renderSettingValue('showReactions', 'current')).toBe('current')
   })
 
   test('renders booleans as on/off', () => {
@@ -174,6 +181,7 @@ describe('ROOT_MENU shape', () => {
       'showPresenceInList',
       'forceAvailableWhenFocused',
       'showTimestampsInPane',
+      'showReactions',
       'notifyMuted',
       'notifyActiveBanner',
       'windowHeight',

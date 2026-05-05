@@ -105,6 +105,7 @@ All keys are optional. Unknown keys and invalid values produce stderr warnings a
   "chatListShortNames": false,
   "showPresenceInList": true,
   "showTimestampsInPane": true,
+  "showReactions": "current",
   "windowHeight": 0,
   "messageFocusIndicatorEnabled": true,
   "messageFocusIndicatorChar": ">",
@@ -127,6 +128,7 @@ All keys are optional. Unknown keys and invalid values produce stderr warnings a
 | `chatListShortNames`           | boolean              | `false` | Show first names in chat list rows.                                                      |
 | `showPresenceInList`           | boolean              |  `true` | Show presence dots in the chat list when available.                                      |
 | `showTimestampsInPane`         | boolean              |  `true` | Show message timestamps in the message pane.                                             |
+| `showReactions`                | `off`, `current`, `all` | `current` | Show message reactions never, only on the focused message, or on every message.      |
 | `windowHeight`                 | non-negative integer |     `0` | `0` fills the terminal; any other value fixes the app height in rows.                    |
 | `messageFocusIndicatorEnabled` | boolean              |  `true` | Show the focused-message marker while navigating messages.                               |
 | `messageFocusIndicatorChar`    | single character     |     `>` | Marker shown beside the focused message.                                                 |
@@ -154,15 +156,15 @@ The in-app Settings menu persists changes back to `config.json`.
 | Enter          | composer          | Send message.                                                  |
 | Ctrl+J         | composer          | Insert newline.                                                |
 | `/`            | list              | Filter chats.                                                  |
-| `N`            | list              | Open the new-chat prompt.                                      |
-| `A`            | Accounts          | Find valid `owa-piggy status` profiles to add.                 |
-| `D` / Delete   | Accounts          | Remove the focused account from teaminal's list.               |
-| `H` / Left     | chat / channel    | Return to chat list.                                           |
-| `J` / Down     | chat / channel    | Focus next message.                                            |
-| `K` / Up       | chat / channel    | Focus previous message.                                        |
-| `L` / Right    | chat / channel    | Jump to latest message, or load older when focused at the top. |
-| `U` / PageUp   | chat / channel    | Move up half a page.                                           |
-| `D` / PageDown | chat / channel    | Move down half a page.                                         |
+| `n`            | list              | Open the new-chat prompt.                                      |
+| `a`            | Accounts          | Find valid `owa-piggy status` profiles to add.                 |
+| `d` / Delete   | Accounts          | Remove the focused account from teaminal's list.               |
+| `h` / Left     | chat / channel    | Return to chat list.                                           |
+| `j` / Down     | chat / channel    | Focus next message.                                            |
+| `k` / Up       | chat / channel    | Focus previous message, or load older when focused at the top. |
+| `l` / Right    | chat / channel    | Jump to latest message.                                        |
+| `u` / PageUp   | chat / channel    | Move up half a page, or load older if that reaches the top.    |
+| `d` / PageDown | chat / channel    | Move down half a page.                                         |
 | `?`            | list              | Show keybindings.                                              |
 | `r`            | any               | Refresh now.                                                   |
 | `q`            | list / menu       | Quit.                                                          |

@@ -109,10 +109,11 @@ describe('handleListKeys', () => {
     expect(a.store.get().modal?.kind).toBe('keybinds')
   })
 
-  test('N opens the new-chat prompt with the current filter', () => {
+  test('n opens the new-chat prompt with the current filter case-insensitively', () => {
     const a = makeCtx({ filter: 'Carl' })
     handleListKeys({ input: 'N', key: makeKey() }, a.ctx)
-    expect(a.newChats).toEqual(['Carl'])
+    handleListKeys({ input: 'n', key: makeKey() }, a.ctx)
+    expect(a.newChats).toEqual(['Carl', 'Carl'])
   })
 
   test('j moves cursor down', () => {
