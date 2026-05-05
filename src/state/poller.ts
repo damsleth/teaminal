@@ -8,14 +8,15 @@
 //                     fetch (no notifications); subsequent fetches diff
 //                     against the set and fire onMention for newly-seen
 //                     mentions of `me` from non-self senders.
+//                     Implementation: src/state/poller/activeLoop.ts
 //   - list     (~30s): refreshes /chats with lastMessagePreview, joined
-//                      teams, and per-team channel lists. v1 does not do
-//                      cross-chat mention detection on the list diff -
-//                      that lands as a follow-on once the UI surfaces
-//                      a need for it.
-//   - presence (~60s): refreshes /me/presence when capability is ok.
-//                      Member presence is intentionally skipped in v1
-//                      and added once the UI has a place to render it.
+//                      teams, and per-team channel lists. Cross-chat
+//                      mention diffing fires onMention for non-active
+//                      chats whose lastMessagePreview moved.
+//                      Implementation: src/state/poller/listLoop.ts
+//   - presence (~60s): refreshes /me/presence and member presence for
+//                      visible 1:1 chats (capped fan-out).
+//                      Implementation: src/state/poller/presenceLoop.ts
 //
 // Each loop has its own consecutive-error counter and an exponential
 // backoff capped at 60s; the next interval gets +/-20% jitter so multiple
@@ -24,43 +25,23 @@
 // Focus change wakes the active loop's interruptable sleep and aborts any
 // in-flight active fetch so opening a chat is responsive even mid-poll.
 
-import { listChats, listMessagesPage } from '../graph/chats'
-import { GraphError, getActiveProfile, RateLimitError } from '../graph/client'
-import { getMyPresence } from '../graph/presence'
-import { getMyTeamsPresence, TeamsPresenceError } from '../graph/teamsPresence'
-import { listChannelMessagesPage } from '../graph/teams'
-import type { ChatMessage, Presence } from '../types'
-import {
-  type AppState,
-  type ConvKey,
-  type Focus,
-  focusKey,
-  seedChatActivity,
-  type Store,
-} from './store'
-import { fetchTeamsAndChannels } from './poller/teamsAndChannels'
-import { runCrossChatMentionPass } from './poller/crossChatMentions'
-import { hydrateMissingMembers } from './poller/hydrateMembers'
-import { mergeChatMembers } from './poller/chatList'
+import type { ChatMessage } from '../types'
+import { type AppState, type ConvKey, focusKey, type Store } from './store'
 import {
   ACTIVE_DEFAULT_MS,
   LIST_DEFAULT_MS,
-  MEMBER_PRESENCE_LIMIT,
   PRESENCE_DEFAULT_MS,
-  backoff,
   isAbortError,
-  jitter,
 } from './poller/intervals'
-import { fetchMemberPresence } from './poller/memberPresence'
-import { mergeWithOptimistic as mergeWithOptimisticImpl } from './poller/merge'
-import { shouldNotifyMention } from './poller/mentions'
-import { mergeActivePagePatch, type MessagesPage } from './poller/pagePatch'
 import { makeSleeper } from './poller/sleeper'
-
+import { makeActiveLoop } from './poller/activeLoop'
+import { makeListLoop } from './poller/listLoop'
+import { makePresenceLoop } from './poller/presenceLoop'
 import {
   loadOlderMessages as loadOlderMessagesImpl,
   type LoadOlderMessagesResult,
 } from './poller/loadOlder'
+import { mergeWithOptimistic as mergeWithOptimisticImpl } from './poller/merge'
 
 // Re-exports preserved for callers that import these from './poller' directly.
 export type { LoadOlderMessagesResult }
@@ -101,37 +82,39 @@ export type PollerHandle = {
   loadOlderMessages: () => Promise<LoadOlderMessagesResult>
 }
 
-async function fetchActiveMessages(focus: Focus, signal: AbortSignal): Promise<MessagesPage> {
-  if (focus.kind === 'chat') {
-    return listMessagesPage(focus.chatId, { signal })
-  }
-  if (focus.kind === 'channel') {
-    return listChannelMessagesPage(focus.teamId, focus.channelId, { signal })
-  }
-  return { messages: [] }
-}
-
 export function startPoller(opts: PollerOpts): PollerHandle {
   const { store, onMention, onError } = opts
   const activeMs = opts.intervals?.activeMs ?? ACTIVE_DEFAULT_MS
   const listMs = opts.intervals?.listMs ?? LIST_DEFAULT_MS
   const presenceMs = opts.intervals?.presenceMs ?? PRESENCE_DEFAULT_MS
 
-  let stopped = false
+  // --- Shared state ---
 
-  // seen-message-ID set for notification dedupe, keyed by ConvKey.
-  // First fetch for a conv populates without notifying; subsequent fetches
-  // diff against this set.
+  let stopped = false
+  const isStopped = () => stopped
+
+  // seen-message-ID set, shared between active loop and list loop's
+  // cross-chat probe so a list-diff seed prevents the active loop from
+  // re-notifying the same IDs when the user opens that chat.
   const seen = new Map<ConvKey, Set<string>>()
 
   const activeSleeper = makeSleeper()
   const listSleeper = makeSleeper()
   const presenceSleeper = makeSleeper()
 
+  // Per-iteration AbortController for the active loop, exposed so the
+  // focus-change subscriber and stop() can cancel the in-flight fetch.
   let activeAbort: AbortController | null = null
+  const setActiveAbort = (c: AbortController | null): void => {
+    activeAbort = c
+  }
 
-  // Wake the active loop and abort its in-flight fetch when focus changes,
-  // so opening a chat doesn't have to wait out the current poll interval.
+  // Hot-stop signal for background member hydration started by the list
+  // loop. Owned at this layer so stop() can abort it independently of
+  // the per-iteration listAbort.
+  const hydrateAbort = new AbortController()
+
+  // Wake the active loop and abort its in-flight fetch when focus changes.
   let lastFocusKey = focusKey(store.get().focus)
   const unsubscribe = store.subscribe((state) => {
     const k = focusKey(state.focus)
@@ -147,11 +130,6 @@ export function startPoller(opts: PollerOpts): PollerHandle {
     onError?.(loop, err instanceof Error ? err : new Error(String(err)))
   }
 
-  function extraBackoffForRateLimit(err: unknown): number {
-    if (err instanceof RateLimitError && err.retryAfterMs > 0) return err.retryAfterMs
-    return 0
-  }
-
   function loadOlderMessages(): Promise<LoadOlderMessagesResult> {
     return loadOlderMessagesImpl({
       store,
@@ -159,274 +137,37 @@ export function startPoller(opts: PollerOpts): PollerHandle {
     })
   }
 
-  async function runActiveLoop(): Promise<void> {
-    let consecutiveErrors = 0
-    while (!stopped) {
-      const focus = store.get().focus
-      const conv = focusKey(focus)
-      if (!conv) {
-        await activeSleeper.sleep(jitter(activeMs))
-        continue
-      }
-      activeAbort = new AbortController()
-      try {
-        const page = await fetchActiveMessages(focus, activeAbort.signal)
-        const messages = page.messages
-        if (stopped) return
-        // Only apply if the focus is still on the same conversation - the
-        // user may have moved on while we were in flight.
-        const stillSame = focusKey(store.get().focus) === conv
-        if (stillSame) {
-          const isFirst = !seen.has(conv)
-          const seenSet = seen.get(conv) ?? new Set<string>()
-          const myId = store.get().me?.id
-          const newMentions: ChatMessage[] = []
-          for (const msg of messages) {
-            if (seenSet.has(msg.id)) continue
-            seenSet.add(msg.id)
-            if (!isFirst && myId && shouldNotifyMention(msg, myId)) {
-              newMentions.push(msg)
-            }
-          }
-          seen.set(conv, seenSet)
-          store.set((s) => ({
-            ...mergeActivePagePatch(s, conv, page, focus),
-          }))
-          for (const msg of newMentions) {
-            onMention?.({ conv, message: msg, source: 'active' })
-          }
-        }
-        consecutiveErrors = 0
-      } catch (err) {
-        if (!isAbortError(err)) {
-          consecutiveErrors++
-          reportError('active', err)
-        }
-      } finally {
-        activeAbort = null
-      }
-      const wait = jitter(backoff(activeMs, consecutiveErrors))
-      await activeSleeper.sleep(wait + extraBackoffForRateLimit(undefined))
-    }
-  }
+  // --- Loop factories ---
 
-  // Per-chat snapshot of the last seen lastMessagePreview.id, used to
-  // detect new activity in non-active chats between list polls. Seeded
-  // on the very first list poll without firing any notifications.
-  const prevPreviewIds = new Map<string, string>()
-  let firstListPoll = true
+  const runActiveLoop = makeActiveLoop({
+    store,
+    sleeper: activeSleeper,
+    intervalMs: activeMs,
+    seen,
+    setActiveAbort,
+    isStopped,
+    onMention,
+    reportError: (err) => reportError('active', err),
+  })
 
-  // Tracks chat IDs we've already issued a getChat($expand=members) call
-  // for; once a chat is hydrated its members are carried forward via
-  // mergeChatMembers, so re-fetching on every list poll is wasted work.
-  const memberHydrated = new Set<string>()
-  const hydrateAbort = new AbortController()
+  const runListLoop = makeListLoop({
+    store,
+    sleeper: listSleeper,
+    intervalMs: listMs,
+    seen,
+    hydrateSignal: hydrateAbort.signal,
+    isStopped,
+    onMention,
+    reportError: (err) => reportError('list', err),
+  })
 
-  async function runListLoop(): Promise<void> {
-    let consecutiveErrors = 0
-    // Bookkeeping AbortController per iteration so stop() can cancel.
-    let listAbort: AbortController | null = null
-    while (!stopped) {
-      listAbort = new AbortController()
-      try {
-        const [chats, teamsAndChannels] = await Promise.all([
-          listChats({ signal: listAbort.signal }),
-          fetchTeamsAndChannels(listAbort.signal, (err) => reportError('list', err)),
-        ])
-        if (stopped) return
-        store.set((s) => ({
-          chats: mergeChatMembers(s.chats, chats),
-          teams: teamsAndChannels.teams,
-          channelsByTeam: teamsAndChannels.channelsByTeam,
-          conn: 'online',
-          lastListPollAt: new Date(),
-        }))
-
-        // Fire-and-forget: don't block the next list-poll iteration on
-        // member hydration. Concurrency-capped inside the function.
-        hydrateMissingMembers(
-          {
-            store,
-            hydrated: memberHydrated,
-            signal: hydrateAbort.signal,
-            isStopped: () => stopped,
-            reportError: (err) => reportError('list', err),
-          },
-          chats,
-        ).catch((err) => {
-          if (!isAbortError(err)) reportError('list', err)
-        })
-
-        const myId = store.get().me?.id
-        const wasFirst = firstListPoll
-        firstListPoll = false
-        if (myId && !wasFirst) {
-          await runCrossChatMentionPass(
-            {
-              store,
-              seen,
-              prevPreviewIds,
-              onMention,
-              reportError: (err) => reportError('list', err),
-            },
-            chats,
-            myId,
-            listAbort.signal,
-          )
-        } else {
-          // Seed prevPreviewIds without firing anything.
-          for (const chat of chats) {
-            const id = chat.lastMessagePreview?.id
-            if (id) prevPreviewIds.set(chat.id, id)
-          }
-          store.set((s) => ({
-            unreadByChatId: seedChatActivity(s.unreadByChatId, chats),
-          }))
-        }
-        consecutiveErrors = 0
-      } catch (err) {
-        if (!isAbortError(err)) {
-          consecutiveErrors++
-          reportError('list', err)
-          if (err instanceof GraphError && err.status === 401) {
-            store.set({ conn: 'authError' })
-          } else if (err instanceof RateLimitError) {
-            store.set({ conn: 'rateLimited' })
-          } else {
-            store.set({ conn: 'offline' })
-          }
-        }
-      } finally {
-        listAbort = null
-      }
-      await listSleeper.sleep(jitter(backoff(listMs, consecutiveErrors)))
-    }
-  }
-
-  async function runPresenceLoop(): Promise<void> {
-    let consecutiveErrors = 0
-    let presenceAbort: AbortController | null = null
-    // Once Teams unified presence has failed in a way that's clearly
-    // not transient (auth/scope/tenant policy), don't keep hitting that
-    // host every 60s. Fall back to the Graph path for the rest of the
-    // session and let the next teaminal launch retry.
-    let teamsPresenceUnreachable = false
-    while (!stopped) {
-      const state = store.get()
-      const caps = state.capabilities
-      const teamsPresenceEnabled = state.settings.useTeamsPresence !== false
-      const useTeams = teamsPresenceEnabled && !teamsPresenceUnreachable
-      const useGraph = caps?.presence.ok !== false
-
-      if (!useTeams && !useGraph) {
-        // Both paths are off; presence stays whatever the realtime
-        // bridge / store seeded.
-        await presenceSleeper.sleep(jitter(presenceMs))
-        continue
-      }
-
-      presenceAbort = new AbortController()
-      let updated = false
-      try {
-        if (useTeams) {
-          try {
-            const teams = await getMyTeamsPresence({
-              profile: getActiveProfile(),
-              signal: presenceAbort.signal,
-            })
-            if (stopped) return
-            if (teams) {
-              const meId = store.get().me?.id ?? teams.oid
-              store.set({
-                myPresence: {
-                  id: meId,
-                  availability: teams.availability as Presence['availability'],
-                  activity: teams.activity as Presence['activity'],
-                },
-              })
-              updated = true
-            }
-          } catch (err) {
-            if (isAbortError(err)) {
-              // fall through to finally; don't bump errors or fall back.
-            } else if (
-              err instanceof TeamsPresenceError &&
-              (err.status === 401 || err.status === 403 || err.status === 404)
-            ) {
-              // Hard auth/scope failure or wrong-tenant; stop trying for
-              // this session, surface once, and fall through to Graph.
-              teamsPresenceUnreachable = true
-              reportError('presence', err)
-            } else {
-              throw err
-            }
-          }
-        }
-        if (!updated && useGraph) {
-          const myPresence = await getMyPresence({ signal: presenceAbort.signal })
-          if (stopped) return
-          store.set({ myPresence })
-        }
-
-        // --- Other-user presence for the chat-list dot ---
-        // Collect the "other" AAD user id for each hydrated 1:1 chat,
-        // capped at MEMBER_PRESENCE_LIMIT to bound the cost. Honors the
-        // showPresenceInList setting so a user who hides the dot does
-        // not pay for the lookup. Failures here never bubble - missing
-        // member presence simply renders nothing.
-        const stateAfterSelf = store.get()
-        const wantsMembers = stateAfterSelf.settings.showPresenceInList !== false
-        if (wantsMembers && !presenceAbort.signal.aborted) {
-          const meId = stateAfterSelf.me?.id
-          const oids: string[] = []
-          const seen = new Set<string>()
-          for (const chat of stateAfterSelf.chats) {
-            if (chat.chatType !== 'oneOnOne') continue
-            const other = (chat.members ?? []).find((m) => m.userId && m.userId !== meId)
-            const id = other?.userId
-            if (!id || seen.has(id)) continue
-            seen.add(id)
-            oids.push(id)
-            if (oids.length >= MEMBER_PRESENCE_LIMIT) break
-          }
-          if (oids.length > 0) {
-            try {
-              const fetched = await fetchMemberPresence(oids, {
-                useTeams,
-                useGraph,
-                signal: presenceAbort.signal,
-              })
-              if (stopped) return
-              if (fetched.size > 0) {
-                store.set((s) => {
-                  const next = { ...s.memberPresence }
-                  for (const [id, p] of fetched) next[id] = p
-                  return { memberPresence: next }
-                })
-              }
-            } catch (err) {
-              if (!isAbortError(err)) {
-                // Don't bump consecutiveErrors: self-presence already
-                // succeeded, and we don't want a transient member-
-                // presence failure to put the whole loop in backoff.
-                reportError('presence', err)
-              }
-            }
-          }
-        }
-
-        consecutiveErrors = 0
-      } catch (err) {
-        if (!isAbortError(err)) {
-          consecutiveErrors++
-          reportError('presence', err)
-        }
-      } finally {
-        presenceAbort = null
-      }
-      await presenceSleeper.sleep(jitter(backoff(presenceMs, consecutiveErrors)))
-    }
-  }
+  const runPresenceLoop = makePresenceLoop({
+    store,
+    sleeper: presenceSleeper,
+    intervalMs: presenceMs,
+    isStopped,
+    reportError: (err) => reportError('presence', err),
+  })
 
   // Kick off all loops; failures inside any loop are caught locally so
   // Promise.all does not need to short-circuit.
@@ -444,8 +185,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
       // sleep resolves AND any future sleep() inside the loop is a
       // no-op. Without the latch, a loop whose previous sleep just
       // resolved on the timer (waker=null in that window) would start a
-      // fresh backoff sleep nobody can wake — that's the source of the
-      // multi-second afterEach hangs we used to see in poller.test.ts.
+      // fresh backoff sleep nobody can wake.
       activeSleeper.close()
       listSleeper.close()
       presenceSleeper.close()
