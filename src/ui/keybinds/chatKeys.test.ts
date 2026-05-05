@@ -147,4 +147,51 @@ describe('handleChatKeys', () => {
     const { ctx } = makeCtx(CHAT_FOCUS)
     expect(handleChatKeys({ input: 'x', key: makeKey() }, ctx)).toBe('pass')
   })
+
+  test('t opens a thread when in channel focus and a message is focused', () => {
+    const { ctx, store } = makeCtx({
+      kind: 'channel',
+      teamId: 't1',
+      channelId: 'ch1',
+    })
+    ctx.focusedMessageId = 'msg-root-1'
+    expect(handleChatKeys({ input: 't', key: makeKey() }, ctx)).toBe('handled')
+    expect(store.get().focus).toEqual({
+      kind: 'thread',
+      teamId: 't1',
+      channelId: 'ch1',
+      rootId: 'msg-root-1',
+    })
+  })
+
+  test('t in channel focus without a focused message is a pass', () => {
+    const { ctx } = makeCtx({ kind: 'channel', teamId: 't1', channelId: 'ch1' })
+    expect(handleChatKeys({ input: 't', key: makeKey() }, ctx)).toBe('pass')
+  })
+
+  test('h in thread returns to parent channel, not to list', () => {
+    const { ctx, store } = makeCtx({
+      kind: 'thread',
+      teamId: 't1',
+      channelId: 'ch1',
+      rootId: 'r1',
+    })
+    handleChatKeys({ input: 'h', key: makeKey() }, ctx)
+    expect(store.get().focus).toEqual({
+      kind: 'channel',
+      teamId: 't1',
+      channelId: 'ch1',
+    })
+  })
+
+  test('Esc in thread returns to parent channel', () => {
+    const { ctx, store } = makeCtx({
+      kind: 'thread',
+      teamId: 't1',
+      channelId: 'ch1',
+      rootId: 'r1',
+    })
+    handleChatKeys({ input: '', key: makeKey({ escape: true }) }, ctx)
+    expect(store.get().focus.kind).toBe('channel')
+  })
 })

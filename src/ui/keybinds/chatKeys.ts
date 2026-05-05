@@ -15,6 +15,8 @@ export type ChatKeysCtx = {
   // Current cursor position in the active conversation's messages list.
   // -1 / 0 are equivalent for "at top".
   activeMessageCursor: number
+  // Id of the message under the cursor, used to open a thread.
+  focusedMessageId?: string
   moveMessageCursor: (delta: number) => void
   jumpMessageBottom: () => void
   tryLoadOlder: () => void
@@ -26,6 +28,19 @@ const HALF_PAGE = Math.ceil(20 / 2)
 export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyResult {
   const { store, moveMessageCursor, jumpMessageBottom, tryLoadOlder } = ctx
   if (ctx.focus.kind === 'list') return 'pass'
+
+  // Thread-specific routing: h / Left / Esc must return to the parent
+  // channel, not the list. Has to come before the generic 'h → list'
+  // rule below.
+  if (
+    ctx.focus.kind === 'thread' &&
+    (input === 'h' || input === 'H' || key.leftArrow || key.escape)
+  ) {
+    store.set({
+      focus: { kind: 'channel', teamId: ctx.focus.teamId, channelId: ctx.focus.channelId },
+    })
+    return 'handled'
+  }
 
   if (input === 'h' || input === 'H' || key.leftArrow) {
     store.set({ focus: { kind: 'list' }, inputZone: 'list' })
@@ -56,6 +71,20 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
     tryLoadOlder()
     return 'handled'
   }
+  // 't' opens the thread overlay when a channel root is focused.
+  if (input === 't' && ctx.focus.kind === 'channel' && ctx.focusedMessageId) {
+    store.set({
+      focus: {
+        kind: 'thread',
+        teamId: ctx.focus.teamId,
+        channelId: ctx.focus.channelId,
+        rootId: ctx.focusedMessageId,
+      },
+    })
+    return 'handled'
+  }
+  // From a thread, h / Esc returns to its parent channel — handled
+  // earlier, before the generic 'h → list' rule.
   if (key.escape) {
     store.set({ focus: { kind: 'list' }, inputZone: 'list' })
     return 'handled'

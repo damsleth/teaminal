@@ -385,7 +385,10 @@ function TypingLine(props: { typing: TypingIndicator[]; theme: Theme }) {
 }
 
 function headerForFocus(
-  focus: { kind: 'chat'; chatId: string } | { kind: 'channel'; teamId: string; channelId: string },
+  focus:
+    | { kind: 'chat'; chatId: string }
+    | { kind: 'channel'; teamId: string; channelId: string }
+    | { kind: 'thread'; teamId: string; channelId: string; rootId: string },
   chats: Chat[],
   teams: Team[],
   channelsByTeam: Record<string, Channel[]>,
@@ -400,5 +403,8 @@ function headerForFocus(
   const channel = (channelsByTeam[focus.teamId] ?? []).find((c) => c.id === focus.channelId)
   const teamName = team?.displayName ?? '?'
   const channelName = channel?.displayName ?? '?'
+  if (focus.kind === 'thread') {
+    return `${teamName} · # ${channelName} · thread`
+  }
   return `${teamName} · # ${channelName}`
 }

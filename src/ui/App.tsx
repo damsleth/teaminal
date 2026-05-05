@@ -195,6 +195,7 @@ export function App() {
           store,
           focus,
           activeMessageCursor,
+          focusedMessageId,
           moveMessageCursor,
           jumpMessageBottom,
           tryLoadOlder,
