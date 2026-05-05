@@ -6,7 +6,8 @@
 // HTML bodies are converted via src/ui/html.htmlToText so <at>, <emoji>,
 // <a>, and entity refs render correctly.
 
-import { Box, Text } from 'ink'
+import { Box, Text, useStdout } from 'ink'
+import { useEffect, useState } from 'react'
 import { chatLabel, shortName } from '../state/selectables'
 import { focusKey, type TypingIndicator } from '../state/store'
 import type { Chat, ChatMessage, Channel, Team } from '../types'
@@ -22,7 +23,13 @@ import { useAppState, useTheme } from './StoreContext'
 
 const TYPING_DOT = '…'
 
-const ROWS_VISIBLE = 20
+// Reserve for surrounding chrome so the message pane doesn't overflow the
+// terminal. Header bar (3) + composer box (3) + status bar (1) + pane
+// border (2) + safety pad (1) = 10. Cozy density adds an in-pane header
+// row, the loading-older indicator (when present) is one extra line, and
+// the typing indicator (when present) is another.
+const CHROME_RESERVED_ROWS = 10
+const MIN_VISIBLE_ROWS = 5
 // Narrow column - message rows show first name / nick only. The chat /
 // channel header above already shows the full display name(s), so the
 // per-row column doesn't need to disambiguate.
@@ -35,6 +42,7 @@ export function MessagePane(props: {
 }) {
   const focus = useAppState((s) => s.focus)
   const messagesByConvo = useAppState((s) => s.messagesByConvo)
+  const messageCacheByConvo = useAppState((s) => s.messageCacheByConvo)
   const me = useAppState((s) => s.me)
   const chats = useAppState((s) => s.chats)
   const teams = useAppState((s) => s.teams)
@@ -46,6 +54,19 @@ export function MessagePane(props: {
   const typingByConvo = useAppState((s) => s.typingByConvo)
   const theme = useTheme()
 
+  // Track terminal height live so the message slice fills the available
+  // space. Without this we capped at 20 rows even on tall terminals.
+  const { stdout } = useStdout()
+  const [terminalRows, setTerminalRows] = useState<number>(stdout?.rows ?? 24)
+  useEffect(() => {
+    if (!stdout) return
+    const onResize = () => setTerminalRows(stdout.rows ?? 24)
+    stdout.on('resize', onResize)
+    return () => {
+      stdout.off('resize', onResize)
+    }
+  }, [stdout])
+
   if (focus.kind === 'list') {
     return (
       <Box flexDirection="column" flexGrow={1} paddingX={1}>
@@ -56,13 +77,12 @@ export function MessagePane(props: {
 
   const conv = focusKey(focus)!
   const messages = messagesByConvo[conv] ?? []
+  const cache = messageCacheByConvo[conv]
   const headerLabel = headerForFocus(focus, chats, teams, channelsByTeam, me?.id)
   const focusedIndex = props.focusedMessageId
     ? messages.findIndex((m) => m.id === props.focusedMessageId)
     : -1
-  const start = visibleStart(messages.length, focusedIndex, props.focusIndicatorActive === true)
-  const visible = messages.slice(start, start + ROWS_VISIBLE)
-  const pageState = readMessagePageState(messages)
+  const pageState = readMessagePageState(cache ?? messages)
   const loadMoreState =
     props.loadOlderState ??
     (pageState.loading
@@ -72,6 +92,21 @@ export function MessagePane(props: {
         : pageState.hasOlder
           ? 'idle'
           : 'unavailable')
+  const isLoadingOlder = loadMoreState === 'loading'
+  const cozyRows = density === 'cozy' ? 1 : 0
+  const typingActive = (typingByConvo[conv] ?? []).length > 0
+  const reservedDynamic = (isLoadingOlder ? 1 : 0) + (typingActive ? 1 : 0)
+  const rowsVisible = Math.max(
+    MIN_VISIBLE_ROWS,
+    terminalRows - CHROME_RESERVED_ROWS - cozyRows - reservedDynamic,
+  )
+  const start = visibleStart(
+    messages.length,
+    focusedIndex,
+    props.focusIndicatorActive === true,
+    rowsVisible,
+  )
+  const visible = messages.slice(start, start + rowsVisible)
   const rows = buildMessageRows(visible, {
     showLoadMoreRow: messages.length > 0 && start === 0,
     loadMoreState,
@@ -82,6 +117,9 @@ export function MessagePane(props: {
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={1}>
       {density === 'cozy' && <Text bold>{headerLabel}</Text>}
+      {isLoadingOlder && start !== 0 && (
+        <Text color={theme.mutedText}>… loading older messages</Text>
+      )}
       <Box flexDirection="column">
         {messages.length === 0 ? (
           <Text color="gray"> loading...</Text>
@@ -247,12 +285,17 @@ function previewBody(m: ChatMessage): string {
   return htmlToText(raw).slice(0, 200)
 }
 
-function visibleStart(total: number, focusedIndex: number, focusActive: boolean): number {
-  if (total <= ROWS_VISIBLE) return 0
-  if (!focusActive || focusedIndex < 0) return total - ROWS_VISIBLE
-  const preferred = focusedIndex - ROWS_VISIBLE + 1
+function visibleStart(
+  total: number,
+  focusedIndex: number,
+  focusActive: boolean,
+  rowsVisible: number,
+): number {
+  if (total <= rowsVisible) return 0
+  if (!focusActive || focusedIndex < 0) return total - rowsVisible
+  const preferred = focusedIndex - rowsVisible + 1
   if (preferred < 0) return 0
-  if (preferred > total - ROWS_VISIBLE) return total - ROWS_VISIBLE
+  if (preferred > total - rowsVisible) return total - rowsVisible
   return preferred
 }
 

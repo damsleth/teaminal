@@ -110,7 +110,9 @@ All keys are optional. Unknown keys and invalid values produce stderr warnings a
   "messageFocusIndicatorChar": ">",
   "messageFocusIndicatorColor": null,
   "messageFocusBackgroundColor": null,
-  "themeOverrides": {}
+  "themeOverrides": {},
+  "useTeamsPresence": true,
+  "forceAvailableWhenFocused": true
 }
 ```
 
@@ -129,6 +131,8 @@ All keys are optional. Unknown keys and invalid values produce stderr warnings a
 | `messageFocusIndicatorColor`   | color or null        |  `null` | Override focused-message marker color.                                                   |
 | `messageFocusBackgroundColor`  | color or null        |  `null` | Optional focused-message background color.                                               |
 | `themeOverrides`               | object               |    `{}` | Override color roles such as `text`, `mutedText`, `unread`, `timestamp`, and `presence`. |
+| `useTeamsPresence`             | boolean              |  `true` | Use the Teams unified presence endpoint (`presence.teams.microsoft.com`) for own presence. Falls back to Graph `/me/presence` automatically on 401/403/404. Set to `false` to force Graph-only in tenants that block public-client access to that host. |
+| `forceAvailableWhenFocused`    | boolean              |  `true` | While the terminal window has focus (DEC focus reporting; CSI ?1004), PUT `forceavailability=Available` to `presence.teams.microsoft.com` so Teams shows you Available, like the desktop client does for an active window. The override expires server-side after ~5 min and is refreshed inside that window. Set to `false` to leave presence to Teams' own desktop client / inactivity timer. |
 
 The in-app Settings menu persists changes back to `config.json`.
 

@@ -172,6 +172,7 @@ describe('ROOT_MENU shape', () => {
       'chatListDensity',
       'chatListShortNames',
       'showPresenceInList',
+      'forceAvailableWhenFocused',
       'showTimestampsInPane',
       'windowHeight',
       'messageFocusIndicatorEnabled',

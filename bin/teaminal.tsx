@@ -9,17 +9,24 @@ import { notifyMention } from '../src/notify/notify'
 import { RealtimeEventBus } from '../src/realtime/events'
 import { TrouterTransport } from '../src/realtime/trouter'
 import { startPoller } from '../src/state/poller'
+import { startForceAvailabilityDriver } from '../src/state/forceAvailability'
 import { startRealtimeBridge } from '../src/state/realtimeBridge'
-import { createAppStore } from '../src/state/store'
+import { createAppStore, messagesFromCaches } from '../src/state/store'
+import {
+  flushMessageCache,
+  loadMessageCache,
+  scheduleMessageCacheSave,
+} from '../src/state/messageCachePersistence'
 import { getToken } from '../src/auth/owaPiggy'
 import { App } from '../src/ui/App'
 import { ErrorBoundary } from '../src/ui/ErrorBoundary'
+import { startFocusTracker } from '../src/ui/focusTracker'
 import { htmlToText } from '../src/ui/html'
 import { PollerProvider, type PollerHandleRef } from '../src/ui/PollerContext'
 import { StoreProvider } from '../src/ui/StoreContext'
 import { debug, warn } from '../src/log'
 
-const VERSION = '0.6.0'
+const VERSION = '0.8.0'
 
 const HELP = `teaminal ${VERSION}
 
@@ -96,6 +103,32 @@ if (!process.stdin.isTTY) {
 
 const store = createAppStore()
 
+// Hydrate persistent message cache before the UI mounts so the message
+// pane shows history immediately and "Load older messages" knows whether
+// more pages are reachable. Failures are silent — the active poller will
+// repopulate from Graph.
+try {
+  const persisted = loadMessageCache()
+  if (Object.keys(persisted).length > 0) {
+    store.set({
+      messageCacheByConvo: persisted,
+      messagesByConvo: messagesFromCaches(persisted),
+    })
+    debug(`bootstrap: hydrated ${Object.keys(persisted).length} cached conversations`)
+  }
+} catch (err) {
+  warn('bootstrap: hydrate message cache failed:', err instanceof Error ? err.message : String(err))
+}
+
+// Persist message cache on every relevant store change. Debounced inside
+// scheduleMessageCacheSave so chat-spam doesn't thrash the disk.
+let lastSavedCaches = store.get().messageCacheByConvo
+store.subscribe((s) => {
+  if (s.messageCacheByConvo === lastSavedCaches) return
+  lastSavedCaches = s.messageCacheByConvo
+  scheduleMessageCacheSave(s.messageCacheByConvo)
+})
+
 // Load user preferences from ~/.config/teaminal/config.json (or
 // $XDG_CONFIG_HOME/teaminal/config.json). Missing file = defaults; any
 // validation warnings go to stderr under TEAMINAL_DEBUG.
@@ -124,6 +157,17 @@ const ink = render(
     </StoreProvider>
   </ErrorBoundary>,
 )
+
+// Terminal focus reporting. Started before bootstrap so the first
+// force-availability PUT (driven below) sees an accurate focused state.
+// Safe to start before render/auth: the tracker only writes a single
+// CSI sequence and attaches a stdin listener.
+const focusTracker = startFocusTracker(store)
+
+// Force-availability driver. Reads store.settings.forceAvailableWhenFocused
+// and store.terminalFocused; PUTs presence.teams.microsoft.com when both
+// are true. Token errors disable for the session, never crash.
+const forceAvailability = startForceAvailabilityDriver(store)
 
 // Background bootstrap. Errors update the store (conn) so the StatusBar
 // reflects them; fatal auth issues print to stderr and exit.
@@ -203,7 +247,10 @@ const ink = render(
     bridge.stop()
     bus.clear()
     pollerHandleRef.current = null
+    forceAvailability.stop()
+    focusTracker.stop()
     await handle.stop()
+    flushMessageCache()
   } catch (err) {
     ink.unmount()
     if (err instanceof Error) {

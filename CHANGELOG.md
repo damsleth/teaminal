@@ -8,6 +8,105 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Force-available while terminal focused. teaminal now enables DEC
+  focus reporting (CSI `?1004`) and PUTs `forceavailability=Available`
+  to `presence.teams.microsoft.com` whenever the terminal window has
+  focus, mirroring how the Teams desktop client keeps you Available
+  while you're actively using it. The override expires server-side
+  after ~5 minutes; the driver refreshes every 4 minutes inside that
+  window. On blur the override is left to decay naturally rather than
+  cleared (restoring auto-presence would require guessing the user's
+  "real" state). New `forceAvailableWhenFocused` config key (default
+  `true`) and matching toggle under Settings → "Set Available while
+  terminal focused". 401/403/404 from the endpoint disable the driver
+  for the session and warn once. Same `PresenceRW` token used for
+  presence reads — no new scope.
+- Other-user presence dots in the chat list. The presence loop now
+  fetches presence for the "other" AAD user in each hydrated 1:1 chat
+  (capped at the first 50 to bound cost) and writes them to
+  `memberPresence`, so the green/yellow/red dot next to the row matches
+  reality. Uses Teams unified presence when available, with a Graph
+  `getPresencesByUserId` fallback when the Teams path is unreachable
+  for the session. Honors the existing `Show presence in chat list`
+  setting — disabling it skips the network call entirely. The realtime
+  bridge also seeds `memberPresence` on `presence-changed` pushes for
+  previously-unseen users (was previously dropped if the entry didn't
+  already exist), so dots light up the moment Trouter delivers an
+  update.
+- Diagnostics presence row now reflects what teaminal actually uses.
+  `probeCapabilities` targets the Teams unified-presence endpoint
+  (`presence.teams.microsoft.com`, `aud=presence.teams.microsoft.com`,
+  `scp=PresenceRW`) instead of Graph `/me/presence`. In tenants where
+  the FOCI Graph token has no `Presence.Read` scope, the runtime path
+  works fine but the old probe lit up `presence unavailable 403` —
+  diagnostics now agrees with reality. `TeamsPresenceError` 401/403/404
+  classify the same way as the Graph variants did.
+- Self-presence at cold start without `Presence.Read`. The presence loop
+  now prefers the Teams unified-presence endpoint
+  (`presence.teams.microsoft.com`) for own presence, which works under
+  FOCI tokens whose Graph audience does not carry `Presence.Read`. The
+  Teams endpoint is also richer (deviceType, OOO, work-location). Falls
+  back to Graph `/me/presence` automatically on a 401/403/404 from the
+  Teams call, and never re-tries Teams in the same session after such a
+  failure. New optional `useTeamsPresence` config key (default `true`)
+  forces the legacy Graph-only path when set to `false` — useful in
+  tenants that block the public client from talking to
+  `presence.teams.microsoft.com`. Trouter `presence-changed` pushes
+  still take precedence over polled values.
+- `getToken({ scope })` overload on `src/auth/owaPiggy.ts`. Lets internal
+  callers ask for a token with a non-default audience by routing through
+  owa-piggy's existing `--scope` flag. Cached separately from the
+  default-graph token so concurrent loops with different audiences do
+  not fight each other in the in-process cache. The legacy
+  `getToken(profile)` string overload is preserved.
+
+### Notes
+
+- No changes to owa-piggy itself were required for this release.
+  The Teams-presence path uses the existing `--scope` flag, never
+  `--json`, so no rotated refresh tokens are exposed.
+
+## [0.7.2] - 2026-05-04
+
+### Added
+
+- Persistent message cache. Older messages loaded into a chat or channel
+  are now written to `${XDG_CACHE_HOME:-~/.cache}/teaminal/messages.json`
+  and rehydrated on next launch, so reopening a conversation no longer
+  re-fetches pages from Graph. Capped at 200 messages per conversation
+  and 100 conversations; optimistic / failed sends are never persisted.
+  Pagination cursors (`@odata.nextLink`) and `fullyLoaded` are restored
+  too, so "Load older messages" picks up where the previous session left
+  off.
+
+### Changed
+
+- Message pane now fills the available terminal height instead of
+  capping at 20 rows. Resizing the terminal recomputes the visible row
+  count live.
+- A subtle `… loading older messages` indicator is shown above the
+  message list when an older-history fetch is in flight, even when the
+  load-more row itself is scrolled out of view.
+
+### Fixed
+
+- Presence loop no longer hammers Graph with 401s when the owa-piggy
+  token does not carry the `Presence.Read` scope. The loop now skips on
+  any failed presence capability (previously only `unavailable` / 403
+  was handled, while `unauthorized` / 401 from a missing scope kept
+  retrying). Own presence is still picked up live from trouter
+  `presence-changed` events when the token grants it elsewhere.
+
+- Half-page navigation (`U` / `D`) now responds to lowercase keystrokes
+  too. Previously it required Shift, unlike `J` / `K`.
+
+- Accounts modal now lists every owa-piggy profile. The status parser
+  previously only recognized the `[profile=name]` header format, so real
+  output (`profile:      name`) collapsed into a single `<owa-default>`
+  entry and additional profiles were dropped.
+
+### Added
+
 - Real-time transport layer (Option E hybrid): internal event bus,
   trouter WebSocket transport, and realtime bridge that accelerates
   polling on push events.

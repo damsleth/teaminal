@@ -148,6 +148,81 @@ describe('getToken caching', () => {
     await getToken()
     expect(seenArgs).toEqual(['token', '--audience', 'graph'])
   })
+
+  test('passes --scope through to the runner and skips --audience', async () => {
+    const token = makeJwt({ exp: FAR_FUTURE })
+    let seenArgs: string[] = []
+    __setRunnerForTests(async (args) => {
+      seenArgs = args
+      return { stdout: token, stderr: '', exitCode: 0 }
+    })
+
+    await getToken({ scope: 'https://presence.teams.microsoft.com/.default' })
+    expect(seenArgs).toEqual(['token', '--scope', 'https://presence.teams.microsoft.com/.default'])
+    expect(seenArgs).not.toContain('--audience')
+  })
+
+  test('passes --scope and --profile together when both are supplied', async () => {
+    const token = makeJwt({ exp: FAR_FUTURE })
+    let seenArgs: string[] = []
+    __setRunnerForTests(async (args) => {
+      seenArgs = args
+      return { stdout: token, stderr: '', exitCode: 0 }
+    })
+
+    await getToken({
+      profile: 'work',
+      scope: 'https://presence.teams.microsoft.com/.default',
+    })
+    expect(seenArgs).toEqual([
+      'token',
+      '--scope',
+      'https://presence.teams.microsoft.com/.default',
+      '--profile',
+      'work',
+    ])
+  })
+
+  test('caches different scopes independently for the same profile', async () => {
+    const tokenGraph = makeJwt({ exp: FAR_FUTURE, aud: 'https://graph.microsoft.com' })
+    const tokenPresence = makeJwt({
+      exp: FAR_FUTURE,
+      aud: 'https://presence.teams.microsoft.com',
+    })
+    let calls = 0
+    __setRunnerForTests(async (args) => {
+      calls++
+      const scopeIdx = args.indexOf('--scope')
+      return {
+        stdout: scopeIdx >= 0 ? tokenPresence : tokenGraph,
+        stderr: '',
+        exitCode: 0,
+      }
+    })
+
+    const a = await getToken()
+    const b = await getToken({ scope: 'https://presence.teams.microsoft.com/.default' })
+    const aAgain = await getToken()
+    const bAgain = await getToken({ scope: 'https://presence.teams.microsoft.com/.default' })
+    expect(a).toBe(tokenGraph)
+    expect(b).toBe(tokenPresence)
+    expect(aAgain).toBe(tokenGraph)
+    expect(bAgain).toBe(tokenPresence)
+    // One spawn per (profile, scope) combo, then cached forever within margin.
+    expect(calls).toBe(2)
+  })
+
+  test('back-compat: getToken(profileString) still works', async () => {
+    const token = makeJwt({ exp: FAR_FUTURE })
+    let seenArgs: string[] = []
+    __setRunnerForTests(async (args) => {
+      seenArgs = args
+      return { stdout: token, stderr: '', exitCode: 0 }
+    })
+
+    expect(await getToken('work')).toBe(token)
+    expect(seenArgs).toEqual(['token', '--audience', 'graph', '--profile', 'work'])
+  })
 })
 
 describe('getToken single-flight', () => {
@@ -191,6 +266,29 @@ describe('getToken single-flight', () => {
     const [a, b] = await Promise.all([getToken('work'), getToken('home')])
     expect(a).toBe(tokenA)
     expect(b).toBe(tokenB)
+    expect(calls).toBe(2)
+  })
+
+  test('different scopes do not block each other under concurrency', async () => {
+    const tokenGraph = makeJwt({ exp: FAR_FUTURE, sub: 'g' })
+    const tokenPresence = makeJwt({ exp: FAR_FUTURE, sub: 'p' })
+    let calls = 0
+    __setRunnerForTests(async (args) => {
+      calls++
+      const scopeIdx = args.indexOf('--scope')
+      return {
+        stdout: scopeIdx >= 0 ? tokenPresence : tokenGraph,
+        stderr: '',
+        exitCode: 0,
+      }
+    })
+
+    const [a, b] = await Promise.all([
+      getToken(),
+      getToken({ scope: 'https://presence.teams.microsoft.com/.default' }),
+    ])
+    expect(a).toBe(tokenGraph)
+    expect(b).toBe(tokenPresence)
     expect(calls).toBe(2)
   })
 })
@@ -248,28 +346,34 @@ describe('invalidate', () => {
     expect(calls).toBe(2)
   })
 
-  test('invalidating one profile leaves others cached', async () => {
-    const tokenWork = makeJwt({ exp: FAR_FUTURE, sub: 'w' })
-    const tokenHome = makeJwt({ exp: FAR_FUTURE, sub: 'h' })
-    let calls = 0
+  test('invalidate({ scope }) clears only that scope, not the default-graph entry', async () => {
+    const tokenGraph = makeJwt({ exp: FAR_FUTURE, sub: 'g' })
+    const tokenPresence1 = makeJwt({ exp: FAR_FUTURE, sub: 'p1' })
+    const tokenPresence2 = makeJwt({ exp: FAR_FUTURE, sub: 'p2' })
+    let presenceCalls = 0
+    let graphCalls = 0
     __setRunnerForTests(async (args) => {
-      calls++
-      const profile = args[args.indexOf('--profile') + 1]
-      return {
-        stdout: profile === 'work' ? tokenWork : tokenHome,
-        stderr: '',
-        exitCode: 0,
+      const scopeIdx = args.indexOf('--scope')
+      if (scopeIdx >= 0) {
+        presenceCalls++
+        return {
+          stdout: presenceCalls === 1 ? tokenPresence1 : tokenPresence2,
+          stderr: '',
+          exitCode: 0,
+        }
       }
+      graphCalls++
+      return { stdout: tokenGraph, stderr: '', exitCode: 0 }
     })
 
-    await getToken('work')
-    await getToken('home')
-    expect(calls).toBe(2)
-
-    invalidate('work')
-    await getToken('work') // re-spawn
-    await getToken('home') // still cached
-    expect(calls).toBe(3)
+    const scope = 'https://presence.teams.microsoft.com/.default'
+    expect(await getToken()).toBe(tokenGraph)
+    expect(await getToken({ scope })).toBe(tokenPresence1)
+    invalidate({ scope })
+    expect(await getToken()).toBe(tokenGraph) // graph still cached
+    expect(await getToken({ scope })).toBe(tokenPresence2) // presence respawned
+    expect(graphCalls).toBe(1)
+    expect(presenceCalls).toBe(2)
   })
 })
 
@@ -327,6 +431,37 @@ describe('parseStatusProfiles', () => {
       profile: 'personal',
       valid: false,
       error: 'AADSTS700084: refresh token expired',
+    })
+  })
+
+  test('parses real owa-piggy status output with `profile:` header lines', () => {
+    const profiles = parseStatusProfiles(
+      [
+        'profile:      brkh',
+        'authtoken:    expires 2026-05-04T17:51:37Z',
+        'refreshtoken: expires 2026-05-05T16:24:08Z',
+        'audience:     graph (https://graph.microsoft.com)',
+        'scope(s):     AuditLog.Create, Channel.ReadBasic.All, Chat.Read, ... (26 scopes)',
+        'launchd:      true',
+        '',
+        'profile:      crayon',
+        'authtoken:    expires 2026-05-04T17:48:53Z',
+        'refreshtoken: expires 2026-05-05T11:55:04Z',
+        'audience:     graph (https://graph.microsoft.com)',
+        'scope(s):     AuditLog.Create, Channel.ReadBasic.All, Chat.Read, ... (26 scopes)',
+        'launchd:      false',
+      ].join('\n'),
+    )
+    expect(profiles).toHaveLength(2)
+    expect(profiles[0]).toMatchObject({
+      profile: 'brkh',
+      valid: true,
+      accessTokenExpiresAt: '2026-05-04T17:51:37Z',
+    })
+    expect(profiles[1]).toMatchObject({
+      profile: 'crayon',
+      valid: true,
+      accessTokenExpiresAt: '2026-05-04T17:48:53Z',
     })
   })
 

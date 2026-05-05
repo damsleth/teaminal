@@ -118,20 +118,25 @@ export function startRealtimeBridge(opts: RealtimeBridgeOpts): RealtimeBridgeHan
           },
         })
       } else {
-        // Update member presence if we're tracking this user.
-        const existing = store.get().memberPresence[event.userId]
-        if (existing) {
-          store.set((s) => ({
+        // Update member presence for any user we've ever seen, and seed
+        // new entries too. The bridge cannot know which user ids the
+        // chat list cares about, but the cost of an extra map entry is
+        // negligible and it lets push notifications instantly populate
+        // dots for users the periodic poll has not yet covered.
+        store.set((s) => {
+          const existing = s.memberPresence[event.userId]
+          return {
             memberPresence: {
               ...s.memberPresence,
               [event.userId]: {
-                ...existing,
-                availability: event.availability as typeof existing.availability,
-                activity: event.availability as typeof existing.activity,
+                id: event.userId,
+                availability: event.availability as AppState['memberPresence'][string]['availability'],
+                activity: (existing?.activity ??
+                  event.availability) as AppState['memberPresence'][string]['activity'],
               },
             },
-          }))
-        }
+          }
+        })
       }
     }),
   )

@@ -29,6 +29,7 @@ export type ToggleKey =
   | 'windowHeight'
   | 'messageFocusIndicatorEnabled'
   | 'messageFocusIndicatorChar'
+  | 'forceAvailableWhenFocused'
 
 export type MenuAction =
   | { kind: 'resume' }
@@ -80,6 +81,11 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'showPresenceInList',
         label: 'Show presence in chat list',
         action: { kind: 'toggle-setting', key: 'showPresenceInList' },
+      },
+      {
+        id: 'forceAvailableWhenFocused',
+        label: 'Set Available while terminal focused',
+        action: { kind: 'toggle-setting', key: 'forceAvailableWhenFocused' },
       },
       {
         id: 'showTimestampsInPane',
@@ -189,6 +195,7 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'showPresenceInList':
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
+    case 'forceAvailableWhenFocused':
       return !current as Settings[K]
     case 'windowHeight':
       return cycleWindowHeight(current as number) as Settings[K]
@@ -223,6 +230,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'showPresenceInList':
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
+    case 'forceAvailableWhenFocused':
       return value ? 'on' : 'off'
     case 'windowHeight':
       return value === 0 ? 'full' : `${value} rows`

@@ -9,7 +9,8 @@
 // All probes are non-mutating GETs - we never POST a test message to
 // verify send permissions.
 
-import { graph, GraphError } from './client'
+import { getActiveProfile, graph, GraphError } from './client'
+import { getMyTeamsPresence, TeamsPresenceError } from './teamsPresence'
 
 export type CapabilityArea = 'me' | 'chats' | 'joinedTeams' | 'presence'
 
@@ -31,17 +32,25 @@ export type ProbeOpts = {
 }
 
 function classify(err: unknown): CapabilityResult {
-  if (err instanceof GraphError) {
+  if (err instanceof GraphError || err instanceof TeamsPresenceError) {
     if (err.status === 401) {
       return { ok: false, reason: 'unauthorized', status: 401, message: err.message }
     }
     if (err.status === 403) {
       return { ok: false, reason: 'unavailable', status: 403, message: err.message }
     }
+    if (err.status === 404) {
+      return { ok: false, reason: 'unavailable', status: 404, message: err.message }
+    }
     if (err.status === 429) {
       return { ok: false, reason: 'transient', status: 429, message: err.message }
     }
-    return { ok: false, reason: 'unknown', status: err.status, message: err.message }
+    return {
+      ok: false,
+      reason: 'unknown',
+      status: err.status === 0 ? undefined : err.status,
+      message: err.message,
+    }
   }
   if (err instanceof Error) {
     return { ok: false, reason: 'unknown', message: err.message }
@@ -87,13 +96,23 @@ export async function probeCapabilities(opts?: ProbeOpts): Promise<Capabilities>
         signal,
       }),
     ),
-    runProbe(() =>
-      graph({
-        method: 'GET',
-        path: '/me/presence',
-        signal,
-      }),
-    ),
+    // Presence probes the Teams unified presence endpoint
+    // (presence.teams.microsoft.com) rather than Graph /me/presence.
+    // Under FOCI the broker token has aud=presence.teams.microsoft.com
+    // and scp=PresenceRW, but typically lacks Presence.Read on the
+    // Graph audience, so /me/presence 403s in tenants where the Teams
+    // path works fine. The runtime poller already uses the Teams
+    // transport; the probe matches it so Diagnostics reflects reality.
+    runProbe(async () => {
+      const result = await getMyTeamsPresence({ profile: getActiveProfile(), signal })
+      if (!result) {
+        throw new TeamsPresenceError(
+          0,
+          'presence.teams.microsoft.com: token had no oid claim',
+        )
+      }
+      return result
+    }),
   ])
 
   return { me, chats, joinedTeams, presence }

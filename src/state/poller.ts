@@ -31,15 +31,16 @@ import {
   listMessagesNextPage,
   listMessagesPage,
 } from '../graph/chats'
-import { GraphError, RateLimitError } from '../graph/client'
-import { getMyPresence } from '../graph/presence'
+import { GraphError, getActiveProfile, RateLimitError } from '../graph/client'
+import { getMyPresence, getPresencesByUserId } from '../graph/presence'
+import { getMyTeamsPresence, getTeamsPresenceByOid, TeamsPresenceError } from '../graph/teamsPresence'
 import {
   listChannelMessagesNextPage,
   listChannelMessagesPage,
   listChannels,
   listJoinedTeams,
 } from '../graph/teams'
-import type { Channel, Chat, ChatMessage } from '../types'
+import type { Channel, Chat, ChatMessage, Presence } from '../types'
 import {
   type AppState,
   type ConvKey,
@@ -57,6 +58,12 @@ import {
 const ACTIVE_DEFAULT_MS = 5_000
 const LIST_DEFAULT_MS = 30_000
 const PRESENCE_DEFAULT_MS = 60_000
+// Cap the per-tick member-presence fan-out. Graph and the Teams
+// unified-presence endpoint both accept much larger batches, but we
+// only render presence dots for visible 1:1 chats and the user's hot
+// list rarely exceeds a few dozen names. Keep the budget tight so a
+// 500-chat tenant does not pay for invisible work every minute.
+const MEMBER_PRESENCE_LIMIT = 50
 const BACKOFF_BASE = 1.5
 const BACKOFF_CAP_MS = 60_000
 
@@ -118,6 +125,38 @@ function isAbortError(err: unknown): boolean {
   // Bun's fetch may throw a DOMException-shaped error with code === 20 or
   // an Error with message containing "aborted". Be permissive.
   return /aborted|abort/i.test(err.message)
+}
+
+// Resolves member presence via Teams unified presence first (works on
+// FOCI tokens with aud=presence.teams.microsoft.com / scp=PresenceRW),
+// then falls back to Graph getPresencesByUserId if the Teams path is
+// disabled or unreachable for the session. Returns a partial map: any
+// user id missing from the result simply has no dot.
+async function fetchMemberPresence(
+  oids: string[],
+  opts: { useTeams: boolean; useGraph: boolean; signal: AbortSignal },
+): Promise<Map<string, Presence>> {
+  const out = new Map<string, Presence>()
+  if (oids.length === 0) return out
+  if (opts.useTeams) {
+    const teams = await getTeamsPresenceByOid(oids, {
+      profile: getActiveProfile(),
+      signal: opts.signal,
+    })
+    for (const [oid, entry] of teams) {
+      out.set(oid, {
+        id: oid,
+        availability: entry.availability as Presence['availability'],
+        activity: entry.activity as Presence['activity'],
+      })
+    }
+    return out
+  }
+  if (opts.useGraph) {
+    const list = await getPresencesByUserId(oids, { signal: opts.signal })
+    for (const p of list) out.set(p.id, p)
+  }
+  return out
 }
 
 function shouldNotifyMention(msg: ChatMessage, myUserId: string): boolean {
@@ -699,19 +738,117 @@ export function startPoller(opts: PollerOpts): PollerHandle {
   async function runPresenceLoop(): Promise<void> {
     let consecutiveErrors = 0
     let presenceAbort: AbortController | null = null
+    // Once Teams unified presence has failed in a way that's clearly
+    // not transient (auth/scope/tenant policy), don't keep hitting that
+    // host every 60s. Fall back to the Graph path for the rest of the
+    // session and let the next teaminal launch retry.
+    let teamsPresenceUnreachable = false
     while (!stopped) {
-      const caps = store.get().capabilities
-      // Skip the loop entirely if capability probe marked presence as
-      // unavailable; the StatusBar will simply omit the presence dot.
-      if (caps && caps.presence.ok === false && caps.presence.reason === 'unavailable') {
+      const state = store.get()
+      const caps = state.capabilities
+      const teamsPresenceEnabled = state.settings.useTeamsPresence !== false
+      const useTeams = teamsPresenceEnabled && !teamsPresenceUnreachable
+      const useGraph = caps?.presence.ok !== false
+
+      if (!useTeams && !useGraph) {
+        // Both paths are off; presence stays whatever the realtime
+        // bridge / store seeded.
         await presenceSleeper.sleep(jitter(presenceMs))
         continue
       }
+
       presenceAbort = new AbortController()
+      let updated = false
       try {
-        const myPresence = await getMyPresence({ signal: presenceAbort.signal })
-        if (stopped) return
-        store.set({ myPresence })
+        if (useTeams) {
+          try {
+            const teams = await getMyTeamsPresence({
+              profile: getActiveProfile(),
+              signal: presenceAbort.signal,
+            })
+            if (stopped) return
+            if (teams) {
+              const meId = store.get().me?.id ?? teams.oid
+              store.set({
+                myPresence: {
+                  id: meId,
+                  availability: teams.availability as Presence['availability'],
+                  activity: teams.activity as Presence['activity'],
+                },
+              })
+              updated = true
+            }
+          } catch (err) {
+            if (isAbortError(err)) {
+              // fall through to finally; don't bump errors or fall back.
+            } else if (
+              err instanceof TeamsPresenceError &&
+              (err.status === 401 || err.status === 403 || err.status === 404)
+            ) {
+              // Hard auth/scope failure or wrong-tenant; stop trying for
+              // this session, surface once, and fall through to Graph.
+              teamsPresenceUnreachable = true
+              reportError('presence', err)
+            } else {
+              throw err
+            }
+          }
+        }
+        if (!updated && useGraph) {
+          const myPresence = await getMyPresence({ signal: presenceAbort.signal })
+          if (stopped) return
+          store.set({ myPresence })
+        }
+
+        // --- Other-user presence for the chat-list dot ---
+        // Collect the "other" AAD user id for each hydrated 1:1 chat,
+        // capped at MEMBER_PRESENCE_LIMIT to bound the cost. Honors the
+        // showPresenceInList setting so a user who hides the dot does
+        // not pay for the lookup. Failures here never bubble - missing
+        // member presence simply renders nothing.
+        const stateAfterSelf = store.get()
+        const wantsMembers = stateAfterSelf.settings.showPresenceInList !== false
+        if (wantsMembers && !presenceAbort.signal.aborted) {
+          const meId = stateAfterSelf.me?.id
+          const oids: string[] = []
+          const seen = new Set<string>()
+          for (const chat of stateAfterSelf.chats) {
+            if (chat.chatType !== 'oneOnOne') continue
+            const other = (chat.members ?? []).find(
+              (m) => m.userId && m.userId !== meId,
+            )
+            const id = other?.userId
+            if (!id || seen.has(id)) continue
+            seen.add(id)
+            oids.push(id)
+            if (oids.length >= MEMBER_PRESENCE_LIMIT) break
+          }
+          if (oids.length > 0) {
+            try {
+              const fetched = await fetchMemberPresence(oids, {
+                useTeams,
+                useGraph,
+                signal: presenceAbort.signal,
+              })
+              if (stopped) return
+              if (fetched.size > 0) {
+                store.set((s) => {
+                  const next = { ...s.memberPresence }
+                  for (const [id, p] of fetched) next[id] = p
+                  return { memberPresence: next }
+                })
+              }
+            } catch (err) {
+              if (!isAbortError(err)) {
+                // Don't bump consecutiveErrors: self-presence already
+                // succeeded, and we don't want a transient member-
+                // presence failure to put the whole loop in backoff.
+                reportError('presence', err)
+              }
+            }
+          }
+        }
+
         consecutiveErrors = 0
       } catch (err) {
         if (!isAbortError(err)) {

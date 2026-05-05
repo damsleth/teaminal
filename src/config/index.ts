@@ -186,6 +186,8 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     messageFocusIndicatorChar: settings.messageFocusIndicatorChar,
     messageFocusIndicatorColor: settings.messageFocusIndicatorColor,
     messageFocusBackgroundColor: settings.messageFocusBackgroundColor,
+    useTeamsPresence: settings.useTeamsPresence,
+    forceAvailableWhenFocused: settings.forceAvailableWhenFocused,
   }
 }
 
@@ -312,6 +314,8 @@ function validateAndAssign(
     case 'showPresenceInList':
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
+    case 'useTeamsPresence':
+    case 'forceAvailableWhenFocused':
       if (typeof value === 'boolean') {
         out[key] = value
         return true
