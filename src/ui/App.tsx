@@ -48,6 +48,7 @@ import { useTerminalRows } from './hooks/useTerminalRows'
 import { handleChatKeys } from './keybinds/chatKeys'
 import { handleFilterKeys } from './keybinds/filterKeys'
 import { handleListKeys } from './keybinds/listKeys'
+import { handleMessageSearchKeys } from './keybinds/messageSearchKeys'
 import { readMessagePageState, type LoadMoreState } from './messageRows'
 import { usePollerHandleRef } from './PollerContext'
 import { StatusBar } from './StatusBar'
@@ -234,6 +235,25 @@ export function App() {
       )
     },
     { isActive: isRawModeSupported && inputZone === 'filter' },
+  )
+
+  // In-conversation message search.
+  const messageSearchQuery = useAppState((s) => s.messageSearchQuery)
+  const messageSearchFocusedId = useAppState((s) => s.messageSearchFocusedId)
+  useInput(
+    (input, key) => {
+      handleMessageSearchKeys(
+        { input, key },
+        {
+          store,
+          focus,
+          query: messageSearchQuery,
+          focusedHitId: messageSearchFocusedId,
+          messages: activeMessages,
+        },
+      )
+    },
+    { isActive: isRawModeSupported && inputZone === 'message-search' },
   )
 
   // Modal rendering: header / composer / status bar stay visible; the

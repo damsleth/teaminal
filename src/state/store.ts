@@ -77,7 +77,7 @@ export type ConnectionState = 'connecting' | 'online' | 'offline' | 'authError' 
 //   filter   - typing into the chat-list filter buffer
 //   menu     - navigating the modal pause-menu (MenuModal owns input)
 // Distinct from `focus` (which conv is open).
-export type InputZone = 'list' | 'composer' | 'filter' | 'menu'
+export type InputZone = 'list' | 'composer' | 'filter' | 'menu' | 'message-search'
 
 // Active modal overlay. When set, App renders the modal in the central pane
 // area (replacing chat list + message pane) and inputZone is 'menu'. Add
@@ -449,6 +449,11 @@ export type AppState = {
   // Case-insensitive substring filter applied to the chat list. Empty
   // string means no filter.
   filter: string
+  // In-conversation message search (S1). Empty query closes the bar.
+  // focusedHitMessageId tracks the message the search bar last jumped
+  // to so n/N can step relative to it across re-renders.
+  messageSearchQuery: string
+  messageSearchFocusedId: string | null
   myPresence?: Presence
   // Keyed by user id, populated only for currently visible chat members.
   memberPresence: Record<string, Presence>
@@ -489,6 +494,8 @@ export function initialAppState(): AppState {
     messageCursorByConvo: {},
     cursor: 0,
     filter: '',
+    messageSearchQuery: '',
+    messageSearchFocusedId: null,
     memberPresence: {},
     conn: 'connecting',
     realtimeState: 'off',

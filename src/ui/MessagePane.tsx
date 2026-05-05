@@ -13,6 +13,7 @@ import { focusKey, type TypingIndicator } from '../state/store'
 import type { Chat, ChatMessage, Channel, Team } from '../types'
 import { htmlToText } from './html'
 import { reactionsSummary } from './reactions'
+import { searchMessages } from './messageSearch'
 import {
   buildMessageRows,
   readMessagePageState,
@@ -50,6 +51,7 @@ export function MessagePane(props: {
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
   const showTimestamps = useAppState((s) => s.settings.showTimestampsInPane)
   const density = useAppState((s) => s.settings.chatListDensity)
+  const inputZone = useAppState((s) => s.inputZone)
   const focusIndicatorVisible = useAppState((s) => s.settings.messageFocusIndicatorEnabled)
   const focusIndicatorChar = useAppState((s) => s.settings.messageFocusIndicatorChar)
   const typingByConvo = useAppState((s) => s.typingByConvo)
@@ -115,9 +117,30 @@ export function MessagePane(props: {
   const showFocusIndicator =
     props.focusIndicatorActive === true && focusIndicatorVisible && messages.length > 0
 
+  // Search bar (S1) is rendered above the timeline when active. The
+  // matching messages are highlighted at the row level via the existing
+  // focused-message indicator (the keys handler updates messageCursor
+  // on Enter / n / N), so the search bar itself is just an input echo.
+  const searchActive = inputZone === 'message-search'
+  const searchQuery = useAppState((s) => s.messageSearchQuery)
+  const hits = searchActive ? searchMessages(messages, searchQuery) : []
+
   return (
     <Box flexDirection="column" flexGrow={1} paddingX={1}>
       {density === 'cozy' && <Text bold>{headerLabel}</Text>}
+      {searchActive && (
+        <Box>
+          <Text>
+            <Text color={theme.mutedText}>/ </Text>
+            {searchQuery}
+            <Text color="cyan">█</Text>
+            <Text color={theme.mutedText}>
+              {'  '}
+              {hits.length} hit(s) · enter jumps · n/N step · esc closes
+            </Text>
+          </Text>
+        </Box>
+      )}
       {isLoadingOlder && start !== 0 && (
         <Text color={theme.mutedText}>… loading older messages</Text>
       )}
