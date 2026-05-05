@@ -40,6 +40,7 @@ export type MenuAction =
   | { kind: 'toggle-setting'; key: ToggleKey }
   | { kind: 'show-keybinds' }
   | { kind: 'show-diagnostics' }
+  | { kind: 'show-events' }
 
 export type MenuItem = {
   id: string
@@ -123,6 +124,11 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'diagnostics',
         label: 'Diagnostics',
         action: { kind: 'show-diagnostics' },
+      },
+      {
+        id: 'events',
+        label: 'Event log',
+        action: { kind: 'show-events' },
       },
     ],
   },

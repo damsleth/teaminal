@@ -35,6 +35,7 @@ import { AccountsModal } from './AccountsModal'
 import { ChatList } from './ChatList'
 import { Composer } from './Composer'
 import { DiagnosticsModal } from './DiagnosticsModal'
+import { EventsModal } from './EventsModal'
 import { HeaderBar } from './HeaderBar'
 import { KeybindsModal } from './KeybindsModal'
 import { MenuModal } from './MenuModal'
@@ -270,6 +271,8 @@ export function App() {
               <KeybindsModal />
             ) : modal.kind === 'accounts' ? (
               <AccountsModal />
+            ) : modal.kind === 'events' ? (
+              <EventsModal />
             ) : (
               <DiagnosticsModal />
             )
