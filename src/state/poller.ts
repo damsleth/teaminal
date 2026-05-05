@@ -24,30 +24,17 @@
 // Focus change wakes the active loop's interruptable sleep and aborts any
 // in-flight active fetch so opening a chat is responsive even mid-poll.
 
-import {
-  getChat,
-  listChats,
-  listMessages,
-  listMessagesNextPage,
-  listMessagesPage,
-} from '../graph/chats'
+import { getChat, listChats, listMessages, listMessagesPage } from '../graph/chats'
 import { GraphError, getActiveProfile, RateLimitError } from '../graph/client'
 import { getMyPresence } from '../graph/presence'
 import { getMyTeamsPresence, TeamsPresenceError } from '../graph/teamsPresence'
-import {
-  listChannelMessagesNextPage,
-  listChannelMessagesPage,
-  listChannels,
-  listJoinedTeams,
-} from '../graph/teams'
+import { listChannelMessagesPage, listChannels, listJoinedTeams } from '../graph/teams'
 import type { Channel, Chat, ChatMessage, Presence } from '../types'
 import {
   type AppState,
   type ConvKey,
   type Focus,
   bumpChatMention,
-  cacheMessagesFromLegacy,
-  emptyMessageCache,
   focusKey,
   markChatRead,
   markChatUnread,
@@ -65,16 +52,18 @@ import {
   jitter,
 } from './poller/intervals'
 import { fetchMemberPresence } from './poller/memberPresence'
-import {
-  countNewMessages,
-  mergeChronological,
-  mergeWithOptimistic as mergeWithOptimisticImpl,
-} from './poller/merge'
+import { mergeWithOptimistic as mergeWithOptimisticImpl } from './poller/merge'
 import { shouldNotifyMention } from './poller/mentions'
 import { mergeActivePagePatch, type MessagesPage } from './poller/pagePatch'
 import { makeSleeper } from './poller/sleeper'
 
+import {
+  loadOlderMessages as loadOlderMessagesImpl,
+  type LoadOlderMessagesResult,
+} from './poller/loadOlder'
+
 // Re-exports preserved for callers that import these from './poller' directly.
+export type { LoadOlderMessagesResult }
 export { mergeChatMembers } from './poller/chatList'
 export const mergeWithOptimistic = mergeWithOptimisticImpl
 
@@ -110,14 +99,6 @@ export type PollerHandle = {
   refresh: () => void
   // Fetch one older page for the currently-focused conversation, if any.
   loadOlderMessages: () => Promise<LoadOlderMessagesResult>
-}
-
-export type LoadOlderMessagesResult = {
-  conv: ConvKey | null
-  added: number
-  fullyLoaded: boolean
-  anchorMessageId?: string
-  error?: Error
 }
 
 async function fetchActiveMessages(focus: Focus, signal: AbortSignal): Promise<MessagesPage> {
@@ -171,135 +152,11 @@ export function startPoller(opts: PollerOpts): PollerHandle {
     return 0
   }
 
-  async function loadOlderMessages(): Promise<LoadOlderMessagesResult> {
-    const focus = store.get().focus
-    const conv = focusKey(focus)
-    if (!conv) return { conv: null, added: 0, fullyLoaded: true }
-
-    const initialState = store.get()
-    const initialCache =
-      initialState.messageCacheByConvo[conv] ??
-      emptyMessageCache(initialState.messagesByConvo[conv] ?? [])
-    if (initialCache.loadingOlder) {
-      return { conv, added: 0, fullyLoaded: initialCache.fullyLoaded }
-    }
-    if (initialCache.fullyLoaded) {
-      return { conv, added: 0, fullyLoaded: true }
-    }
-
-    const anchorMessageId = initialCache.messages[0]?.id
-    if (focus.kind === 'channel' && !initialCache.nextLink) {
-      store.set((s) => {
-        const cache = s.messageCacheByConvo[conv] ?? initialCache
-        const nextCaches = {
-          ...s.messageCacheByConvo,
-          [conv]: { ...cache, fullyLoaded: true, loadingOlder: false },
-        }
-        return {
-          messageCacheByConvo: nextCaches,
-          messagesByConvo: {
-            ...s.messagesByConvo,
-            [conv]: nextCaches[conv]?.messages ?? [],
-          },
-        }
-      })
-      return { conv, added: 0, fullyLoaded: true, anchorMessageId }
-    }
-
-    store.set((s) => {
-      const caches =
-        Object.keys(s.messageCacheByConvo).length === 0
-          ? cacheMessagesFromLegacy(s.messagesByConvo)
-          : s.messageCacheByConvo
-      const cache = caches[conv] ?? initialCache
-      return {
-        messageCacheByConvo: {
-          ...caches,
-          [conv]: { ...cache, loadingOlder: true, error: undefined },
-        },
-      }
+  function loadOlderMessages(): Promise<LoadOlderMessagesResult> {
+    return loadOlderMessagesImpl({
+      store,
+      reportError: (err) => reportError('active', err),
     })
-
-    const olderAbort = new AbortController()
-    try {
-      const cache = store.get().messageCacheByConvo[conv] ?? initialCache
-      let page: MessagesPage
-      if (cache.nextLink) {
-        page =
-          focus.kind === 'chat'
-            ? await listMessagesNextPage(cache.nextLink, { signal: olderAbort.signal })
-            : await listChannelMessagesNextPage(cache.nextLink, { signal: olderAbort.signal })
-      } else if (focus.kind === 'chat') {
-        const oldest = cache.messages[0]
-        if (!oldest) {
-          page = { messages: [] }
-        } else {
-          page = await listMessagesPage(focus.chatId, {
-            beforeCreatedDateTime: oldest.createdDateTime,
-            signal: olderAbort.signal,
-          })
-        }
-      } else {
-        page = { messages: [] }
-      }
-
-      let result: LoadOlderMessagesResult = {
-        conv,
-        added: 0,
-        fullyLoaded: true,
-        anchorMessageId,
-      }
-      store.set((s) => {
-        const current = s.messageCacheByConvo[conv] ?? initialCache
-        const added = countNewMessages(current.messages, page.messages)
-        const merged = mergeChronological(current.messages, page.messages)
-        const fullyLoaded = page.nextLink === undefined || page.messages.length === 0
-        const nextCaches = {
-          ...s.messageCacheByConvo,
-          [conv]: {
-            ...current,
-            messages: merged,
-            nextLink: page.nextLink,
-            loadingOlder: false,
-            fullyLoaded,
-            error: undefined,
-            lastOlderLoad: {
-              beforeFirstId: anchorMessageId,
-              addedCount: added,
-            },
-          },
-        }
-        result = { conv, added, fullyLoaded, anchorMessageId }
-        return {
-          messageCacheByConvo: nextCaches,
-          messagesByConvo: {
-            ...s.messagesByConvo,
-            [conv]: merged,
-          },
-        }
-      })
-      return result
-    } catch (err) {
-      if (isAbortError(err)) {
-        return { conv, added: 0, fullyLoaded: false, anchorMessageId }
-      }
-      const error = err instanceof Error ? err : new Error(String(err))
-      store.set((s) => {
-        const current = s.messageCacheByConvo[conv] ?? initialCache
-        return {
-          messageCacheByConvo: {
-            ...s.messageCacheByConvo,
-            [conv]: {
-              ...current,
-              loadingOlder: false,
-              error: error.message,
-            },
-          },
-        }
-      })
-      reportError('active', error)
-      return { conv, added: 0, fullyLoaded: false, anchorMessageId, error }
-    }
   }
 
   async function runActiveLoop(): Promise<void> {
