@@ -51,6 +51,7 @@ export function startRealtimeBridge(opts: RealtimeBridgeOpts): RealtimeBridgeHan
     'chat-created',
     'message-edited',
     'message-deleted',
+    'reaction-added',
   ] as const) {
     unsubs.push(
       bus.onKind(kind, () => {

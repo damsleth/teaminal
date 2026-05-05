@@ -228,11 +228,17 @@ describe('realtimeBridge', () => {
     bus.emit({ kind: 'typing-stopped', chatId: 'c1', userId: 'u1' })
     bus.emit({ kind: 'presence-changed', userId: 'u1', availability: 'Away' })
     bus.emit({ kind: 'read-receipt', chatId: 'c1', userId: 'u1', messageId: 'm1' })
-    bus.emit({ kind: 'reaction-added', chatId: 'c1', messageId: 'm1' })
     bus.emit({ kind: 'member-joined', chatId: 'c1', userId: 'u1' })
     bus.emit({ kind: 'member-left', chatId: 'c1', userId: 'u1' })
 
     expect(getRefreshCount()).toBe(0)
+    bridge.stop()
+  })
+
+  test('reaction-added wakes the poller (read-path acceleration)', () => {
+    const { bus, bridge, getRefreshCount } = setup()
+    bus.emit({ kind: 'reaction-added', chatId: 'c1', messageId: 'm1' })
+    expect(getRefreshCount()).toBe(1)
     bridge.stop()
   })
 })

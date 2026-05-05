@@ -12,6 +12,7 @@ import { chatLabel, shortName } from '../state/selectables'
 import { focusKey, type TypingIndicator } from '../state/store'
 import type { Chat, ChatMessage, Channel, Team } from '../types'
 import { htmlToText } from './html'
+import { reactionsSummary } from './reactions'
 import {
   buildMessageRows,
   readMessagePageState,
@@ -219,6 +220,9 @@ function MessageRow(props: {
   const sendError = m._sendError
 
   const bodyText = previewBody(m)
+  const isDeleted = isMessageDeleted(m)
+  const isEdited = !isDeleted && isMessageEdited(m)
+  const reactionLine = isDeleted ? null : reactionsSummary(m.reactions)
 
   // Status precedence: error first (red), then sending (gray dim), then
   // system / self colors.
@@ -255,11 +259,28 @@ function MessageRow(props: {
           <Text color={color}>{`${senderTrimmed.padEnd(SENDER_COL_WIDTH)}  `}</Text>
         </Box>
         <Box flexGrow={1} flexShrink={1} minWidth={0}>
-          <Text color={props.focused ? theme.messageFocusIndicator : color} bold={props.focused}>
+          <Text
+            color={
+              isDeleted ? theme.mutedText : props.focused ? theme.messageFocusIndicator : color
+            }
+            italic={isDeleted}
+            bold={props.focused && !isDeleted}
+          >
             {bodyText}
+            {isEdited && <Text color={theme.mutedText}> (edited)</Text>}
           </Text>
         </Box>
       </Box>
+      {reactionLine && (
+        <Box flexDirection="row">
+          <Box width={2} flexShrink={0} />
+          <Box width={statusWidth} flexShrink={0} />
+          <Box width={SENDER_COL_WIDTH + 2} flexShrink={0} />
+          <Box flexGrow={1} flexShrink={1} minWidth={0}>
+            <Text color={theme.mutedText}>{reactionLine}</Text>
+          </Box>
+        </Box>
+      )}
       {sendError && (
         <Box flexDirection="row">
           <Box width={2} flexShrink={0} />
@@ -275,6 +296,11 @@ function MessageRow(props: {
 }
 
 function previewBody(m: ChatMessage): string {
+  if (isMessageDeleted(m)) {
+    const senderName = m.from?.user?.displayName ?? 'someone'
+    const time = m.createdDateTime.slice(11, 16)
+    return `(message deleted by ${senderName} · ${time})`
+  }
   if (m.messageType === 'systemEventMessage') {
     return '(system event)'
   }
@@ -283,6 +309,27 @@ function previewBody(m: ChatMessage): string {
     return raw.replace(/\s+/g, ' ').trim().slice(0, 200)
   }
   return htmlToText(raw).slice(0, 200)
+}
+
+// 5s grace window: Graph rewrites lastModifiedDateTime as part of
+// server-side normalization on a fresh send, so 'edited within 5s'
+// is treated as 'not actually edited by the user'.
+const EDITED_GRACE_MS = 5_000
+
+export function isMessageEdited(m: ChatMessage): boolean {
+  if (!m.lastModifiedDateTime) return false
+  const created = Date.parse(m.createdDateTime)
+  const modified = Date.parse(m.lastModifiedDateTime)
+  if (!Number.isFinite(created) || !Number.isFinite(modified)) return false
+  return modified - created > EDITED_GRACE_MS
+}
+
+export function isMessageDeleted(m: ChatMessage): boolean {
+  if (m.deletedDateTime) return true
+  // Some channel paths return a stub with empty body and no deletedDateTime.
+  // We don't auto-detect those because empty bodies are also a legitimate
+  // shape for system events; rely on the explicit deletedDateTime field.
+  return false
 }
 
 function visibleStart(
