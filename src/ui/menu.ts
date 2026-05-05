@@ -30,6 +30,8 @@ export type ToggleKey =
   | 'messageFocusIndicatorEnabled'
   | 'messageFocusIndicatorChar'
   | 'forceAvailableWhenFocused'
+  | 'notifyMuted'
+  | 'notifyActiveBanner'
 
 export type MenuAction =
   | { kind: 'resume' }
@@ -92,6 +94,16 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'showTimestampsInPane',
         label: 'Show timestamps in messages',
         action: { kind: 'toggle-setting', key: 'showTimestampsInPane' },
+      },
+      {
+        id: 'notifyMuted',
+        label: 'Mute notifications',
+        action: { kind: 'toggle-setting', key: 'notifyMuted' },
+      },
+      {
+        id: 'notifyActiveBanner',
+        label: 'Banner for active conversation',
+        action: { kind: 'toggle-setting', key: 'notifyActiveBanner' },
       },
       {
         id: 'windowHeight',
@@ -202,6 +214,8 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
     case 'forceAvailableWhenFocused':
+    case 'notifyMuted':
+    case 'notifyActiveBanner':
       return !current as Settings[K]
     case 'windowHeight':
       return cycleWindowHeight(current as number) as Settings[K]
@@ -237,6 +251,8 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
     case 'forceAvailableWhenFocused':
+    case 'notifyMuted':
+    case 'notifyActiveBanner':
       return value ? 'on' : 'off'
     case 'windowHeight':
       return value === 0 ? 'full' : `${value} rows`

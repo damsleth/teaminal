@@ -71,3 +71,14 @@ export function notifyMention(senderName: string, preview: string, scope: string
   bell()
   void system(`teaminal · ${scope}`, `${senderName}: ${preview}`)
 }
+
+// Lower-level helpers used by the coalescing layer (src/notify/index.ts).
+// notifyMention above remains for any caller that wants the raw
+// fire-and-forget path with no coalescing.
+export function ringBell(): void {
+  bell()
+}
+
+export async function postBanner(title: string, body: string): Promise<SystemNotifyResult> {
+  return system(title, body)
+}

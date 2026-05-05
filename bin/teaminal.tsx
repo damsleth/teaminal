@@ -5,7 +5,7 @@ import { loadSettings } from '../src/config'
 import { probeCapabilities } from '../src/graph/capabilities'
 import { setActiveProfile } from '../src/graph/client'
 import { getMe } from '../src/graph/me'
-import { notifyMention } from '../src/notify/notify'
+import { drainNotifications, notifyMention } from '../src/notify'
 import { RealtimeEventBus } from '../src/realtime/events'
 import { TrouterTransport } from '../src/realtime/trouter'
 import { startPoller } from '../src/state/poller'
@@ -176,6 +176,10 @@ const forceAvailability = startForceAvailabilityDriver(store)
   let bridge: ReturnType<typeof startRealtimeBridge> | null = null
   let bus: RealtimeEventBus | null = null
   let transport: TrouterTransport | null = null
+  // 1s timer driving notification coalesce-window expiry. Lightweight
+  // (Map iteration over <= a handful of conv states); no work happens
+  // when nothing is buffered.
+  let notifyDrainTimer: ReturnType<typeof setInterval> | null = null
   try {
     debug('bootstrap: getMe()')
     const me = await getMe()
@@ -202,11 +206,23 @@ const forceAvailability = startForceAvailabilityDriver(store)
           event.message.body.contentType === 'text'
             ? raw.replace(/\s+/g, ' ').trim()
             : htmlToText(raw)
+        // Pull a fresh state snapshot for the quiet predicates. The
+        // notify layer applies coalescing + rate-limiting + quiet hours
+        // before deciding whether to ring the bell or post a banner.
+        const s = store.get()
         const scope = event.conv.startsWith('chat:') ? 'chat' : 'channel'
-        notifyMention(sender, preview.slice(0, 120), scope)
+        notifyMention(
+          { conv: event.conv, senderName: sender, preview: preview.slice(0, 120), scope },
+          {
+            now: new Date(),
+            terminalFocused: s.terminalFocused !== false,
+            state: { focus: s.focus, myPresence: s.myPresence, settings: s.settings },
+          },
+        )
       },
     })
     pollerHandleRef.current = handle
+    notifyDrainTimer = setInterval(() => drainNotifications(), 1000)
 
     // Real-time push layer (Option E hybrid). The event bus and bridge
     // run immediately; the trouter transport connects in the background.
@@ -260,6 +276,9 @@ const forceAvailability = startForceAvailabilityDriver(store)
     // failure in one teardown doesn't skip the rest. Order matters:
     // stop the push side before the poll side so a final realtime event
     // can't enqueue work onto a torn-down poller.
+    try {
+      if (notifyDrainTimer) clearInterval(notifyDrainTimer)
+    } catch {}
     try {
       transport?.disconnect()
     } catch {}

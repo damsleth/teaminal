@@ -174,6 +174,8 @@ describe('ROOT_MENU shape', () => {
       'showPresenceInList',
       'forceAvailableWhenFocused',
       'showTimestampsInPane',
+      'notifyMuted',
+      'notifyActiveBanner',
       'windowHeight',
       'messageFocusIndicatorEnabled',
       'messageFocusIndicatorChar',
