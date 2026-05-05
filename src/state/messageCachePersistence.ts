@@ -43,13 +43,22 @@ type PersistedFile = {
   caches: Record<string, PersistedCache>
 }
 
-export function getMessageCachePath(env: Env = process.env): string {
+export function getMessageCachePath(env: Env = process.env, profile?: string | null): string {
   const xdg = env.XDG_CACHE_HOME
   const base =
     xdg && xdg.length > 0
       ? xdg
       : join(env.HOME && env.HOME.length > 0 ? env.HOME : homedir(), '.cache')
-  return join(base, 'teaminal', 'messages.json')
+  // Per-profile cache so switching accounts doesn't cross-pollute. The
+  // legacy filename `messages.json` is kept as the default-profile name
+  // for back-compat with existing on-disk caches.
+  const filename =
+    profile && profile.length > 0 ? `messages.${slugifyProfile(profile)}.json` : 'messages.json'
+  return join(base, 'teaminal', filename)
+}
+
+function slugifyProfile(p: string): string {
+  return p.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 64)
 }
 
 export function loadMessageCache(

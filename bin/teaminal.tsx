@@ -2,27 +2,20 @@
 
 import { render } from 'ink'
 import { loadSettings } from '../src/config'
-import { probeCapabilities } from '../src/graph/capabilities'
-import { setActiveProfile } from '../src/graph/client'
-import { getMe } from '../src/graph/me'
-import { drainNotifications, notifyMention } from '../src/notify'
-import { RealtimeEventBus } from '../src/realtime/events'
-import { TrouterTransport } from '../src/realtime/trouter'
-import { startPoller } from '../src/state/poller'
+import { runSession, type SessionHandle } from '../src/state/bootstrap'
 import { startForceAvailabilityDriver } from '../src/state/forceAvailability'
-import { startRealtimeBridge } from '../src/state/realtimeBridge'
-import { createAppStore, messagesFromCaches } from '../src/state/store'
+import { createAppStore, messagesFromCaches, resetAccountScopedState } from '../src/state/store'
 import {
   flushMessageCache,
+  getMessageCachePath,
   loadMessageCache,
   scheduleMessageCacheSave,
 } from '../src/state/messageCachePersistence'
-import { getToken } from '../src/auth/owaPiggy'
 import { App } from '../src/ui/App'
 import { ErrorBoundary } from '../src/ui/ErrorBoundary'
 import { startFocusTracker } from '../src/ui/focusTracker'
-import { htmlToText } from '../src/ui/html'
 import { PollerProvider, type PollerHandleRef } from '../src/ui/PollerContext'
+import { SessionProvider, type SessionApi } from '../src/ui/SessionContext'
 import { StoreProvider } from '../src/ui/StoreContext'
 import { debug, warn } from '../src/log'
 
@@ -79,7 +72,7 @@ function parseArgs(argv: string[]): {
   return out
 }
 
-const { profile, showHelp, showVersion, debugFlag } = parseArgs(Bun.argv.slice(2))
+const { profile: cliProfile, showHelp, showVersion, debugFlag } = parseArgs(Bun.argv.slice(2))
 
 if (showHelp) {
   process.stdout.write(HELP)
@@ -91,9 +84,6 @@ if (showVersion) {
 }
 if (debugFlag) process.env.TEAMINAL_DEBUG = '1'
 
-// Ink requires a TTY to set raw mode for keyboard input. Pipes, CI, and
-// scripted invocations should get a clear message instead of a React stack
-// trace from somewhere deep in the reconciler.
 if (!process.stdin.isTTY) {
   process.stderr.write(
     'teaminal: stdin is not a TTY. Run from an interactive terminal (iTerm, Terminal.app, etc).\n',
@@ -103,163 +93,127 @@ if (!process.stdin.isTTY) {
 
 const store = createAppStore()
 
-// Hydrate persistent message cache before the UI mounts so the message
-// pane shows history immediately and "Load older messages" knows whether
-// more pages are reachable. Failures are silent — the active poller will
-// repopulate from Graph.
-try {
-  const persisted = loadMessageCache()
-  if (Object.keys(persisted).length > 0) {
-    store.set({
-      messageCacheByConvo: persisted,
-      messagesByConvo: messagesFromCaches(persisted),
-    })
-    debug(`bootstrap: hydrated ${Object.keys(persisted).length} cached conversations`)
-  }
-} catch (err) {
-  warn('bootstrap: hydrate message cache failed:', err instanceof Error ? err.message : String(err))
-}
-
-// Persist message cache on every relevant store change. Debounced inside
-// scheduleMessageCacheSave so chat-spam doesn't thrash the disk.
-let lastSavedCaches = store.get().messageCacheByConvo
-store.subscribe((s) => {
-  if (s.messageCacheByConvo === lastSavedCaches) return
-  lastSavedCaches = s.messageCacheByConvo
-  scheduleMessageCacheSave(s.messageCacheByConvo)
-})
-
-// Load user preferences from ~/.config/teaminal/config.json (or
-// $XDG_CONFIG_HOME/teaminal/config.json). Missing file = defaults; any
-// validation warnings go to stderr under TEAMINAL_DEBUG.
+// Resolve the active profile. CLI overrides config; null falls through
+// to owa-piggy's default profile.
 const configResult = loadSettings()
 store.set({ settings: configResult.settings })
-if (profile) setActiveProfile(profile)
-else if (configResult.settings.activeAccount) setActiveProfile(configResult.settings.activeAccount)
+let activeProfile: string | null = cliProfile ?? configResult.settings.activeAccount ?? null
 if (configResult.source === 'file') {
   debug(`config: loaded from ${configResult.path}`)
 }
 for (const w of configResult.warnings) warn(w)
 
-// PollerHandleRef is mutated by the bootstrap below once startPoller
-// resolves; the App reads ref.current inside event handlers, so it
-// observes the assignment without needing a re-render.
-const pollerHandleRef: PollerHandleRef = { current: null }
+// Hydrate the per-profile message cache before mounting so the message
+// pane shows history immediately. Failure is silent — the active poller
+// repopulates from Graph.
+function hydrateCache(profile: string | null): void {
+  try {
+    const persisted = loadMessageCache(getMessageCachePath(process.env, profile))
+    if (Object.keys(persisted).length > 0) {
+      store.set({
+        messageCacheByConvo: persisted,
+        messagesByConvo: messagesFromCaches(persisted),
+      })
+      debug(`bootstrap: hydrated ${Object.keys(persisted).length} cached conversations`)
+    }
+  } catch (err) {
+    warn(
+      'bootstrap: hydrate message cache failed:',
+      err instanceof Error ? err.message : String(err),
+    )
+  }
+}
+hydrateCache(activeProfile)
 
-// Start the UI immediately so the user sees a frame within hundreds of
-// milliseconds; data fills in as auth + capability probe + poller complete.
+// Persist message cache on every relevant store change. Debounced inside
+// scheduleMessageCacheSave so chat-spam doesn't thrash the disk. The
+// path is tied to the *current* active profile and rebuilt on switch.
+let lastSavedCaches = store.get().messageCacheByConvo
+let activeCachePath = getMessageCachePath(process.env, activeProfile)
+const cacheSubscription = store.subscribe((s) => {
+  if (s.messageCacheByConvo === lastSavedCaches) return
+  lastSavedCaches = s.messageCacheByConvo
+  scheduleMessageCacheSave(s.messageCacheByConvo, undefined, activeCachePath)
+})
+
+// PollerHandleRef and current session handle are mutated by the
+// bootstrap + restart flows; the App reads ref.current inside event
+// handlers, so it observes the assignment without needing a re-render.
+const pollerHandleRef: PollerHandleRef = { current: null }
+let currentSession: SessionHandle | null = null
+
 const ink = render(
   <ErrorBoundary>
     <StoreProvider store={store}>
       <PollerProvider handleRef={pollerHandleRef}>
-        <App />
+        <SessionProvider api={makeSessionApi()}>
+          <App />
+        </SessionProvider>
       </PollerProvider>
     </StoreProvider>
   </ErrorBoundary>,
 )
 
-// Terminal focus reporting. Started before bootstrap so the first
-// force-availability PUT (driven below) sees an accurate focused state.
-// Safe to start before render/auth: the tracker only writes a single
-// CSI sequence and attaches a stdin listener.
 const focusTracker = startFocusTracker(store)
-
-// Force-availability driver. Reads store.settings.forceAvailableWhenFocused
-// and store.terminalFocused; PUTs presence.teams.microsoft.com when both
-// are true. Token errors disable for the session, never crash.
 const forceAvailability = startForceAvailabilityDriver(store)
 
-// Background bootstrap. Errors update the store (conn) so the StatusBar
-// reflects them; fatal auth issues print to stderr and exit.
-;(async () => {
-  let handle: Awaited<ReturnType<typeof startPoller>> | null = null
-  let bridge: ReturnType<typeof startRealtimeBridge> | null = null
-  let bus: RealtimeEventBus | null = null
-  let transport: TrouterTransport | null = null
-  // 1s timer driving notification coalesce-window expiry. Lightweight
-  // (Map iteration over <= a handful of conv states); no work happens
-  // when nothing is buffered.
-  let notifyDrainTimer: ReturnType<typeof setInterval> | null = null
-  try {
-    debug('bootstrap: getMe()')
-    const me = await getMe()
-    store.set({ me })
+function makeSessionApi(): SessionApi {
+  return {
+    getActiveProfile: () => activeProfile,
+    switchAccount,
+  }
+}
 
-    debug('bootstrap: probeCapabilities()')
-    const capabilities = await probeCapabilities()
-    store.set({ capabilities })
-
-    if (capabilities.me.ok === false && capabilities.me.reason === 'unauthorized') {
-      ink.unmount()
-      process.stderr.write(`teaminal: auth failed: ${capabilities.me.message}\n`)
-      process.exit(3)
+async function switchAccount(nextProfile: string | null): Promise<void> {
+  if (currentSession?.profile === nextProfile) return
+  // Tear down the running session first so its loops can't write into
+  // the about-to-be-reset store.
+  if (currentSession) {
+    try {
+      await currentSession.stop()
+    } catch (err) {
+      warn(
+        'switch: stop previous session failed:',
+        err instanceof Error ? err.message : String(err),
+      )
     }
+    currentSession = null
+  }
+  // Flush the previous profile's cache before swapping the path.
+  try {
+    flushMessageCache()
+  } catch {}
+  resetAccountScopedState(store)
+  activeProfile = nextProfile
+  activeCachePath = getMessageCachePath(process.env, activeProfile)
+  hydrateCache(activeProfile)
 
-    debug('bootstrap: startPoller()')
-    handle = startPoller({
+  try {
+    currentSession = await runSession({
       store,
-      onError: (loop, err) => warn(`poller[${loop}]:`, err.message),
-      onMention: (event) => {
-        const sender = event.message.from?.user?.displayName ?? 'someone'
-        const raw = event.message.body.content ?? ''
-        const preview =
-          event.message.body.contentType === 'text'
-            ? raw.replace(/\s+/g, ' ').trim()
-            : htmlToText(raw)
-        // Pull a fresh state snapshot for the quiet predicates. The
-        // notify layer applies coalescing + rate-limiting + quiet hours
-        // before deciding whether to ring the bell or post a banner.
-        const s = store.get()
-        const scope = event.conv.startsWith('chat:') ? 'chat' : 'channel'
-        notifyMention(
-          { conv: event.conv, senderName: sender, preview: preview.slice(0, 120), scope },
-          {
-            now: new Date(),
-            terminalFocused: s.terminalFocused !== false,
-            state: { focus: s.focus, myPresence: s.myPresence, settings: s.settings },
-          },
-        )
+      profile: activeProfile,
+      pollerHandleRef,
+      onFatal: (kind, msg) => {
+        warn(`bootstrap: fatal (${kind}): ${msg}`)
       },
     })
-    pollerHandleRef.current = handle
-    notifyDrainTimer = setInterval(() => drainNotifications(), 1000)
+  } catch (err) {
+    warn('switch: bootstrap failed:', err instanceof Error ? err.message : String(err))
+    throw err
+  }
+}
 
-    // Real-time push layer (Option E hybrid). The event bus and bridge
-    // run immediately; the trouter transport connects in the background.
-    // If trouter fails, the app degrades to polling-only — no user-facing
-    // error beyond the header indicator changing from green to gray.
-    debug('bootstrap: startRealtimeBridge()')
-    bus = new RealtimeEventBus()
-    bridge = startRealtimeBridge({
-      bus,
+;(async () => {
+  try {
+    currentSession = await runSession({
       store,
-      getPoller: () => pollerHandleRef.current,
-    })
-
-    debug('bootstrap: trouter transport')
-    transport = new TrouterTransport({
-      bus,
-      getToken: () => getToken(profile),
-      profile,
-    })
-    transport.onStateChange((state) => {
-      debug('trouter: state ->', state)
-      store.set({
-        realtimeState:
-          state === 'disconnected'
-            ? 'off'
-            : state === 'connecting'
-              ? 'connecting'
-              : state === 'connected'
-                ? 'connected'
-                : state === 'reconnecting'
-                  ? 'reconnecting'
-                  : 'error',
-      })
-    })
-    // Connect in the background — never block the main bootstrap.
-    transport.connect().catch((err) => {
-      warn('trouter: initial connect failed:', err instanceof Error ? err.message : String(err))
+      profile: activeProfile,
+      pollerHandleRef,
+      onFatal: (kind, msg) => {
+        ink.unmount()
+        process.stderr.write(`teaminal: auth failed (${kind}): ${msg}\n`)
+        process.exit(3)
+      },
     })
 
     await ink.waitUntilExit()
@@ -272,31 +226,20 @@ const forceAvailability = startForceAvailabilityDriver(store)
     }
     process.exit(1)
   } finally {
-    // Best-effort shutdown. Each step is independently guarded so a
-    // failure in one teardown doesn't skip the rest. Order matters:
-    // stop the push side before the poll side so a final realtime event
-    // can't enqueue work onto a torn-down poller.
+    // Best-effort shutdown. Stop the session (push + poll), then the
+    // hardware-level helpers (focus tracker / force-availability), then
+    // flush the cache one last time.
     try {
-      if (notifyDrainTimer) clearInterval(notifyDrainTimer)
+      cacheSubscription()
     } catch {}
     try {
-      transport?.disconnect()
+      if (currentSession) await currentSession.stop()
     } catch {}
-    try {
-      bridge?.stop()
-    } catch {}
-    try {
-      bus?.clear()
-    } catch {}
-    pollerHandleRef.current = null
     try {
       forceAvailability.stop()
     } catch {}
     try {
       focusTracker.stop()
-    } catch {}
-    try {
-      if (handle) await handle.stop()
     } catch {}
     try {
       flushMessageCache()
