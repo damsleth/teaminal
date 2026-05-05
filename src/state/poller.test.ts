@@ -5,6 +5,10 @@ import {
 } from '../auth/owaPiggy'
 import { __resetForTests, __setTransportForTests } from '../graph/client'
 import type { Capabilities } from '../graph/capabilities'
+import {
+  __resetForTests as resetTeamsPresence,
+  __setTransportForTests as setTeamsPresenceTransport,
+} from '../graph/teamsPresence'
 import type { Chat, ChatMessage, Mention } from '../types'
 import { createAppStore, focusKey } from './store'
 import {
@@ -32,7 +36,10 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response {
 
 function primeAuth(): void {
   setAuthRunner(async () => ({
-    stdout: makeJwt({ exp: FAR_FUTURE }),
+    // Include `oid` so the Teams presence client can build an MRI for the
+    // self-presence call. ME.id is the AAD object id by convention in
+    // these tests.
+    stdout: makeJwt({ exp: FAR_FUTURE, oid: ME.id }),
     stderr: '',
     exitCode: 0,
   }))
@@ -118,6 +125,7 @@ afterEach(async () => {
   }
   __resetForTests()
   resetAuth()
+  resetTeamsPresence()
 })
 
 describe('active loop', () => {
@@ -629,7 +637,13 @@ describe('presence loop', () => {
       joinedTeams: { ok: true },
       presence: { ok: true },
     }
-    store.set({ capabilities: caps })
+    // Force the Graph path so this legacy test still validates the
+    // fallback. New default behavior (Teams presence preferred) is
+    // covered by the dedicated tests below.
+    store.set({
+      capabilities: caps,
+      settings: { ...store.get().settings, useTeamsPresence: false },
+    })
     activeHandle = startPoller({
       store,
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 30 },
@@ -660,7 +674,10 @@ describe('presence loop', () => {
       joinedTeams: { ok: true },
       presence: { ok: false, reason: 'unavailable', status: 403, message: 'Forbidden' },
     }
-    store.set({ capabilities: caps })
+    store.set({
+      capabilities: caps,
+      settings: { ...store.get().settings, useTeamsPresence: false },
+    })
     activeHandle = startPoller({
       store,
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 30 },
@@ -668,6 +685,175 @@ describe('presence loop', () => {
     await Bun.sleep(120)
     expect(presenceCalls).toBe(0)
     expect(store.get().myPresence).toBeUndefined()
+  })
+
+  test('skips presence calls when capability is unauthorized (e.g. Presence.Read scope missing)', async () => {
+    primeAuth()
+    let presenceCalls = 0
+    installTransport(
+      makeHandlers({
+        '/me/presence': () => {
+          presenceCalls++
+          return jsonResponse({
+            id: 'x',
+            availability: 'Available',
+            activity: 'Available',
+          })
+        },
+      }),
+    )
+    const store = createAppStore()
+    const caps: Capabilities = {
+      me: { ok: true },
+      chats: { ok: true },
+      joinedTeams: { ok: true },
+      presence: {
+        ok: false,
+        reason: 'unauthorized',
+        status: 401,
+        message: 'InvalidAuthenticationToken',
+      },
+    }
+    store.set({
+      capabilities: caps,
+      settings: { ...store.get().settings, useTeamsPresence: false },
+    })
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 30 },
+    })
+    await Bun.sleep(120)
+    expect(presenceCalls).toBe(0)
+    expect(store.get().myPresence).toBeUndefined()
+  })
+
+  test('prefers Teams presence over Graph when useTeamsPresence is on (default)', async () => {
+    primeAuth() // auth runner accepts any args (graph or scope)
+    let graphCalls = 0
+    let teamsCalls = 0
+    installTransport(
+      makeHandlers({
+        '/me/presence': () => {
+          graphCalls++
+          return jsonResponse({
+            id: 'me-id',
+            availability: 'Available',
+            activity: 'Available',
+          })
+        },
+      }),
+    )
+    setTeamsPresenceTransport(async (_url, init) => {
+      teamsCalls++
+      const body = JSON.parse(String(init.body ?? '[]')) as Array<{ mri: string }>
+      const oid = body[0]?.mri.replace(/^8:orgid:/, '') ?? ''
+      return new Response(
+        JSON.stringify([
+          {
+            mri: `8:orgid:${oid}`,
+            presence: {
+              availability: 'Busy',
+              activity: 'InACall',
+              deviceType: 'Desktop',
+            },
+            status: 20000,
+          },
+        ]),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )
+    })
+    const store = createAppStore()
+    store.set({ me: ME, capabilities: { presence: { ok: true } } as Capabilities })
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 30 },
+    })
+    await waitFor(() => store.get().myPresence?.availability === 'Busy')
+    expect(teamsCalls).toBeGreaterThan(0)
+    expect(graphCalls).toBe(0)
+    expect(store.get().myPresence?.activity).toBe('InACall')
+    expect(store.get().myPresence?.id).toBe(ME.id)
+  })
+
+  test('falls back to Graph after a Teams 401 and stops re-trying Teams', async () => {
+    primeAuth()
+    let graphCalls = 0
+    let teamsCalls = 0
+    installTransport(
+      makeHandlers({
+        '/me/presence': () => {
+          graphCalls++
+          return jsonResponse({
+            id: 'me-id',
+            availability: 'Available',
+            activity: 'Available',
+          })
+        },
+      }),
+    )
+    setTeamsPresenceTransport(async () => {
+      teamsCalls++
+      // Simulate tenant policy / scope rejection.
+      return new Response('{"substatuscode":{"value":40102}}', {
+        status: 401,
+        headers: { 'content-type': 'application/json' },
+      })
+    })
+    const errors: { loop: string; err: Error }[] = []
+    const store = createAppStore()
+    store.set({ me: ME, capabilities: { presence: { ok: true } } as Capabilities })
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 25 },
+      onError: (loop, err) => errors.push({ loop, err }),
+    })
+    await waitFor(() => store.get().myPresence !== undefined)
+    expect(store.get().myPresence?.availability).toBe('Available')
+    expect(graphCalls).toBeGreaterThan(0)
+    const teamsAfterFallback = teamsCalls
+    // Let several more presence intervals run.
+    await Bun.sleep(120)
+    // Teams must not be re-tried in the same session after the 401.
+    expect(teamsCalls).toBe(teamsAfterFallback)
+    expect(errors.some((e) => e.loop === 'presence')).toBe(true)
+  })
+
+  test('uses Graph from the start when useTeamsPresence is false', async () => {
+    primeAuth()
+    let graphCalls = 0
+    let teamsCalls = 0
+    installTransport(
+      makeHandlers({
+        '/me/presence': () => {
+          graphCalls++
+          return jsonResponse({
+            id: 'me-id',
+            availability: 'Away',
+            activity: 'Away',
+          })
+        },
+      }),
+    )
+    setTeamsPresenceTransport(async () => {
+      teamsCalls++
+      return new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    })
+    const store = createAppStore()
+    store.set({
+      me: ME,
+      capabilities: { presence: { ok: true } } as Capabilities,
+      settings: { ...store.get().settings, useTeamsPresence: false },
+    })
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 30 },
+    })
+    await waitFor(() => store.get().myPresence?.availability === 'Away')
+    expect(graphCalls).toBeGreaterThan(0)
+    expect(teamsCalls).toBe(0)
   })
 })
 

@@ -128,14 +128,19 @@ describe('realtimeBridge', () => {
     bridge.stop()
   })
 
-  test('presence-changed ignores untracked non-self users', () => {
+  test('presence-changed seeds memberPresence for previously-unseen users', () => {
+    // The bridge has no view into which user ids the chat list cares
+    // about, so seeding on push is the right default: it lets us light
+    // up dots for users that the periodic poll has not yet covered
+    // (e.g. a brand-new 1:1 chat created mid-session). The cost of an
+    // unused map entry is negligible.
     const { bus, store, bridge } = setup()
     store.set({
       me: { id: 'me1', displayName: 'Me', userPrincipalName: 'me@test.com', mail: null },
     })
     bus.emit({ kind: 'presence-changed', userId: 'unknown', availability: 'Away' })
 
-    expect(store.get().memberPresence['unknown']).toBeUndefined()
+    expect(store.get().memberPresence['unknown']?.availability).toBe('Away')
     bridge.stop()
   })
 

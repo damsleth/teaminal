@@ -1,10 +1,12 @@
 // Diagnostics overlay - inspect the live access token and capability probe.
 //
 // The most useful single thing here is the `scp` claim: if a Graph endpoint
-// returns 403 (e.g. presence in some tenants), it usually means the FOCI
-// broker token did not include the matching scope (Presence.Read,
-// Channel.ReadBasic.All, Group.ReadWrite.All, etc.). The active scope list
-// makes that immediately obvious.
+// returns 403 (e.g. channel listing in some tenants), it usually means the
+// FOCI broker token did not include the matching scope
+// (Channel.ReadBasic.All, Group.ReadWrite.All, etc.). The active scope list
+// makes that immediately obvious. The presence probe targets the Teams
+// unified presence endpoint (presence.teams.microsoft.com / PresenceRW),
+// not Graph /me/presence, since the Teams path is what the runtime uses.
 //
 // Triggered by Help -> Diagnostics in the modal menu. Esc / Enter to close.
 // No keys are bound to this beyond closing - it's a read-only inspector.

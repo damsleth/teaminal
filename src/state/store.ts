@@ -182,6 +182,22 @@ export type Settings = {
   // color-picker UI.
   messageFocusIndicatorColor: string | null
   messageFocusBackgroundColor: string | null
+  // When true (default), the presence loop hits Teams unified presence
+  // (presence.teams.microsoft.com) for own presence instead of Graph's
+  // /me/presence. The Teams endpoint works under FOCI tokens whose Graph
+  // audience does not carry the Presence.Read scope, and returns richer
+  // info (deviceType, OOO, work-location). Falls back to Graph if the
+  // Teams call fails with an auth error. Set false to force the Graph
+  // path — useful in tenants where the public client is blocked from
+  // talking to presence.teams.microsoft.com directly.
+  useTeamsPresence: boolean
+  // When true (default), teaminal PUTs forceavailability=Available to
+  // presence.teams.microsoft.com while the terminal window has focus
+  // (DEC focus reporting; CSI ?1004). The server expires the override
+  // after ~5 min, so the driver refreshes inside that window. On blur
+  // the override is left to decay naturally. Set false to leave
+  // presence to Teams' own desktop client / inactivity timer.
+  forceAvailableWhenFocused: boolean
 }
 
 export const defaultSettings: Settings = {
@@ -198,6 +214,8 @@ export const defaultSettings: Settings = {
   messageFocusIndicatorChar: '>',
   messageFocusIndicatorColor: null,
   messageFocusBackgroundColor: null,
+  useTeamsPresence: true,
+  forceAvailableWhenFocused: true,
 }
 
 export type MessageCache = {
@@ -421,6 +439,11 @@ export type AppState = {
   // Real-time push transport state. 'off' when not configured or not
   // attempted; other values reflect the trouter/SSE connection lifecycle.
   realtimeState: RealtimeState
+  // True while the terminal window has input focus, per DEC focus
+  // reporting (CSI ?1004). Drives the force-availability driver.
+  // Defaults to true (process startup implies focus); set to false
+  // when the terminal sends ESC[O and back to true on ESC[I.
+  terminalFocused: boolean
   // Active typing indicators per conversation, keyed by ConvKey.
   // Entries expire after ~8s of inactivity (cleaned by a timer).
   typingByConvo: Record<ConvKey, TypingIndicator[]>
@@ -451,6 +474,7 @@ export function initialAppState(): AppState {
     memberPresence: {},
     conn: 'connecting',
     realtimeState: 'off',
+    terminalFocused: true,
     typingByConvo: {},
     modal: null,
     settings: { ...defaultSettings },

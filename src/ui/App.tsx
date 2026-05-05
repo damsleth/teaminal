@@ -323,11 +323,15 @@ export function App() {
           moveMessageCursor(-1)
           return
         }
-        if (input === 'U' || (key as typeof key & { pageUp?: boolean }).pageUp) {
+        if (input === 'u' || input === 'U' || (key as typeof key & { pageUp?: boolean }).pageUp) {
           moveMessageCursor(-Math.ceil(20 / 2))
           return
         }
-        if (input === 'D' || (key as typeof key & { pageDown?: boolean }).pageDown) {
+        if (
+          input === 'd' ||
+          input === 'D' ||
+          (key as typeof key & { pageDown?: boolean }).pageDown
+        ) {
           moveMessageCursor(Math.ceil(20 / 2))
           return
         }

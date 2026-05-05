@@ -36,6 +36,28 @@ type CacheEntry = { token: string; exp: number }
 const cache = new Map<string, CacheEntry>()
 const inFlight = new Map<string, Promise<string>>()
 
+const DEFAULT_SCOPE_KEY = '<graph-default>'
+
+export type GetTokenOpts = {
+  profile?: string
+  // Pass-through to owa-piggy's --scope flag. Lets callers ask for a token
+  // with a non-default audience (e.g. Teams unified presence) without
+  // adding a new flag to owa-piggy. Cached separately from the default
+  // graph token, so concurrent loops with different scopes don't fight
+  // each other in the in-process cache.
+  scope?: string
+}
+
+function normalizeOpts(opts?: GetTokenOpts | string): GetTokenOpts {
+  if (opts === undefined) return {}
+  if (typeof opts === 'string') return { profile: opts }
+  return opts
+}
+
+function fullCacheKey(opts: GetTokenOpts): string {
+  return `${opts.profile ?? DEFAULT_KEY}::${opts.scope ?? DEFAULT_SCOPE_KEY}`
+}
+
 export type OwaPiggyProfileStatus = {
   profile: string
   valid: boolean
@@ -45,10 +67,6 @@ export type OwaPiggyProfileStatus = {
   scopes?: string[]
   scopeSummary?: string
   error?: string
-}
-
-function cacheKey(profile?: string): string {
-  return profile ?? DEFAULT_KEY
 }
 
 export function decodeJwtClaims(token: string): Record<string, unknown> {
@@ -81,8 +99,9 @@ export function decodeJwtExp(token: string): number {
   return exp
 }
 
-export async function getToken(profile?: string): Promise<string> {
-  const key = cacheKey(profile)
+export async function getToken(opts?: GetTokenOpts | string): Promise<string> {
+  const normalized = normalizeOpts(opts)
+  const key = fullCacheKey(normalized)
   const now = Math.floor(Date.now() / 1000)
 
   const cached = cache.get(key)
@@ -94,8 +113,15 @@ export async function getToken(profile?: string): Promise<string> {
   if (existing) return existing
 
   const promise = (async () => {
-    const args = ['token', '--audience', 'graph']
-    if (profile) args.push('--profile', profile)
+    const args = ['token']
+    if (normalized.scope) {
+      // --scope takes precedence over --audience inside owa-piggy and
+      // routes to the same FOCI exchange. Don't pass --audience too.
+      args.push('--scope', normalized.scope)
+    } else {
+      args.push('--audience', 'graph')
+    }
+    if (normalized.profile) args.push('--profile', normalized.profile)
     const { stdout, stderr, exitCode } = await runner(args)
     if (exitCode !== 0) {
       const msg = stderr.trim() || `owa-piggy exited with code ${exitCode}`
@@ -118,8 +144,8 @@ export async function getToken(profile?: string): Promise<string> {
   }
 }
 
-export function invalidate(profile?: string): void {
-  cache.delete(cacheKey(profile))
+export function invalidate(opts?: GetTokenOpts | string): void {
+  cache.delete(fullCacheKey(normalizeOpts(opts)))
 }
 
 function splitStatusBlocks(stdout: string, fallbackProfile?: string): string[][] {
@@ -129,8 +155,10 @@ function splitStatusBlocks(stdout: string, fallbackProfile?: string): string[][]
     .filter((line) => line.trim() !== '')
   const blocks: string[][] = []
   let current: string[] = []
+  const isHeader = (line: string): boolean =>
+    /^\[profile=[^\]]+\]$/.test(line) || /^profile:\s+\S+$/.test(line)
   for (const line of lines) {
-    if (/^\[profile=[^\]]+\]$/.test(line) && current.length > 0) {
+    if (isHeader(line) && current.length > 0) {
       blocks.push(current)
       current = [line]
       continue
@@ -138,11 +166,7 @@ function splitStatusBlocks(stdout: string, fallbackProfile?: string): string[][]
     current.push(line)
   }
   if (current.length > 0) blocks.push(current)
-  if (
-    blocks.length === 1 &&
-    !/^\[profile=[^\]]+\]$/.test(blocks[0]?.[0] ?? '') &&
-    fallbackProfile
-  ) {
+  if (blocks.length === 1 && !isHeader(blocks[0]?.[0] ?? '') && fallbackProfile) {
     blocks[0]?.unshift(`[profile=${fallbackProfile}]`)
   }
   return blocks
@@ -150,7 +174,9 @@ function splitStatusBlocks(stdout: string, fallbackProfile?: string): string[][]
 
 function parseProfileBlock(lines: string[], index: number): OwaPiggyProfileStatus | null {
   const first = lines[0] ?? ''
-  const label = first.match(/^\[profile=([^\]]+)\]$/)
+  const bracketLabel = first.match(/^\[profile=([^\]]+)\]$/)
+  const colonLabel = first.match(/^profile:\s+(\S+)$/)
+  const label = bracketLabel ?? colonLabel
   const profile = label?.[1] ?? (index === 0 ? DEFAULT_KEY : `profile-${index + 1}`)
   const body = label ? lines.slice(1) : lines
   if (body.length === 0) return null
