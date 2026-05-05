@@ -1,0 +1,85 @@
+name: Release
+
+# Triggered when a tag matching v* is pushed. Builds release binaries for
+# the four supported targets, smokes each one, archives them, and creates
+# a GitHub Release with the assets attached.
+#
+# Homebrew tap PR is intentionally NOT automated yet: that requires a
+# personal access token and a decision about which formula to update.
+# See .plans/done/quick-wins.md and docs/release.md for the manual steps.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: bun-darwin-arm64
+            os: macos-latest
+          - target: bun-darwin-x64
+            os: macos-13
+          - target: bun-linux-x64-modern
+            os: ubuntu-latest
+          - target: bun-linux-arm64
+            os: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.x
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build
+        run: TARGET=${{ matrix.target }} ./scripts/build.sh
+
+      - name: Smoke
+        run: ./dist/teaminal --version
+
+      - name: Archive
+        run: |
+          mkdir -p out
+          version="${GITHUB_REF#refs/tags/v}"
+          archive="teaminal-${version}-${{ matrix.target }}.tar.gz"
+          tar -C dist -czf "out/${archive}" teaminal
+          (cd out && shasum -a 256 "${archive}" > "${archive}.sha256")
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: teaminal-${{ matrix.target }}
+          path: out/*
+
+  release:
+    name: github release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect
+        run: |
+          mkdir -p release
+          find artifacts -type f -exec cp {} release/ \;
+          ls -la release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
