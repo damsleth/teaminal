@@ -32,12 +32,8 @@ import {
   listMessagesPage,
 } from '../graph/chats'
 import { GraphError, getActiveProfile, RateLimitError } from '../graph/client'
-import { getMyPresence, getPresencesByUserId } from '../graph/presence'
-import {
-  getMyTeamsPresence,
-  getTeamsPresenceByOid,
-  TeamsPresenceError,
-} from '../graph/teamsPresence'
+import { getMyPresence } from '../graph/presence'
+import { getMyTeamsPresence, TeamsPresenceError } from '../graph/teamsPresence'
 import {
   listChannelMessagesNextPage,
   listChannelMessagesPage,
@@ -58,18 +54,29 @@ import {
   seedChatActivity,
   type Store,
 } from './store'
+import { mergeChatMembers } from './poller/chatList'
+import {
+  ACTIVE_DEFAULT_MS,
+  LIST_DEFAULT_MS,
+  MEMBER_PRESENCE_LIMIT,
+  PRESENCE_DEFAULT_MS,
+  backoff,
+  isAbortError,
+  jitter,
+} from './poller/intervals'
+import { fetchMemberPresence } from './poller/memberPresence'
+import {
+  countNewMessages,
+  mergeChronological,
+  mergeWithOptimistic as mergeWithOptimisticImpl,
+} from './poller/merge'
+import { shouldNotifyMention } from './poller/mentions'
+import { mergeActivePagePatch, type MessagesPage } from './poller/pagePatch'
+import { makeSleeper } from './poller/sleeper'
 
-const ACTIVE_DEFAULT_MS = 5_000
-const LIST_DEFAULT_MS = 30_000
-const PRESENCE_DEFAULT_MS = 60_000
-// Cap the per-tick member-presence fan-out. Graph and the Teams
-// unified-presence endpoint both accept much larger batches, but we
-// only render presence dots for visible 1:1 chats and the user's hot
-// list rarely exceeds a few dozen names. Keep the budget tight so a
-// 500-chat tenant does not pay for invisible work every minute.
-const MEMBER_PRESENCE_LIMIT = 50
-const BACKOFF_BASE = 1.5
-const BACKOFF_CAP_MS = 60_000
+// Re-exports preserved for callers that import these from './poller' directly.
+export { mergeChatMembers } from './poller/chatList'
+export const mergeWithOptimistic = mergeWithOptimisticImpl
 
 export type PollerLoopName = 'active' | 'list' | 'presence'
 
@@ -111,197 +118,6 @@ export type LoadOlderMessagesResult = {
   fullyLoaded: boolean
   anchorMessageId?: string
   error?: Error
-}
-
-function jitter(ms: number): number {
-  return Math.round(ms * (0.8 + Math.random() * 0.4))
-}
-
-function backoff(baseMs: number, consecutive: number): number {
-  if (consecutive === 0) return baseMs
-  const raised = baseMs * Math.pow(BACKOFF_BASE, consecutive)
-  return Math.min(BACKOFF_CAP_MS, raised)
-}
-
-function isAbortError(err: unknown): boolean {
-  if (!(err instanceof Error)) return false
-  if (err.name === 'AbortError') return true
-  // Bun's fetch may throw a DOMException-shaped error with code === 20 or
-  // an Error with message containing "aborted". Be permissive.
-  return /aborted|abort/i.test(err.message)
-}
-
-// Resolves member presence via Teams unified presence first (works on
-// FOCI tokens with aud=presence.teams.microsoft.com / scp=PresenceRW),
-// then falls back to Graph getPresencesByUserId if the Teams path is
-// disabled or unreachable for the session. Returns a partial map: any
-// user id missing from the result simply has no dot.
-async function fetchMemberPresence(
-  oids: string[],
-  opts: { useTeams: boolean; useGraph: boolean; signal: AbortSignal },
-): Promise<Map<string, Presence>> {
-  const out = new Map<string, Presence>()
-  if (oids.length === 0) return out
-  if (opts.useTeams) {
-    const teams = await getTeamsPresenceByOid(oids, {
-      profile: getActiveProfile(),
-      signal: opts.signal,
-    })
-    for (const [oid, entry] of teams) {
-      out.set(oid, {
-        id: oid,
-        availability: entry.availability as Presence['availability'],
-        activity: entry.activity as Presence['activity'],
-      })
-    }
-    return out
-  }
-  if (opts.useGraph) {
-    const list = await getPresencesByUserId(oids, { signal: opts.signal })
-    for (const p of list) out.set(p.id, p)
-  }
-  return out
-}
-
-function shouldNotifyMention(msg: ChatMessage, myUserId: string): boolean {
-  if (msg.from?.user?.id === myUserId) return false // own echo
-  const mentions = msg.mentions
-  if (!mentions || mentions.length === 0) return false
-  return mentions.some((m) => m.mentioned?.user?.id === myUserId)
-}
-
-// Merge a fresh server page with the local cache without dropping older
-// pages or optimistic sends. Server-confirmed messages take precedence
-// wherever ids overlap.
-export function mergeWithOptimistic(existing: ChatMessage[], server: ChatMessage[]): ChatMessage[] {
-  return mergeChronological(existing, server)
-}
-
-function messageTime(msg: ChatMessage): number {
-  const parsed = Date.parse(msg.createdDateTime)
-  return Number.isFinite(parsed) ? parsed : 0
-}
-
-function mergeChronological(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
-  const byId = new Map<string, ChatMessage>()
-  for (const msg of existing) byId.set(msg.id, msg)
-  for (const msg of incoming) byId.set(msg.id, msg)
-  return Array.from(byId.values()).sort((a, b) => messageTime(a) - messageTime(b))
-}
-
-function countNewMessages(existing: ChatMessage[], incoming: ChatMessage[]): number {
-  const ids = new Set(existing.map((m) => m.id))
-  let count = 0
-  for (const msg of incoming) {
-    if (!ids.has(msg.id)) count++
-  }
-  return count
-}
-
-type MessagesPage = {
-  messages: ChatMessage[]
-  nextLink?: string
-}
-
-function newestMessageId(messages: ChatMessage[]): string | undefined {
-  return messages[messages.length - 1]?.id
-}
-
-function mergeActivePagePatch(
-  state: AppState,
-  conv: ConvKey,
-  page: MessagesPage,
-  focus: Focus,
-): Partial<AppState> {
-  const cache = state.messageCacheByConvo[conv]
-  const legacyMessages = state.messagesByConvo[conv] ?? []
-  const existing = cache?.messages ?? legacyMessages
-  const merged = mergeWithOptimistic(existing, page.messages)
-
-  const incomingIds = new Set(page.messages.map((m) => m.id))
-  const hasCachedOlderMessages = existing.some(
-    (m) => !incomingIds.has(m.id) && !m._sending && !m._sendError,
-  )
-  const preserveOlderPaging = hasCachedOlderMessages && cache !== undefined
-  const nextLink = preserveOlderPaging ? cache.nextLink : page.nextLink
-  const fullyLoaded = preserveOlderPaging
-    ? (cache?.fullyLoaded ?? false)
-    : page.nextLink === undefined
-  const nextCaches = {
-    ...state.messageCacheByConvo,
-    [conv]: {
-      ...(cache ?? emptyMessageCache()),
-      messages: merged,
-      nextLink,
-      loadingOlder: false,
-      fullyLoaded,
-      error: undefined,
-    },
-  }
-  const prevCursor = state.messageCursorByConvo[conv]
-  const nextCursor =
-    prevCursor === undefined
-      ? Math.max(0, merged.length - 1)
-      : Math.min(prevCursor, Math.max(0, merged.length - 1))
-  const patch: Partial<AppState> = {
-    messageCacheByConvo: nextCaches,
-    messagesByConvo: {
-      ...state.messagesByConvo,
-      [conv]: merged,
-    },
-    messageCursorByConvo: {
-      ...state.messageCursorByConvo,
-      [conv]: nextCursor,
-    },
-  }
-  if (focus.kind === 'chat') {
-    patch.unreadByChatId = markChatRead(state.unreadByChatId, focus.chatId, newestMessageId(merged))
-  }
-  return patch
-}
-
-// /chats does not return members on the bulk list call ($expand=members is
-// capped at 25 with a different shape). Each list-poll iteration would
-// therefore overwrite previously-hydrated members with undefined and chat
-// labels would flip back to "(1:1)". Carry forward members from the prior
-// store snapshot so labels stay stable.
-export function mergeChatMembers(prev: Chat[], next: Chat[]): Chat[] {
-  if (prev.length === 0) return next
-  const prevById = new Map(prev.map((c) => [c.id, c]))
-  return next.map((c) => {
-    const p = prevById.get(c.id)
-    if (p?.members && p.members.length > 0 && (!c.members || c.members.length === 0)) {
-      return { ...c, members: p.members }
-    }
-    return c
-  })
-}
-
-type Sleeper = {
-  sleep(ms: number): Promise<void>
-  wake(): void
-}
-
-function makeSleeper(): Sleeper {
-  let waker: (() => void) | null = null
-  return {
-    sleep(ms: number) {
-      return new Promise<void>((resolve) => {
-        const id = setTimeout(() => {
-          waker = null
-          resolve()
-        }, ms)
-        waker = () => {
-          clearTimeout(id)
-          waker = null
-          resolve()
-        }
-      })
-    },
-    wake() {
-      waker?.()
-    },
-  }
 }
 
 async function fetchActiveMessages(focus: Focus, signal: AbortSignal): Promise<MessagesPage> {
