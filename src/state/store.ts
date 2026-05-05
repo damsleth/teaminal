@@ -199,6 +199,15 @@ export type Settings = {
   // the override is left to decay naturally. Set false to leave
   // presence to Teams' own desktop client / inactivity timer.
   forceAvailableWhenFocused: boolean
+  // Notification preferences. notifyMuted is a session-level kill switch
+  // that suppresses banners (bell still rings — terminal-level mute is
+  // the user's responsibility). notifyActiveBanner forces the banner
+  // even when the user is already viewing the active conv (default off:
+  // bell only). quietHoursStart/End are HH:MM strings or null to disable.
+  notifyMuted: boolean
+  notifyActiveBanner: boolean
+  quietHoursStart: string | null
+  quietHoursEnd: string | null
 }
 
 export const defaultSettings: Settings = {
@@ -217,6 +226,10 @@ export const defaultSettings: Settings = {
   messageFocusBackgroundColor: null,
   useTeamsPresence: true,
   forceAvailableWhenFocused: true,
+  notifyMuted: false,
+  notifyActiveBanner: false,
+  quietHoursStart: null,
+  quietHoursEnd: null,
 }
 
 export type MessageCache = {

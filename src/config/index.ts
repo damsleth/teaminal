@@ -188,6 +188,10 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     messageFocusBackgroundColor: settings.messageFocusBackgroundColor,
     useTeamsPresence: settings.useTeamsPresence,
     forceAvailableWhenFocused: settings.forceAvailableWhenFocused,
+    notifyMuted: settings.notifyMuted,
+    notifyActiveBanner: settings.notifyActiveBanner,
+    quietHoursStart: settings.quietHoursStart,
+    quietHoursEnd: settings.quietHoursEnd,
   }
 }
 
@@ -316,6 +320,8 @@ function validateAndAssign(
     case 'messageFocusIndicatorEnabled':
     case 'useTeamsPresence':
     case 'forceAvailableWhenFocused':
+    case 'notifyMuted':
+    case 'notifyActiveBanner':
       if (typeof value === 'boolean') {
         out[key] = value
         return true
@@ -347,6 +353,18 @@ function validateAndAssign(
         return true
       }
       warnings.push(`config: "${key}" must be null, a named color, or a hex color`)
+      return false
+    case 'quietHoursStart':
+    case 'quietHoursEnd':
+      if (value === null) {
+        out[key] = null
+        return true
+      }
+      if (typeof value === 'string' && /^\d{1,2}:\d{2}$/.test(value.trim())) {
+        out[key] = value.trim()
+        return true
+      }
+      warnings.push(`config: "${key}" must be null or an HH:MM string`)
       return false
   }
 }
