@@ -1,11 +1,18 @@
 #!/usr/bin/env bash
 #
-# Compile teaminal into a single binary for a supported macOS architecture.
+# Compile teaminal into a single binary for a supported platform target.
 #
-# Defaults to the current host architecture when running on macOS; override
-# via the TARGET env var to cross-build:
-#   TARGET=bun-darwin-arm64 ./scripts/build.sh
-#   TARGET=bun-darwin-x64 ./scripts/build.sh
+# Defaults to the current host architecture when running on a supported
+# host (macOS, Linux). Override via the TARGET env var to cross-build:
+#
+#   TARGET=bun-darwin-arm64    ./scripts/build.sh
+#   TARGET=bun-darwin-x64      ./scripts/build.sh
+#   TARGET=bun-linux-x64-modern ./scripts/build.sh
+#   TARGET=bun-linux-arm64     ./scripts/build.sh
+#
+# Cross-build is permitted whenever the underlying `bun build --compile`
+# supports it; we don't gate on host→target compatibility because in
+# CI each runner produces its own artifact for its own target.
 
 set -euo pipefail
 
@@ -13,7 +20,12 @@ cd "$(dirname "$0")/.."
 
 ENTRY="bin/teaminal.tsx"
 OUT="dist/teaminal"
-SUPPORTED_TARGETS=("bun-darwin-arm64" "bun-darwin-x64")
+SUPPORTED_TARGETS=(
+  "bun-darwin-arm64"
+  "bun-darwin-x64"
+  "bun-linux-x64-modern"
+  "bun-linux-arm64"
+)
 
 default_target() {
   local os arch
@@ -21,19 +33,23 @@ default_target() {
   arch="$(uname -m)"
 
   case "${os}:${arch}" in
-    Darwin:arm64) echo "bun-darwin-arm64" ;;
+    Darwin:arm64)  echo "bun-darwin-arm64" ;;
     Darwin:x86_64) echo "bun-darwin-x64" ;;
+    Linux:x86_64)  echo "bun-linux-x64-modern" ;;
+    Linux:aarch64) echo "bun-linux-arm64" ;;
+    Linux:arm64)   echo "bun-linux-arm64" ;;
     *)
       cat >&2 <<EOF
 teaminal build error: unsupported host platform ${os}/${arch}
 
-teaminal currently ships compiled binaries for macOS only:
+Supported targets:
   - bun-darwin-arm64
   - bun-darwin-x64
+  - bun-linux-x64-modern
+  - bun-linux-arm64
 
-To cross-build one of those targets, run:
+To cross-build, set TARGET explicitly, e.g.:
   TARGET=bun-darwin-arm64 ./scripts/build.sh
-  TARGET=bun-darwin-x64 ./scripts/build.sh
 EOF
       exit 2
       ;;
@@ -48,9 +64,11 @@ case " ${SUPPORTED_TARGETS[*]} " in
     cat >&2 <<EOF
 teaminal build error: unsupported target '${TARGET}'
 
-teaminal currently supports macOS targets only:
+teaminal currently supports:
   - bun-darwin-arm64
   - bun-darwin-x64
+  - bun-linux-x64-modern
+  - bun-linux-arm64
 
 Set TARGET to one of the supported values, for example:
   TARGET=bun-darwin-arm64 ./scripts/build.sh
