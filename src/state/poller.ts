@@ -549,9 +549,15 @@ export function startPoller(opts: PollerOpts): PollerHandle {
       unsubscribe()
       activeAbort?.abort()
       hydrateAbort.abort()
-      activeSleeper.wake()
-      listSleeper.wake()
-      presenceSleeper.wake()
+      // close() (not just wake()) latches each sleeper so any in-flight
+      // sleep resolves AND any future sleep() inside the loop is a
+      // no-op. Without the latch, a loop whose previous sleep just
+      // resolved on the timer (waker=null in that window) would start a
+      // fresh backoff sleep nobody can wake — that's the source of the
+      // multi-second afterEach hangs we used to see in poller.test.ts.
+      activeSleeper.close()
+      listSleeper.close()
+      presenceSleeper.close()
       await loops
     },
     refresh() {
