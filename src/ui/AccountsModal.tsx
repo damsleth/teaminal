@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { listProfilesFromStatus, type OwaPiggyProfileStatus } from '../auth/owaPiggy'
 import { updateSettings } from '../config'
 import type { Settings } from '../state/store'
+import { useSessionApi } from './SessionContext'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
 type Mode =
@@ -23,6 +24,7 @@ export function AccountsModal() {
   const settings = useAppState((s) => s.settings)
   const theme = useTheme()
   const isOpen = modal?.kind === 'accounts'
+  const session = useSessionApi()
   const [mode, setMode] = useState<Mode>({ kind: 'list', cursor: 0 })
 
   async function persist(patch: Partial<Settings>): Promise<void> {
@@ -146,6 +148,30 @@ export function AccountsModal() {
       if ((input === 'D' || key.delete) && settings.accounts.length > 0) {
         const profile = settings.accounts[clamp(mode.cursor, settings.accounts.length)]
         if (profile) setMode({ kind: 'confirm-remove', profile })
+        return
+      }
+      // Enter switches to the selected account.
+      if (key.return && settings.accounts.length > 0) {
+        const profile = settings.accounts[clamp(mode.cursor, settings.accounts.length)]
+        if (!profile) return
+        if (settings.activeAccount === profile && session.getActiveProfile() === profile) {
+          // Already active; close the modal as a no-op.
+          store.set({ modal: null, inputZone: 'list' })
+          return
+        }
+        void (async () => {
+          try {
+            await persist({ activeAccount: profile })
+            await session.switchAccount(profile)
+            store.set({ modal: null, inputZone: 'list' })
+          } catch (err) {
+            setMode({
+              kind: 'list',
+              cursor: 0,
+              error: err instanceof Error ? err.message : String(err),
+            })
+          }
+        })()
       }
     },
     { isActive: isOpen },
@@ -209,7 +235,9 @@ export function AccountsModal() {
             )}
             {mode.error && <Text color={theme.errorText}>{mode.error.slice(0, 180)}</Text>}
             <Box height={1} />
-            <Text color={theme.mutedText}>A add account · D/Delete remove · Esc close</Text>
+            <Text color={theme.mutedText}>
+              Enter switch · A add account · D/Delete remove · Esc close
+            </Text>
           </>
         )}
       </Box>

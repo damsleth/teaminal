@@ -41,6 +41,18 @@ export class Store<S extends object> {
     for (const l of this.listeners) l(this.state)
   }
 
+  /**
+   * Replace the entire state object. Used by resetAccountScopedState
+   * when switching profiles, where 'partial merge with undefined =
+   * ignore' semantics of set() would leave stale me / capabilities /
+   * myPresence on the next account.
+   */
+  replace(next: S): void {
+    if (next === this.state) return
+    this.state = next
+    for (const l of this.listeners) l(this.state)
+  }
+
   subscribe(listener: Listener<S>): () => void {
     this.listeners.add(listener)
     return () => {
@@ -516,4 +528,23 @@ export function initialAppState(): AppState {
 
 export function createAppStore(): Store<AppState> {
   return new Store<AppState>(initialAppState())
+}
+
+/**
+ * Wipe the account-scoped slices of the store while preserving
+ * settings (theme / notifications / window height) and the
+ * terminal-focused flag (which is a hardware-level fact, not a
+ * per-account fact).
+ *
+ * Used when switching the active owa-piggy profile: the new account
+ * has its own me/chats/teams/messages and re-fetches them from scratch,
+ * but the user's UI preferences should persist across the switch.
+ */
+export function resetAccountScopedState(store: Store<AppState>): void {
+  const prev = store.get()
+  const fresh = initialAppState()
+  // Preserve UI preferences and hardware-level state.
+  fresh.settings = prev.settings
+  fresh.terminalFocused = prev.terminalFocused
+  store.replace(fresh)
 }
