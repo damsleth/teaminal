@@ -64,10 +64,22 @@ export type Mention = {
   mentioned?: IdentitySet
 }
 
+export type Reaction = {
+  // Microsoft's documented short list, plus the open string for unknowns.
+  reactionType: 'like' | 'heart' | 'laugh' | 'surprised' | 'sad' | 'angry' | 'custom' | string
+  createdDateTime?: string
+  user?: IdentitySet
+  // Custom reactions carry a display name; non-custom usually don't.
+  displayName?: string
+}
+
 export type ChatMessage = {
   id: string
   createdDateTime: string
   lastModifiedDateTime?: string
+  // Set on tombstone-style deletes returned by Graph in some channel
+  // paths. The body content is empty when this is present.
+  deletedDateTime?: string | null
   chatId?: string
   messageType?: 'message' | 'systemEventMessage' | 'unknownFutureValue' | string
   from?: IdentitySet
@@ -75,7 +87,7 @@ export type ChatMessage = {
   mentions?: Mention[]
   importance?: 'normal' | 'high' | 'urgent'
   attachments?: unknown[]
-  reactions?: unknown[]
+  reactions?: Reaction[]
   replyToId?: string | null
   subject?: string | null
   // Local-only fields used by the optimistic-send flow. Underscore prefix
