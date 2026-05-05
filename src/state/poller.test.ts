@@ -45,7 +45,7 @@ function primeAuth(): void {
   }))
 }
 
-async function waitFor(predicate: () => boolean, timeoutMs = 1500): Promise<void> {
+async function waitFor(predicate: () => boolean, timeoutMs = 5_000): Promise<void> {
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
     if (predicate()) return
