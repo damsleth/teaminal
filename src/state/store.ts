@@ -86,6 +86,7 @@ export type ModalState =
   | { kind: 'menu'; path: string[]; cursor: number }
   | { kind: 'keybinds' }
   | { kind: 'diagnostics' }
+  | { kind: 'events' }
   | AccountManagerModalState
 
 export type AccountManagerAccount = {

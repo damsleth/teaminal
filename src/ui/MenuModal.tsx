@@ -134,6 +134,9 @@ export function MenuModal() {
       case 'show-diagnostics':
         store.set({ modal: { kind: 'diagnostics' }, inputZone: 'menu' })
         return
+      case 'show-events':
+        store.set({ modal: { kind: 'events' }, inputZone: 'menu' })
+        return
       case 'show-accounts':
         openAccounts(store)
         return
