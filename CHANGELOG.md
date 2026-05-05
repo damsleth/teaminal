@@ -8,6 +8,73 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **In-app event log.** New Events modal (Menu → Help → Event log) shows
+  the last 500 structured event records in real time, with a type-ahead
+  filter (source / level / message) and color-by-level. `src/log.ts`
+  exposes `recordEvent`, `getRecentEvents`, `subscribeEvents`. Existing
+  `debug` / `warn` / `error` calls now tee into the buffer so any call
+  site already surfaces in the modal.
+- **Notification coalescing.** Mentions now coalesce per-conversation
+  (default 30s window, 90s cap) and rate-limit globally (5s). The first
+  mention in a conv fires immediately when allowed; subsequent ones
+  buffer into a digest banner like "A (+1): latest preview (+3 more)".
+- **Quiet states for notifications.** Banners are suppressed (bell
+  stays) when (a) the user is viewing the active conv (configurable
+  via `notifyActiveBanner`), (b) presence is `Presenting` or
+  `DoNotDisturb`, (c) inside the configured quiet hours, or (d) when
+  `notifyMuted` is on. New menu rows under Settings: 'Mute notifications'
+  and 'Banner for active conversation'. New config keys: `notifyMuted`,
+  `notifyActiveBanner`, `quietHoursStart`, `quietHoursEnd` (HH:MM,
+  wraps midnight).
+- **Composer M1.** Internal cursor + motion / deletion bindings:
+  Left/Right, Home/Ctrl+A, End/Ctrl+E, Ctrl+W (delete previous word),
+  Ctrl+U (delete to line start), Ctrl+K (delete to line end / join),
+  Alt+Backspace (delete previous word), Alt+Left/Right (prev/next
+  word). Multi-line render (up to 5 lines visible with overflow hint),
+  cursor visible at its actual column.
+- **Bracketed paste.** The composer toggles CSI `?2004h` while focused
+  and parses CSI 200~ / 201~ wrappers (including pastes that straddle
+  Bun stdin chunk boundaries) so multi-line pastes preserve their
+  newlines instead of triggering one Enter per line.
+- **Per-conversation drafts.** Composer drafts are saved to
+  `AppState.draftsByConvo` on every keystroke and reseeded when focus
+  changes. Send clears the draft; failure restores it for retry.
+- **Reactions read path.** `ChatMessage.reactions` is now properly
+  typed (`Reaction[]`). Each message renders an aggregated counter line
+  ('👍 3 ❤ 1 😂 2') with first-seen ordering and a glyph table for
+  the documented Microsoft set plus common aliases.
+- **Edited / deleted message markers.** Edited messages get a faint
+  ' (edited)' suffix when `lastModifiedDateTime` is more than 5s after
+  `createdDateTime` (5s grace avoids flagging Graph's server-side
+  normalization of fresh sends). Deleted messages render as
+  '(message deleted by SenderName · HH:MM)' in italic muted text.
+- **In-conversation message search (S1).** `/` from chat / channel
+  focus opens an inline search bar at the top of MessagePane. Type to
+  filter (case-insensitive across body + sender display name); Enter
+  jumps to most recent match; n / N step newer / older with wrap.
+  Closes with Esc.
+- **Channel threads M1.** New `Focus` kind 'thread'. Press `t` on a
+  focused channel root message to open its thread; reads via Graph's
+  `/replies` endpoint. The composer routes sends through
+  `postChannelReply` when in thread focus. `h` / Esc inside a thread
+  returns to the parent channel rather than the chat list.
+- **Multi-account M1.** Picking an account in the Accounts modal and
+  hitting Enter now switches profiles cleanly: stops the running
+  session, wipes account-scoped state via `resetAccountScopedState`,
+  flushes the previous profile's cache, hydrates the new profile's
+  cache, and brings up a fresh session against it. Settings and
+  terminal-focus state survive the switch. Per-profile cache files
+  ('messages.<slug>.json') replace the shared 'messages.json' for
+  named profiles; the default profile keeps the legacy filename.
+- **GitHub Actions CI.** `.github/workflows/ci.yml` runs typecheck +
+  test + prettier --check on every push and PR across
+  ubuntu-latest × macos-latest. `.github/workflows/release.yml`
+  triggers on `v*` tags and builds + smokes + uploads release
+  artifacts for four targets: `bun-darwin-arm64`, `bun-darwin-x64`,
+  `bun-linux-x64-modern`, `bun-linux-arm64`.
+- **Linux build targets.** `scripts/build.sh` accepts
+  `bun-linux-x64-modern` and `bun-linux-arm64` and defaults to the
+  right one when run on a Linux host.
 - `-p` short alias for `--profile` on the CLI.
 - `engines.bun` field in `package.json` documenting the >=1.1.0 minimum.
 - `noUnusedLocals` and `noUnusedParameters` enabled in `tsconfig.json`.
@@ -16,6 +83,17 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Major poller refactor.** `src/state/poller.ts` shrunk from 888 to
+  ~200 lines of pure orchestration. Loops are now factored into
+  `src/state/poller/{activeLoop,listLoop,presenceLoop}.ts` plus
+  helpers (`teamsAndChannels`, `crossChatMentions`, `hydrateMembers`,
+  `loadOlder`, `merge`, `mentions`, `pagePatch`, `chatList`,
+  `intervals`, `sleeper`, `memberPresence`).
+- **`App.tsx` refactor.** Down from 578 to ~290 lines. `NewChatPrompt`
+  moved into its own file; focus-driven side effects extracted into
+  hooks (`useTerminalRows`, `useHydrateMembers`, `useClampMessageCursor`);
+  zone keymaps extracted into `src/ui/keybinds/` with pure
+  testable handler functions.
 - Trouter websocket connect timeout is now cleared on `onopen` and
   `onclose` so a delayed timer can no longer fire `close()` on a
   healthy socket. Also documents the rationale behind the
@@ -30,6 +108,15 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Poller test flake.** Long-standing afterEach 5s timeouts in
+  `src/state/poller.test.ts` traced to a race in `makeSleeper`: between
+  a timer-resolved sleep and the next `sleep()` call, `wake()` was a
+  no-op. New `Sleeper.close()` latches a 'closed' flag so subsequent
+  sleeps return immediately; `stop()` calls `close()` instead of
+  `wake()`. Suite now runs 540/540 in ~2.5s.
+- The realtime bridge now also wakes the poller on `reaction-added`
+  events, completing the symmetric set with chat-updated / created /
+  message-edited / -deleted.
 - Stale `TODO: persist later` comment in `src/state/store.ts` (settings
   persistence shipped in 0.6.0).
 
