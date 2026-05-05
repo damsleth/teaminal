@@ -65,8 +65,7 @@ describe('probeCapabilities', () => {
   test('reports ok for every probe when all succeed', async () => {
     primeAuth()
     installTransports({
-      'https://graph.microsoft.com/v1.0/me?': () =>
-        jsonResponse({ id: 'me-id', displayName: 'X' }),
+      'https://graph.microsoft.com/v1.0/me?': () => jsonResponse({ id: 'me-id', displayName: 'X' }),
       'https://graph.microsoft.com/v1.0/chats?': () => jsonResponse({ value: [] }),
       'https://graph.microsoft.com/v1.0/me/joinedTeams': () => jsonResponse({ value: [] }),
       [TEAMS_PRESENCE_URL]: () => teamsPresenceOk(),
@@ -88,8 +87,7 @@ describe('probeCapabilities', () => {
           { error: { code: 'Forbidden', message: 'Teams disabled for tenant' } },
           { status: 403 },
         ),
-      [TEAMS_PRESENCE_URL]: () =>
-        new Response('Presence not licensed', { status: 403 }),
+      [TEAMS_PRESENCE_URL]: () => new Response('Presence not licensed', { status: 403 }),
     })
     const caps = await probeCapabilities()
     expect(caps.me.ok).toBe(true)
@@ -154,8 +152,7 @@ describe('probeCapabilities', () => {
       'https://graph.microsoft.com/v1.0/me?': () => jsonResponse({ id: 'x', displayName: 'X' }),
       'https://graph.microsoft.com/v1.0/chats?': () => jsonResponse({ value: [] }),
       'https://graph.microsoft.com/v1.0/me/joinedTeams': () => jsonResponse({ value: [] }),
-      [TEAMS_PRESENCE_URL]: () =>
-        new Response('Service Unavailable', { status: 503 }),
+      [TEAMS_PRESENCE_URL]: () => new Response('Service Unavailable', { status: 503 }),
     })
     const caps = await probeCapabilities()
     if (!caps.presence.ok) {
