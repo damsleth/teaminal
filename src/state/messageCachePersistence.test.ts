@@ -144,6 +144,31 @@ describe('saveMessageCacheNow / loadMessageCache', () => {
     saveMessageCacheNow(caches, path)
     expect(loadMessageCache(path)['chat:c1']?.loadingOlder).toBe(false)
   })
+
+  test('cleans up the tmp file when rename fails', () => {
+    // Point the path at a directory that exists but is not writable as a
+    // file (use a directory path itself — renameSync onto an existing
+    // non-empty directory throws).
+    const dir = mkdtempSync(join(tmpdir(), 'teaminal-msgcache-fail-'))
+    tmpDirs.push(dir)
+    const blockingDir = join(dir, 'messages.json')
+    mkdtempSync(blockingDir + '-x') // unrelated
+    require('node:fs').mkdirSync(blockingDir)
+    require('node:fs').writeFileSync(join(blockingDir, 'occupant'), 'x')
+    const caches: Record<string, MessageCache> = {
+      'chat:c1': {
+        messages: [makeMessage('m1') as never],
+        loadingOlder: false,
+        fullyLoaded: false,
+      },
+    }
+    expect(() => saveMessageCacheNow(caches, blockingDir)).toThrow()
+    // No leftover .messages.json.<pid>.<ts>.tmp files in the parent dir.
+    const stragglers = require('node:fs')
+      .readdirSync(dir)
+      .filter((f: string) => f.startsWith('.messages.json.'))
+    expect(stragglers).toEqual([])
+  })
 })
 
 describe('scheduleMessageCacheSave', () => {

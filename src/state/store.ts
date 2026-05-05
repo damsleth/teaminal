@@ -449,8 +449,8 @@ export type AppState = {
   typingByConvo: Record<ConvKey, TypingIndicator[]>
   // Active modal overlay (e.g. pause menu). null = no modal.
   modal: ModalState | null
-  // User-tunable display preferences. Persisted to disk later (TODO);
-  // for now just in-process.
+  // User-tunable display preferences. Persisted to disk via
+  // src/config/index.ts (loadSettings/saveSettings/updateSettings).
   settings: Settings
   // Wall-clock timestamp of the last successful list-poll. Drives the
   // "updated Ns ago" hint in the StatusBar; undefined while we have not

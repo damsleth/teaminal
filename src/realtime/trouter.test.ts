@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { TrouterTransport } from './trouter'
 import { RealtimeEventBus } from './events'
-import type { RealtimeEvent } from './events'
 
 function makeDummyTransport() {
   const bus = new RealtimeEventBus()

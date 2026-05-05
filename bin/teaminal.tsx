@@ -36,7 +36,7 @@ USAGE
   teaminal [options]
 
 OPTIONS
-  --profile <alias>    owa-piggy profile alias (otherwise uses owa-piggy default)
+  --profile, -p <alias> owa-piggy profile alias (otherwise uses owa-piggy default)
   --debug              enable verbose stderr logging (sets TEAMINAL_DEBUG=1)
   --version            print version and exit
   --help               print this help and exit
@@ -63,7 +63,7 @@ function parseArgs(argv: string[]): {
     if (a === '--help' || a === '-h') out.showHelp = true
     else if (a === '--version' || a === '-V') out.showVersion = true
     else if (a === '--debug') out.debugFlag = true
-    else if (a === '--profile') {
+    else if (a === '--profile' || a === '-p') {
       const v = argv[i + 1]
       if (!v || v.startsWith('-')) {
         process.stderr.write('teaminal: --profile requires a value\n')
@@ -172,6 +172,10 @@ const forceAvailability = startForceAvailabilityDriver(store)
 // Background bootstrap. Errors update the store (conn) so the StatusBar
 // reflects them; fatal auth issues print to stderr and exit.
 ;(async () => {
+  let handle: Awaited<ReturnType<typeof startPoller>> | null = null
+  let bridge: ReturnType<typeof startRealtimeBridge> | null = null
+  let bus: RealtimeEventBus | null = null
+  let transport: TrouterTransport | null = null
   try {
     debug('bootstrap: getMe()')
     const me = await getMe()
@@ -188,7 +192,7 @@ const forceAvailability = startForceAvailabilityDriver(store)
     }
 
     debug('bootstrap: startPoller()')
-    const handle = startPoller({
+    handle = startPoller({
       store,
       onError: (loop, err) => warn(`poller[${loop}]:`, err.message),
       onMention: (event) => {
@@ -209,15 +213,15 @@ const forceAvailability = startForceAvailabilityDriver(store)
     // If trouter fails, the app degrades to polling-only — no user-facing
     // error beyond the header indicator changing from green to gray.
     debug('bootstrap: startRealtimeBridge()')
-    const bus = new RealtimeEventBus()
-    const bridge = startRealtimeBridge({
+    bus = new RealtimeEventBus()
+    bridge = startRealtimeBridge({
       bus,
       store,
       getPoller: () => pollerHandleRef.current,
     })
 
     debug('bootstrap: trouter transport')
-    const transport = new TrouterTransport({
+    transport = new TrouterTransport({
       bus,
       getToken: () => getToken(profile),
       profile,
@@ -243,14 +247,6 @@ const forceAvailability = startForceAvailabilityDriver(store)
     })
 
     await ink.waitUntilExit()
-    transport.disconnect()
-    bridge.stop()
-    bus.clear()
-    pollerHandleRef.current = null
-    forceAvailability.stop()
-    focusTracker.stop()
-    await handle.stop()
-    flushMessageCache()
   } catch (err) {
     ink.unmount()
     if (err instanceof Error) {
@@ -259,5 +255,32 @@ const forceAvailability = startForceAvailabilityDriver(store)
       process.stderr.write(`teaminal: unexpected error: ${String(err)}\n`)
     }
     process.exit(1)
+  } finally {
+    // Best-effort shutdown. Each step is independently guarded so a
+    // failure in one teardown doesn't skip the rest. Order matters:
+    // stop the push side before the poll side so a final realtime event
+    // can't enqueue work onto a torn-down poller.
+    try {
+      transport?.disconnect()
+    } catch {}
+    try {
+      bridge?.stop()
+    } catch {}
+    try {
+      bus?.clear()
+    } catch {}
+    pollerHandleRef.current = null
+    try {
+      forceAvailability.stop()
+    } catch {}
+    try {
+      focusTracker.stop()
+    } catch {}
+    try {
+      if (handle) await handle.stop()
+    } catch {}
+    try {
+      flushMessageCache()
+    } catch {}
   }
 })()

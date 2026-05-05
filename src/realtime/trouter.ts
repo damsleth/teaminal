@@ -63,7 +63,9 @@ export class TrouterTransport implements RealtimeTransport {
   private stateListeners = new Set<TransportStateListener>()
   private bus: RealtimeEventBus
   private getToken: () => Promise<string>
-  private profile?: string
+  // Note: opts.profile is captured via the getToken closure in TransportOpts,
+  // so we don't need to retain it on the instance. Re-add when we surface
+  // per-profile diagnostics.
 
   private ws: WebSocket | null = null
   private skypeToken: string | null = null
@@ -77,7 +79,7 @@ export class TrouterTransport implements RealtimeTransport {
   constructor(opts: TransportOpts) {
     this.bus = opts.bus
     this.getToken = opts.getToken
-    this.profile = opts.profile
+    void opts.profile
   }
 
   get state(): TransportState {
@@ -162,6 +164,12 @@ export class TrouterTransport implements RealtimeTransport {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        // The trouter registration shape mimics the Teams desktop client.
+        // We have empirically not seen the service reject unfamiliar
+        // platform/templateKey values, but the desktop-shaped payload is
+        // the safest known-good and avoids tripping any tenant-side
+        // "unknown client" filters. Revisit if Microsoft documents the
+        // protocol or starts enforcing client identification.
         clientDescription: {
           appId: 'teaminal',
           platform: 'electron',
@@ -194,7 +202,17 @@ export class TrouterTransport implements RealtimeTransport {
     return new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(this.trouterUrl!)
 
+      // Reject if connection doesn't open within 15s. Cleared on resolve
+      // so a delayed timer can't fire close() on a healthy socket.
+      const timeout = setTimeout(() => {
+        if (ws.readyState !== WebSocket.OPEN) {
+          ws.close()
+          reject(new Error('trouter: websocket connection timeout'))
+        }
+      }, 15_000)
+
       ws.onopen = () => {
+        clearTimeout(timeout)
         debug('trouter: websocket connected')
         this.ws = ws
         this.reconnectAttempts = 0
@@ -218,6 +236,7 @@ export class TrouterTransport implements RealtimeTransport {
       }
 
       ws.onclose = () => {
+        clearTimeout(timeout)
         debug('trouter: websocket closed')
         this.ws = null
         this.clearKeepalive()
@@ -225,14 +244,6 @@ export class TrouterTransport implements RealtimeTransport {
           this.scheduleReconnect()
         }
       }
-
-      // Reject if connection doesn't open within 15s.
-      setTimeout(() => {
-        if (ws.readyState !== WebSocket.OPEN) {
-          ws.close()
-          reject(new Error('trouter: websocket connection timeout'))
-        }
-      }, 15_000)
     })
   }
 
