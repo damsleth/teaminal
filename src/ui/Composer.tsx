@@ -38,7 +38,7 @@
 import { Box, Text, useInput, useStdin, useStdout } from 'ink'
 import { useEffect, useRef, useState } from 'react'
 import { sendMessage } from '../graph/chats'
-import { sendChannelMessage } from '../graph/teams'
+import { postChannelReply, sendChannelMessage } from '../graph/teams'
 import { focusKey } from '../state/store'
 import type { ChatMessage } from '../types'
 import {
@@ -81,7 +81,7 @@ export function Composer() {
   const composerActive =
     isRawModeSupported &&
     inputZone === 'composer' &&
-    (focus.kind === 'chat' || focus.kind === 'channel')
+    (focus.kind === 'chat' || focus.kind === 'channel' || focus.kind === 'thread')
 
   // Re-seed the buffer from the per-conversation draft when focus changes.
   // Tracked by `conv` (a string), so equality comparison is cheap.
@@ -184,7 +184,7 @@ export function Composer() {
   async function doSend(content: string): Promise<void> {
     const trimmed = content.trim()
     if (!trimmed) return
-    if (focus.kind !== 'chat' && focus.kind !== 'channel') return
+    if (focus.kind !== 'chat' && focus.kind !== 'channel' && focus.kind !== 'thread') return
     if (sending) return
 
     const convForSend = focusKey(focus)
@@ -222,7 +222,9 @@ export function Composer() {
       const sent =
         focus.kind === 'chat'
           ? await sendMessage(focus.chatId, trimmed)
-          : await sendChannelMessage(focus.teamId, focus.channelId, trimmed)
+          : focus.kind === 'channel'
+            ? await sendChannelMessage(focus.teamId, focus.channelId, trimmed)
+            : await postChannelReply(focus.teamId, focus.channelId, focus.rootId, trimmed)
       store.set((s) => ({
         messagesByConvo: {
           ...s.messagesByConvo,

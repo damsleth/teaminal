@@ -52,7 +52,13 @@ export class Store<S extends object> {
 export type FocusList = { kind: 'list' }
 export type FocusChat = { kind: 'chat'; chatId: string }
 export type FocusChannel = { kind: 'channel'; teamId: string; channelId: string }
-export type Focus = FocusList | FocusChat | FocusChannel
+export type FocusThread = {
+  kind: 'thread'
+  teamId: string
+  channelId: string
+  rootId: string
+}
+export type Focus = FocusList | FocusChat | FocusChannel | FocusThread
 
 export type ConvKey = string
 
@@ -66,6 +72,8 @@ export function focusKey(focus: Focus): ConvKey | null {
       return `chat:${focus.chatId}`
     case 'channel':
       return `channel:${focus.teamId}:${focus.channelId}`
+    case 'thread':
+      return `thread:${focus.teamId}:${focus.channelId}:${focus.rootId}`
   }
 }
 

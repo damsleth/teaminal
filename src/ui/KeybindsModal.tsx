@@ -22,6 +22,8 @@ const BINDINGS: Binding[] = [
   { keys: 'U/D', when: 'chat / channel', action: 'half-page messages' },
   { keys: 'L', when: 'chat / channel', action: 'jump bottom / load older at top' },
   { keys: 'H / Esc', when: 'chat / channel', action: 'back to chat list' },
+  { keys: 't', when: 'channel', action: 'open thread for focused message' },
+  { keys: 'H / Esc', when: 'thread', action: 'back to channel' },
   { keys: 'Tab', when: 'chat / channel', action: 'enter composer' },
   { keys: 'Esc', when: 'composer / filter', action: 'leave mode' },
   { keys: 'Esc', when: 'chat list', action: 'open menu' },

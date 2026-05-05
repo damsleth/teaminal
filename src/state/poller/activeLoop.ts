@@ -10,7 +10,7 @@
 // conversation's view with the previous one's messages.
 
 import { listMessagesPage } from '../../graph/chats'
-import { listChannelMessagesPage } from '../../graph/teams'
+import { listChannelMessagesPage, listChannelRepliesPage } from '../../graph/teams'
 import type { ChatMessage } from '../../types'
 import { focusKey, type AppState, type ConvKey, type Focus, type Store } from '../store'
 import type { MentionEvent } from '../poller'
@@ -40,6 +40,9 @@ async function fetchActiveMessages(focus: Focus, signal: AbortSignal): Promise<M
   }
   if (focus.kind === 'channel') {
     return listChannelMessagesPage(focus.teamId, focus.channelId, { signal })
+  }
+  if (focus.kind === 'thread') {
+    return listChannelRepliesPage(focus.teamId, focus.channelId, focus.rootId, { signal })
   }
   return { messages: [] }
 }

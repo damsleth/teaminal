@@ -137,3 +137,87 @@ export async function sendChannelMessage(
     signal: opts?.signal,
   })
 }
+
+// --- Channel replies (threaded messages) ---
+//
+// Each root message in a channel may have replies hanging off it. The
+// list endpoint supports $top and pagination via @odata.nextLink, but
+// orderBy/filter shapes are limited under delegated auth. Replies arrive
+// in the same descending order as root messages; we reverse for render
+// parity with listChannelMessagesPage.
+
+export type ListChannelRepliesOpts = {
+  top?: number
+  signal?: AbortSignal
+}
+
+export type ChannelRepliesPage = {
+  messages: ChannelMessage[]
+  nextLink?: string
+}
+
+const CHANNEL_REPLIES_TOP_DEFAULT = 50
+
+export async function listChannelReplies(
+  teamId: string,
+  channelId: string,
+  rootId: string,
+  opts?: ListChannelRepliesOpts,
+): Promise<ChannelMessage[]> {
+  return (await listChannelRepliesPage(teamId, channelId, rootId, opts)).messages
+}
+
+export async function listChannelRepliesPage(
+  teamId: string,
+  channelId: string,
+  rootId: string,
+  opts?: ListChannelRepliesOpts,
+): Promise<ChannelRepliesPage> {
+  const res = await graph<CollectionResponse<ChannelMessage>>({
+    method: 'GET',
+    path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(rootId)}/replies`,
+    query: { $top: opts?.top ?? CHANNEL_REPLIES_TOP_DEFAULT },
+    signal: opts?.signal,
+  })
+  return {
+    messages: res.value.slice().reverse(),
+    nextLink: res['@odata.nextLink'],
+  }
+}
+
+export async function listChannelRepliesNextPage(
+  nextLink: string,
+  opts?: { signal?: AbortSignal },
+): Promise<ChannelRepliesPage> {
+  const res = await graph<CollectionResponse<ChannelMessage>>({
+    method: 'GET',
+    path: nextLink,
+    signal: opts?.signal,
+  })
+  return {
+    messages: res.value.slice().reverse(),
+    nextLink: res['@odata.nextLink'],
+  }
+}
+
+/**
+ * Post a reply to a channel root message.
+ *
+ * Caller must have a valid root message id (from a previous channel
+ * messages fetch). The returned ChannelMessage has the canonical id and
+ * `replyToId` set to the root.
+ */
+export async function postChannelReply(
+  teamId: string,
+  channelId: string,
+  rootId: string,
+  content: string,
+  opts?: SendChannelMessageOpts,
+): Promise<ChannelMessage> {
+  return graph<ChannelMessage>({
+    method: 'POST',
+    path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(rootId)}/replies`,
+    body: { body: { contentType: 'text', content } },
+    signal: opts?.signal,
+  })
+}
