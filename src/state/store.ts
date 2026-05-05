@@ -434,6 +434,9 @@ export type AppState = {
   // Compatibility mirror for UI/composer code that has not moved to
   // messageCacheByConvo yet.
   messagesByConvo: Record<ConvKey, ChatMessage[]>
+  // Per-conversation composer drafts. Cleared on successful send;
+  // preserved across focus switches so a half-typed reply isn't lost.
+  draftsByConvo: Record<ConvKey, string>
   unreadByChatId: Record<string, ChatUnreadActivity>
   focus: Focus
   inputZone: InputZone
@@ -479,6 +482,7 @@ export function initialAppState(): AppState {
     channelsByTeam: {},
     messageCacheByConvo: {},
     messagesByConvo: {},
+    draftsByConvo: {},
     unreadByChatId: {},
     focus: { kind: 'list' },
     inputZone: 'list',
