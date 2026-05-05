@@ -8,6 +8,33 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `-p` short alias for `--profile` on the CLI.
+- `engines.bun` field in `package.json` documenting the >=1.1.0 minimum.
+- `noUnusedLocals` and `noUnusedParameters` enabled in `tsconfig.json`.
+- Regression test covering tmp-file cleanup when the message-cache
+  save fails (`saveMessageCacheNow` rename onto a directory).
+
+### Changed
+
+- Trouter websocket connect timeout is now cleared on `onopen` and
+  `onclose` so a delayed timer can no longer fire `close()` on a
+  healthy socket. Also documents the rationale behind the
+  desktop-shaped `clientDescription` payload sent during registration.
+- `bin/teaminal.tsx` shutdown logic moved into a `finally` block so
+  exceptions out of `ink.waitUntilExit()` no longer leak background
+  tasks (poller loops, trouter websocket, force-availability driver,
+  focus tracker, message cache flush).
+- Message-cache `saveMessageCacheNow` now `unlinkSync`s the failed
+  tmp file instead of overwriting it with empty content. No more
+  zero-byte stragglers next to `messages.json` after a save error.
+
+### Fixed
+
+- Stale `TODO: persist later` comment in `src/state/store.ts` (settings
+  persistence shipped in 0.6.0).
+
+### Added
+
 - Force-available while terminal focused. teaminal now enables DEC
   focus reporting (CSI `?1004`) and PUTs `forceavailability=Available`
   to `presence.teams.microsoft.com` whenever the terminal window has

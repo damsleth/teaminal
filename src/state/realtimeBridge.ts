@@ -11,7 +11,7 @@
 // uses them as "something changed" signals that trigger authoritative
 // Graph fetches through the existing poller.
 
-import type { RealtimeEventBus, RealtimeEvent } from '../realtime/events'
+import type { RealtimeEventBus } from '../realtime/events'
 import type { AppState, ConvKey, Store, TypingIndicator } from './store'
 import type { PollerHandle } from './poller'
 
@@ -130,7 +130,8 @@ export function startRealtimeBridge(opts: RealtimeBridgeOpts): RealtimeBridgeHan
               ...s.memberPresence,
               [event.userId]: {
                 id: event.userId,
-                availability: event.availability as AppState['memberPresence'][string]['availability'],
+                availability:
+                  event.availability as AppState['memberPresence'][string]['availability'],
                 activity: (existing?.activity ??
                   event.availability) as AppState['memberPresence'][string]['activity'],
               },

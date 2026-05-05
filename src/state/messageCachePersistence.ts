@@ -19,7 +19,7 @@
 // Save scheduling is debounced; the bootstrap also calls `flushMessageCache`
 // on shutdown to write the latest snapshot synchronously.
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { ChatMessage } from '../types'
@@ -128,9 +128,10 @@ export function saveMessageCacheNow(
     writeFileSync(tmp, JSON.stringify(payload), { mode: 0o600 })
     renameSync(tmp, path)
   } catch (err) {
+    // Best-effort cleanup of the tmp file on failure. Swallow nested
+    // errors: the caller already gets the original write failure below.
     try {
-      // best-effort cleanup of the tmp file on failure
-      if (existsSync(tmp)) writeFileSync(tmp, '', { flag: 'w' })
+      if (existsSync(tmp)) unlinkSync(tmp)
     } catch {}
     throw err
   }
