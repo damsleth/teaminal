@@ -15,6 +15,7 @@
 // must never call fetch() directly.
 
 import { getToken, invalidate } from '../auth/owaPiggy'
+import { recordRequest } from '../log'
 
 const BASE_V1 = 'https://graph.microsoft.com/v1.0'
 const BASE_BETA = 'https://graph.microsoft.com/beta'
@@ -174,7 +175,32 @@ async function executeRequest<T>(
   }
   if (opts.signal) init.signal = opts.signal
 
-  const res = await transport(url, init)
+  const startedAt = Date.now()
+  let res: Response
+  try {
+    res = await transport(url, init)
+  } catch (err) {
+    recordRequest({
+      ts: startedAt,
+      method: opts.method,
+      path: opts.path,
+      status: null,
+      durationMs: Date.now() - startedAt,
+      retried401: retried401 || undefined,
+      retried429: retried429Count > 0 || undefined,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+  recordRequest({
+    ts: startedAt,
+    method: opts.method,
+    path: opts.path,
+    status: res.status,
+    durationMs: Date.now() - startedAt,
+    retried401: retried401 || undefined,
+    retried429: retried429Count > 0 || undefined,
+  })
 
   if (res.status === 401 && !retried401) {
     invalidate(activeProfile)

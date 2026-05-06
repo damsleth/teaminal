@@ -6,6 +6,54 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Experimental real-time push gate.** New `realtimeEnabled` config key
+  enables the trouter-based push transport; it stays off by default so
+  polling remains the durable source of truth unless users opt in.
+- **Read-receipt display path.** Trouter read-receipt events now update
+  per-chat read positions and render subtle `seen by N` lines under
+  matching self-sent messages when real-time push is enabled.
+- **Real-time push menu toggle.** Menu → Settings now exposes
+  `realtimeEnabled` with a restart hint, so users can opt into the
+  experimental trouter transport without editing config JSON by hand.
+- **HAR-matched Trouter connect flow.** The experimental transport now
+  opens the regional `/v4/c` WebSocket, authenticates with an IC3 Teams
+  token, handles `trouter.connected`, and completes registrar
+  registration with the Skype token.
+- **`--log-file <path>`** CLI flag (also `logFile` config key) mirrors
+  stderr to a redacted append-only file. Bearer tokens, AAD-style ids,
+  and email local parts are scrubbed before each line is written.
+- **Network panel** under Menu → Help → Network shows the last 200
+  Graph requests (path, method, status, duration, retry flags) sourced
+  from a new `recordRequest` ring buffer in `src/log.ts`.
+- **Quiet hours** picker in Menu → Settings cycles through preset
+  windows (off, 22:00→07:00, 23:00→06:00, 21:00→08:00, 20:00→09:00)
+  so users can configure quiet hours without editing config.json.
+- **Channel reply badges.** Channel root messages now show
+  `╰─ N replies` (or `N+ replies` when a follow-up page exists). The
+  active loop opportunistically fetches reply counts for the most
+  recent visible roots, throttled to one batch per minute per channel.
+- **Quote-on-reply preview.** Entering a thread reply shows a
+  `Re: sender: preview` row above the composer so the user sees the
+  root post they're replying to.
+- **Loading-presence indicator.** 1:1 chat rows render a hollow `◯` in
+  muted text while the presence loop hasn't yet resolved that member's
+  status (also used while `chat.members` is mid-hydration). Once
+  presence lands, the dot becomes filled and colored.
+- **`m` toggles unread.** Pressing `m` on a focused chat row in the
+  list flips its read/unread state (mark-as-unread / mark-as-read).
+- **Tail panels.** Three new toggles in Menu → Settings: `tailEvents`,
+  `tailNetwork`, `tailDiagnostics` render 1/3-width strips above the
+  composer with a live tail of the corresponding modal panel. Off by
+  default; the modal versions remain the canonical surface.
+- **System event decoder.** Teams systemEventMessage rows (chat created,
+  members added/removed, chat renamed, calls/meetings started/ended,
+  recording, transcript) now render as readable lines like
+  `Carl added Nina` or `Call ended (12m)`. Subtypes we can't decode are
+  hidden from the timeline rather than rendered as a blank
+  `(system event)` placeholder.
+
 ### Fixed
 
 - Chat-list rows with presence enabled no longer grow by an extra line
@@ -22,6 +70,8 @@ adheres to [Semantic Versioning](https://semver.org/).
   for New chat.
 - New-chat member search keeps printable `j`/`k` input in the search
   box; Tab moves focus into results before `j`/`k` navigate matches.
+- The top-of-history load-more row is hidden once a conversation cache
+  is fully loaded.
 
 ### Added
 

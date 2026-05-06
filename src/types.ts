@@ -73,6 +73,22 @@ export type Reaction = {
   displayName?: string
 }
 
+// Graph attaches a typed `eventDetail` payload to systemEventMessage
+// rows describing what happened (chat created, member added, call ended,
+// meeting started, ...). Field coverage matches what we actually decode
+// in src/ui/systemEvent.ts; unknown subtypes fall through to null.
+export type SystemEventDetail = {
+  '@odata.type'?: string
+  initiator?: IdentitySet
+  members?: { id?: string; displayName?: string | null }[]
+  callDuration?: string
+  callEventType?: string
+  meetingOrganizer?: IdentitySet
+  topic?: string | null
+  // Future subtypes pass through opaquely.
+  [key: string]: unknown
+}
+
 export type ChatMessage = {
   id: string
   createdDateTime: string
@@ -90,6 +106,7 @@ export type ChatMessage = {
   reactions?: Reaction[]
   replyToId?: string | null
   subject?: string | null
+  eventDetail?: SystemEventDetail | null
   // Local-only fields used by the optimistic-send flow. Underscore prefix
   // marks them as never set by Graph; they're always undefined on
   // server-confirmed messages. Once the server response replaces the

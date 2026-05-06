@@ -31,8 +31,12 @@ export type ToggleKey =
   | 'messageFocusIndicatorEnabled'
   | 'messageFocusIndicatorChar'
   | 'forceAvailableWhenFocused'
+  | 'realtimeEnabled'
   | 'notifyMuted'
   | 'notifyActiveBanner'
+  | 'tailEvents'
+  | 'tailNetwork'
+  | 'tailDiagnostics'
 
 export type MenuAction =
   | { kind: 'resume' }
@@ -41,9 +45,38 @@ export type MenuAction =
   | { kind: 'submenu' }
   | { kind: 'noop' }
   | { kind: 'toggle-setting'; key: ToggleKey }
+  | { kind: 'cycle-quiet-hours' }
   | { kind: 'show-keybinds' }
   | { kind: 'show-diagnostics' }
   | { kind: 'show-events' }
+  | { kind: 'show-network' }
+
+// Preset windows for the quiet-hours menu entry. The first preset (both
+// null) is "off"; remaining presets cover the typical sleep windows.
+// Adding a preset here makes it show up in the cycle automatically.
+export const QUIET_HOURS_PRESETS: { start: string | null; end: string | null }[] = [
+  { start: null, end: null },
+  { start: '22:00', end: '07:00' },
+  { start: '23:00', end: '06:00' },
+  { start: '21:00', end: '08:00' },
+  { start: '20:00', end: '09:00' },
+]
+
+export function cycleQuietHoursPreset(current: { start: string | null; end: string | null }): {
+  start: string | null
+  end: string | null
+} {
+  const idx = QUIET_HOURS_PRESETS.findIndex(
+    (p) => p.start === current.start && p.end === current.end,
+  )
+  const next = QUIET_HOURS_PRESETS[(idx === -1 ? 0 : idx + 1) % QUIET_HOURS_PRESETS.length]!
+  return next
+}
+
+export function renderQuietHoursValue(start: string | null, end: string | null): string {
+  if (!start || !end) return 'off'
+  return `${start} - ${end}`
+}
 
 export type MenuItem = {
   id: string
@@ -92,6 +125,12 @@ export const ROOT_MENU: MenuItem[] = [
         action: { kind: 'toggle-setting', key: 'forceAvailableWhenFocused' },
       },
       {
+        id: 'realtimeEnabled',
+        label: 'Real-time push',
+        action: { kind: 'toggle-setting', key: 'realtimeEnabled' },
+        hint: 'restart',
+      },
+      {
         id: 'showTimestampsInPane',
         label: 'Show timestamps in messages',
         action: { kind: 'toggle-setting', key: 'showTimestampsInPane' },
@@ -112,6 +151,11 @@ export const ROOT_MENU: MenuItem[] = [
         action: { kind: 'toggle-setting', key: 'notifyActiveBanner' },
       },
       {
+        id: 'quietHours',
+        label: 'Quiet hours',
+        action: { kind: 'cycle-quiet-hours' },
+      },
+      {
         id: 'windowHeight',
         label: 'Window height',
         action: { kind: 'toggle-setting', key: 'windowHeight' },
@@ -125,6 +169,21 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'messageFocusIndicatorChar',
         label: 'Focused message marker char',
         action: { kind: 'toggle-setting', key: 'messageFocusIndicatorChar' },
+      },
+      {
+        id: 'tailEvents',
+        label: 'Tail event log',
+        action: { kind: 'toggle-setting', key: 'tailEvents' },
+      },
+      {
+        id: 'tailNetwork',
+        label: 'Tail network',
+        action: { kind: 'toggle-setting', key: 'tailNetwork' },
+      },
+      {
+        id: 'tailDiagnostics',
+        label: 'Tail diagnostics',
+        action: { kind: 'toggle-setting', key: 'tailDiagnostics' },
       },
     ],
   },
@@ -147,6 +206,11 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'events',
         label: 'Event log',
         action: { kind: 'show-events' },
+      },
+      {
+        id: 'network',
+        label: 'Network',
+        action: { kind: 'show-network' },
       },
     ],
   },
@@ -229,8 +293,12 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
     case 'forceAvailableWhenFocused':
+    case 'realtimeEnabled':
     case 'notifyMuted':
     case 'notifyActiveBanner':
+    case 'tailEvents':
+    case 'tailNetwork':
+    case 'tailDiagnostics':
       return !current as Settings[K]
     case 'windowHeight':
       return cycleWindowHeight(current as number) as Settings[K]
@@ -267,8 +335,12 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
     case 'forceAvailableWhenFocused':
+    case 'realtimeEnabled':
     case 'notifyMuted':
     case 'notifyActiveBanner':
+    case 'tailEvents':
+    case 'tailNetwork':
+    case 'tailDiagnostics':
       return value ? 'on' : 'off'
     case 'windowHeight':
       return value === 0 ? 'full' : `${value} rows`

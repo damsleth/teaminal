@@ -27,8 +27,10 @@ export interface RealtimeTransport {
 
 export type TransportOpts = {
   bus: RealtimeEventBus
-  /** Function that returns a fresh access token (Graph audience). */
+  /** Function that returns a fresh Skype/Spaces access token. */
   getToken: () => Promise<string>
+  /** Function that returns a fresh IC3 Teams access token for websocket auth. */
+  getIc3Token?: () => Promise<string>
   /** owa-piggy profile alias, if any. */
   profile?: string
 }

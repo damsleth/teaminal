@@ -14,6 +14,7 @@ import { listChannelMessagesPage, listChannelRepliesPage } from '../../graph/tea
 import type { ChatMessage } from '../../types'
 import { focusKey, type AppState, type ConvKey, type Focus, type Store } from '../store'
 import type { MentionEvent } from '../poller'
+import { scheduleReplyCountFetch } from '../threadMeta'
 import { backoff, isAbortError, jitter } from './intervals'
 import { shouldNotifyMention } from './mentions'
 import { mergeActivePagePatch, type MessagesPage } from './pagePatch'
@@ -86,6 +87,17 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
           }))
           for (const msg of newMentions) {
             onMention?.({ conv, message: msg, source: 'active' })
+          }
+          // Opportunistic reply-count badge fetch for channel roots.
+          // Throttled per-channel inside scheduleReplyCountFetch; safe
+          // to call on every successful channel poll.
+          if (focus.kind === 'channel' && messages.length > 0) {
+            void scheduleReplyCountFetch({
+              store,
+              teamId: focus.teamId,
+              channelId: focus.channelId,
+              rootMessages: messages,
+            })
           }
         }
         consecutiveErrors = 0

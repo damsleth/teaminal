@@ -35,6 +35,9 @@ describe('resetAccountScopedState', () => {
       myPresence: { id: 'me', availability: 'Available', activity: 'Available' },
       memberPresence: { other: { id: 'other', availability: 'Away', activity: 'Away' } },
       typingByConvo: { 'chat:c1': [{ userId: 'x', displayName: 'X', startedAt: 0 }] },
+      readReceiptsByConvo: {
+        'chat:c1': { x: { userId: 'x', messageId: 'm1', seenAt: 0 } },
+      },
       conn: 'online',
       realtimeState: 'connected',
       terminalFocused: true,
@@ -57,6 +60,7 @@ describe('resetAccountScopedState', () => {
     expect(s.myPresence).toBeUndefined()
     expect(s.memberPresence).toEqual({})
     expect(s.typingByConvo).toEqual({})
+    expect(s.readReceiptsByConvo).toEqual({})
     expect(s.conn).toBe('connecting')
     expect(s.realtimeState).toBe('off')
     expect(s.modal).toBeNull()

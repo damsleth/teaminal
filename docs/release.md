@@ -20,17 +20,17 @@ Example:
 
 ```bash
 TARGET=bun-darwin-arm64 ./scripts/build.sh
-tar -C dist -czf teaminal-0.5.0-darwin-arm64.tar.gz teaminal
+tar -C dist -czf teaminal-0.11.0-darwin-arm64.tar.gz teaminal
 
 TARGET=bun-darwin-x64 ./scripts/build.sh
-tar -C dist -czf teaminal-0.5.0-darwin-x64.tar.gz teaminal
+tar -C dist -czf teaminal-0.11.0-darwin-x64.tar.gz teaminal
 ```
 
 Generate checksums after uploading or before editing the tap:
 
 ```bash
-shasum -a 256 teaminal-0.5.0-darwin-arm64.tar.gz
-shasum -a 256 teaminal-0.5.0-darwin-x64.tar.gz
+shasum -a 256 teaminal-0.11.0-darwin-arm64.tar.gz
+shasum -a 256 teaminal-0.11.0-darwin-x64.tar.gz
 ```
 
 ## Homebrew Tap
@@ -61,7 +61,7 @@ Release-archive formula template:
 class Teaminal < Formula
   desc "Lightweight terminal Microsoft Teams client"
   homepage "https://github.com/damsleth/teaminal"
-  version "0.5.0"
+  version "0.11.0"
   license "MIT"
 
   on_macos do

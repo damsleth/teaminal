@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  cycleQuietHoursPreset,
   cycleSetting,
   firstSelectable,
   nextSelectable,
+  QUIET_HOURS_PRESETS,
+  renderQuietHoursValue,
   renderSettingValue,
   resolveMenuPath,
   ROOT_MENU,
@@ -102,6 +105,7 @@ describe('cycleSetting', () => {
     expect(cycleSetting('showPresenceInList', false)).toBe(true)
     expect(cycleSetting('showTimestampsInPane', true)).toBe(false)
     expect(cycleSetting('messageFocusIndicatorEnabled', true)).toBe(false)
+    expect(cycleSetting('realtimeEnabled', false)).toBe(true)
   })
 
   test('cycles windowHeight through presets and wraps to full', () => {
@@ -141,6 +145,7 @@ describe('renderSettingValue', () => {
     expect(renderSettingValue('showPresenceInList', true)).toBe('on')
     expect(renderSettingValue('showPresenceInList', false)).toBe('off')
     expect(renderSettingValue('messageFocusIndicatorEnabled', false)).toBe('off')
+    expect(renderSettingValue('realtimeEnabled', true)).toBe('on')
   })
 
   test('renders windowHeight as "full" or "N rows"', () => {
@@ -180,6 +185,7 @@ describe('ROOT_MENU shape', () => {
       'chatListShortNames',
       'showPresenceInList',
       'forceAvailableWhenFocused',
+      'realtimeEnabled',
       'showTimestampsInPane',
       'showReactions',
       'notifyMuted',
@@ -187,6 +193,9 @@ describe('ROOT_MENU shape', () => {
       'windowHeight',
       'messageFocusIndicatorEnabled',
       'messageFocusIndicatorChar',
+      'tailEvents',
+      'tailNetwork',
+      'tailDiagnostics',
     ])
   })
 
@@ -201,5 +210,47 @@ describe('ROOT_MENU shape', () => {
     const help = ROOT_MENU.find((i) => i.id === 'help')
     const keybinds = help?.children?.find((c) => c.id === 'keybinds')
     expect(keybinds?.action.kind).toBe('show-keybinds')
+  })
+
+  test('settings submenu has a quiet-hours cycle entry', () => {
+    const settings = ROOT_MENU.find((i) => i.id === 'settings')
+    const quiet = settings?.children?.find((c) => c.id === 'quietHours')
+    expect(quiet?.action.kind).toBe('cycle-quiet-hours')
+  })
+
+  test('realtime setting is marked restart-required', () => {
+    const settings = ROOT_MENU.find((i) => i.id === 'settings')
+    const realtime = settings?.children?.find((c) => c.id === 'realtimeEnabled')
+    expect(realtime?.hint).toBe('restart')
+  })
+})
+
+describe('cycleQuietHoursPreset', () => {
+  test('cycles forward through preset list', () => {
+    const a = cycleQuietHoursPreset({ start: null, end: null })
+    expect(a).toEqual(QUIET_HOURS_PRESETS[1]!)
+    const b = cycleQuietHoursPreset(a)
+    expect(b).toEqual(QUIET_HOURS_PRESETS[2]!)
+  })
+
+  test('wraps from last preset back to off', () => {
+    const last = QUIET_HOURS_PRESETS[QUIET_HOURS_PRESETS.length - 1]!
+    expect(cycleQuietHoursPreset(last)).toEqual(QUIET_HOURS_PRESETS[0]!)
+  })
+
+  test('non-preset values jump to off then advance', () => {
+    expect(cycleQuietHoursPreset({ start: '01:00', end: '02:00' })).toEqual(QUIET_HOURS_PRESETS[0]!)
+  })
+})
+
+describe('renderQuietHoursValue', () => {
+  test('renders "off" when either side is null', () => {
+    expect(renderQuietHoursValue(null, null)).toBe('off')
+    expect(renderQuietHoursValue('22:00', null)).toBe('off')
+    expect(renderQuietHoursValue(null, '07:00')).toBe('off')
+  })
+
+  test('renders the window when both are set', () => {
+    expect(renderQuietHoursValue('22:00', '07:00')).toBe('22:00 - 07:00')
   })
 })

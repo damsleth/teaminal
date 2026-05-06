@@ -5,6 +5,7 @@ import {
   error,
   getRecentEvents,
   recordEvent,
+  redactForFile,
   subscribeEvents,
   warn,
 } from './log'
@@ -73,5 +74,53 @@ describe('event ring buffer', () => {
   test('unknown prefix maps to unknown source', () => {
     debug('something not a known prefix')
     expect(getRecentEvents()[0]?.source).toBe('unknown')
+  })
+})
+
+describe('request log ring buffer', () => {
+  test('recordRequest accumulates and emits to subscribers', async () => {
+    const { recordRequest, getRecentRequests, subscribeRequests } = await import('./log')
+    const seen: number[] = []
+    const off = subscribeRequests((r) => seen.push(r.status ?? -1))
+    recordRequest({ ts: 1, method: 'GET', path: '/chats', status: 200, durationMs: 12 })
+    recordRequest({ ts: 2, method: 'GET', path: '/me/presence', status: 429, durationMs: 5 })
+    off()
+    expect(getRecentRequests().map((r) => r.status)).toEqual([200, 429])
+    expect(seen).toEqual([200, 429])
+  })
+
+  test('request ring caps at 200 entries', async () => {
+    const { recordRequest, getRecentRequests } = await import('./log')
+    for (let i = 0; i < 250; i++) {
+      recordRequest({ ts: i, method: 'GET', path: `/p${i}`, status: 200, durationMs: 1 })
+    }
+    const rs = getRecentRequests()
+    expect(rs).toHaveLength(200)
+    expect(rs[0]?.path).toBe('/p50')
+    expect(rs[199]?.path).toBe('/p249')
+  })
+})
+
+describe('log file redaction', () => {
+  test('redacts Bearer tokens', () => {
+    const out = redactForFile('Authorization: Bearer abc123def456_ghi-jkl.mno')
+    expect(out).toContain('<redacted>')
+    expect(out).not.toContain('abc123def456')
+  })
+
+  test('redacts AAD-style ids', () => {
+    const id = '12345678-aaaa-bbbb-cccc-1234567890ab'
+    const out = redactForFile(`oid=${id}`)
+    expect(out).toBe('oid=<oid:12345678>')
+  })
+
+  test('masks email local-part but keeps domain', () => {
+    const out = redactForFile('user.name+tag@contoso.onmicrosoft.com replied')
+    expect(out).toBe('<email:***@contoso.onmicrosoft.com> replied')
+  })
+
+  test('passthroughs benign lines unchanged', () => {
+    const line = '[ts] poller[active]: fetched 3 messages\n'
+    expect(redactForFile(line)).toBe(line)
   })
 })

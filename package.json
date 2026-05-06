@@ -1,6 +1,6 @@
 {
   "name": "teaminal",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "license": "MIT",
   "description": "Lightweight terminal Microsoft Teams client",
   "type": "module",
@@ -11,8 +11,8 @@
     "teaminal": "./bin/teaminal.tsx"
   },
   "scripts": {
-    "dev": "bun run bin/teaminal.tsx",
-    "dev:watch": "bun --watch run bin/teaminal.tsx",
+    "dev": "bun run bin/teaminal.tsx --log-file .tmp/events.log --network-log .tmp/network.log",
+    "dev:watch": "bun --watch run bin/teaminal.tsx --log-file .tmp/events.log --network-log .tmp/network.log",
     "build": "bash scripts/build.sh",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit",

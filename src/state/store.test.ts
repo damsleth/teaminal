@@ -130,6 +130,7 @@ describe('createAppStore', () => {
     expect(s.get().conn).toBe('connecting')
     expect(s.get().realtimeState).toBe('off')
     expect(s.get().typingByConvo).toEqual({})
+    expect(s.get().readReceiptsByConvo).toEqual({})
   })
 
   test('focus updates fire listeners', () => {

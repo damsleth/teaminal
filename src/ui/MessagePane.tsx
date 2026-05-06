@@ -9,10 +9,11 @@
 import { Box, Text, useStdout } from 'ink'
 import { useEffect, useState } from 'react'
 import { chatLabel, shortName } from '../state/selectables'
-import { focusKey, type TypingIndicator } from '../state/store'
+import { focusKey, type ReadReceipt, type ThreadMeta, type TypingIndicator } from '../state/store'
 import type { Chat, ChatMessage, Channel, Team } from '../types'
 import { htmlToText } from './html'
 import { reactionsSummary } from './reactions'
+import { describeSystemEvent } from './systemEvent'
 import { searchMessages } from './messageSearch'
 import {
   buildMessageRows,
@@ -59,6 +60,8 @@ export function MessagePane(props: {
   const focusIndicatorVisible = useAppState((s) => s.settings.messageFocusIndicatorEnabled)
   const focusIndicatorChar = useAppState((s) => s.settings.messageFocusIndicatorChar)
   const typingByConvo = useAppState((s) => s.typingByConvo)
+  const readReceiptsByConvo = useAppState((s) => s.readReceiptsByConvo)
+  const threadMetaByRoot = useAppState((s) => s.threadMetaByRoot)
   const theme = useTheme()
 
   // Track terminal height live so the message slice fills the available
@@ -83,7 +86,15 @@ export function MessagePane(props: {
   }
 
   const conv = focusKey(focus)!
-  const messages = messagesByConvo[conv] ?? []
+  const rawMessages = messagesByConvo[conv] ?? []
+  // Drop system-event rows we can't render usefully. This covers two
+  // shapes Graph returns:
+  //   1. messageType === 'systemEventMessage' with eventDetail we
+  //      couldn't decode (or no eventDetail at all)
+  //   2. messageType undefined / 'message' but with no sender and no
+  //      body content - same outcome on the wire, blank "(system)" row.
+  // In either case we'd rather show nothing than a meaningless line.
+  const messages = rawMessages.filter((m) => isRenderableMessage(m))
   const cache = messageCacheByConvo[conv]
   const headerLabel = headerForFocus(focus, chats, teams, channelsByTeam, me?.id)
   const pageState = readMessagePageState(cache ?? messages)
@@ -105,7 +116,7 @@ export function MessagePane(props: {
     terminalRows - CHROME_RESERVED_ROWS - cozyRows - reservedDynamic,
   )
   const allRows = buildMessageRows(messages, {
-    showLoadMoreRow: messages.length > 0,
+    showLoadMoreRow: messages.length > 0 && !pageState.fullyLoaded,
     loadMoreState,
   })
   const rows = sliceMessageRowsToBudget(allRows, {
@@ -168,8 +179,14 @@ export function MessagePane(props: {
                 focusedMessageId={props.focusedMessageId}
                 myUserId={me?.id}
                 reactionDisplayMode={reactionDisplayMode}
+                readReceipts={readReceiptsByConvo[conv]}
                 showTimestamp={showTimestamps}
                 theme={theme}
+                threadMeta={
+                  focus.kind === 'channel' && row.kind === 'message'
+                    ? threadMetaByRoot[row.message.id]
+                    : undefined
+                }
               />
             ))}
             <TypingLine typing={conv ? (typingByConvo[conv] ?? []) : []} theme={theme} />
@@ -187,8 +204,10 @@ function TimelineRow(props: {
   focusedMessageId?: string | null
   myUserId?: string
   reactionDisplayMode: 'off' | 'current' | 'all'
+  readReceipts?: Record<string, ReadReceipt>
   showTimestamp: boolean
   theme: Theme
+  threadMeta?: ThreadMeta
 }) {
   if (props.row.kind === 'date') {
     return (
@@ -220,8 +239,10 @@ function TimelineRow(props: {
       focusedMessageId={props.focusedMessageId}
       myUserId={props.myUserId}
       reactionDisplayMode={props.reactionDisplayMode}
+      readReceipts={props.readReceipts}
       showTimestamp={props.showTimestamp}
       theme={props.theme}
+      threadMeta={props.threadMeta}
     />
   )
 }
@@ -233,15 +254,21 @@ function MessageRow(props: {
   focusedMessageId?: string | null
   myUserId?: string
   reactionDisplayMode: 'off' | 'current' | 'all'
+  readReceipts?: Record<string, ReadReceipt>
   showTimestamp: boolean
   theme: Theme
+  threadMeta?: ThreadMeta
 }) {
   const { theme } = props
   const m = props.message
   const time = m.createdDateTime.slice(11, 16)
-  const rawSender = m.from?.user?.displayName ?? '(system)'
-  const isSystem = m.messageType === 'systemEventMessage' || rawSender === '(system)'
-  const senderShort = isSystem ? '(system)' : shortName(rawSender)
+  const isSystem = m.messageType === 'systemEventMessage'
+  // Sender label resolution: system rows leave the sender column blank
+  // and put the decoded subtype in the body. Other rows fall through to
+  // the best available display name from from.user/application/device;
+  // upstream filter guarantees non-null for non-system rows.
+  const senderRaw = isSystem ? '' : (effectiveSenderName(m) ?? '')
+  const senderShort = senderRaw ? shortName(senderRaw) : ''
   const senderTrimmed =
     senderShort.length > SENDER_COL_WIDTH
       ? senderShort.slice(0, SENDER_COL_WIDTH - 1) + '…'
@@ -249,6 +276,10 @@ function MessageRow(props: {
   const isSelf = !!props.myUserId && m.from?.user?.id === props.myUserId
   const isSending = m._sending === true
   const sendError = m._sendError
+  const readReceiptLine =
+    isSelf && !isSending && !sendError
+      ? readReceiptLineForMessage(props.readReceipts, m.id, props.myUserId)
+      : null
 
   const bodyText = previewBody(m)
   const isDeleted = isMessageDeleted(m)
@@ -322,6 +353,30 @@ function MessageRow(props: {
           </Box>
         </Box>
       )}
+      {props.threadMeta && props.threadMeta.count > 0 && (
+        <Box flexDirection="row">
+          <Box width={2} flexShrink={0} />
+          <Box width={statusWidth} flexShrink={0} />
+          <Box width={SENDER_COL_WIDTH + 2} flexShrink={0} />
+          <Box flexGrow={1} flexShrink={1} minWidth={0}>
+            <Text color={theme.mutedText} wrap="truncate-end">
+              {`╰─ ${formatReplyCount(props.threadMeta)}`}
+            </Text>
+          </Box>
+        </Box>
+      )}
+      {readReceiptLine && (
+        <Box flexDirection="row">
+          <Box width={2} flexShrink={0} />
+          <Box width={statusWidth} flexShrink={0} />
+          <Box width={SENDER_COL_WIDTH + 2} flexShrink={0} />
+          <Box flexGrow={1} flexShrink={1} minWidth={0}>
+            <Text color={theme.mutedText} wrap="truncate-end">
+              {readReceiptLine}
+            </Text>
+          </Box>
+        </Box>
+      )}
       {sendError && (
         <Box flexDirection="row">
           <Box width={2} flexShrink={0} />
@@ -345,13 +400,67 @@ function previewBody(m: ChatMessage): string {
     return `(message deleted by ${senderName} · ${time})`
   }
   if (m.messageType === 'systemEventMessage') {
-    return '(system event)'
+    const decoded = describeSystemEvent(m)
+    return decoded ?? ''
   }
   const raw = m.body.content ?? ''
   if (m.body.contentType === 'text') {
     return raw.replace(/\s+/g, ' ').trim().slice(0, 200)
   }
   return htmlToText(raw).slice(0, 200)
+}
+
+// True when a message is worth rendering. The user has explicitly asked
+// for no meaningless "(system)" rows, so the gate is: every kept row
+// must either have a real sender name we can show, OR be a decodable
+// system event that we'll render in place of the sender column. Empty
+// or undecodable system rows are dropped entirely.
+export function isRenderableMessage(m: ChatMessage): boolean {
+  if (m.deletedDateTime) {
+    // Tombstone deletes always have a "deleted by ..." preview that
+    // is useful regardless of sender, so keep them.
+    return true
+  }
+  if (m.messageType === 'systemEventMessage') {
+    return describeSystemEvent(m) !== null
+  }
+  if (effectiveSenderName(m) === null) return false
+  const hasBody =
+    typeof m.body?.content === 'string' && m.body.content.replace(/<[^>]+>/g, '').trim().length > 0
+  return hasBody
+}
+
+// Best display name we can produce for a non-system message, or null
+// if there's no name to show. Falls through user → application →
+// device. (Graph returns app/bot messages with from.application set
+// and from.user null; under some FOCI tokens it sets neither.)
+export function effectiveSenderName(m: ChatMessage): string | null {
+  const direct = m.from?.user?.displayName?.trim()
+  if (direct) return direct
+  const app = m.from?.application?.displayName?.trim()
+  if (app) return app
+  const device = m.from?.device?.displayName?.trim()
+  if (device) return device
+  return null
+}
+
+export function formatReplyCount(meta: ThreadMeta): string {
+  if (meta.count <= 0) return ''
+  const suffix = meta.count === 1 ? 'reply' : 'replies'
+  return meta.more ? `${meta.count}+ ${suffix}` : `${meta.count} ${suffix}`
+}
+
+export function readReceiptLineForMessage(
+  receipts: Record<string, ReadReceipt> | undefined,
+  messageId: string,
+  myUserId?: string,
+): string | null {
+  if (!receipts) return null
+  const seenCount = Object.values(receipts).filter(
+    (r) => r.messageId === messageId && r.userId !== myUserId,
+  ).length
+  if (seenCount <= 0) return null
+  return seenCount === 1 ? 'seen by 1' : `seen by ${seenCount}`
 }
 
 // 5s grace window: Graph rewrites lastModifiedDateTime as part of

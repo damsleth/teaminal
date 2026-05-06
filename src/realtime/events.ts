@@ -17,6 +17,7 @@ export type RealtimeEvent =
   | { kind: 'message-edited'; chatId: string; messageId: string }
   | { kind: 'message-deleted'; chatId: string; messageId: string }
   | { kind: 'reaction-added'; chatId: string; messageId: string }
+  | { kind: 'call-incoming'; chatId?: string; callerId?: string }
 
 export type RealtimeEventKind = RealtimeEvent['kind']
 

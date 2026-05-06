@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { TrouterTransport } from './trouter'
+import { buildTrouterConnectUrl, parseSocketIoEvent, TrouterTransport } from './trouter'
 import { RealtimeEventBus } from './events'
 
 function makeDummyTransport() {
@@ -12,6 +12,24 @@ function makeDummyTransport() {
 }
 
 describe('TrouterTransport frame parsing', () => {
+  test('builds the HAR-matched /v4/c websocket URL from a regional trouter URL', () => {
+    const url = buildTrouterConnectUrl('https://go-eu.trouter.teams.microsoft.com/v4/a', 'reg-1')
+    expect(url).toStartWith('wss://go-eu.trouter.teams.microsoft.com/v4/c?')
+    expect(url).toContain('epid=reg-1')
+    expect(url).toContain('dom=teams.microsoft.com')
+    expect(decodeURIComponent(url)).toContain('"ua":"SkypeSpaces"')
+  })
+
+  test('parses Socket.IO event packets', () => {
+    expect(
+      parseSocketIoEvent('5:1+::{"name":"trouter.message_loss","args":[{"tag":"messaging"}]}'),
+    ).toEqual({
+      id: '1',
+      expectsAck: true,
+      event: { name: 'trouter.message_loss', args: [{ tag: 'messaging' }] },
+    })
+  })
+
   test('parses empty string as ping', () => {
     const { transport } = makeDummyTransport()
     expect(transport.parseFrame('')).toEqual({ type: 'ping' })

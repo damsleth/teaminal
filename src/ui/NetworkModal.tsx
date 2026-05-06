@@ -1,23 +1,21 @@
-// Events overlay.
+// Network overlay.
 //
-// Triggered from the menu (Diagnostics -> Events). Renders the in-memory
-// ring buffer from src/log.ts as a scrolling list of recent events, with
-// a type-ahead filter and color-by-level. Read-only - this is for
-// debugging.
+// Triggered from the menu (Help -> Network). Renders the in-memory
+// per-request ring buffer from src/log.ts (recordRequest, populated by
+// src/graph/client.ts) as a scrolling list. Path-only - no full URLs,
+// no headers, no bodies.
 //
-// Esc closes. j/k or ↓/↑ scroll. Typing builds a filter; Backspace edits.
-// The list auto-tails (newest at the bottom) until the user moves the
-// cursor; then it stays put until they hit g to jump to the bottom.
+// Esc closes. j/k or ↓/↑ scroll. g jumps to the tail.
 
 import { Box, Text, useApp, useInput } from 'ink'
 import { useEffect, useState } from 'react'
-import { getRecentEvents, subscribeEvents, type EventRecord } from '../log'
+import { getRecentRequests, subscribeRequests, type RequestRecord } from '../log'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
 const VISIBLE_ROWS = 18
 
-export function openEvents(store: ReturnType<typeof useAppStore>): void {
-  store.set({ modal: { kind: 'events' }, inputZone: 'menu' })
+export function openNetwork(store: ReturnType<typeof useAppStore>): void {
+  store.set({ modal: { kind: 'network' }, inputZone: 'menu' })
 }
 
 function formatTs(ts: number): string {
@@ -28,30 +26,30 @@ function formatTs(ts: number): string {
   return `${hh}:${mm}:${ss}`
 }
 
-function colorForLevel(theme: ReturnType<typeof useTheme>, level: EventRecord['level']): string {
-  if (level === 'error') return 'red'
-  if (level === 'warn') return 'yellow'
-  if (level === 'debug') return theme.mutedText
+function colorForStatus(theme: ReturnType<typeof useTheme>, status: number | null): string {
+  if (status === null) return theme.errorText
+  if (status >= 500) return theme.errorText
+  if (status === 429) return theme.warnText
+  if (status >= 400) return theme.warnText
   return theme.text
 }
 
-export function EventsModal() {
+export function NetworkModal() {
   const { exit } = useApp()
   const store = useAppStore()
   const theme = useTheme()
   const modal = useAppState((s) => s.modal)
-  const isOpen = modal?.kind === 'events'
+  const isOpen = modal?.kind === 'network'
 
-  const [records, setRecords] = useState<EventRecord[]>(() => getRecentEvents())
-  const [filter, setFilter] = useState('')
+  const [records, setRecords] = useState<RequestRecord[]>(() => getRecentRequests())
   const [cursor, setCursor] = useState<number | null>(null)
 
   useEffect(() => {
     if (!isOpen) return
-    setRecords(getRecentEvents())
-    return subscribeEvents((rec) => {
+    setRecords(getRecentRequests())
+    return subscribeRequests((rec) => {
       setRecords((prev) => {
-        const next = prev.length >= 500 ? prev.slice(prev.length - 499) : prev.slice()
+        const next = prev.length >= 200 ? prev.slice(prev.length - 199) : prev.slice()
         next.push(rec)
         return next
       })
@@ -81,35 +79,19 @@ export function EventsModal() {
         setCursor(null)
         return
       }
-      if (key.backspace || key.delete) {
-        setFilter((f) => f.slice(0, -1))
-        return
-      }
-      if (input && !key.ctrl && !key.meta && input.length === 1) {
-        // Reserve some characters that already mean things in this modal.
-        if (ch === 'j' || ch === 'k' || ch === 'g') return
-        setFilter((f) => f + input)
-      }
     },
     { isActive: isOpen },
   )
 
   if (!isOpen) return null
 
-  const filtered = filter
-    ? records.filter((r) => {
-        const f = filter.toLowerCase()
-        return r.source.includes(f) || r.level.includes(f) || r.message.toLowerCase().includes(f)
-      })
-    : records
-
-  const totalCount = filtered.length
+  const totalCount = records.length
   const tail = cursor === null
   const focused = tail
     ? Math.max(totalCount - 1, 0)
     : Math.min(Math.max(cursor!, 0), Math.max(totalCount - 1, 0))
   const start = Math.max(focused - VISIBLE_ROWS + 1, 0)
-  const slice = filtered.slice(start, start + VISIBLE_ROWS)
+  const slice = records.slice(start, start + VISIBLE_ROWS)
 
   return (
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
@@ -121,32 +103,34 @@ export function EventsModal() {
         paddingY={1}
         width={100}
       >
-        <Text bold>Events ({totalCount})</Text>
+        <Text bold>Network ({totalCount})</Text>
         <Box height={1} />
         {slice.length === 0 ? (
-          <Text color={theme.mutedText}>No events.</Text>
+          <Text color={theme.mutedText}>No requests yet.</Text>
         ) : (
           slice.map((r, i) => {
             const isFocused = !tail && i + start === focused
+            const statusText = r.status === null ? 'ERR' : String(r.status)
+            const retryFlag = r.retried429 ? ' r429' : r.retried401 ? ' r401' : ''
+            const path = r.path.length > 50 ? `${r.path.slice(0, 50)}…` : r.path
             return (
               <Text
                 key={`${r.ts}-${i}`}
-                color={colorForLevel(theme, r.level)}
+                color={colorForStatus(theme, r.status)}
                 inverse={isFocused}
-                wrap="wrap"
               >
                 {formatTs(r.ts)}
                 {'  '}
-                <Text color={theme.mutedText}>{r.source.padEnd(8)}</Text>
-                {r.message}
+                <Text color={theme.mutedText}>{r.method.padEnd(6)}</Text>
+                {path.padEnd(52)} {statusText.padStart(3)}
+                {'  '}
+                <Text color={theme.mutedText}>{`${r.durationMs}ms${retryFlag}`}</Text>
               </Text>
             )
           })
         )}
         <Box height={1} />
-        <Text color={theme.mutedText}>
-          filter: {filter || '(none)'} · j/k scroll · g tail · esc closes
-        </Text>
+        <Text color={theme.mutedText}>j/k scroll · g tail · esc closes</Text>
       </Box>
     </Box>
   )

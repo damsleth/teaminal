@@ -17,9 +17,9 @@ import { startFocusTracker } from '../src/ui/focusTracker'
 import { PollerProvider, type PollerHandleRef } from '../src/ui/PollerContext'
 import { SessionProvider, type SessionApi } from '../src/ui/SessionContext'
 import { StoreProvider } from '../src/ui/StoreContext'
-import { debug, warn } from '../src/log'
+import { debug, setLogFile, setNetworkLog, warn } from '../src/log'
 
-const VERSION = '0.10.0'
+const VERSION = '0.11.0'
 
 const HELP = `teaminal ${VERSION}
 
@@ -31,6 +31,8 @@ USAGE
 OPTIONS
   --profile, -p <alias> owa-piggy profile alias (otherwise uses owa-piggy default)
   --debug              enable verbose stderr logging (sets TEAMINAL_DEBUG=1)
+  --log-file <path>    mirror event log to <path> (redacted, append-only)
+  --network-log <path> mirror Graph requests to <path> (redacted, append-only)
   --version            print version and exit
   --help               print this help and exit
 
@@ -44,12 +46,16 @@ function parseArgs(argv: string[]): {
   showHelp: boolean
   showVersion: boolean
   debugFlag: boolean
+  logFile?: string
+  networkLog?: string
 } {
   const out: {
     profile?: string
     showHelp: boolean
     showVersion: boolean
     debugFlag: boolean
+    logFile?: string
+    networkLog?: string
   } = { showHelp: false, showVersion: false, debugFlag: false }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
@@ -64,6 +70,22 @@ function parseArgs(argv: string[]): {
       }
       out.profile = v
       i++
+    } else if (a === '--log-file') {
+      const v = argv[i + 1]
+      if (!v || v.startsWith('-')) {
+        process.stderr.write('teaminal: --log-file requires a path\n')
+        process.exit(2)
+      }
+      out.logFile = v
+      i++
+    } else if (a === '--network-log') {
+      const v = argv[i + 1]
+      if (!v || v.startsWith('-')) {
+        process.stderr.write('teaminal: --network-log requires a path\n')
+        process.exit(2)
+      }
+      out.networkLog = v
+      i++
     } else {
       process.stderr.write(`teaminal: unknown argument: ${a}\n`)
       process.exit(2)
@@ -72,7 +94,14 @@ function parseArgs(argv: string[]): {
   return out
 }
 
-const { profile: cliProfile, showHelp, showVersion, debugFlag } = parseArgs(Bun.argv.slice(2))
+const {
+  profile: cliProfile,
+  showHelp,
+  showVersion,
+  debugFlag,
+  logFile: cliLogFile,
+  networkLog: cliNetworkLog,
+} = parseArgs(Bun.argv.slice(2))
 
 if (showHelp) {
   process.stdout.write(HELP)
@@ -98,6 +127,9 @@ const store = createAppStore()
 const configResult = loadSettings()
 store.set({ settings: configResult.settings })
 let activeProfile: string | null = cliProfile ?? configResult.settings.activeAccount ?? null
+const resolvedLogFile = cliLogFile ?? configResult.settings.logFile ?? null
+if (resolvedLogFile) setLogFile(resolvedLogFile)
+if (cliNetworkLog) setNetworkLog(cliNetworkLog)
 if (configResult.source === 'file') {
   debug(`config: loaded from ${configResult.path}`)
 }

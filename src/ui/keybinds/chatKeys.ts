@@ -33,10 +33,7 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
   // Thread-specific routing: h / Left / Esc must return to the parent
   // channel, not the list. Has to come before the generic 'h → list'
   // rule below.
-  if (
-    ctx.focus.kind === 'thread' &&
-    (ch === 'h' || key.leftArrow || key.escape)
-  ) {
+  if (ctx.focus.kind === 'thread' && (ch === 'h' || key.leftArrow || key.escape)) {
     store.set({
       focus: { kind: 'channel', teamId: ctx.focus.teamId, channelId: ctx.focus.channelId },
     })
