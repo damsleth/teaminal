@@ -7,6 +7,7 @@ export type LoadMoreState = 'idle' | 'loading' | 'error' | 'unavailable'
 export type MessagePageState = {
   hasOlder: boolean
   loading: boolean
+  fullyLoaded: boolean
   error?: string
 }
 
@@ -33,6 +34,7 @@ export function readMessagePageState(source: ChatMessage[] | MessagePageMeta): M
       meta.hasOlder || ((meta.nextLink || meta.olderNextLink) && !meta.fullyLoaded),
     ),
     loading: meta.loadingOlder === true,
+    fullyLoaded: meta.fullyLoaded === true,
     error: meta.loadOlderError ?? meta.error,
   }
 }

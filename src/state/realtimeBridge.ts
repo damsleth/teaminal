@@ -5,6 +5,7 @@
 //     is re-fetched immediately (< 1s latency instead of 5–30s).
 //   - On 'typing' / 'typing-stopped': update typingByConvo in the store.
 //   - On 'presence-changed': update myPresence or memberPresence.
+//   - On 'read-receipt': track each user's latest seen message.
 //   - Clean up stale typing indicators every 2s.
 //
 // The bridge never trusts push payloads for message content — it only
@@ -98,6 +99,27 @@ export function startRealtimeBridge(opts: RealtimeBridgeOpts): RealtimeBridgeHan
         else next[conv] = filtered
         return { typingByConvo: next }
       })
+    }),
+  )
+
+  // --- Read receipts ---
+  unsubs.push(
+    bus.onKind('read-receipt', (event) => {
+      if (event.kind !== 'read-receipt') return
+      const conv: ConvKey = `chat:${event.chatId}`
+      store.set((s) => ({
+        readReceiptsByConvo: {
+          ...s.readReceiptsByConvo,
+          [conv]: {
+            ...(s.readReceiptsByConvo[conv] ?? {}),
+            [event.userId]: {
+              userId: event.userId,
+              messageId: event.messageId,
+              seenAt: Date.now(),
+            },
+          },
+        },
+      }))
     }),
   )
 

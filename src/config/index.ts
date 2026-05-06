@@ -189,10 +189,15 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     messageFocusBackgroundColor: settings.messageFocusBackgroundColor,
     useTeamsPresence: settings.useTeamsPresence,
     forceAvailableWhenFocused: settings.forceAvailableWhenFocused,
+    realtimeEnabled: settings.realtimeEnabled,
     notifyMuted: settings.notifyMuted,
     notifyActiveBanner: settings.notifyActiveBanner,
     quietHoursStart: settings.quietHoursStart,
     quietHoursEnd: settings.quietHoursEnd,
+    logFile: settings.logFile,
+    tailEvents: settings.tailEvents,
+    tailNetwork: settings.tailNetwork,
+    tailDiagnostics: settings.tailDiagnostics,
   }
 }
 
@@ -321,8 +326,12 @@ function validateAndAssign(
     case 'messageFocusIndicatorEnabled':
     case 'useTeamsPresence':
     case 'forceAvailableWhenFocused':
+    case 'realtimeEnabled':
     case 'notifyMuted':
     case 'notifyActiveBanner':
+    case 'tailEvents':
+    case 'tailNetwork':
+    case 'tailDiagnostics':
       if (typeof value === 'boolean') {
         out[key] = value
         return true
@@ -373,6 +382,18 @@ function validateAndAssign(
         return true
       }
       warnings.push(`config: "${key}" must be null or an HH:MM string`)
+      return false
+    case 'logFile':
+      if (value === null) {
+        out.logFile = null
+        return true
+      }
+      if (typeof value === 'string') {
+        const trimmed = value.trim()
+        out.logFile = trimmed.length > 0 ? trimmed : null
+        return true
+      }
+      warnings.push('config: "logFile" must be null or a path string')
       return false
   }
 }

@@ -235,6 +235,19 @@ describe('realtimeBridge', () => {
     bridge.stop()
   })
 
+  test('read-receipt records latest seen message per user', () => {
+    const { bus, store, bridge } = setup()
+
+    bus.emit({ kind: 'read-receipt', chatId: 'c1', userId: 'u1', messageId: 'm1' })
+    bus.emit({ kind: 'read-receipt', chatId: 'c1', userId: 'u1', messageId: 'm2' })
+    bus.emit({ kind: 'read-receipt', chatId: 'c1', userId: 'u2', messageId: 'm1' })
+
+    const receipts = store.get().readReceiptsByConvo['chat:c1']
+    expect(receipts?.u1?.messageId).toBe('m2')
+    expect(receipts?.u2?.messageId).toBe('m1')
+    bridge.stop()
+  })
+
   test('reaction-added wakes the poller (read-path acceleration)', () => {
     const { bus, bridge, getRefreshCount } = setup()
     bus.emit({ kind: 'reaction-added', chatId: 'c1', messageId: 'm1' })

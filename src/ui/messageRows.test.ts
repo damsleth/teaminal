@@ -3,6 +3,7 @@ import type { ChatMessage } from '../types'
 import {
   buildMessageRows,
   messageRenderRowHeight,
+  readMessagePageState,
   type MessageRenderRow,
   sliceMessageRowsToBudget,
 } from './messageRows'
@@ -20,6 +21,29 @@ function rowKey(row: MessageRenderRow): string {
   if (row.kind === 'message' || row.kind === 'date') return row.key
   return 'load-more'
 }
+
+describe('readMessagePageState', () => {
+  test('reports fullyLoaded so exhausted caches can hide the load-more row', () => {
+    expect(
+      readMessagePageState({
+        messages: [msg('a')],
+        loadingOlder: false,
+        fullyLoaded: true,
+      }),
+    ).toEqual({ hasOlder: false, loading: false, fullyLoaded: true, error: undefined })
+  })
+
+  test('reports older history when a cache has a nextLink and is not fully loaded', () => {
+    expect(
+      readMessagePageState({
+        messages: [msg('a')],
+        nextLink: 'https://graph.microsoft.com/v1.0/chats/c1/messages?$skiptoken=older',
+        loadingOlder: false,
+        fullyLoaded: false,
+      }),
+    ).toEqual({ hasOlder: true, loading: false, fullyLoaded: false, error: undefined })
+  })
+})
 
 describe('message row viewport budgeting', () => {
   test('counts reaction and send-error continuations as physical rows', () => {

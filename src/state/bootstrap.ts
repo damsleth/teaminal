@@ -105,28 +105,48 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
       getPoller: () => pollerHandleRef.current,
     })
 
-    transport = new TrouterTransport({
-      bus,
-      getToken: () => getToken(profile ?? undefined),
-      profile: profile ?? undefined,
-    })
-    transport.onStateChange((state) => {
-      store.set({
-        realtimeState:
-          state === 'disconnected'
-            ? 'off'
-            : state === 'connecting'
-              ? 'connecting'
-              : state === 'connected'
-                ? 'connected'
-                : state === 'reconnecting'
-                  ? 'reconnecting'
-                  : 'error',
+    if (store.get().settings.realtimeEnabled) {
+      // Trouter / Teams authsvc requires a token with audience
+      // https://api.spaces.skype.com/ - the audience the Teams desktop
+      // client uses for chat / authsvc / messaging service endpoints.
+      // The default Graph-audience token (graph.microsoft.com) is
+      // rejected with 401 by the authsvc endpoint. owa-piggy already
+      // exposes per-resource tokens via --scope, so we route the request
+      // through the same scoped path the presence loop uses.
+      transport = new TrouterTransport({
+        bus,
+        getToken: () =>
+          getToken({
+            profile: profile ?? undefined,
+            scope: 'https://api.spaces.skype.com/.default',
+          }),
+        getIc3Token: () =>
+          getToken({
+            profile: profile ?? undefined,
+            scope: 'https://ic3.teams.office.com/.default',
+          }),
+        profile: profile ?? undefined,
       })
-    })
-    transport.connect().catch((err) => {
-      warn('trouter: initial connect failed:', err instanceof Error ? err.message : String(err))
-    })
+      transport.onStateChange((state) => {
+        store.set({
+          realtimeState:
+            state === 'disconnected'
+              ? 'off'
+              : state === 'connecting'
+                ? 'connecting'
+                : state === 'connected'
+                  ? 'connected'
+                  : state === 'reconnecting'
+                    ? 'reconnecting'
+                    : 'error',
+        })
+      })
+      transport.connect().catch((err) => {
+        warn('trouter: initial connect failed:', err instanceof Error ? err.message : String(err))
+      })
+    } else {
+      store.set({ realtimeState: 'off' })
+    }
   } catch (err) {
     // Roll back partial bootstrap so the caller can retry / switch.
     try {

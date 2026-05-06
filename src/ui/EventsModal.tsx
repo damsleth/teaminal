@@ -129,11 +129,16 @@ export function EventsModal() {
           slice.map((r, i) => {
             const isFocused = !tail && i + start === focused
             return (
-              <Text key={`${r.ts}-${i}`} color={colorForLevel(theme, r.level)} inverse={isFocused}>
+              <Text
+                key={`${r.ts}-${i}`}
+                color={colorForLevel(theme, r.level)}
+                inverse={isFocused}
+                wrap="wrap"
+              >
                 {formatTs(r.ts)}
                 {'  '}
                 <Text color={theme.mutedText}>{r.source.padEnd(8)}</Text>
-                {r.message.length > 70 ? `${r.message.slice(0, 70)}…` : r.message}
+                {r.message}
               </Text>
             )
           })

@@ -40,7 +40,9 @@ import { HeaderBar } from './HeaderBar'
 import { KeybindsModal } from './KeybindsModal'
 import { MenuModal } from './MenuModal'
 import { MessagePane } from './MessagePane'
+import { NetworkModal } from './NetworkModal'
 import { NewChatPrompt } from './NewChatPrompt'
+import { TailPanels } from './TailPanels'
 import { findExistingOneOnOne } from './derive'
 import { useClampMessageCursor } from './hooks/useClampMessageCursor'
 import { useHydrateMembers } from './hooks/useHydrateMembers'
@@ -294,6 +296,8 @@ export function App() {
               <AccountsModal />
             ) : modal.kind === 'events' ? (
               <EventsModal />
+            ) : modal.kind === 'network' ? (
+              <NetworkModal />
             ) : (
               <DiagnosticsModal />
             )
@@ -306,6 +310,7 @@ export function App() {
           )}
         </Box>
       </Box>
+      <TailPanels />
       <Box borderStyle="round" borderColor="gray">
         <Composer />
       </Box>

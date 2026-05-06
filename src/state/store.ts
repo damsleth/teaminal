@@ -107,6 +107,7 @@ export type ModalState =
   | { kind: 'keybinds' }
   | { kind: 'diagnostics' }
   | { kind: 'events' }
+  | { kind: 'network' }
   | AccountManagerModalState
 
 export type AccountManagerAccount = {
@@ -221,6 +222,10 @@ export type Settings = {
   // the override is left to decay naturally. Set false to leave
   // presence to Teams' own desktop client / inactivity timer.
   forceAvailableWhenFocused: boolean
+  // Experimental Teams push transport. Disabled by default because the
+  // undocumented trouter WebSocket upgrade is tenant/protocol-sensitive;
+  // polling remains the durable path when this is off or errors.
+  realtimeEnabled: boolean
   // Notification preferences. notifyMuted is a session-level kill switch
   // that suppresses banners (bell still rings — terminal-level mute is
   // the user's responsibility). notifyActiveBanner forces the banner
@@ -230,6 +235,14 @@ export type Settings = {
   notifyActiveBanner: boolean
   quietHoursStart: string | null
   quietHoursEnd: string | null
+  // Optional path for the redacted stderr mirror. CLI --log-file
+  // overrides this. null disables the mirror.
+  logFile: string | null
+  // Always-on diagnostics tails rendered as 1/3-width strips above the
+  // composer. Independent of the modal versions of the same panels.
+  tailEvents: boolean
+  tailNetwork: boolean
+  tailDiagnostics: boolean
 }
 
 export const defaultSettings: Settings = {
@@ -249,10 +262,15 @@ export const defaultSettings: Settings = {
   messageFocusBackgroundColor: null,
   useTeamsPresence: true,
   forceAvailableWhenFocused: true,
+  realtimeEnabled: false,
   notifyMuted: false,
   notifyActiveBanner: false,
   quietHoursStart: null,
   quietHoursEnd: null,
+  logFile: null,
+  tailEvents: false,
+  tailNetwork: false,
+  tailDiagnostics: false,
 }
 
 export type MessageCache = {
@@ -372,6 +390,37 @@ export function markChatUnread(
   }
 }
 
+/**
+ * Manually toggle a chat's unread state. If the chat currently has
+ * unread or mentions, clear them (mark read). Otherwise set
+ * unreadCount to 1 so the chat shows in the unread count and the
+ * sidebar gets the unread badge.
+ *
+ * Used by the `m` keybind in the chat list to flip a chat's read state.
+ */
+export function toggleChatUnread(
+  activityByChatId: Record<string, ChatUnreadActivity>,
+  chat: Chat,
+): Record<string, ChatUnreadActivity> {
+  const prev = activityByChatId[chat.id]
+  const isUnread = !!prev && (prev.unreadCount > 0 || prev.mentionCount > 0)
+  if (isUnread) {
+    return markChatRead(activityByChatId, chat.id)
+  }
+  const preview = chat.lastMessagePreview
+  return {
+    ...activityByChatId,
+    [chat.id]: {
+      ...(prev ?? { unreadCount: 0, mentionCount: 0 }),
+      lastSeenPreviewId: prev?.lastSeenPreviewId,
+      unreadCount: 1,
+      mentionCount: 0,
+      lastSenderName: previewSenderName(preview) ?? prev?.lastSenderName,
+      lastActivityAt: previewActivityAt(preview) ?? prev?.lastActivityAt,
+    },
+  }
+}
+
 export function bumpChatMention(
   activityByChatId: Record<string, ChatUnreadActivity>,
   chatId: string,
@@ -436,6 +485,16 @@ export function setMessageCursor(
   }
 }
 
+// Per-root metadata for channel reply badging. Populated opportunistically
+// by the active-loop after a channel page lands. count is the number of
+// replies actually returned by the replies endpoint; if more pages exist,
+// `more` is true (we cap fetches at one page to keep the cost bounded).
+export type ThreadMeta = {
+  count: number
+  more: boolean
+  checkedAt: number
+}
+
 // Real-time transport connection state, shown in the header bar.
 export type RealtimeState = 'off' | 'connecting' | 'connected' | 'reconnecting' | 'error'
 
@@ -445,6 +504,12 @@ export type TypingIndicator = {
   displayName: string
   /** Date.now() when the indicator was last refreshed. */
   startedAt: number
+}
+
+export type ReadReceipt = {
+  userId: string
+  messageId: string
+  seenAt: number
 }
 
 export type AppState = {
@@ -492,6 +557,14 @@ export type AppState = {
   // Active typing indicators per conversation, keyed by ConvKey.
   // Entries expire after ~8s of inactivity (cleaned by a timer).
   typingByConvo: Record<ConvKey, TypingIndicator[]>
+  // Latest read position per user, per conversation. Push events only
+  // tell us what message each user has read up to; rendering code maps
+  // those positions to "seen by N" lines under matching self messages.
+  readReceiptsByConvo: Record<ConvKey, Record<string, ReadReceipt>>
+  // Reply-count metadata for channel root messages, keyed by root id.
+  // Populated opportunistically when the user has a channel focused;
+  // missing entries simply render no badge.
+  threadMetaByRoot: Record<string, ThreadMeta>
   // Active modal overlay (e.g. pause menu). null = no modal.
   modal: ModalState | null
   // User-tunable display preferences. Persisted to disk via
@@ -524,6 +597,8 @@ export function initialAppState(): AppState {
     realtimeState: 'off',
     terminalFocused: true,
     typingByConvo: {},
+    readReceiptsByConvo: {},
+    threadMetaByRoot: {},
     modal: null,
     settings: { ...defaultSettings },
   }

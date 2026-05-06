@@ -121,20 +121,22 @@ export function HeaderBar() {
         <Text color="gray">presence n/a</Text>
       ) : (
         <>
+          <Text color="gray">{'presence '}</Text>
           <Text color={presenceColor(theme, myPresence?.availability)}>{DOT}</Text>
-          <Text color="gray">{` ${myPresence?.availability ?? '?'}`}</Text>
+          <Text color="gray">{` ${(myPresence?.availability ?? '?').toLowerCase()}`}</Text>
         </>
       )}
       <Text color="gray">{' · '}</Text>
+      <Text color="gray">{'graph '}</Text>
       <Text color={connColor(conn)}>{DOT}</Text>
       <Text color="gray">{` ${conn}`}</Text>
       <Text color="gray">{` · ${chats.length} chats`}</Text>
-      {unreadText && <Text color={theme.unread}>{` · ${unreadText}`}</Text>}
+      {unreadText && <Text color={theme.unread}>{` · ${unreadText.toLowerCase()}`}</Text>}
       {realtimeState !== 'off' && (
         <>
-          <Text color="gray">{' · '}</Text>
+          <Text color="gray">{' · push '}</Text>
           <Text color={realtimeColor(realtimeState)}>{DOT}</Text>
-          <Text color="gray">{` rt:${realtimeState}`}</Text>
+          <Text color="gray">{` ${realtimeState}`}</Text>
         </>
       )}
       {updated && <Text color="gray">{` · upd ${updated}`}</Text>}

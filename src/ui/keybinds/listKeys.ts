@@ -6,7 +6,13 @@
 
 import type { Channel, Chat, Team } from '../../types'
 import type { Me } from '../../graph/me'
-import { focusKey, type AppState, type Focus, type Store } from '../../state/store'
+import {
+  focusKey,
+  toggleChatUnread,
+  type AppState,
+  type Focus,
+  type Store,
+} from '../../state/store'
 import { buildSelectableList, clampCursor, itemMatchesFilter } from '../../state/selectables'
 import { isNewChatQueryCandidate } from '../ChatList'
 import { openKeybinds } from '../KeybindsModal'
@@ -69,6 +75,23 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
     const selectableCount = visible.length + (syntheticNewChatQuery ? 1 : 0)
     if (ch === 'n') {
       openNewChatPrompt(ctx.filter)
+      return 'handled'
+    }
+    // m toggles unread/read on the focused chat row. Channels and
+    // teams have no unread state to flip.
+    if (ch === 'm') {
+      const items = buildSelectableList(ctx)
+      const visible = ctx.filter
+        ? items.filter((it) => itemMatchesFilter(it, ctx.filter))
+        : items
+      const safe = clampCursor(ctx.cursor, visible.length + (syntheticNewChatQuery ? 1 : 0))
+      const it = visible[safe]
+      if (it && it.kind === 'chat') {
+        const chat = it.chat
+        store.set((s) => ({
+          unreadByChatId: toggleChatUnread(s.unreadByChatId, chat),
+        }))
+      }
       return 'handled'
     }
     if (selectableCount === 0) {

@@ -56,12 +56,32 @@ import {
   type ComposerAction,
   type ComposerBuffer,
 } from './composerReducer'
+import { htmlToText } from './html'
+import { shortName } from '../state/selectables'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
 const MAX_VISIBLE_LINES = 5
 
 function makeTempId(): string {
   return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+const QUOTE_PREVIEW_MAX = 80
+
+export function findRootQuote(
+  focus: { kind: 'thread'; teamId: string; channelId: string; rootId: string },
+  messagesByConvo: Record<string, ChatMessage[]>,
+): { sender: string; preview: string } | null {
+  const channelKey = `channel:${focus.teamId}:${focus.channelId}`
+  const root = (messagesByConvo[channelKey] ?? []).find((m) => m.id === focus.rootId)
+  if (!root) return null
+  const senderRaw = root.from?.user?.displayName ?? '(system)'
+  const sender = shortName(senderRaw)
+  const raw = root.body.content ?? ''
+  const text = root.body.contentType === 'text' ? raw.replace(/\s+/g, ' ').trim() : htmlToText(raw)
+  const preview =
+    text.length > QUOTE_PREVIEW_MAX ? `${text.slice(0, QUOTE_PREVIEW_MAX - 1)}…` : text
+  return { sender, preview }
 }
 
 export function Composer() {
@@ -71,6 +91,7 @@ export function Composer() {
   const focus = useAppState((s) => s.focus)
   const inputZone = useAppState((s) => s.inputZone)
   const drafts = useAppState((s) => s.draftsByConvo)
+  const messagesByConvo = useAppState((s) => s.messagesByConvo)
   const theme = useTheme()
   const [buf, setBuf] = useState<ComposerBuffer>(emptyBuffer)
   const [sending, setSending] = useState(false)
@@ -274,8 +295,17 @@ export function Composer() {
   if (cursorLine < firstVisible) firstVisible = cursorLine
   const visible = lines.slice(firstVisible, firstVisible + MAX_VISIBLE_LINES)
 
+  const quote = focus.kind === 'thread' ? findRootQuote(focus, messagesByConvo) : null
+
   return (
     <Box paddingX={1} flexDirection="column">
+      {quote && (
+        <Box>
+          <Text color={theme.mutedText} wrap="truncate-end">
+            {`Re: ${quote.sender}: ${quote.preview}`}
+          </Text>
+        </Box>
+      )}
       {overflow > 0 && firstVisible > 0 && (
         <Box>
           <Text color={theme.mutedText}>… {firstVisible} earlier line(s)</Text>

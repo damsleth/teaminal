@@ -122,6 +122,13 @@ describe('mergeSettings', () => {
     expect(w.some((m) => /"chatListShortNames" must be a boolean/.test(m))).toBe(true)
   })
 
+  test('validates realtimeEnabled as a boolean', () => {
+    const w: string[] = []
+    expect(mergeSettings({ realtimeEnabled: true }, w).realtimeEnabled).toBe(true)
+    expect(mergeSettings({ realtimeEnabled: 'yes' }, w).realtimeEnabled).toBe(false)
+    expect(w.some((m) => /"realtimeEnabled" must be a boolean/.test(m))).toBe(true)
+  })
+
   test('rejects negative or non-integer windowHeight', () => {
     const w: string[] = []
     expect(mergeSettings({ windowHeight: -3 }, w).windowHeight).toBe(0)

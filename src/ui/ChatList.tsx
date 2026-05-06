@@ -95,7 +95,11 @@ export function isNewChatQueryCandidate(filter: string): boolean {
 }
 
 // Presence dot for the "other" 1:1 chat member (or null when not a 1:1
-// or when the user has hidden presence). Green/yellow/red/gray per theme.
+// or when the user has hidden presence). Green/yellow/red/gray per
+// theme. While the presence loop hasn't yet resolved a member's status
+// (cold start or members-not-yet-hydrated), render a hollow `◯` in
+// muted text so the user can see the row is *expected* to have presence
+// rather than wondering why it's blank.
 function presenceForChatItem(
   item: SelectableItem,
   myUserId: string | undefined,
@@ -105,11 +109,17 @@ function presenceForChatItem(
   if (item.kind !== 'chat') return null
   const chat = item.chat
   if (chat.chatType !== 'oneOnOne') return null
-  const other = (chat.members ?? []).find((m) => m.userId && m.userId !== myUserId)
+  const members = chat.members ?? []
+  // Members slice not yet hydrated → we know it's a 1:1 from chatType
+  // but can't pin a userId yet. Show "loading".
+  if (members.length === 0) return { dot: '◯', color: theme.mutedText }
+  const other = members.find((m) => m.userId && m.userId !== myUserId)
   const userId = other?.userId
+  // 1:1 with self (rare but possible) or member entry without a userId
+  // — treat as no-presence rather than perpetually loading.
   if (!userId) return null
   const p = memberPresence[userId]
-  if (!p) return null
+  if (!p) return { dot: '◯', color: theme.mutedText }
   const key = p.availability as PresenceColorKey
   const color = theme.presence[key] ?? theme.presence.PresenceUnknown
   return { dot: '●', color }
@@ -175,7 +185,7 @@ export function ChatList() {
 
   if (selectableCount === 0) {
     return (
-      <Box flexDirection="column" paddingX={1}>
+      <Box flexDirection="column" paddingLeft={0} paddingRight={1}>
         {filterBanner}
         {density === 'cozy' && <Text bold>Chats</Text>}
         <Text color="gray">
@@ -186,7 +196,7 @@ export function ChatList() {
   }
 
   return (
-    <Box flexDirection="column" paddingX={1}>
+    <Box flexDirection="column" paddingLeft={0} paddingRight={1}>
       {filterBanner}
       {visible.map((row, i) => {
         if (row.kind === 'header') {
@@ -202,13 +212,12 @@ export function ChatList() {
           const isSelected = row.index === safeCursor
           return (
             <Box key={`new-chat-${row.query}`} flexDirection="row">
-              {density === 'cozy' && (
-                <Box width={2} flexShrink={0}>
-                  <Text color={isSelected ? theme.selected : undefined}>
-                    {isSelected ? '>' : ' '}
-                  </Text>
-                </Box>
-              )}
+              {density === 'cozy' && <Box width={2} flexShrink={0} />}
+              <Box width={2} flexShrink={0}>
+                <Text color={isSelected ? theme.selected : undefined}>
+                  {isSelected ? '> ' : '  '}
+                </Text>
+              </Box>
               <Box flexGrow={1} flexShrink={1} minWidth={0}>
                 <Text color={isSelected ? theme.selected : 'gray'} bold={isSelected}>
                   {`Create chat with "${row.query}"`}
@@ -221,21 +230,41 @@ export function ChatList() {
         const isSelected = row.index === safeCursor
         const indent = density === 'cozy' ? rowIndent(row.item) : ''
         const label = rowLabel(row.item, me?.id, shortNames)
-        const presence =
-          density === 'cozy' && showPresence
-            ? presenceForChatItem(row.item, me?.id, memberPresence, theme)
-            : null
+        const presence = showPresence
+          ? presenceForChatItem(row.item, me?.id, memberPresence, theme)
+          : null
         const unread = row.item.kind === 'chat' ? unreadByChatId[row.item.chat.id] : undefined
+        const hasMention = !!unread && unread.mentionCount > 0
         const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
-        const markerText = isSelected ? '>' : presence ? presence.dot : ' '
-        const markerColor = isSelected ? theme.selected : presence?.color
+        // Unread badge sits between the selector and the label. `@` for
+        // mentions takes priority over the generic `●` so the user can
+        // tell pings apart from passive unread at a glance.
+        const unreadBadge = hasMention ? '@ ' : hasUnread ? '● ' : ''
+        // Layout per row (left → right):
+        //   1. presence column (2 cols): dot/loading/blank, always
+        //      reserved when presence is enabled or in cozy mode so all
+        //      rows column-align even when individual chats have no
+        //      presence to show.
+        //   2. selector column (2 cols): `> ` for the focused row,
+        //      `  ` otherwise. Sits *right* of the presence column so
+        //      the selected row keeps its presence dot.
+        //   3. indent (cozy: channel/team indent)
+        //   4. label
+        const showGutter = density === 'cozy' || showPresence
+        const presenceText = presence ? presence.dot : ' '
+        const presenceColor = presence?.color
         return (
           <Box key={`${row.item.kind}-${row.index}`} flexDirection="row">
-            {density === 'cozy' && (
+            {showGutter && (
               <Box width={2} flexShrink={0}>
-                <Text color={markerColor}>{markerText}</Text>
+                <Text color={presenceColor}>{`${presenceText} `}</Text>
               </Box>
             )}
+            <Box width={2} flexShrink={0}>
+              <Text color={isSelected ? theme.selected : undefined}>
+                {isSelected ? '> ' : '  '}
+              </Text>
+            </Box>
             {indent && (
               <Box width={indent.length} flexShrink={0}>
                 <Text>{indent}</Text>
@@ -246,6 +275,7 @@ export function ChatList() {
                 color={isSelected ? theme.selected : hasUnread ? theme.unread : undefined}
                 bold={isSelected || hasUnread}
               >
+                {unreadBadge}
                 {label}
               </Text>
               {density === 'cozy' && hasUnread && row.item.kind === 'chat' && (

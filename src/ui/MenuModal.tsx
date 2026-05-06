@@ -18,10 +18,12 @@
 
 import { Box, Text, useApp, useInput } from 'ink'
 import {
+  cycleQuietHoursPreset,
   cycleSetting,
   emptyAccountManagerModal,
   firstSelectable,
   nextSelectable,
+  renderQuietHoursValue,
   renderSettingValue,
   resolveMenuPath,
   ROOT_MENU,
@@ -31,6 +33,7 @@ import {
 } from './menu'
 import type { Settings } from '../state/store'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
+import { updateSettings } from '../config'
 import { warn } from '../log'
 
 const LOGO = [
@@ -129,6 +132,23 @@ export function MenuModal() {
         })
         return
       }
+      case 'cycle-quiet-hours': {
+        const cur = store.get().settings
+        const next = cycleQuietHoursPreset({
+          start: cur.quietHoursStart,
+          end: cur.quietHoursEnd,
+        })
+        store.set((s) => ({
+          settings: { ...s.settings, quietHoursStart: next.start, quietHoursEnd: next.end },
+        }))
+        void updateSettings({
+          quietHoursStart: next.start,
+          quietHoursEnd: next.end,
+        }).catch((err) => {
+          warn('config: failed to persist quiet hours:', errMessage(err))
+        })
+        return
+      }
       case 'show-keybinds':
         store.set({ modal: { kind: 'keybinds' }, inputZone: 'menu' })
         return
@@ -137,6 +157,9 @@ export function MenuModal() {
         return
       case 'show-events':
         store.set({ modal: { kind: 'events' }, inputZone: 'menu' })
+        return
+      case 'show-network':
+        store.set({ modal: { kind: 'network' }, inputZone: 'menu' })
         return
       case 'show-accounts':
         openAccounts(store)
@@ -203,7 +226,12 @@ function errMessage(err: unknown): string {
 }
 
 function formatValueSuffix(item: MenuItem, settings: Settings): string {
-  if (item.action.kind !== 'toggle-setting') return ''
-  const key = item.action.key as ToggleKey
-  return ` : ${renderSettingValue(key, settings[key])}`
+  if (item.action.kind === 'toggle-setting') {
+    const key = item.action.key as ToggleKey
+    return ` : ${renderSettingValue(key, settings[key])}`
+  }
+  if (item.action.kind === 'cycle-quiet-hours') {
+    return ` : ${renderQuietHoursValue(settings.quietHoursStart, settings.quietHoursEnd)}`
+  }
+  return ''
 }
