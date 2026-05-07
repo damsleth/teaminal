@@ -129,17 +129,9 @@ describe('mergeSettings', () => {
     expect(w.some((m) => /"realtimeEnabled" must be a boolean/.test(m))).toBe(true)
   })
 
-  test('rejects negative or non-integer windowHeight', () => {
+  test('silently ignores legacy windowHeight', () => {
     const w: string[] = []
-    expect(mergeSettings({ windowHeight: -3 }, w).windowHeight).toBe(0)
-    expect(mergeSettings({ windowHeight: 1.5 }, w).windowHeight).toBe(0)
-    expect(w.length).toBe(2)
-  })
-
-  test('accepts zero and positive integers for windowHeight', () => {
-    const w: string[] = []
-    expect(mergeSettings({ windowHeight: 0 }, w).windowHeight).toBe(0)
-    expect(mergeSettings({ windowHeight: 30 }, w).windowHeight).toBe(30)
+    expect(mergeSettings({ windowHeight: 30 }, w)).toEqual(defaultSettings)
     expect(w).toEqual([])
   })
 
@@ -218,12 +210,12 @@ describe('mergeSettings', () => {
 describe('saveConfig/updateConfig', () => {
   test('creates the config directory and writes atomically to config.json', async () => {
     const nestedPath = join(tmpDir, 'xdg', 'teaminal', 'config.json')
-    await saveConfig({ theme: 'light', windowHeight: 30 }, nestedPath)
+    await saveConfig({ theme: 'light' }, nestedPath)
 
     expect(existsSync(nestedPath)).toBe(true)
     const saved = JSON.parse(readFileSync(nestedPath, 'utf8'))
     expect(saved.theme).toBe('light')
-    expect(saved.windowHeight).toBe(30)
+    expect(saved.windowHeight).toBeUndefined()
     expect(readdirSync(join(tmpDir, 'xdg', 'teaminal')).sort()).toEqual(['config.json'])
   })
 

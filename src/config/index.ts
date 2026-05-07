@@ -182,7 +182,6 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     showPresenceInList: settings.showPresenceInList,
     showTimestampsInPane: settings.showTimestampsInPane,
     showReactions: settings.showReactions,
-    windowHeight: settings.windowHeight,
     messageFocusIndicatorEnabled: settings.messageFocusIndicatorEnabled,
     messageFocusIndicatorChar: settings.messageFocusIndicatorChar,
     messageFocusIndicatorColor: settings.messageFocusIndicatorColor,
@@ -204,6 +203,9 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
 export function mergeSettings(input: Record<string, unknown>, warnings: string[]): Settings {
   const out: Settings = cloneSettings(defaultSettings)
   for (const [key, value] of Object.entries(input)) {
+    if (key === 'windowHeight') {
+      continue
+    }
     if (!(key in defaultSettings)) {
       warnings.push(`config: unknown key "${key}" ignored`)
       continue
@@ -344,13 +346,6 @@ function validateAndAssign(
         return true
       }
       warnings.push('config: "showReactions" must be "off", "current", or "all"')
-      return false
-    case 'windowHeight':
-      if (typeof value === 'number' && Number.isInteger(value) && value >= 0) {
-        out.windowHeight = value
-        return true
-      }
-      warnings.push('config: "windowHeight" must be a non-negative integer (0 = full)')
       return false
     case 'messageFocusIndicatorChar':
       if (typeof value === 'string' && Array.from(value).length === 1) {

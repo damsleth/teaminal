@@ -26,6 +26,7 @@
 // in-flight active fetch so opening a chat is responsive even mid-poll.
 
 import type { ChatMessage } from '../types'
+import { recordEvent } from '../log'
 import { type AppState, type ConvKey, focusKey, type Store } from './store'
 import {
   ACTIVE_DEFAULT_MS,
@@ -78,6 +79,10 @@ export type PollerHandle = {
   // runs without waiting out the current interval. Useful when the user
   // hits a manual-refresh key.
   refresh: () => void
+  // Clear visible account-scoped data and wake the pollers. This is the
+  // escape hatch for a stale/stuck UI: the next list/active iterations
+  // rebuild state from Graph rather than preserving old slices.
+  hardRefresh: () => void
   // Fetch one older page for the currently-focused conversation, if any.
   loadOlderMessages: () => Promise<LoadOlderMessagesResult>
 }
@@ -192,8 +197,26 @@ export function startPoller(opts: PollerOpts): PollerHandle {
       await loops
     },
     refresh() {
+      recordEvent('poller', 'info', 'manual refresh requested')
       activeSleeper.wake()
       listSleeper.wake()
+    },
+    hardRefresh() {
+      recordEvent('poller', 'info', 'hard refresh requested')
+      seen.clear()
+      activeAbort?.abort()
+      store.set({
+        chats: [],
+        teams: [],
+        channelsByTeam: {},
+        messagesByConvo: {},
+        messageCacheByConvo: {},
+        unreadByChatId: {},
+        conn: 'connecting',
+      })
+      activeSleeper.wake()
+      listSleeper.wake()
+      presenceSleeper.wake()
     },
     loadOlderMessages,
   }

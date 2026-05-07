@@ -27,7 +27,6 @@ export type ToggleKey =
   | 'showPresenceInList'
   | 'showTimestampsInPane'
   | 'showReactions'
-  | 'windowHeight'
   | 'messageFocusIndicatorEnabled'
   | 'messageFocusIndicatorChar'
   | 'forceAvailableWhenFocused'
@@ -156,11 +155,6 @@ export const ROOT_MENU: MenuItem[] = [
         action: { kind: 'cycle-quiet-hours' },
       },
       {
-        id: 'windowHeight',
-        label: 'Window height',
-        action: { kind: 'toggle-setting', key: 'windowHeight' },
-      },
-      {
         id: 'messageFocusIndicatorEnabled',
         label: 'Focused message marker',
         action: { kind: 'toggle-setting', key: 'messageFocusIndicatorEnabled' },
@@ -251,18 +245,8 @@ export function nextSelectable(items: MenuItem[], from: number, dir: 1 | -1): nu
   return -1
 }
 
-// Preset cycle for the windowHeight setting. 0 = fill the terminal.
-// Add bespoke heights here; they show up automatically in the menu cycle
-// and the renderSettingValue formatter.
-export const WINDOW_HEIGHT_PRESETS = [0, 20, 30, 40] as const
 export const MESSAGE_FOCUS_MARKER_PRESETS = ['>', '|', '*', '-'] as const
 export const REACTION_DISPLAY_PRESETS = ['current', 'all', 'off'] as const
-
-function cycleWindowHeight(current: number): number {
-  const idx = WINDOW_HEIGHT_PRESETS.indexOf(current as (typeof WINDOW_HEIGHT_PRESETS)[number])
-  if (idx === -1) return WINDOW_HEIGHT_PRESETS[0]!
-  return WINDOW_HEIGHT_PRESETS[(idx + 1) % WINDOW_HEIGHT_PRESETS.length]!
-}
 
 function cycleMessageFocusIndicatorChar(current: string): string {
   const idx = MESSAGE_FOCUS_MARKER_PRESETS.indexOf(
@@ -300,8 +284,6 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'tailNetwork':
     case 'tailDiagnostics':
       return !current as Settings[K]
-    case 'windowHeight':
-      return cycleWindowHeight(current as number) as Settings[K]
     case 'messageFocusIndicatorChar':
       return cycleMessageFocusIndicatorChar(current as string) as Settings[K]
   }
@@ -342,8 +324,6 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'tailNetwork':
     case 'tailDiagnostics':
       return value ? 'on' : 'off'
-    case 'windowHeight':
-      return value === 0 ? 'full' : `${value} rows`
     case 'messageFocusIndicatorChar':
       return String(value)
   }

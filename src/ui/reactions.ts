@@ -53,7 +53,12 @@ export function aggregateReactions(reactions: Reaction[] | undefined): ReactionB
 }
 
 export function reactionGlyph(type: string): string {
+  if (looksLikeEmojiGlyph(type)) return type
   return REACTION_GLYPH[type] ?? `:${type}:`
+}
+
+function looksLikeEmojiGlyph(type: string): boolean {
+  return /\p{Extended_Pictographic}/u.test(type)
 }
 
 /**
@@ -63,5 +68,7 @@ export function reactionGlyph(type: string): string {
 export function reactionsSummary(reactions: Reaction[] | undefined): string | null {
   const buckets = aggregateReactions(reactions)
   if (buckets.length === 0) return null
-  return buckets.map((b) => `${reactionGlyph(b.reactionType)} ${b.count}`).join('  ')
+  return buckets
+    .map((b) => `${reactionGlyph(b.reactionType)}${b.count >= 2 ? b.count : ''}`)
+    .join('|')
 }

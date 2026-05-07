@@ -52,6 +52,7 @@ import { handleFilterKeys } from './keybinds/filterKeys'
 import { handleListKeys } from './keybinds/listKeys'
 import { handleMessageSearchKeys } from './keybinds/messageSearchKeys'
 import { readMessagePageState, type LoadMoreState } from './messageRows'
+import { messagesForTimelineNavigation } from './renderableMessage'
 import { usePollerHandleRef } from './PollerContext'
 import { StatusBar } from './StatusBar'
 import { useAppState, useAppStore } from './StoreContext'
@@ -76,7 +77,6 @@ export function App() {
   const inputZone = useAppState((s) => s.inputZone)
   const filter = useAppState((s) => s.filter)
   const modal = useAppState((s) => s.modal)
-  const windowHeight = useAppState((s) => s.settings.windowHeight)
   const messagesByConvo = useAppState((s) => s.messagesByConvo)
   const messageCacheByConvo = useAppState((s) => s.messageCacheByConvo)
   const messageCursorByConvo = useAppState((s) => s.messageCursorByConvo)
@@ -90,15 +90,16 @@ export function App() {
 
   const activeConv = focusKey(focus)
   const activeMessages = activeConv ? (messagesByConvo[activeConv] ?? []) : []
+  const activeNavigationMessages = messagesForTimelineNavigation(activeMessages)
   const activeCache = activeConv ? messageCacheByConvo[activeConv] : undefined
   const activeMessageCursor =
-    activeConv && activeMessages.length > 0
+    activeConv && activeNavigationMessages.length > 0
       ? clampCursor(
-          messageCursorByConvo[activeConv] ?? activeMessages.length - 1,
-          activeMessages.length,
+          messageCursorByConvo[activeConv] ?? activeNavigationMessages.length - 1,
+          activeNavigationMessages.length,
         )
       : 0
-  const focusedMessageId = activeMessages[activeMessageCursor]?.id
+  const focusedMessageId = activeNavigationMessages[activeMessageCursor]?.id
   const pageState = readMessagePageState(activeCache ?? activeMessages)
   const loadOlderState: LoadMoreState = pageState.loading
     ? 'loading'
@@ -109,31 +110,31 @@ export function App() {
         : 'unavailable'
 
   function setMessageCursor(next: number): void {
-    if (!activeConv || activeMessages.length === 0) return
+    if (!activeConv || activeNavigationMessages.length === 0) return
     store.set((s) => ({
       messageCursorByConvo: setStoredMessageCursor(
         s.messageCursorByConvo,
         activeConv,
         next,
-        activeMessages.length,
+        activeNavigationMessages.length,
       ),
     }))
   }
 
   function moveMessageCursor(delta: number): void {
-    if (!activeConv || activeMessages.length === 0) return
+    if (!activeConv || activeNavigationMessages.length === 0) return
     store.set((s) => ({
       messageCursorByConvo: setStoredMessageCursor(
         s.messageCursorByConvo,
         activeConv,
-        nextMessageCursor(s.messageCursorByConvo[activeConv], delta, activeMessages.length),
-        activeMessages.length,
+        nextMessageCursor(activeMessageCursor, delta, activeNavigationMessages.length),
+        activeNavigationMessages.length,
       ),
     }))
   }
 
   function jumpMessageBottom(): void {
-    setMessageCursor(activeMessages.length - 1)
+    setMessageCursor(activeNavigationMessages.length - 1)
   }
 
   function tryLoadOlder(): void {
@@ -179,11 +180,19 @@ export function App() {
     pollerRef.current?.refresh()
   }
 
+  const hardRefresh = (): void => {
+    pollerRef.current?.hardRefresh?.()
+  }
+
   // List / chat dispatcher. Tab is shared across both zones (move to
   // composer) so it lives here rather than being duplicated. The
   // per-zone handlers cover the rest.
   useInput(
     (input, key) => {
+      if (input === 'R') {
+        hardRefresh()
+        return
+      }
       if (key.tab && focus.kind !== 'list') {
         store.set({ inputZone: 'composer' })
         return
@@ -215,6 +224,7 @@ export function App() {
         focus,
         exit,
         refresh,
+        hardRefresh,
         openNewChatPrompt,
       })
     },
@@ -252,7 +262,7 @@ export function App() {
           focus,
           query: messageSearchQuery,
           focusedHitId: messageSearchFocusedId,
-          messages: activeMessages,
+          messages: activeNavigationMessages,
         },
       )
     },
@@ -263,16 +273,8 @@ export function App() {
   // central row (ChatList + MessagePane) is replaced by the modal box.
   // Ink has no z-index so this is the closest "overlay" we can do.
   //
-  // windowHeight: 0 means "fill the terminal" — we resolve to the live
-  // stdout.rows count so the layout pins to terminal height (height="100%"
-  // shrinks with content, which makes the box jump when switching between
-  // chats with different message counts). Any other value is an explicit
-  // row count, useful when the user wants to keep prior terminal
-  // scrollback visible above the app.
-  const heightProp: number = windowHeight > 0 ? windowHeight : terminalRows
-
   return (
-    <Box flexDirection="column" height={heightProp}>
+    <Box flexDirection="column" height={terminalRows}>
       <Box borderStyle="round" borderColor="gray" paddingX={1}>
         <HeaderBar />
       </Box>

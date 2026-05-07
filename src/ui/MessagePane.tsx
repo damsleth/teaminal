@@ -7,7 +7,7 @@
 // <a>, and entity refs render correctly.
 
 import { Box, Text, useStdout } from 'ink'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { chatLabel, shortName } from '../state/selectables'
 import { focusKey, type ReadReceipt, type ThreadMeta, type TypingIndicator } from '../state/store'
 import type { Chat, ChatMessage, Channel, Team } from '../types'
@@ -15,16 +15,20 @@ import { htmlToText } from './html'
 import { reactionsSummary } from './reactions'
 import { describeSystemEvent } from './systemEvent'
 import { searchMessages } from './messageSearch'
+import { effectiveSenderName, isRenderableMessage } from './renderableMessage'
 import {
   buildMessageRows,
+  chooseMessageRowsWindowStart,
+  messageRowsWindowEnd,
   readMessagePageState,
-  sliceMessageRowsToBudget,
   shouldShowReactionRow,
   type LoadMoreState,
   type MessageRenderRow,
 } from './messageRows'
 import type { Theme } from './theme'
 import { useAppState, useTheme } from './StoreContext'
+
+export { effectiveSenderName, isRenderableMessage } from './renderableMessage'
 
 const TYPING_DOT = '…'
 
@@ -67,15 +71,20 @@ export function MessagePane(props: {
   // Track terminal height live so the message slice fills the available
   // space. Without this we capped at 20 rows even on tall terminals.
   const { stdout } = useStdout()
-  const [terminalRows, setTerminalRows] = useState<number>(stdout?.rows ?? 24)
+  const [terminalSize, setTerminalSize] = useState({
+    rows: stdout?.rows ?? 24,
+    columns: stdout?.columns ?? 80,
+  })
   useEffect(() => {
     if (!stdout) return
-    const onResize = () => setTerminalRows(stdout.rows ?? 24)
+    const onResize = () =>
+      setTerminalSize({ rows: stdout.rows ?? 24, columns: stdout.columns ?? 80 })
     stdout.on('resize', onResize)
     return () => {
       stdout.off('resize', onResize)
     }
   }, [stdout])
+  const windowStartRef = useRef(0)
 
   if (focus.kind === 'list') {
     return (
@@ -113,18 +122,29 @@ export function MessagePane(props: {
   const reservedDynamic = (isLoadingOlder ? 1 : 0) + (typingActive ? 1 : 0)
   const rowBudget = Math.max(
     MIN_VISIBLE_ROWS,
-    terminalRows - CHROME_RESERVED_ROWS - cozyRows - reservedDynamic,
+    terminalSize.rows - CHROME_RESERVED_ROWS - cozyRows - reservedDynamic,
   )
+  const messageTextColumns = Math.max(12, terminalSize.columns - 60)
   const allRows = buildMessageRows(messages, {
     showLoadMoreRow: messages.length > 0 && !pageState.fullyLoaded,
     loadMoreState,
   })
-  const rows = sliceMessageRowsToBudget(allRows, {
+  const windowStart = chooseMessageRowsWindowStart(allRows, {
     focusedMessageId: props.focusedMessageId,
     focusActive: props.focusIndicatorActive === true,
+    messageTextColumns,
+    reactionDisplayMode,
+    rowBudget,
+    previousStart: windowStartRef.current,
+  })
+  windowStartRef.current = windowStart
+  const windowEnd = messageRowsWindowEnd(allRows, windowStart, {
+    focusedMessageId: props.focusedMessageId,
+    messageTextColumns,
     reactionDisplayMode,
     rowBudget,
   })
+  const rows = allRows.slice(windowStart, windowEnd)
   const showingHistoryTop = rows.length > 0 && allRows.length > 0 && rows[0] === allRows[0]
   const showFocusIndicator =
     props.focusIndicatorActive === true && focusIndicatorVisible && messages.length > 0
@@ -334,25 +354,14 @@ function MessageRow(props: {
             }
             italic={isDeleted}
             bold={props.focused && !isDeleted}
-            wrap="truncate-end"
+            wrap="wrap"
           >
             {bodyText}
             {isEdited && <Text color={theme.mutedText}> (edited)</Text>}
+            {reactionLine && <Text color={theme.mutedText}> {`(${reactionLine})`}</Text>}
           </Text>
         </Box>
       </Box>
-      {reactionLine && (
-        <Box flexDirection="row">
-          <Box width={2} flexShrink={0} />
-          <Box width={statusWidth} flexShrink={0} />
-          <Box width={SENDER_COL_WIDTH + 2} flexShrink={0} />
-          <Box flexGrow={1} flexShrink={1} minWidth={0}>
-            <Text color={theme.mutedText} wrap="truncate-end">
-              {reactionLine}
-            </Text>
-          </Box>
-        </Box>
-      )}
       {props.threadMeta && props.threadMeta.count > 0 && (
         <Box flexDirection="row">
           <Box width={2} flexShrink={0} />
@@ -405,43 +414,9 @@ function previewBody(m: ChatMessage): string {
   }
   const raw = m.body.content ?? ''
   if (m.body.contentType === 'text') {
-    return raw.replace(/\s+/g, ' ').trim().slice(0, 200)
+    return raw.replace(/\s+/g, ' ').trim()
   }
-  return htmlToText(raw).slice(0, 200)
-}
-
-// True when a message is worth rendering. The user has explicitly asked
-// for no meaningless "(system)" rows, so the gate is: every kept row
-// must either have a real sender name we can show, OR be a decodable
-// system event that we'll render in place of the sender column. Empty
-// or undecodable system rows are dropped entirely.
-export function isRenderableMessage(m: ChatMessage): boolean {
-  if (m.deletedDateTime) {
-    // Tombstone deletes always have a "deleted by ..." preview that
-    // is useful regardless of sender, so keep them.
-    return true
-  }
-  if (m.messageType === 'systemEventMessage') {
-    return describeSystemEvent(m) !== null
-  }
-  if (effectiveSenderName(m) === null) return false
-  const hasBody =
-    typeof m.body?.content === 'string' && m.body.content.replace(/<[^>]+>/g, '').trim().length > 0
-  return hasBody
-}
-
-// Best display name we can produce for a non-system message, or null
-// if there's no name to show. Falls through user → application →
-// device. (Graph returns app/bot messages with from.application set
-// and from.user null; under some FOCI tokens it sets neither.)
-export function effectiveSenderName(m: ChatMessage): string | null {
-  const direct = m.from?.user?.displayName?.trim()
-  if (direct) return direct
-  const app = m.from?.application?.displayName?.trim()
-  if (app) return app
-  const device = m.from?.device?.displayName?.trim()
-  if (device) return device
-  return null
+  return htmlToText(raw)
 }
 
 export function formatReplyCount(meta: ThreadMeta): string {

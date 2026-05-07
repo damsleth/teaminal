@@ -1,36 +1,45 @@
 # Release and Homebrew Notes
 
-teaminal currently supports macOS release binaries only:
+teaminal publishes single-file Bun executables for:
 
-- `bun-darwin-arm64`
-- `bun-darwin-x64`
+- `darwin-arm64`
+- `darwin-x64`
+- `linux-x64`
+- `linux-arm64`
+- `windows-x64`
 
 Keep `scripts/build.sh`, `README.md`, this file, and the Homebrew formula in sync whenever supported platforms or artifact names change.
 
 ## Build Artifacts
 
-For each release tag, build both supported targets and publish release assets named exactly:
+For each release tag, the workflow publishes release assets named exactly:
 
 - `teaminal-VERSION-darwin-arm64.tar.gz`
 - `teaminal-VERSION-darwin-x64.tar.gz`
+- `teaminal-VERSION-linux-x64.tar.gz`
+- `teaminal-VERSION-linux-arm64.tar.gz`
+- `teaminal-VERSION-windows-x64.zip`
+- `SHA256SUMS.txt`
 
 Each archive should contain a single executable named `teaminal`.
 
 Example:
 
 ```bash
-TARGET=bun-darwin-arm64 ./scripts/build.sh
-tar -C dist -czf teaminal-0.11.0-darwin-arm64.tar.gz teaminal
-
-TARGET=bun-darwin-x64 ./scripts/build.sh
-tar -C dist -czf teaminal-0.11.0-darwin-x64.tar.gz teaminal
+./scripts/build-release.sh
 ```
 
-Generate checksums after uploading or before editing the tap:
+Generate local archives/checksums with the same logic as CI:
 
 ```bash
-shasum -a 256 teaminal-0.11.0-darwin-arm64.tar.gz
-shasum -a 256 teaminal-0.11.0-darwin-x64.tar.gz
+version=0.12.0
+mkdir -p dist/release-archives
+tar -C dist/release/darwin-arm64 -czf dist/release-archives/teaminal-${version}-darwin-arm64.tar.gz teaminal
+tar -C dist/release/darwin-x64 -czf dist/release-archives/teaminal-${version}-darwin-x64.tar.gz teaminal
+tar -C dist/release/linux-x64 -czf dist/release-archives/teaminal-${version}-linux-x64.tar.gz teaminal
+tar -C dist/release/linux-arm64 -czf dist/release-archives/teaminal-${version}-linux-arm64.tar.gz teaminal
+(cd dist/release/windows-x64 && zip -9 ../../release-archives/teaminal-${version}-windows-x64.zip teaminal.exe)
+(cd dist/release-archives && shasum -a 256 * > SHA256SUMS.txt)
 ```
 
 ## Homebrew Tap
@@ -61,7 +70,7 @@ Release-archive formula template:
 class Teaminal < Formula
   desc "Lightweight terminal Microsoft Teams client"
   homepage "https://github.com/damsleth/teaminal"
-  version "0.11.0"
+  version "0.12.0"
   license "MIT"
 
   on_macos do
@@ -88,10 +97,10 @@ end
 
 Release steps:
 
-1. Confirm `package.json`, `bin/teaminal.tsx`, `CHANGELOG.md`, `README.md`, `scripts/build.sh`, and this file all agree on the release version and supported targets.
-2. Build and smoke both release assets with `TARGET=bun-darwin-arm64 ./scripts/build.sh` and `TARGET=bun-darwin-x64 ./scripts/build.sh`.
-3. Archive each `dist/teaminal` binary using the artifact names above.
-4. Create the GitHub release and upload both archives.
+1. Confirm `package.json`, `bin/teaminal.tsx`, `CHANGELOG.md`, `README.md`, `scripts/build.sh`, `.github/workflows/release.yml`, and this file all agree on the release version and supported targets.
+2. Tag the release commit and push the tag.
+3. Confirm the GitHub Actions release workflow succeeds.
+4. Confirm the GitHub release has all five platform archives and `SHA256SUMS.txt`.
 5. Compute SHA-256 values and update `Formula/teaminal.rb` in the tap.
 6. Run `brew audit --strict --online teaminal` and `brew test teaminal` from the tap.
 7. Install from the tap on Apple Silicon and Intel macOS, or at least verify both URLs and checksums before publishing the tap commit.

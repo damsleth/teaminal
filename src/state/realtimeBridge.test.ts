@@ -11,6 +11,7 @@ function setup() {
     refresh: () => {
       refreshCount++
     },
+    hardRefresh: () => {},
     stop: async () => {},
     loadOlderMessages: async () => ({
       conv: null,

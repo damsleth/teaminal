@@ -108,17 +108,6 @@ describe('cycleSetting', () => {
     expect(cycleSetting('realtimeEnabled', false)).toBe(true)
   })
 
-  test('cycles windowHeight through presets and wraps to full', () => {
-    expect(cycleSetting('windowHeight', 0)).toBe(20)
-    expect(cycleSetting('windowHeight', 20)).toBe(30)
-    expect(cycleSetting('windowHeight', 30)).toBe(40)
-    expect(cycleSetting('windowHeight', 40)).toBe(0)
-  })
-
-  test('cycles windowHeight off-preset values back to the first preset', () => {
-    expect(cycleSetting('windowHeight', 99)).toBe(0)
-  })
-
   test('cycles focused-message marker chars through presets', () => {
     expect(cycleSetting('messageFocusIndicatorChar', '>')).toBe('|')
     expect(cycleSetting('messageFocusIndicatorChar', '|')).toBe('*')
@@ -146,11 +135,6 @@ describe('renderSettingValue', () => {
     expect(renderSettingValue('showPresenceInList', false)).toBe('off')
     expect(renderSettingValue('messageFocusIndicatorEnabled', false)).toBe('off')
     expect(renderSettingValue('realtimeEnabled', true)).toBe('on')
-  })
-
-  test('renders windowHeight as "full" or "N rows"', () => {
-    expect(renderSettingValue('windowHeight', 0)).toBe('full')
-    expect(renderSettingValue('windowHeight', 30)).toBe('30 rows')
   })
 
   test('renders focused-message marker char', () => {
@@ -190,7 +174,6 @@ describe('ROOT_MENU shape', () => {
       'showReactions',
       'notifyMuted',
       'notifyActiveBanner',
-      'windowHeight',
       'messageFocusIndicatorEnabled',
       'messageFocusIndicatorChar',
       'tailEvents',

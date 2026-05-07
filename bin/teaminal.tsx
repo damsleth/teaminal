@@ -18,8 +18,7 @@ import { PollerProvider, type PollerHandleRef } from '../src/ui/PollerContext'
 import { SessionProvider, type SessionApi } from '../src/ui/SessionContext'
 import { StoreProvider } from '../src/ui/StoreContext'
 import { debug, setLogFile, setNetworkLog, warn } from '../src/log'
-
-const VERSION = '0.11.0'
+import { VERSION } from '../src/version'
 
 const HELP = `teaminal ${VERSION}
 

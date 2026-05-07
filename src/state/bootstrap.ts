@@ -15,7 +15,7 @@ import { getToken } from '../auth/owaPiggy'
 import { probeCapabilities } from '../graph/capabilities'
 import { setActiveProfile } from '../graph/client'
 import { getMe } from '../graph/me'
-import { warn } from '../log'
+import { recordEvent, warn } from '../log'
 import { drainNotifications, notifyMention } from '../notify'
 import { RealtimeEventBus } from '../realtime/events'
 import { TrouterTransport } from '../realtime/trouter'
@@ -55,11 +55,14 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
   let notifyDrainTimer: ReturnType<typeof setInterval> | null = null
 
   try {
+    recordEvent('app', 'info', `session starting profile=${profile ?? '(default)'}`)
     const me = await getMe()
     store.set({ me })
+    recordEvent('app', 'info', 'bootstrap /me loaded')
 
     const capabilities = await probeCapabilities()
     store.set({ capabilities })
+    recordEvent('app', 'info', 'bootstrap capability probe complete')
 
     if (capabilities.me.ok === false && capabilities.me.reason === 'unauthorized') {
       onFatal('unauthorized', capabilities.me.message ?? 'unauthorized')
@@ -96,6 +99,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
       },
     })
     pollerHandleRef.current = pollerHandle
+    recordEvent('poller', 'info', 'poller started')
     notifyDrainTimer = setInterval(() => drainNotifications(), 1000)
 
     bus = new RealtimeEventBus()
@@ -146,6 +150,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
       })
     } else {
       store.set({ realtimeState: 'off' })
+      recordEvent('trouter', 'info', 'realtime disabled')
     }
   } catch (err) {
     // Roll back partial bootstrap so the caller can retry / switch.
@@ -167,6 +172,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
   return {
     profile,
     async stop() {
+      recordEvent('app', 'info', `session stopping profile=${profile ?? '(default)'}`)
       // Reverse-order teardown. Push side stops first so a final realtime
       // event cannot enqueue work onto a torn-down poller.
       try {

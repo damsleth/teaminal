@@ -56,6 +56,11 @@ export function DiagnosticsModal() {
   const me = useAppState((s) => s.me)
   const lastListPollAt = useAppState((s) => s.lastListPollAt)
   const conn = useAppState((s) => s.conn)
+  const realtimeState = useAppState((s) => s.realtimeState)
+  const chats = useAppState((s) => s.chats)
+  const teams = useAppState((s) => s.teams)
+  const channelsByTeam = useAppState((s) => s.channelsByTeam)
+  const messagesByConvo = useAppState((s) => s.messagesByConvo)
   const theme = useTheme()
   const isOpen = modal?.kind === 'diagnostics'
 
@@ -119,6 +124,10 @@ export function DiagnosticsModal() {
           <Text>{conn}</Text>
         </Text>
         <Text>
+          <Text color="gray">realtime: </Text>
+          <Text>{realtimeState}</Text>
+        </Text>
+        <Text>
           <Text color="gray">user: </Text>
           <Text>{me?.displayName ?? '?'}</Text>
           <Text color="gray">{me?.userPrincipalName ? ` <${me.userPrincipalName}>` : ''}</Text>
@@ -126,6 +135,10 @@ export function DiagnosticsModal() {
         <Text>
           <Text color="gray">last poll: </Text>
           <Text>{lastListPollAt ? lastListPollAt.toISOString() : '(none yet)'}</Text>
+        </Text>
+        <Text>
+          <Text color="gray">loaded: </Text>
+          <Text>{`${chats.length} chats, ${teams.length} teams, ${countChannels(channelsByTeam)} channels, ${countMessages(messagesByConvo)} messages`}</Text>
         </Text>
 
         <Box height={1} />
@@ -207,6 +220,14 @@ export function DiagnosticsModal() {
       </Box>
     </Box>
   )
+}
+
+function countChannels(channelsByTeam: Record<string, unknown[]>): number {
+  return Object.values(channelsByTeam).reduce((sum, channels) => sum + channels.length, 0)
+}
+
+function countMessages(messagesByConvo: Record<string, unknown[]>): number {
+  return Object.values(messagesByConvo).reduce((sum, messages) => sum + messages.length, 0)
 }
 
 function CapabilityRow(props: {

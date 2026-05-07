@@ -10,14 +10,15 @@ Pre-alpha. See `.plans/teaminal.md` for the design contract and `AGENTS.md` for 
 
 ## Platform Support
 
-Compiled release binaries currently support macOS only:
+Compiled release binaries support macOS, Linux, and Windows:
 
-| Platform            | Bun target         |
-| ------------------- | ------------------ |
-| macOS Apple Silicon | `bun-darwin-arm64` |
-| macOS Intel         | `bun-darwin-x64`   |
-
-Linux and Windows are not supported release targets yet. `scripts/build.sh` fails early for unsupported hosts or `TARGET` values.
+| Platform            | Release artifact suffix |
+| ------------------- | ----------------------- |
+| macOS Apple Silicon | `darwin-arm64.tar.gz`   |
+| macOS Intel         | `darwin-x64.tar.gz`     |
+| Linux x64           | `linux-x64.tar.gz`      |
+| Linux arm64         | `linux-arm64.tar.gz`    |
+| Windows x64         | `windows-x64.zip`       |
 
 ## Prerequisites
 
@@ -30,6 +31,10 @@ Set up `owa-piggy` first and verify it can return a Graph token:
 ```bash
 owa-piggy token --audience graph >/dev/null
 ```
+
+Channel message reads and sends require delegated Graph scopes
+`ChannelMessage.Read.All` and `ChannelMessage.Send`. Broader group
+scopes such as `Group.ReadWrite.All` do not satisfy those endpoints.
 
 Use a named profile when needed:
 
@@ -71,17 +76,20 @@ bun run format
 
 ## Build
 
-Build for the current supported macOS host:
+Build for the current supported host:
 
 ```bash
 bun run build
 ```
 
-Cross-build one of the supported macOS targets:
+Cross-build one of the supported targets:
 
 ```bash
 TARGET=bun-darwin-arm64 ./scripts/build.sh
 TARGET=bun-darwin-x64 ./scripts/build.sh
+TARGET=bun-linux-x64-modern ./scripts/build.sh
+TARGET=bun-linux-arm64 ./scripts/build.sh
+TARGET=bun-windows-x64 OUT=dist/teaminal.exe ./scripts/build.sh
 ```
 
 The binary is written to `dist/teaminal`. The build script runs `dist/teaminal --version` as a smoke test after compilation.
@@ -106,7 +114,6 @@ All keys are optional. Unknown keys and invalid values produce stderr warnings a
   "showPresenceInList": true,
   "showTimestampsInPane": true,
   "showReactions": "current",
-  "windowHeight": 0,
   "messageFocusIndicatorEnabled": true,
   "messageFocusIndicatorChar": ">",
   "messageFocusIndicatorColor": null,
@@ -129,7 +136,6 @@ All keys are optional. Unknown keys and invalid values produce stderr warnings a
 | `showPresenceInList`           | boolean              |  `true` | Show presence dots in the chat list when available.                                      |
 | `showTimestampsInPane`         | boolean              |  `true` | Show message timestamps in the message pane.                                             |
 | `showReactions`                | `off`, `current`, `all` | `current` | Show message reactions never, only on the focused message, or on every message.      |
-| `windowHeight`                 | non-negative integer |     `0` | `0` fills the terminal; any other value fixes the app height in rows.                    |
 | `messageFocusIndicatorEnabled` | boolean              |  `true` | Show the focused-message marker while navigating messages.                               |
 | `messageFocusIndicatorChar`    | single character     |     `>` | Marker shown beside the focused message.                                                 |
 | `messageFocusIndicatorColor`   | color or null        |  `null` | Override focused-message marker color.                                                   |
@@ -168,6 +174,7 @@ The in-app Settings menu persists changes back to `config.json`.
 | `d` / PageDown | chat / channel    | Move down half a page.                                         |
 | `?`            | list              | Show keybindings.                                              |
 | `r`            | any               | Refresh now.                                                   |
+| `Shift+R`      | any               | Hard refresh: clear visible data and reload from Graph.        |
 | `q`            | list / menu       | Quit.                                                          |
 | Ctrl+C         | any               | Quit.                                                          |
 

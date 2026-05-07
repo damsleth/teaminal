@@ -2,7 +2,7 @@
 //
 // Active when AppState.inputZone === 'list' AND the user has not opened
 // a modal. Owns: cursor up/down, Enter/h/l navigation, q to quit, /
-// to enter filter mode, n for new-chat, ? for keybinds, r for refresh.
+// to enter filter mode, n for new-chat, ? for keybinds, r/R for refresh.
 
 import type { Channel, Chat, Team } from '../../types'
 import type { Me } from '../../graph/me'
@@ -30,15 +30,22 @@ export type ListKeysCtx = {
   focus: Focus
   exit: () => void
   refresh: () => void
+  hardRefresh: () => void
   openNewChatPrompt: (initialQuery?: string) => void
 }
 
 export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyResult {
-  const { store, exit, refresh, openNewChatPrompt } = ctx
+  const { store, exit, refresh, hardRefresh, openNewChatPrompt } = ctx
   const ch = input.toLowerCase()
 
   if (key.ctrl && ch === 'c') {
     exit()
+    return 'handled'
+  }
+
+  // R clears visible slices first, then forces an immediate refresh.
+  if (input === 'R') {
+    hardRefresh()
     return 'handled'
   }
 
@@ -81,9 +88,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
     // teams have no unread state to flip.
     if (ch === 'm') {
       const items = buildSelectableList(ctx)
-      const visible = ctx.filter
-        ? items.filter((it) => itemMatchesFilter(it, ctx.filter))
-        : items
+      const visible = ctx.filter ? items.filter((it) => itemMatchesFilter(it, ctx.filter)) : items
       const safe = clampCursor(ctx.cursor, visible.length + (syntheticNewChatQuery ? 1 : 0))
       const it = visible[safe]
       if (it && it.kind === 'chat') {
@@ -148,7 +153,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
  * Pure, no side effects.
  */
 export function listSelectableCount(
-  ctx: Omit<ListKeysCtx, 'exit' | 'refresh' | 'openNewChatPrompt'>,
+  ctx: Omit<ListKeysCtx, 'exit' | 'refresh' | 'hardRefresh' | 'openNewChatPrompt'>,
 ): {
   visible: ReturnType<typeof buildSelectableList>
   selectableCount: number

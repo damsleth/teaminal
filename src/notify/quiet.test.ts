@@ -4,7 +4,6 @@ import type { AppState } from '../state/store'
 
 function settings(overrides: Record<string, unknown> = {}): AppState['settings'] {
   return {
-    windowHeight: 0,
     showPresenceInList: true,
     useTeamsPresence: true,
     activeAccount: null,

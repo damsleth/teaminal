@@ -176,12 +176,6 @@ export type ThemeOverrides = {
   presence?: Partial<Record<ThemePresenceKey, string>>
 }
 
-// Window height is the number of terminal rows teaminal renders into.
-// 0 is the sentinel for "fill the terminal" (height="100%"). The menu
-// cycles through a small preset list; bespoke values can be added by
-// extending WINDOW_HEIGHT_PRESETS in src/ui/menu.ts.
-export type WindowHeight = number
-
 export type Settings = {
   theme: ThemeMode
   themeOverrides: ThemeOverrides
@@ -198,7 +192,6 @@ export type Settings = {
   showPresenceInList: boolean
   showTimestampsInPane: boolean
   showReactions: ReactionDisplayMode
-  windowHeight: WindowHeight
   messageFocusIndicatorEnabled: boolean
   messageFocusIndicatorChar: string
   // null means "use the resolved theme default". Advanced users can set
@@ -255,7 +248,6 @@ export const defaultSettings: Settings = {
   showPresenceInList: true,
   showTimestampsInPane: true,
   showReactions: 'current',
-  windowHeight: 0,
   messageFocusIndicatorEnabled: true,
   messageFocusIndicatorChar: '>',
   messageFocusIndicatorColor: null,

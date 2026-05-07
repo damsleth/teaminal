@@ -8,6 +8,15 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Hard refresh + startup diagnostics.** `Shift+R` now clears visible
+  account data and wakes all pollers, while bootstrap/list/active poller
+  stages emit structured in-app events so slow startup shows what is in
+  flight.
+- **Menu build metadata.** The Esc menu now shows the running teaminal
+  version and `github.com/damsleth/teaminal` below the logo.
+- **Multi-platform release workflow.** Tag releases now build
+  single-file Bun executables for macOS, Linux, and Windows, publish
+  platform archives, and attach `SHA256SUMS.txt`.
 - **Experimental real-time push gate.** New `realtimeEnabled` config key
   enables the trouter-based push transport; it stays off by default so
   polling remains the durable source of truth unless users opt in.
@@ -56,6 +65,26 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The chat/team sidebar now uses the live terminal height instead of a
+  fixed short viewport, and the user-facing `windowHeight` setting has
+  been removed.
+- Compact chat-list density no longer spends two columns on the selected
+  `>` marker; selected rows rely on bold/color styling.
+- Reaction summaries now render as compact counters like `👍|😊3`,
+  without colon-wrapping emoji-valued reaction types.
+- Message navigation now skips hidden Graph/system rows, fixing a
+  date-boundary scroll jump where the focused row disappeared and the
+  pane snapped back to the bottom.
+- Message text now wraps instead of truncating, and reactions render
+  inline after the body / `(edited)` marker as `(👍|😊3)`.
+- Message scrolling now keeps the visible window stable until the
+  focused message moves above the top row or below the bottom row.
+- The inactive composer no longer adds a second help-text row, keeping
+  composer height stable between focused and unfocused states.
+- Chat-list unread markers now render after the chat name instead of as
+  leading dots that can be confused with presence.
+- Channel message reads and sends now request the Graph scopes those
+  endpoints require: `ChannelMessage.Read.All` and `ChannelMessage.Send`.
 - Chat-list rows with presence enabled no longer grow by an extra line
   when selected.
 - Entering a chat from list focus no longer crashes `MessagePane` with
@@ -110,7 +139,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   changes. Send clears the draft; failure restores it for retry.
 - **Reactions read path.** `ChatMessage.reactions` is now properly
   typed (`Reaction[]`). Each message renders an aggregated counter line
-  ('👍 3 ❤ 1 😂 2') with first-seen ordering and a glyph table for
+  (`👍3|❤1|😂2`) with first-seen ordering and a glyph table for
   the documented Microsoft set plus common aliases.
 - **Edited / deleted message markers.** Edited messages get a faint
   ' (edited)' suffix when `lastModifiedDateTime` is more than 5s after
@@ -138,9 +167,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 - **GitHub Actions CI.** `.github/workflows/ci.yml` runs typecheck +
   test + prettier --check on every push and PR across
   ubuntu-latest × macos-latest. `.github/workflows/release.yml`
-  triggers on `v*` tags and builds + smokes + uploads release
-  artifacts for four targets: `bun-darwin-arm64`, `bun-darwin-x64`,
-  `bun-linux-x64-modern`, `bun-linux-arm64`.
+  triggers on `v*` tags and builds/uploads release artifacts for
+  macOS, Linux, and Windows single-file binaries.
 - **Linux build targets.** `scripts/build.sh` accepts
   `bun-linux-x64-modern` and `bun-linux-arm64` and defaults to the
   right one when run on a Linux host.
