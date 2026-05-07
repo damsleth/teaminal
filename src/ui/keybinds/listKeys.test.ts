@@ -39,11 +39,13 @@ function makeCtx(opts?: Partial<ListKeysCtx>): {
   store: ReturnType<typeof createAppStore>
   exits: number
   refreshes: number
+  hardRefreshes: number
   newChats: string[]
 } {
   const store = createAppStore()
   let exits = 0
   let refreshes = 0
+  let hardRefreshes = 0
   const newChats: string[] = []
   const ctx: ListKeysCtx = {
     store,
@@ -60,6 +62,9 @@ function makeCtx(opts?: Partial<ListKeysCtx>): {
     refresh: () => {
       refreshes++
     },
+    hardRefresh: () => {
+      hardRefreshes++
+    },
     openNewChatPrompt: (q) => {
       newChats.push(q ?? '')
     },
@@ -73,6 +78,9 @@ function makeCtx(opts?: Partial<ListKeysCtx>): {
     },
     get refreshes() {
       return refreshes
+    },
+    get hardRefreshes() {
+      return hardRefreshes
     },
     newChats,
   }
@@ -95,6 +103,13 @@ describe('handleListKeys', () => {
     const a = makeCtx()
     handleListKeys({ input: 'r', key: makeKey() }, a.ctx)
     expect(a.refreshes).toBe(1)
+  })
+
+  test('Shift+R calls hard refresh', () => {
+    const a = makeCtx()
+    handleListKeys({ input: 'R', key: makeKey() }, a.ctx)
+    expect(a.hardRefreshes).toBe(1)
+    expect(a.refreshes).toBe(0)
   })
 
   test('/ enters filter mode', () => {

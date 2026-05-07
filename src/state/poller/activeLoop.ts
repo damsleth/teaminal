@@ -11,6 +11,7 @@
 
 import { listMessagesPage } from '../../graph/chats'
 import { listChannelMessagesPage, listChannelRepliesPage } from '../../graph/teams'
+import { recordEvent } from '../../log'
 import type { ChatMessage } from '../../types'
 import { focusKey, type AppState, type ConvKey, type Focus, type Store } from '../store'
 import type { MentionEvent } from '../poller'
@@ -64,8 +65,15 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
       const ctrl = new AbortController()
       setActiveAbort(ctrl)
       try {
+        const startedAt = Date.now()
+        recordEvent('poller', 'info', 'active refresh started', { conv })
         const page = await fetchActiveMessages(focus, ctrl.signal)
         const messages = page.messages
+        recordEvent('poller', 'info', 'active refresh fetched', {
+          conv,
+          messages: messages.length,
+          durationMs: Date.now() - startedAt,
+        })
         if (isStopped()) return
         // Only apply if the focus is still on the same conversation.
         const stillSame = focusKey(store.get().focus) === conv
@@ -105,6 +113,10 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
         if (!isAbortError(err)) {
           consecutiveErrors++
           reportError(err)
+          recordEvent('poller', 'warn', 'active refresh failed', {
+            conv,
+            error: err instanceof Error ? err.message : String(err),
+          })
         }
       } finally {
         setActiveAbort(null)

@@ -165,6 +165,28 @@ describe('graph success path', () => {
     await graph({ method: 'GET', path: '/me' })
     expect(seenArgs).toEqual(['token', '--audience', 'graph', '--profile', 'work'])
   })
+
+  test('passes explicit scopes through to owa-piggy', async () => {
+    let seenArgs: string[] = []
+    setAuthRunner(async (args) => {
+      seenArgs = args
+      return { stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }
+    })
+    __setTransportForTests(async () => jsonResponse({}))
+    setActiveProfile('work')
+    await graph({
+      method: 'GET',
+      path: '/teams/t/channels/c/messages',
+      scope: 'https://graph.microsoft.com/ChannelMessage.Read.All',
+    })
+    expect(seenArgs).toEqual([
+      'token',
+      '--scope',
+      'https://graph.microsoft.com/ChannelMessage.Read.All',
+      '--profile',
+      'work',
+    ])
+  })
 })
 
 describe('401 handling', () => {

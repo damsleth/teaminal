@@ -22,10 +22,11 @@ import {
 import type { ChatListDensity } from '../state/store'
 import type { Presence } from '../types'
 import { htmlToText } from './html'
+import { useTerminalRows } from './hooks/useTerminalRows'
 import { useAppState, useTheme } from './StoreContext'
 import type { PresenceColorKey, Theme } from './theme'
 
-const ROWS_VISIBLE = 18
+const CHROME_ROWS_ESTIMATE = 8
 
 type Row =
   | { kind: 'header'; label: string }
@@ -140,6 +141,8 @@ export function ChatList() {
   const memberPresence = useAppState((s) => s.memberPresence)
   const unreadByChatId = useAppState((s) => s.unreadByChatId)
   const theme = useTheme()
+  const terminalRows = useTerminalRows()
+  const rowsVisible = Math.max(3, terminalRows - CHROME_ROWS_ESTIMATE)
 
   // Build selectables from individual slices so the hook only re-runs on
   // the data we actually depend on. (useAppState's selectors guarantee
@@ -155,20 +158,20 @@ export function ChatList() {
   const rows = buildRows(items, density, syntheticNewChatQuery)
 
   // Find the visual index of the row holding the cursor item, then keep it
-  // on-screen by sliding a window of size ROWS_VISIBLE.
+  // on-screen by sliding a viewport sized from the live terminal height.
   const cursorRowIdx = rows.findIndex((r) => r.kind === 'item' && r.index === safeCursor)
   const viewportRef = useRef(0)
   const viewStart = (() => {
     const cur = cursorRowIdx === -1 ? 0 : cursorRowIdx
     let start = viewportRef.current
     if (cur < start) start = cur
-    if (cur >= start + ROWS_VISIBLE) start = cur - ROWS_VISIBLE + 1
+    if (cur >= start + rowsVisible) start = cur - rowsVisible + 1
     if (start < 0) start = 0
     viewportRef.current = start
     return start
   })()
 
-  const visible = rows.slice(viewStart, viewStart + ROWS_VISIBLE)
+  const visible = rows.slice(viewStart, viewStart + rowsVisible)
 
   // Filter banner: shown while typing a filter, and when a filter is
   // applied but the user isn't actively editing it.
@@ -213,13 +216,15 @@ export function ChatList() {
           return (
             <Box key={`new-chat-${row.query}`} flexDirection="row">
               {density === 'cozy' && <Box width={2} flexShrink={0} />}
-              <Box width={2} flexShrink={0}>
-                <Text color={isSelected ? theme.selected : undefined}>
-                  {isSelected ? '> ' : '  '}
-                </Text>
-              </Box>
+              {density === 'cozy' && (
+                <Box width={2} flexShrink={0}>
+                  <Text color={isSelected ? theme.selected : undefined}>
+                    {isSelected ? '> ' : '  '}
+                  </Text>
+                </Box>
+              )}
               <Box flexGrow={1} flexShrink={1} minWidth={0}>
-                <Text color={isSelected ? theme.selected : 'gray'} bold={isSelected}>
+                <Text color={isSelected ? theme.selected : 'gray'} bold={isSelected} wrap="wrap">
                   {`Create chat with "${row.query}"`}
                 </Text>
               </Box>
@@ -236,18 +241,17 @@ export function ChatList() {
         const unread = row.item.kind === 'chat' ? unreadByChatId[row.item.chat.id] : undefined
         const hasMention = !!unread && unread.mentionCount > 0
         const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
-        // Unread badge sits between the selector and the label. `@` for
-        // mentions takes priority over the generic `●` so the user can
-        // tell pings apart from passive unread at a glance.
-        const unreadBadge = hasMention ? '@ ' : hasUnread ? '● ' : ''
+        // Unread badge is a suffix, not a leading dot, so it can't be
+        // confused with the presence column.
+        const unreadBadge = hasMention ? ' @' : hasUnread ? ' ●' : ''
         // Layout per row (left → right):
         //   1. presence column (2 cols): dot/loading/blank, always
         //      reserved when presence is enabled or in cozy mode so all
         //      rows column-align even when individual chats have no
         //      presence to show.
-        //   2. selector column (2 cols): `> ` for the focused row,
-        //      `  ` otherwise. Sits *right* of the presence column so
-        //      the selected row keeps its presence dot.
+        //   2. selector column (cozy only): `> ` for the focused row,
+        //      `  ` otherwise. Compact density saves those columns and
+        //      relies on selected color/bold styling.
         //   3. indent (cozy: channel/team indent)
         //   4. label
         const showGutter = density === 'cozy' || showPresence
@@ -260,11 +264,13 @@ export function ChatList() {
                 <Text color={presenceColor}>{`${presenceText} `}</Text>
               </Box>
             )}
-            <Box width={2} flexShrink={0}>
-              <Text color={isSelected ? theme.selected : undefined}>
-                {isSelected ? '> ' : '  '}
-              </Text>
-            </Box>
+            {density === 'cozy' && (
+              <Box width={2} flexShrink={0}>
+                <Text color={isSelected ? theme.selected : undefined}>
+                  {isSelected ? '> ' : '  '}
+                </Text>
+              </Box>
+            )}
             {indent && (
               <Box width={indent.length} flexShrink={0}>
                 <Text>{indent}</Text>
@@ -274,9 +280,10 @@ export function ChatList() {
               <Text
                 color={isSelected ? theme.selected : hasUnread ? theme.unread : undefined}
                 bold={isSelected || hasUnread}
+                wrap="wrap"
               >
-                {unreadBadge}
                 {label}
+                {unreadBadge}
               </Text>
               {density === 'cozy' && hasUnread && row.item.kind === 'chat' && (
                 <Text color={theme.unread} bold>
@@ -300,5 +307,5 @@ function previewChat(chat: Extract<SelectableItem, { kind: 'chat' }>['chat']): s
     body.contentType === 'html'
       ? htmlToText(body.content)
       : body.content.replace(/\s+/g, ' ').trim()
-  return text.slice(0, 80)
+  return text
 }

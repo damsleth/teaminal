@@ -17,6 +17,8 @@ import type { Channel, ChannelMessage, Team } from '../types'
 type CollectionResponse<T> = { value: T[]; '@odata.nextLink'?: string }
 
 const CHANNEL_MESSAGES_TOP_DEFAULT = 50
+export const CHANNEL_MESSAGE_READ_SCOPE = 'https://graph.microsoft.com/ChannelMessage.Read.All'
+export const CHANNEL_MESSAGE_SEND_SCOPE = 'https://graph.microsoft.com/ChannelMessage.Send'
 
 export type ListJoinedTeamsOpts = {
   signal?: AbortSignal
@@ -80,6 +82,7 @@ export async function listChannelMessagesPage(
     method: 'GET',
     path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages`,
     query: { $top: opts?.top ?? CHANNEL_MESSAGES_TOP_DEFAULT },
+    scope: CHANNEL_MESSAGE_READ_SCOPE,
     signal: opts?.signal,
   })
   return {
@@ -95,6 +98,7 @@ export async function listChannelMessagesNextPage(
   const res = await graph<CollectionResponse<ChannelMessage>>({
     method: 'GET',
     path: nextLink,
+    scope: CHANNEL_MESSAGE_READ_SCOPE,
     signal: opts?.signal,
   })
   return {
@@ -116,6 +120,7 @@ export function paginateChannelMessages(
     method: 'GET',
     path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages`,
     query: { $top: opts?.top ?? CHANNEL_MESSAGES_TOP_DEFAULT },
+    scope: CHANNEL_MESSAGE_READ_SCOPE,
     signal: opts?.signal,
   })
 }
@@ -134,6 +139,7 @@ export async function sendChannelMessage(
     method: 'POST',
     path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages`,
     body: { body: { contentType: 'text', content } },
+    scope: CHANNEL_MESSAGE_SEND_SCOPE,
     signal: opts?.signal,
   })
 }
@@ -177,6 +183,7 @@ export async function listChannelRepliesPage(
     method: 'GET',
     path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(rootId)}/replies`,
     query: { $top: opts?.top ?? CHANNEL_REPLIES_TOP_DEFAULT },
+    scope: CHANNEL_MESSAGE_READ_SCOPE,
     signal: opts?.signal,
   })
   return {
@@ -192,6 +199,7 @@ export async function listChannelRepliesNextPage(
   const res = await graph<CollectionResponse<ChannelMessage>>({
     method: 'GET',
     path: nextLink,
+    scope: CHANNEL_MESSAGE_READ_SCOPE,
     signal: opts?.signal,
   })
   return {
@@ -218,6 +226,7 @@ export async function postChannelReply(
     method: 'POST',
     path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(rootId)}/replies`,
     body: { body: { contentType: 'text', content } },
+    scope: CHANNEL_MESSAGE_SEND_SCOPE,
     signal: opts?.signal,
   })
 }

@@ -60,6 +60,11 @@ describe('reactionGlyph', () => {
   test('unknown reactions surface as :type: shorthand', () => {
     expect(reactionGlyph('confused')).toBe(':confused:')
   })
+
+  test('emoji-valued reactions render without colon shorthand', () => {
+    expect(reactionGlyph('😆')).toBe('😆')
+    expect(reactionGlyph('❤️')).toBe('❤️')
+  })
 })
 
 describe('reactionsSummary', () => {
@@ -68,10 +73,16 @@ describe('reactionsSummary', () => {
     expect(reactionsSummary([])).toBeNull()
   })
 
-  test('joins type counts with two spaces', () => {
+  test('joins compact type counts with pipes', () => {
     const s = reactionsSummary([r('like'), r('like'), r('heart')])
-    expect(s).toMatch(/\ud83d\udc4d 2/)
-    expect(s).toMatch(/\u2764\ufe0f 1/)
-    expect(s?.includes('  ')).toBe(true)
+    expect(s).toMatch(/\ud83d\udc4d2/)
+    expect(s).toMatch(/\u2764\ufe0f/)
+    expect(s).not.toMatch(/\u2764\ufe0f1/)
+    expect(s?.includes('|')).toBe(true)
+  })
+
+  test('omits colons and single counts for emoji-valued reactions', () => {
+    expect(reactionsSummary([r('😆'), r('❤️')])).toBe('😆|❤️')
+    expect(reactionsSummary([r('😆'), r('😆'), r('❤️')])).toBe('😆2|❤️')
   })
 })

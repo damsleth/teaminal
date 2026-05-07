@@ -338,13 +338,6 @@ export function Composer() {
           </Box>
         )
       })}
-      {!composerActive && (
-        <Box>
-          <Text color="gray" wrap="truncate-end">
-            Tab to compose · Esc to leave
-          </Text>
-        </Box>
-      )}
       {sending && (
         <Box>
           <Text color="gray" wrap="truncate-end">

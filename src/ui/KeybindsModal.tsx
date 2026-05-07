@@ -40,6 +40,7 @@ const BINDINGS: Binding[] = [
   { keys: 'Enter', when: 'search', action: 'jump to most recent match' },
   { keys: '?', when: 'list', action: 'show this help' },
   { keys: 'r', when: 'any', action: 'refresh now' },
+  { keys: 'Shift+R', when: 'any', action: 'hard refresh' },
   { keys: 'q', when: 'list / menu', action: 'quit' },
   { keys: 'Ctrl+C', when: 'any', action: 'quit' },
 ]

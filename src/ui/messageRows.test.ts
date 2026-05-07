@@ -2,7 +2,9 @@ import { describe, expect, test } from 'bun:test'
 import type { ChatMessage } from '../types'
 import {
   buildMessageRows,
+  chooseMessageRowsWindowStart,
   messageRenderRowHeight,
+  messageRowsWindowEnd,
   readMessagePageState,
   type MessageRenderRow,
   sliceMessageRowsToBudget,
@@ -46,26 +48,14 @@ describe('readMessagePageState', () => {
 })
 
 describe('message row viewport budgeting', () => {
-  test('counts reaction and send-error continuations as physical rows', () => {
+  test('counts send-error continuations as physical rows; inline reactions stay on one row', () => {
     expect(messageRenderRowHeight({ kind: 'message', key: 'a', message: msg('a') })).toBe(1)
     const reactedRow: MessageRenderRow = {
       kind: 'message',
       key: 'b',
       message: { ...msg('b'), reactions: [{ reactionType: 'like' }] },
     }
-    expect(messageRenderRowHeight(reactedRow, { reactionDisplayMode: 'off' })).toBe(1)
-    expect(
-      messageRenderRowHeight(reactedRow, {
-        reactionDisplayMode: 'current',
-        focusedMessageId: 'a',
-      }),
-    ).toBe(1)
-    expect(
-      messageRenderRowHeight(reactedRow, {
-        reactionDisplayMode: 'current',
-        focusedMessageId: 'b',
-      }),
-    ).toBe(2)
+    expect(messageRenderRowHeight(reactedRow)).toBe(1)
     expect(
       messageRenderRowHeight({
         kind: 'message',
@@ -73,6 +63,19 @@ describe('message row viewport budgeting', () => {
         message: { ...msg('c'), _sendError: 'failed' },
       }),
     ).toBe(2)
+  })
+
+  test('counts wrapped body text when estimating the viewport budget', () => {
+    expect(
+      messageRenderRowHeight(
+        {
+          kind: 'message',
+          key: 'long',
+          message: msg('abcdefghijkl'),
+        },
+        { messageTextColumns: 5 },
+      ),
+    ).toBe(3)
   })
 
   test('keeps the bottom rows within the physical row budget', () => {
@@ -84,31 +87,49 @@ describe('message row viewport budgeting', () => {
 
     const visible = sliceMessageRowsToBudget(rows, { rowBudget: 3 })
 
-    expect(visible.map(rowKey)).toEqual(['mid', 'new'])
+    expect(visible.map(rowKey)).toEqual(['date-2026-05-05', 'mid', 'new'])
     expect(visible.reduce((sum, row) => sum + messageRenderRowHeight(row), 0)).toBe(3)
   })
 
-  test('anchors a focused message at the bottom of the row budget', () => {
+  test('keeps the existing window while the focused message remains visible', () => {
     const rows = buildMessageRows([msg('a'), msg('b'), msg('c'), msg('d')])
 
     const visible = sliceMessageRowsToBudget(rows, {
       rowBudget: 2,
       focusedMessageId: 'b',
       focusActive: true,
+      previousStart: 1,
     })
 
     expect(visible.map(rowKey)).toEqual(['a', 'b'])
   })
 
-  test('fills below the focused message when the viewport reaches history top', () => {
+  test('scrolls up only when the focused message moves above the window', () => {
     const rows = buildMessageRows([msg('a'), msg('b'), msg('c'), msg('d')])
 
     const visible = sliceMessageRowsToBudget(rows, {
-      rowBudget: 4,
+      rowBudget: 2,
       focusedMessageId: 'a',
       focusActive: true,
+      previousStart: 2,
     })
 
-    expect(visible.map(rowKey)).toEqual(['date-2026-05-05', 'a', 'b', 'c'])
+    expect(visible.map(rowKey)).toEqual(['a', 'b'])
+  })
+
+  test('scrolls down only when the focused message moves below the window', () => {
+    const rows = buildMessageRows([msg('a'), msg('b'), msg('c'), msg('d')])
+    const start = chooseMessageRowsWindowStart(rows, {
+      rowBudget: 2,
+      focusedMessageId: 'd',
+      focusActive: true,
+      previousStart: 1,
+    })
+    const end = messageRowsWindowEnd(rows, start, {
+      rowBudget: 2,
+      focusedMessageId: 'd',
+    })
+
+    expect(rows.slice(start, end).map(rowKey)).toEqual(['c', 'd'])
   })
 })

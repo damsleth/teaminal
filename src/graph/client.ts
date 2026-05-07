@@ -31,6 +31,7 @@ export type GraphOpts = {
   headers?: Record<string, string | undefined>
   body?: object | string
   beta?: boolean
+  scope?: string
   signal?: AbortSignal
 }
 
@@ -147,7 +148,7 @@ async function executeRequest<T>(
   retried401 = false,
   retried429Count = 0,
 ): Promise<T> {
-  const token = await getToken(activeProfile)
+  const token = await getToken({ profile: activeProfile, scope: opts.scope })
   const headers = new Headers({
     Accept: 'application/json',
   })
@@ -203,7 +204,7 @@ async function executeRequest<T>(
   })
 
   if (res.status === 401 && !retried401) {
-    invalidate(activeProfile)
+    invalidate({ profile: activeProfile, scope: opts.scope })
     return executeRequest<T>(url, opts, true, retried429Count)
   }
 

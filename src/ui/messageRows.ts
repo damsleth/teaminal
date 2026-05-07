@@ -1,5 +1,6 @@
 import type { ChatMessage } from '../types'
 import type { ReactionDisplayMode } from '../state/store'
+import { htmlToText } from './html'
 import { reactionsSummary } from './reactions'
 
 export type LoadMoreState = 'idle' | 'loading' | 'error' | 'unavailable'
@@ -15,6 +16,12 @@ export type MessageRenderRow =
   | { kind: 'loadMore'; state: LoadMoreState; label: string }
   | { kind: 'date'; key: string; label: string }
   | { kind: 'message'; key: string; message: ChatMessage }
+
+export type MessageRowHeightOpts = {
+  focusedMessageId?: string | null
+  reactionDisplayMode?: ReactionDisplayMode
+  messageTextColumns?: number
+}
 
 type MessagePageMeta = Partial<{
   messages: ChatMessage[]
@@ -91,60 +98,96 @@ export function shouldShowReactionRow(
   return true
 }
 
-export function messageRenderRowHeight(
-  row: MessageRenderRow,
-  opts?: {
-    reactionDisplayMode?: ReactionDisplayMode
-    focusedMessageId?: string | null
-  },
-): number {
+export function messageRenderRowHeight(row: MessageRenderRow, opts?: MessageRowHeightOpts): number {
   if (row.kind !== 'message') return 1
-  let height = 1
-  if (shouldShowReactionRow(row, opts)) height++
+  let height = estimateWrappedRows(messageTextForHeight(row, opts), opts?.messageTextColumns)
   if (row.message._sendError) height++
   return height
 }
 
-export function sliceMessageRowsToBudget(
+export function defaultMessageRowsWindowStart(
   rows: MessageRenderRow[],
-  opts: {
-    focusedMessageId?: string | null
-    focusActive?: boolean
-    reactionDisplayMode?: ReactionDisplayMode
-    rowBudget: number
-  },
-): MessageRenderRow[] {
-  if (rows.length === 0) return []
-  const budget = Math.max(1, opts.rowBudget)
-  const focusedRowIndex =
-    opts.focusActive && opts.focusedMessageId
-      ? rows.findIndex((row) => row.kind === 'message' && row.message.id === opts.focusedMessageId)
-      : -1
-  const endExclusive = focusedRowIndex >= 0 ? focusedRowIndex + 1 : rows.length
-
-  let start = endExclusive
+  rowBudget: number,
+  opts?: MessageRowHeightOpts,
+): number {
+  const budget = Math.max(1, rowBudget)
+  let start = rows.length
   let used = 0
   while (start > 0) {
-    const nextHeight = messageRenderRowHeight(rows[start - 1]!, {
-      reactionDisplayMode: opts.reactionDisplayMode,
-      focusedMessageId: opts.focusedMessageId,
-    })
+    const nextHeight = messageRenderRowHeight(rows[start - 1]!, opts)
     if (used > 0 && used + nextHeight > budget) break
     start--
     used += nextHeight
     if (used >= budget) break
   }
+  return Math.max(0, start)
+}
 
-  let end = endExclusive
-  while (used < budget && end < rows.length) {
-    const nextHeight = messageRenderRowHeight(rows[end]!, {
-      reactionDisplayMode: opts.reactionDisplayMode,
-      focusedMessageId: opts.focusedMessageId,
-    })
+export function messageRowsWindowEnd(
+  rows: MessageRenderRow[],
+  start: number,
+  opts: MessageRowHeightOpts & { rowBudget: number },
+): number {
+  const budget = Math.max(1, opts.rowBudget)
+  let end = Math.max(0, Math.min(start, rows.length))
+  let used = 0
+  while (end < rows.length) {
+    const nextHeight = messageRenderRowHeight(rows[end]!, opts)
     if (used > 0 && used + nextHeight > budget) break
     end++
     used += nextHeight
+    if (used >= budget) break
   }
+  return end
+}
+
+export function chooseMessageRowsWindowStart(
+  rows: MessageRenderRow[],
+  opts: MessageRowHeightOpts & {
+    focusActive?: boolean
+    rowBudget: number
+    previousStart?: number
+  },
+): number {
+  if (rows.length === 0) return 0
+  const focusedRowIndex =
+    opts.focusActive && opts.focusedMessageId
+      ? rows.findIndex((row) => row.kind === 'message' && row.message.id === opts.focusedMessageId)
+      : -1
+  if (focusedRowIndex < 0) return defaultMessageRowsWindowStart(rows, opts.rowBudget, opts)
+
+  const previousStart =
+    opts.previousStart === undefined
+      ? defaultMessageRowsWindowStart(rows, opts.rowBudget, opts)
+      : Math.max(0, Math.min(opts.previousStart, rows.length - 1))
+  const previousEnd = messageRowsWindowEnd(rows, previousStart, opts)
+  if (focusedRowIndex >= previousStart && focusedRowIndex < previousEnd) return previousStart
+  if (focusedRowIndex < previousStart) return focusedRowIndex
+
+  const budget = Math.max(1, opts.rowBudget)
+  let start = focusedRowIndex + 1
+  let used = 0
+  while (start > 0) {
+    const nextHeight = messageRenderRowHeight(rows[start - 1]!, opts)
+    if (used > 0 && used + nextHeight > budget) break
+    start--
+    used += nextHeight
+    if (used >= budget) break
+  }
+  return start
+}
+
+export function sliceMessageRowsToBudget(
+  rows: MessageRenderRow[],
+  opts: MessageRowHeightOpts & {
+    focusActive?: boolean
+    rowBudget: number
+    previousStart?: number
+  },
+): MessageRenderRow[] {
+  if (rows.length === 0) return []
+  const start = chooseMessageRowsWindowStart(rows, opts)
+  const end = messageRowsWindowEnd(rows, start, opts)
 
   return rows.slice(start, end)
 }
@@ -160,6 +203,44 @@ function loadMoreLabel(state: LoadMoreState): string {
     case 'unavailable':
       return 'Older history unavailable until poller pagination is wired'
   }
+}
+
+function messageTextForHeight(row: MessageRenderRow, opts?: MessageRowHeightOpts): string {
+  if (row.kind !== 'message') return ''
+  const message = row.message
+  let text = ''
+  if (message.deletedDateTime) {
+    const senderName = message.from?.user?.displayName ?? 'someone'
+    const time = message.createdDateTime.slice(11, 16)
+    text = `(message deleted by ${senderName} · ${time})`
+  } else if (message.body.contentType === 'text') {
+    text = (message.body.content ?? '').replace(/\s+/g, ' ').trim()
+  } else {
+    text = htmlToText(message.body.content ?? '')
+  }
+  if (!message.deletedDateTime && isHeightEdited(message)) text += ' (edited)'
+  if (shouldShowReactionRow(row, opts)) {
+    const reactions = reactionsSummary(message.reactions)
+    if (reactions) text += ` (${reactions})`
+  }
+  return text || ' '
+}
+
+function estimateWrappedRows(text: string, columns = 80): number {
+  const width = Math.max(1, columns)
+  return text
+    .split('\n')
+    .reduce((sum, line) => sum + Math.max(1, Math.ceil(Array.from(line).length / width)), 0)
+}
+
+const HEIGHT_EDITED_GRACE_MS = 5_000
+
+function isHeightEdited(message: ChatMessage): boolean {
+  if (!message.lastModifiedDateTime) return false
+  const created = Date.parse(message.createdDateTime)
+  const modified = Date.parse(message.lastModifiedDateTime)
+  if (!Number.isFinite(created) || !Number.isFinite(modified)) return false
+  return modified - created > HEIGHT_EDITED_GRACE_MS
 }
 
 function formatDateHeader(iso: string, now = new Date()): string {

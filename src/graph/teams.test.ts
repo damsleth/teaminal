@@ -5,6 +5,8 @@ import {
 } from '../auth/owaPiggy'
 import { __resetForTests, __setTransportForTests } from './client'
 import {
+  CHANNEL_MESSAGE_READ_SCOPE,
+  CHANNEL_MESSAGE_SEND_SCOPE,
   listChannelMessages,
   listChannels,
   listJoinedTeams,
@@ -119,6 +121,11 @@ describe('listChannels', () => {
 describe('listChannelMessages', () => {
   test('GETs the channel messages path with $top=50 by default', async () => {
     primeAuth()
+    let seenArgs: string[] = []
+    setAuthRunner(async (args) => {
+      seenArgs = args
+      return { stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }
+    })
     let seenUrl = ''
     __setTransportForTests(async (url) => {
       seenUrl = url
@@ -130,6 +137,7 @@ describe('listChannelMessages', () => {
     )
     expect(seenUrl).not.toContain('%24orderby')
     expect(seenUrl).not.toContain('%24filter')
+    expect(seenArgs).toEqual(['token', '--scope', CHANNEL_MESSAGE_READ_SCOPE])
   })
 
   test('honors a custom $top', async () => {
@@ -193,6 +201,11 @@ describe('paginateChannelMessages', () => {
 describe('sendChannelMessage', () => {
   test('POSTs Graph-wrapped {body: {contentType: text, content}}', async () => {
     primeAuth()
+    let seenArgs: string[] = []
+    setAuthRunner(async (args) => {
+      seenArgs = args
+      return { stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }
+    })
     let seenMethod = ''
     let seenBody = ''
     let seenUrl = ''
@@ -211,6 +224,7 @@ describe('sendChannelMessage', () => {
       body: { contentType: 'text', content: 'hi channel' },
     })
     expect(created.id).toBe('cm-new')
+    expect(seenArgs).toEqual(['token', '--scope', CHANNEL_MESSAGE_SEND_SCOPE])
   })
 
   test('forwards AbortSignal', async () => {

@@ -9,6 +9,7 @@
 #   TARGET=bun-darwin-x64      ./scripts/build.sh
 #   TARGET=bun-linux-x64-modern ./scripts/build.sh
 #   TARGET=bun-linux-arm64     ./scripts/build.sh
+#   TARGET=bun-windows-x64     ./scripts/build.sh
 #
 # Cross-build is permitted whenever the underlying `bun build --compile`
 # supports it; we don't gate on host→target compatibility because in
@@ -19,12 +20,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ENTRY="bin/teaminal.tsx"
-OUT="dist/teaminal"
+OUT="${OUT:-dist/teaminal}"
 SUPPORTED_TARGETS=(
   "bun-darwin-arm64"
   "bun-darwin-x64"
   "bun-linux-x64-modern"
   "bun-linux-arm64"
+  "bun-windows-x64"
 )
 
 default_target() {
@@ -47,6 +49,7 @@ Supported targets:
   - bun-darwin-x64
   - bun-linux-x64-modern
   - bun-linux-arm64
+  - bun-windows-x64
 
 To cross-build, set TARGET explicitly, e.g.:
   TARGET=bun-darwin-arm64 ./scripts/build.sh
@@ -69,6 +72,7 @@ teaminal currently supports:
   - bun-darwin-x64
   - bun-linux-x64-modern
   - bun-linux-arm64
+  - bun-windows-x64
 
 Set TARGET to one of the supported values, for example:
   TARGET=bun-darwin-arm64 ./scripts/build.sh
@@ -95,12 +99,16 @@ bun build \
 
 echo "==> binary: $(ls -lh "${OUT}" | awk '{print $5, $9}')"
 
-# Smoke: --version should exit 0 quickly. We can't fully exercise the UI
-# without a TTY here, but the version path proves modules linked.
-echo "==> smoke: ${OUT} --version"
-if "${OUT}" --version; then
-  echo "build OK"
+if [[ "${SMOKE:-1}" != "0" && "${TARGET}" != bun-windows-* ]]; then
+  # Smoke: --version should exit 0 quickly. We can't fully exercise the UI
+  # without a TTY here, but the version path proves modules linked.
+  echo "==> smoke: ${OUT} --version"
+  if "${OUT}" --version; then
+    echo "build OK"
+  else
+    echo "build smoke failed"
+    exit 1
+  fi
 else
-  echo "build smoke failed"
-  exit 1
+  echo "==> smoke skipped for ${TARGET}"
 fi

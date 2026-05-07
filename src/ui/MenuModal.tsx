@@ -35,6 +35,7 @@ import type { Settings } from '../state/store'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { updateSettings } from '../config'
 import { warn } from '../log'
+import { REPOSITORY_URL, VERSION } from '../version'
 
 const LOGO = [
   '████████╗███████╗ █████╗ ███╗   ███╗██╗███╗   ██╗ █████╗ ██╗     ',
@@ -191,6 +192,8 @@ export function MenuModal() {
             </Text>
           ))}
         </Box>
+        <Text color="gray">{`teaminal ${VERSION}`}</Text>
+        <Text color="gray">{REPOSITORY_URL}</Text>
         <Box height={1} />
         {breadcrumb && (
           <Box marginBottom={1}>

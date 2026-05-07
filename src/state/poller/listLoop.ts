@@ -13,6 +13,7 @@
 
 import { listChats } from '../../graph/chats'
 import { GraphError, RateLimitError } from '../../graph/client'
+import { recordEvent } from '../../log'
 import { mergeChatMembers } from './chatList'
 import { runCrossChatMentionPass } from './crossChatMentions'
 import { fetchTeamsAndChannels } from './teamsAndChannels'
@@ -53,10 +54,22 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
     while (!isStopped()) {
       const listAbort = new AbortController()
       try {
+        const startedAt = Date.now()
+        recordEvent('poller', 'info', 'list refresh started')
         const [chats, teamsAndChannels] = await Promise.all([
           listChats({ signal: listAbort.signal }),
           fetchTeamsAndChannels(listAbort.signal, reportError),
         ])
+        const channelCount = Object.values(teamsAndChannels.channelsByTeam).reduce(
+          (sum, channels) => sum + channels.length,
+          0,
+        )
+        recordEvent('poller', 'info', 'list refresh fetched', {
+          chats: chats.length,
+          teams: teamsAndChannels.teams.length,
+          channels: channelCount,
+          durationMs: Date.now() - startedAt,
+        })
         if (isStopped()) return
         store.set((s) => ({
           chats: mergeChatMembers(s.chats, chats),
@@ -112,6 +125,9 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
           } else {
             store.set({ conn: 'offline' })
           }
+          recordEvent('poller', 'warn', 'list refresh failed', {
+            error: err instanceof Error ? err.message : String(err),
+          })
         }
       }
       await sleeper.sleep(jitter(backoff(intervalMs, consecutiveErrors)))
