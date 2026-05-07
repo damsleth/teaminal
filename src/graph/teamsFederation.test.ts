@@ -123,6 +123,28 @@ describe('conversationExistsInTeams', () => {
 })
 
 describe('resolveFederatedEquivalentConversationId', () => {
+  test('returns null without probing chatsvc when the peer is in-tenant', async () => {
+    primeAuth()
+    const urls: string[] = []
+    __setTransportForTests(async (url) => {
+      urls.push(url)
+      return jsonResponse(
+        { errorCode: 'NotFound', message: 'Federated lookup being incorrectly called for in-tenant users.' },
+        { status: 404 },
+      )
+    })
+
+    const resolved = await resolveFederatedEquivalentConversationId(
+      '6555c7ee-7c68-4aa8-9f0c-05164c288c36',
+      '0caa699d-79d5-4660-81d0-ce05b8954fc7',
+    )
+
+    expect(resolved).toBeNull()
+    // Only fetchFederated should be called - no chatsvc probes.
+    expect(urls.length).toBe(1)
+    expect(urls[0]).toContain('fetchFederated')
+  })
+
   test('prefers the federated canonical MRI before the originally selected user id', async () => {
     primeAuth()
     const urls: string[] = []

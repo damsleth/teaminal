@@ -35,6 +35,11 @@ let runner: Runner = defaultRunner
 type CacheEntry = { token: string; exp: number }
 const cache = new Map<string, CacheEntry>()
 const inFlight = new Map<string, Promise<string>>()
+// Tenants without preauthorization between the Teams Web app id and a
+// specific Graph scope (e.g. ChannelMessage.Read.All) reject the FOCI
+// exchange with AADSTS65002. We retry once without --scope and remember
+// the failure so subsequent calls skip the explicit scope entirely.
+const scopeFallbacks = new Set<string>()
 
 const DEFAULT_SCOPE_KEY = '<graph-default>'
 
@@ -56,6 +61,17 @@ function normalizeOpts(opts?: GetTokenOpts | string): GetTokenOpts {
 
 function fullCacheKey(opts: GetTokenOpts): string {
   return `${opts.profile ?? DEFAULT_KEY}::${opts.scope ?? DEFAULT_SCOPE_KEY}`
+}
+
+function scopeFallbackCacheKey(opts: GetTokenOpts): string {
+  return `${opts.profile ?? DEFAULT_KEY}::${opts.scope ?? DEFAULT_SCOPE_KEY}`
+}
+
+function isPreauthFailure(stderr: string): boolean {
+  // AADSTS65002: Teams Web app id has no preauthorization for the
+  // requested Graph scope in this tenant. Fall back to the default
+  // graph audience token.
+  return /AADSTS65002/i.test(stderr)
 }
 
 export type OwaPiggyProfileStatus = {
@@ -112,17 +128,28 @@ export async function getToken(opts?: GetTokenOpts | string): Promise<string> {
   const existing = inFlight.get(key)
   if (existing) return existing
 
+  const scopeFallbackKey = scopeFallbackCacheKey(normalized)
+  const useScope = normalized.scope && !scopeFallbacks.has(scopeFallbackKey)
+
   const promise = (async () => {
-    const args = ['token']
-    if (normalized.scope) {
-      // --scope takes precedence over --audience inside owa-piggy and
-      // routes to the same FOCI exchange. Don't pass --audience too.
-      args.push('--scope', normalized.scope)
-    } else {
-      args.push('--audience', 'graph')
+    const runOnce = async (
+      withScope: boolean,
+    ): Promise<{ stdout: string; stderr: string; exitCode: number }> => {
+      const args = ['token']
+      if (withScope && normalized.scope) {
+        args.push('--scope', normalized.scope)
+      } else {
+        args.push('--audience', 'graph')
+      }
+      if (normalized.profile) args.push('--profile', normalized.profile)
+      return runner(args)
     }
-    if (normalized.profile) args.push('--profile', normalized.profile)
-    const { stdout, stderr, exitCode } = await runner(args)
+
+    let { stdout, stderr, exitCode } = await runOnce(!!useScope)
+    if (exitCode !== 0 && useScope && isPreauthFailure(stderr)) {
+      scopeFallbacks.add(scopeFallbackKey)
+      ;({ stdout, stderr, exitCode } = await runOnce(false))
+    }
     if (exitCode !== 0) {
       const msg = stderr.trim() || `owa-piggy exited with code ${exitCode}`
       throw new OwaPiggyError(msg)
@@ -262,4 +289,5 @@ export function __resetForTests(): void {
   runner = defaultRunner
   cache.clear()
   inFlight.clear()
+  scopeFallbacks.clear()
 }

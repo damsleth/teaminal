@@ -183,6 +183,38 @@ describe('getToken caching', () => {
     ])
   })
 
+  test('falls back to default --audience graph when --scope hits AADSTS65002', async () => {
+    const token = makeJwt({ exp: FAR_FUTURE })
+    const runs: string[][] = []
+    __setRunnerForTests(async (args) => {
+      runs.push(args)
+      if (args.includes('--scope')) {
+        return {
+          stdout: '',
+          stderr:
+            "ERROR: invalid_request: AADSTS65002: Consent between first party application '9199bf20' and first party resource '00000003' must be configured via preauthorization",
+          exitCode: 1,
+        }
+      }
+      return { stdout: token, stderr: '', exitCode: 0 }
+    })
+
+    const a = await getToken({ scope: 'https://graph.microsoft.com/ChannelMessage.Read.All' })
+    expect(a).toBe(token)
+    // First spawn tried --scope; second spawn fell back to --audience.
+    expect(runs[0]).toContain('--scope')
+    expect(runs[1]).toEqual(['token', '--audience', 'graph'])
+
+    // Invalidate the cached token so the next call re-spawns. The
+    // failed-scope set persists, so it should skip --scope and hit
+    // --audience graph directly.
+    invalidate({ scope: 'https://graph.microsoft.com/ChannelMessage.Read.All' })
+    const b = await getToken({ scope: 'https://graph.microsoft.com/ChannelMessage.Read.All' })
+    expect(b).toBe(token)
+    expect(runs.length).toBe(3)
+    expect(runs[2]).toEqual(['token', '--audience', 'graph'])
+  })
+
   test('caches different scopes independently for the same profile', async () => {
     const tokenGraph = makeJwt({ exp: FAR_FUTURE, aud: 'https://graph.microsoft.com' })
     const tokenPresence = makeJwt({

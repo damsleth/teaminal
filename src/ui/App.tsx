@@ -68,6 +68,11 @@ function otherUserIdForFederatedResolution(
   selfId: string,
 ): string | null {
   if (chat && chat.chatType !== 'oneOnOne') return null
+  // Only look up federated equivalents for chats that look "detached"
+  // (no message preview yet). Populated chats already point at the
+  // canonical thread; running the resolver on every focused chat
+  // generates 401 noise on in-tenant ids and burns Teams quota.
+  if (chat && chat.lastMessagePreview) return null
   const member = chat?.members?.find((m) => m.userId && m.userId !== selfId)
   if (member?.userId) return member.userId
   const match = chatId.match(/^19:([^_@]+)_([^@]+)@unq\.gbl\.spaces$/)

@@ -71,6 +71,20 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Channel access in tenants without `ChannelMessage.Read.All`
+  preauthorization.** When `owa-piggy` rejects the explicit Graph scope
+  with `AADSTS65002`, teaminal now falls back to the default Graph
+  audience token for the rest of the session. Channel reads/sends
+  continue working without admin consent on the FOCI exchange.
+- **Federated lookup no longer probes in-tenant chats.** A 404 with
+  "Federated lookup being incorrectly called for in-tenant users" now
+  short-circuits the resolver, and the on-focus path only runs for
+  detached chats with no `lastMessagePreview` so populated in-tenant
+  chats stop generating Teams chatsvc 401 noise.
+- **Chat-list rendering no longer overlaps adjacent rows.** Long chat
+  names and unread previews are truncated instead of wrapping, so the
+  sidebar viewport calculation stays in sync with rendered rows and
+  the composer no longer collapses when the list grows tall.
 - `Tab` now toggles between message navigation and the composer when a
   conversation is open; the composer status hint no longer says
   "Esc navigation".
