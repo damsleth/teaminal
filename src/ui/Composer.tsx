@@ -160,7 +160,7 @@ export function Composer() {
         return
       }
 
-      if (key.escape) {
+      if (key.escape || key.tab) {
         store.set({ inputZone: 'list' })
         return
       }

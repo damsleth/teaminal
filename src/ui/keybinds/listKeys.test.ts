@@ -149,6 +149,20 @@ describe('handleListKeys', () => {
     expect(a.store.get().cursor).toBe(0)
   })
 
+  test('u moves cursor up half a page in the sidebar', () => {
+    const chats = Array.from({ length: 20 }, (_, i) => chat(`c${i}`))
+    const a = makeCtx({ chats, cursor: 15 })
+    handleListKeys({ input: 'u', key: makeKey() }, a.ctx)
+    expect(a.store.get().cursor).toBe(5)
+  })
+
+  test('d moves cursor down half a page in the sidebar', () => {
+    const chats = Array.from({ length: 20 }, (_, i) => chat(`c${i}`))
+    const a = makeCtx({ chats, cursor: 5 })
+    handleListKeys({ input: 'd', key: makeKey() }, a.ctx)
+    expect(a.store.get().cursor).toBe(15)
+  })
+
   test('Enter on a chat row sets focus to that chat', () => {
     const a = makeCtx({ cursor: 1 })
     handleListKeys({ input: '', key: makeKey({ return: true }) }, a.ctx)

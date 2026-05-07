@@ -15,6 +15,7 @@ type Binding = { keys: string; when: string; action: string }
 const BINDINGS: Binding[] = [
   { keys: 'j / ↓', when: 'list', action: 'cursor down' },
   { keys: 'k / ↑', when: 'list', action: 'cursor up' },
+  { keys: 'u/d', when: 'list', action: 'half-page sidebar' },
   { keys: 'l / Enter', when: 'list', action: 'open chat / channel' },
   { keys: 'h', when: 'list', action: 'reserved back/no-op' },
   { keys: 'n', when: 'list', action: 'new chat prompt' },
@@ -25,7 +26,8 @@ const BINDINGS: Binding[] = [
   { keys: 'h / Esc', when: 'chat / channel', action: 'back to chat list' },
   { keys: 't', when: 'channel', action: 'open thread for focused message' },
   { keys: 'h / Esc', when: 'thread', action: 'back to channel' },
-  { keys: 'Tab', when: 'chat / channel', action: 'enter composer' },
+  { keys: 'Tab', when: 'chat / channel', action: 'toggle composer' },
+  { keys: 'Tab', when: 'composer', action: 'back to chat' },
   { keys: 'Esc', when: 'composer / filter', action: 'leave mode' },
   { keys: 'Esc', when: 'chat list', action: 'open menu' },
   { keys: 'Enter', when: 'composer', action: 'send' },

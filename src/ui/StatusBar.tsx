@@ -11,7 +11,7 @@ export function StatusBar() {
 
   let hint = 'j/k move · l/Enter open · / filter · n new chat · ? help · q quit'
   if (inputZone === 'filter') hint = 'type to filter · Enter accept · Esc clear'
-  else if (inputZone === 'composer') hint = 'Enter send · Ctrl+J newline · Esc navigation'
+  else if (inputZone === 'composer') hint = 'Enter send · Ctrl+J newline · Tab chat'
   else if (inputZone === 'menu') hint = 'menu open'
   else if (focus.kind !== 'list') {
     hint = 'j/k msg · u/d half · u/k older top · l bottom · h back · Tab compose · r refresh'
