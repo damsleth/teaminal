@@ -120,6 +120,13 @@ async function requestTeams<T>(
   return { status: res.status, body: parsed, text }
 }
 
+export class TeamsInTenantLookupError extends TeamsFederationError {
+  constructor(status: number, message: string) {
+    super(status, message)
+    this.name = 'TeamsInTenantLookupError'
+  }
+}
+
 export async function fetchFederatedUsers(
   userOids: string[],
   opts?: TeamsFederationOpts,
@@ -128,6 +135,13 @@ export async function fetchFederatedUsers(
   const url = `${TEAMS_ORIGIN}/api/mt/part/${region(opts)}/beta/users/fetchFederated?edEnabled=false&includeDisabledAccounts=true`
   const mris = userOids.map(userMriFromOid)
   const res = await requestTeams<unknown[]>('POST', url, mris, opts)
+  if (res.status === 404 && /in-tenant/i.test(res.text)) {
+    // Teams responds with 404 + "Federated lookup being incorrectly
+    // called for in-tenant users." for same-tenant peers. There is
+    // nothing federated to resolve here, so signal the caller to bail
+    // out of the entire flow.
+    throw new TeamsInTenantLookupError(res.status, 'in-tenant user, federated lookup not applicable')
+  }
   if (res.status < 200 || res.status >= 300) {
     throw new TeamsFederationError(
       res.status,
@@ -250,6 +264,11 @@ export async function resolveFederatedEquivalentConversationId(
       (oid) => oid !== selfUserId,
     )
   } catch (err) {
+    if (err instanceof TeamsInTenantLookupError) {
+      // Same-tenant peer: nothing federated to resolve. Skip the
+      // chatsvc probes (they 401 on in-tenant ids and add noise).
+      return null
+    }
     recordEvent(
       'graph',
       'debug',

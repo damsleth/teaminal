@@ -224,7 +224,11 @@ export function ChatList() {
                 </Box>
               )}
               <Box flexGrow={1} flexShrink={1} minWidth={0}>
-                <Text color={isSelected ? theme.selected : 'gray'} bold={isSelected} wrap="wrap">
+                <Text
+                  color={isSelected ? theme.selected : 'gray'}
+                  bold={isSelected}
+                  wrap="truncate-end"
+                >
                   {`Create chat with "${row.query}"`}
                 </Text>
               </Box>
@@ -280,13 +284,13 @@ export function ChatList() {
               <Text
                 color={isSelected ? theme.selected : hasUnread ? theme.unread : undefined}
                 bold={isSelected || hasUnread}
-                wrap="wrap"
+                wrap="truncate-end"
               >
                 {label}
                 {unreadBadge}
               </Text>
               {density === 'cozy' && hasUnread && row.item.kind === 'chat' && (
-                <Text color={theme.unread} bold>
+                <Text color={theme.unread} bold wrap="truncate-end">
                   {unread?.lastSenderName
                     ? `${shortName(unread.lastSenderName)} ${previewChat(row.item.chat)}`
                     : previewChat(row.item.chat)}
