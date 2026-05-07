@@ -22,8 +22,10 @@
 // list / chat / filter zones plus a few app-wide shortcuts.
 
 import { Box, useApp, useInput, useStdin } from 'ink'
-import { useState } from 'react'
-import { createOneOnOneChat } from '../graph/chats'
+import { useEffect, useRef, useState } from 'react'
+import { createOneOnOneChat, getChat } from '../graph/chats'
+import { resolveFederatedEquivalentConversationId } from '../graph/teamsFederation'
+import { recordEvent } from '../log'
 import { clampCursor } from '../state/selectables'
 import {
   focusKey,
@@ -56,9 +58,26 @@ import { messagesForTimelineNavigation } from './renderableMessage'
 import { usePollerHandleRef } from './PollerContext'
 import { StatusBar } from './StatusBar'
 import { useAppState, useAppStore } from './StoreContext'
-import type { DirectoryUser } from '../types'
+import type { Chat, DirectoryUser } from '../types'
 
 const LIST_PANE_WIDTH = 30
+
+function otherUserIdForFederatedResolution(
+  chatId: string,
+  chat: Chat | undefined,
+  selfId: string,
+): string | null {
+  if (chat && chat.chatType !== 'oneOnOne') return null
+  const member = chat?.members?.find((m) => m.userId && m.userId !== selfId)
+  if (member?.userId) return member.userId
+  const match = chatId.match(/^19:([^_@]+)_([^@]+)@unq\.gbl\.spaces$/)
+  if (!match) return null
+  const first = match[1]!
+  const second = match[2]!
+  if (first === selfId) return second
+  if (second === selfId) return first
+  return null
+}
 
 export function App() {
   const { exit } = useApp()
@@ -82,11 +101,36 @@ export function App() {
   const messageCursorByConvo = useAppState((s) => s.messageCursorByConvo)
 
   const [newChatPrompt, setNewChatPrompt] = useState<string | null>(null)
+  const federatedFocusCheckedRef = useRef<Set<string>>(new Set())
 
   // Side-effect hooks. These do not affect the render output directly;
   // they react to focus / message-list changes by updating the store.
   useHydrateMembers(focus, store)
   useClampMessageCursor(focus, messagesByConvo, store)
+  useEffect(() => {
+    if (focus.kind !== 'chat' || !me?.id) return
+    if (federatedFocusCheckedRef.current.has(focus.chatId)) return
+    const chat = chats.find((c) => c.id === focus.chatId)
+    const otherUserId = otherUserIdForFederatedResolution(focus.chatId, chat, me.id)
+    if (!otherUserId) return
+    federatedFocusCheckedRef.current.add(focus.chatId)
+    let cancelled = false
+    void (async () => {
+      const federatedChatId = await resolveFederatedChatId(me.id, otherUserId)
+      if (!federatedChatId || federatedChatId === focus.chatId || cancelled) return
+      const canonical = await materializeChat(federatedChatId)
+      if (cancelled) return
+      store.set((s) => ({
+        chats: [canonical, ...s.chats.filter((c) => c.id !== canonical.id)],
+        focus: { kind: 'chat', chatId: canonical.id },
+        inputZone: 'list',
+      }))
+      pollerRef.current?.refresh()
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [focus, me?.id, chats])
 
   const activeConv = focusKey(focus)
   const activeMessages = activeConv ? (messagesByConvo[activeConv] ?? []) : []
@@ -165,6 +209,19 @@ export function App() {
       pollerRef.current?.refresh()
       return
     }
+    const federatedChatId = await resolveFederatedChatId(selfId, user.id)
+    if (federatedChatId) {
+      const chat = await materializeChat(federatedChatId)
+      setNewChatPrompt(null)
+      store.set((s) => ({
+        chats: [chat, ...s.chats.filter((c) => c.id !== chat.id)],
+        focus: { kind: 'chat', chatId: chat.id },
+        inputZone: 'list',
+        filter: '',
+      }))
+      pollerRef.current?.refresh()
+      return
+    }
     const chat = await createOneOnOneChat(selfId, user.id)
     setNewChatPrompt(null)
     store.set((s) => ({
@@ -174,6 +231,39 @@ export function App() {
       filter: '',
     }))
     pollerRef.current?.refresh()
+  }
+
+  async function resolveFederatedChatId(
+    selfId: string,
+    otherUserId: string,
+  ): Promise<string | null> {
+    try {
+      return await resolveFederatedEquivalentConversationId(selfId, otherUserId)
+    } catch (err) {
+      recordEvent(
+        'graph',
+        'warn',
+        `federated equivalent lookup failed: ${err instanceof Error ? err.message : String(err)}`,
+      )
+      return null
+    }
+  }
+
+  async function materializeChat(chatId: string): Promise<Chat> {
+    const local = store.get().chats.find((c) => c.id === chatId)
+    if (local) return local
+    return getChat(chatId, { members: true }).catch((err) => {
+      recordEvent(
+        'graph',
+        'warn',
+        `federated canonical chat hydrate failed: ${err instanceof Error ? err.message : String(err)}`,
+      )
+      return {
+        id: chatId,
+        chatType: 'oneOnOne' as const,
+        createdDateTime: new Date().toISOString(),
+      }
+    })
   }
 
   const refresh = (): void => {

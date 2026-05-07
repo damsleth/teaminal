@@ -155,8 +155,11 @@ The in-app Settings menu persists changes back to `config.json`.
 | -------------- | ----------------- | -------------------------------------------------------------- |
 | `j` / Down     | list              | Move cursor down.                                              |
 | `k` / Up       | list              | Move cursor up.                                                |
+| `u` / PageUp   | list              | Move up half a page.                                           |
+| `d` / PageDown | list              | Move down half a page.                                         |
 | Enter          | list              | Open selected chat or channel.                                 |
-| Tab            | chat / channel    | Enter composer.                                                |
+| Tab            | chat / channel    | Toggle between message navigation and composer.                |
+| Tab            | composer          | Return to message navigation.                                  |
 | Esc            | composer / filter | Leave mode.                                                    |
 | Esc            | chat / channel    | Return to chat list.                                           |
 | Esc            | chat list         | Open menu.                                                     |

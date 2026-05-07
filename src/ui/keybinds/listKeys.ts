@@ -19,6 +19,8 @@ import { openKeybinds } from '../KeybindsModal'
 import { openMenu } from '../MenuModal'
 import type { KeyResult, RawKey } from './types'
 
+const HALF_PAGE = 10
+
 export type ListKeysCtx = {
   store: Store<AppState>
   me?: Me
@@ -114,6 +116,14 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
     }
     if (ch === 'k' || key.upArrow) {
       store.set({ cursor: clampCursor(safe - 1, selectableCount) })
+      return 'handled'
+    }
+    if (ch === 'u' || (key as typeof key & { pageUp?: boolean }).pageUp) {
+      store.set({ cursor: clampCursor(safe - HALF_PAGE, selectableCount) })
+      return 'handled'
+    }
+    if (ch === 'd' || (key as typeof key & { pageDown?: boolean }).pageDown) {
+      store.set({ cursor: clampCursor(safe + HALF_PAGE, selectableCount) })
       return 'handled'
     }
     if (ch === 'h' || key.leftArrow) {

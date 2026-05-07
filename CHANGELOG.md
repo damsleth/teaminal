@@ -8,6 +8,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Federated chat canonicalization.** New one-on-one chat creation now
+  probes Teams' federated profile and canonical `consumptionhorizons`
+  paths before falling back to Graph chat creation, so federated chats
+  open the same `@unq.gbl.spaces` thread that Teams web switches to.
+  Existing detached one-on-one chats are also redirected to the canonical
+  thread when focused.
 - **Hard refresh + startup diagnostics.** `Shift+R` now clears visible
   account data and wakes all pollers, while bootstrap/list/active poller
   stages emit structured in-app events so slow startup shows what is in
@@ -65,6 +71,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `Tab` now toggles between message navigation and the composer when a
+  conversation is open; the composer status hint no longer says
+  "Esc navigation".
+- `u` / `d` now move half a page in the chats/channels sidebar, matching
+  message-pane navigation.
 - The chat/team sidebar now uses the live terminal height instead of a
   fixed short viewport, and the user-facing `windowHeight` setting has
   been removed.

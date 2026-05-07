@@ -32,7 +32,7 @@ Example:
 Generate local archives/checksums with the same logic as CI:
 
 ```bash
-version=0.12.0
+version=0.12.1
 mkdir -p dist/release-archives
 tar -C dist/release/darwin-arm64 -czf dist/release-archives/teaminal-${version}-darwin-arm64.tar.gz teaminal
 tar -C dist/release/darwin-x64 -czf dist/release-archives/teaminal-${version}-darwin-x64.tar.gz teaminal
@@ -70,7 +70,7 @@ Release-archive formula template:
 class Teaminal < Formula
   desc "Lightweight terminal Microsoft Teams client"
   homepage "https://github.com/damsleth/teaminal"
-  version "0.12.0"
+  version "0.12.1"
   license "MIT"
 
   on_macos do
