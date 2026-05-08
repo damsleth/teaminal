@@ -109,6 +109,17 @@ export type ModalState =
   | { kind: 'events' }
   | { kind: 'network' }
   | AccountManagerModalState
+  | AuthExpiredModalState
+
+export type AuthExpiredModalState = {
+  kind: 'auth-expired'
+  profile: string | null
+  message: string
+  // 'idle' = waiting for user choice; 'reseeding' = subprocess in flight;
+  // 'retrying' = reseed succeeded, runSession is being kicked off.
+  status: 'idle' | 'reseeding' | 'retrying'
+  lastError?: string
+}
 
 export type AccountManagerAccount = {
   id: string
