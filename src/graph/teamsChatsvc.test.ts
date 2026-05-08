@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
+  __resetForTests as resetFederation,
+  __setTransportForTests as setFederationTransport,
+} from './teamsFederation'
+import {
   __resetForTests,
   __setTransportForTests,
   listChannelMessagesViaChatsvc,
@@ -28,10 +32,22 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response {
 
 function primeAuth(): void {
   setAuthRunner(async () => ({ stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }))
+  // The chatsvc messages endpoint authenticates with a Skype token
+  // exchanged through Teams authsvc. Tests that don't care about that
+  // exchange route the authsvc POST through the federation transport
+  // and return a stable token; the chatsvc transport in __setTransport
+  // For Tests is what each test actually inspects.
+  setFederationTransport(async () =>
+    new Response(JSON.stringify({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }),
+  )
 }
 
 afterEach(() => {
   __resetForTests()
+  resetFederation()
   resetAuth()
 })
 
@@ -111,14 +127,14 @@ describe('skypeToChannelMessage', () => {
 })
 
 describe('listChannelMessagesViaChatsvc', () => {
-  test('hits the regional chatsvc messages endpoint with the spaces token', async () => {
+  test('hits the regional chatsvc messages endpoint with the Skype token', async () => {
     primeAuth()
     let seenUrl = ''
     let seenAuth = ''
     __setTransportForTests(async (url, init) => {
       seenUrl = url
       const headers = new Headers(init.headers as Record<string, string>)
-      seenAuth = headers.get('authorization') ?? ''
+      seenAuth = headers.get('authentication') ?? ''
       return jsonResponse({
         messages: [
           {
@@ -135,7 +151,7 @@ describe('listChannelMessagesViaChatsvc', () => {
 
     expect(seenUrl).toContain('teams.microsoft.com/api/chatsvc/emea/v1/users/ME/conversations/')
     expect(seenUrl).toContain(encodeURIComponent('19:abc@thread.tacv2'))
-    expect(seenAuth).toMatch(/^Bearer /)
+    expect(seenAuth).toBe('skypetoken=skype-test-token')
     expect(page.messages.map((m) => m.id)).toEqual(['1'])
   })
 

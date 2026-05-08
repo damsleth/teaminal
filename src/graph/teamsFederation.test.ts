@@ -80,7 +80,12 @@ describe('federatedUserOids', () => {
 describe('getMsnp24EquivalentConversationId', () => {
   test('returns null on the Teams 404 shape from detached chats', async () => {
     primeAuth()
-    __setTransportForTests(async () => jsonResponse({ message: 'not found' }, { status: 404 }))
+    __setTransportForTests(async (url) => {
+      if (url.includes('/authsvc/')) {
+        return jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } })
+      }
+      return jsonResponse({ message: 'not found' }, { status: 404 })
+    })
 
     await expect(
       getMsnp24EquivalentConversationId('19:detached@unq.gbl.spaces'),
@@ -90,8 +95,14 @@ describe('getMsnp24EquivalentConversationId', () => {
   test('extracts a canonical conversation id from nested response bodies', async () => {
     primeAuth()
     let seenUrl = ''
-    __setTransportForTests(async (url) => {
+    let seenAuth = ''
+    __setTransportForTests(async (url, init) => {
+      if (url.includes('/authsvc/')) {
+        return jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } })
+      }
       seenUrl = url
+      const headers = new Headers(init.headers as Record<string, string>)
+      seenAuth = headers.get('authentication') ?? ''
       return jsonResponse({ conversation: { id: '19:canonical@thread.v2' } })
     })
 
@@ -101,6 +112,7 @@ describe('getMsnp24EquivalentConversationId', () => {
     expect(seenUrl).toBe(
       'https://teams.microsoft.com/api/chatsvc/emea/v1/users/ME/conversations/19%3Adetached%40unq.gbl.spaces?view=msnp24Equivalent',
     )
+    expect(seenAuth).toBe('skypetoken=skype-test-token')
   })
 })
 
@@ -152,6 +164,13 @@ describe('resolveFederatedEquivalentConversationId', () => {
     const selected = '0caa699d-79d5-4660-81d0-ce05b8954fc7'
     const canonical = '4bc16140-a25f-46fa-af77-572d8b946c1c'
     __setTransportForTests(async (url) => {
+      // The msnp24Equivalent path now goes through Skype-token auth,
+      // so the resolver fires an authsvc exchange before each chatsvc
+      // probe. Authsvc URLs are not interesting to the assertions
+      // below, so we satisfy them silently and only push real probes.
+      if (url.includes('/authsvc/')) {
+        return jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } })
+      }
       urls.push(url)
       if (url.includes('fetchFederated')) {
         return jsonResponse([{ mri: `8:orgid:${canonical}` }])
