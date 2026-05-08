@@ -9,6 +9,10 @@ import {
   __setTransportForTests as setChatsvcTransport,
 } from './teamsChatsvc'
 import {
+  __resetForTests as resetFederation,
+  __setTransportForTests as setFederationTransport,
+} from './teamsFederation'
+import {
   __resetChannelReadFallbackForTests,
   CHANNEL_MESSAGE_READ_SCOPE,
   CHANNEL_MESSAGE_SEND_SCOPE,
@@ -48,6 +52,7 @@ afterEach(() => {
   __resetForTests()
   resetAuth()
   resetChatsvc()
+  resetFederation()
   __resetChannelReadFallbackForTests()
 })
 
@@ -211,6 +216,11 @@ describe('listChannelMessages', () => {
         ],
       })
     })
+    // Skype-token exchange (authsvc) is a separate POST routed through
+    // the federation transport; satisfy it with a stable token.
+    setFederationTransport(async () =>
+      jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }),
+    )
 
     const page = await listChannelMessagesPage('team-1', '19:abc@thread.tacv2')
     expect(graphCalls).toBe(1)

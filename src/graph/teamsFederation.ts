@@ -18,7 +18,9 @@ export const TEAMS_SPACES_SCOPE = 'https://api.spaces.skype.com/.default'
 export const TEAMS_IC3_SCOPE = 'https://ic3.teams.office.com/.default'
 
 const TEAMS_ORIGIN = 'https://teams.microsoft.com'
+const TEAMS_AUTHZ_URL = `${TEAMS_ORIGIN}/api/authsvc/v1.0/authz`
 const DEFAULT_REGION = 'emea'
+const SKYPE_TOKEN_REFRESH_MARGIN_S = 60
 
 export class TeamsFederationError extends Error {
   constructor(
@@ -39,6 +41,15 @@ export type TeamsFederationOpts = {
 type Transport = (url: string, init: RequestInit) => Promise<Response>
 const realTransport: Transport = (url, init) => fetch(url, init)
 let transport: Transport = realTransport
+
+// Skype token cache. The chatsvc /v1/users/ME/* endpoints reject the
+// raw spaces token (errorCode 911 "Authentication failed") - they want
+// the Skype token returned by Teams authsvc. Trouter does the same
+// exchange for its WebSocket; we cache the token in-process so chat /
+// federation calls share it and don't re-spawn for every request.
+type SkypeTokenEntry = { token: string; exp: number }
+const skypeTokenCache = new Map<string, SkypeTokenEntry>()
+const skypeTokenInFlight = new Map<string, Promise<string>>()
 
 function region(opts?: TeamsFederationOpts): string {
   return opts?.region ?? DEFAULT_REGION
@@ -120,6 +131,168 @@ async function requestTeams<T>(
   return { status: res.status, body: parsed, text }
 }
 
+type SkypeTokenResponse = {
+  token: string
+  expiresIn?: number
+}
+
+// Authsvc returns the skype token under several layouts depending on
+// region / experiment: top-level `skypeToken`, top-level `tokens`, or
+// nested under `tokens.skypeToken`. Try every shape we've observed.
+function pickSkypeToken(data: unknown): SkypeTokenResponse | null {
+  if (!data || typeof data !== 'object') return null
+  const obj = data as Record<string, unknown>
+  const candidates: unknown[] = [
+    obj.skypeToken,
+    obj.tokens,
+    (obj.tokens as Record<string, unknown> | undefined)?.skypeToken,
+  ]
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.length > 0) return { token: c }
+    if (c && typeof c === 'object') {
+      const t = (c as Record<string, unknown>).skypeToken ?? (c as Record<string, unknown>).token
+      if (typeof t === 'string' && t.length > 0) {
+        const expRaw = (c as Record<string, unknown>).expiresIn
+        const exp = typeof expRaw === 'number' && Number.isFinite(expRaw) ? expRaw : undefined
+        return { token: t, ...(exp !== undefined ? { expiresIn: exp } : {}) }
+      }
+    }
+  }
+  return null
+}
+
+function skypeCacheKey(opts?: TeamsFederationOpts): string {
+  return profile(opts) ?? '<default>'
+}
+
+export async function getSkypeToken(opts?: TeamsFederationOpts): Promise<string> {
+  const key = skypeCacheKey(opts)
+  const now = Date.now() / 1000
+  const cached = skypeTokenCache.get(key)
+  if (cached && cached.exp - now > SKYPE_TOKEN_REFRESH_MARGIN_S) {
+    return cached.token
+  }
+  const existing = skypeTokenInFlight.get(key)
+  if (existing) return existing
+  const promise = (async () => {
+    const graphToken = await getToken({ profile: profile(opts) })
+    const startedAt = Date.now()
+    let res: Response
+    try {
+      res = await transport(TEAMS_AUTHZ_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${graphToken}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: '{}',
+        signal: opts?.signal,
+      })
+    } catch (err) {
+      recordRequest({
+        ts: startedAt,
+        method: 'POST',
+        path: '/api/authsvc/v1.0/authz',
+        status: null,
+        durationMs: Date.now() - startedAt,
+        error: err instanceof Error ? err.message : String(err),
+      })
+      throw err
+    }
+    const durationMs = Date.now() - startedAt
+    recordRequest({
+      ts: startedAt,
+      method: 'POST',
+      path: '/api/authsvc/v1.0/authz',
+      status: res.status,
+      durationMs,
+    })
+    if (!res.ok) {
+      const text = await safeText(res)
+      throw new TeamsFederationError(
+        res.status,
+        `teams authz ${res.status}: ${text || 'request failed'}`,
+      )
+    }
+    const raw = (await res.json().catch(() => ({}))) as unknown
+    const skype = pickSkypeToken(raw)
+    if (!skype) {
+      throw new TeamsFederationError(res.status, 'teams authz: skype token missing from response')
+    }
+    skypeTokenCache.set(key, {
+      token: skype.token,
+      exp: Date.now() / 1000 + (skype.expiresIn ?? 3600),
+    })
+    return skype.token
+  })()
+  skypeTokenInFlight.set(key, promise)
+  try {
+    return await promise
+  } finally {
+    skypeTokenInFlight.delete(key)
+  }
+}
+
+function chatsvcMeHeaders(skypeToken: string): Record<string, string> {
+  return {
+    Accept: 'application/json',
+    'Content-Type': 'application/json;charset=UTF-8',
+    Authentication: `skypetoken=${skypeToken}`,
+    'x-skypetoken': skypeToken,
+    'x-ms-client-type': 'teaminal',
+    'x-ms-client-caller': 'teaminal',
+    'x-ms-client-request-type': '0',
+    'x-client-ui-language': 'en-us',
+  }
+}
+
+// chatsvc /v1/users/ME/* endpoints want the Skype token, not the
+// spaces token. Caller passes the full URL (including region) and
+// receives the parsed body alongside the raw status / text for
+// downstream error handling.
+export async function requestChatsvcMe<T>(
+  method: 'GET' | 'POST',
+  url: string,
+  body: unknown | undefined,
+  opts?: TeamsFederationOpts,
+): Promise<{ status: number; body: T | null; text: string }> {
+  const token = await getSkypeToken(opts)
+  const startedAt = Date.now()
+  const path = new URL(url).pathname + new URL(url).search
+  let res: Response
+  try {
+    res = await transport(url, {
+      method,
+      headers: chatsvcMeHeaders(token),
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: opts?.signal,
+    })
+  } catch (err) {
+    recordRequest({
+      ts: startedAt,
+      method,
+      path,
+      status: null,
+      durationMs: Date.now() - startedAt,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+  const durationMs = Date.now() - startedAt
+  recordRequest({ ts: startedAt, method, path, status: res.status, durationMs })
+  const text = await safeText(res)
+  let parsed: T | null = null
+  if (text) {
+    try {
+      parsed = JSON.parse(text) as T
+    } catch {
+      parsed = null
+    }
+  }
+  return { status: res.status, body: parsed, text }
+}
+
 export class TeamsInTenantLookupError extends TeamsFederationError {
   constructor(status: number, message: string) {
     super(status, message)
@@ -135,11 +308,13 @@ export async function fetchFederatedUsers(
   const url = `${TEAMS_ORIGIN}/api/mt/part/${region(opts)}/beta/users/fetchFederated?edEnabled=false&includeDisabledAccounts=true`
   const mris = userOids.map(userMriFromOid)
   const res = await requestTeams<unknown[]>('POST', url, mris, opts)
-  if (res.status === 404 && /in-tenant/i.test(res.text)) {
-    // Teams responds with 404 + "Federated lookup being incorrectly
-    // called for in-tenant users." for same-tenant peers. There is
-    // nothing federated to resolve here, so signal the caller to bail
-    // out of the entire flow.
+  if (res.status === 404) {
+    // Teams responds with 404 (sometimes "Federated lookup being
+    // incorrectly called for in-tenant users", sometimes a generic
+    // "An unexpected error(Type = NotFound) occurred") for same-tenant
+    // peers. Either way there is nothing federated to resolve, so
+    // signal the caller to bail out of the entire flow rather than
+    // banging on the chatsvc endpoints with the wrong audience.
     throw new TeamsInTenantLookupError(res.status, 'in-tenant user, federated lookup not applicable')
   }
   if (res.status < 200 || res.status >= 300) {
@@ -221,7 +396,7 @@ export async function getMsnp24EquivalentConversationId(
   const url = `${TEAMS_ORIGIN}/api/chatsvc/${region(opts)}/v1/users/ME/conversations/${encodeURIComponent(
     conversationId,
   )}?view=msnp24Equivalent`
-  const res = await requestTeams<unknown>('GET', url, undefined, opts)
+  const res = await requestChatsvcMe<unknown>('GET', url, undefined, opts)
   if (res.status === 404) return null
   if (res.status < 200 || res.status >= 300) {
     throw new TeamsFederationError(
@@ -295,4 +470,6 @@ export function __setTransportForTests(t: Transport): void {
 
 export function __resetForTests(): void {
   transport = realTransport
+  skypeTokenCache.clear()
+  skypeTokenInFlight.clear()
 }

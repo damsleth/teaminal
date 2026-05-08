@@ -9,16 +9,16 @@
 //   GET https://teams.microsoft.com/api/chatsvc/{region}/v1/users/ME
 //       /conversations/{threadId}/messages?pageSize=N&startTime=1
 //
-// authenticated with the same spaces token we already use for
-// fetchFederated / msnp24Equivalent. The response is Skype-shaped, so
-// we translate each message into the ChannelMessage shape the rest of
-// the app already consumes.
+// authenticated with the Skype token Teams authsvc returns when given
+// the default Graph access token (the spaces token alone is rejected
+// with errorCode 911). The response is Skype-shaped, so we translate
+// each message into the ChannelMessage shape the rest of the app
+// already consumes.
 
-import { getToken } from '../auth/owaPiggy'
 import { recordRequest } from '../log'
 import type { ChatMessage } from '../types'
 import { getActiveProfile } from './client'
-import { TEAMS_SPACES_SCOPE } from './teamsFederation'
+import { getSkypeToken } from './teamsFederation'
 
 const TEAMS_ORIGIN = 'https://teams.microsoft.com'
 const DEFAULT_REGION = 'emea'
@@ -58,10 +58,11 @@ function profile(opts?: ChatsvcOpts): string | undefined {
   return opts?.profile ?? getActiveProfile()
 }
 
-function chatsvcHeaders(token: string): Record<string, string> {
+function chatsvcHeaders(skypeToken: string): Record<string, string> {
   return {
-    Authorization: `Bearer ${token}`,
     Accept: 'application/json',
+    Authentication: `skypetoken=${skypeToken}`,
+    'x-skypetoken': skypeToken,
     'x-ms-client-type': 'teaminal',
     'x-ms-client-caller': 'teaminal-channel-fallback',
     'x-ms-client-request-type': '0',
@@ -81,7 +82,7 @@ async function chatsvcGet<T>(
   url: string,
   opts?: ChatsvcOpts,
 ): Promise<{ status: number; body: T | null; text: string }> {
-  const token = await getToken({ profile: profile(opts), scope: TEAMS_SPACES_SCOPE })
+  const token = await getSkypeToken({ profile: profile(opts), signal: opts?.signal })
   const startedAt = Date.now()
   const path = new URL(url).pathname + new URL(url).search
   let res: Response

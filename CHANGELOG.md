@@ -90,10 +90,21 @@ adheres to [Semantic Versioning](https://semver.org/).
   preauthorization or admin consent.** When Graph returns the 403
   "Missing scope permissions" response, teaminal now falls back to
   the Teams chat service (`teams.microsoft.com/api/chatsvc/{region}/v1
-  /users/ME/conversations/{threadId}/messages`) using the same spaces
-  token the Teams web client uses, translates the Skype-shaped
-  payload into the existing `ChannelMessage` shape, and latches the
-  fallback for the rest of the session so Graph is not retried.
+  /users/ME/conversations/{threadId}/messages`) authenticated with a
+  Skype token exchanged via `teams.microsoft.com/api/authsvc/v1.0/authz`
+  (the same exchange the trouter transport already does), translates
+  the Skype-shaped payload into the existing `ChannelMessage` shape,
+  and latches the fallback for the rest of the session so Graph is not
+  retried.
+- **`getMsnp24EquivalentConversationId` now uses the Skype token.**
+  The `/api/chatsvc/{region}/v1/users/ME/...` endpoint rejects the
+  raw spaces token with errorCode 911 ("Authentication failed"); the
+  federated equivalent lookup now goes through the same authsvc-backed
+  Skype-token path as channel reads.
+- **Federated in-tenant fast-bail covers generic 404s.** Any 404 from
+  `fetchFederated` (including "An unexpected error(Type = NotFound)
+  occurred") now short-circuits the resolver, not just the explicit
+  "in-tenant users" message.
 - **`AADSTS65002` scope-fallback at the auth layer.** When `owa-piggy`
   rejects the explicit Graph scope, teaminal now falls back to the
   default Graph audience token for the rest of the session. (Combined
