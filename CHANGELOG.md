@@ -86,11 +86,19 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- **Channel access in tenants without `ChannelMessage.Read.All`
-  preauthorization.** When `owa-piggy` rejects the explicit Graph scope
-  with `AADSTS65002`, teaminal now falls back to the default Graph
-  audience token for the rest of the session. Channel reads/sends
-  continue working without admin consent on the FOCI exchange.
+- **Channel reads in tenants without `ChannelMessage.Read.All`
+  preauthorization or admin consent.** When Graph returns the 403
+  "Missing scope permissions" response, teaminal now falls back to
+  the Teams chat service (`teams.microsoft.com/api/chatsvc/{region}/v1
+  /users/ME/conversations/{threadId}/messages`) using the same spaces
+  token the Teams web client uses, translates the Skype-shaped
+  payload into the existing `ChannelMessage` shape, and latches the
+  fallback for the rest of the session so Graph is not retried.
+- **`AADSTS65002` scope-fallback at the auth layer.** When `owa-piggy`
+  rejects the explicit Graph scope, teaminal now falls back to the
+  default Graph audience token for the rest of the session. (Combined
+  with the chatsvc fallback above, channel reads work even when both
+  the FOCI exchange and the default Graph token lack the scope.)
 - **Federated lookup no longer probes in-tenant chats.** A 404 with
   "Federated lookup being incorrectly called for in-tenant users" now
   short-circuits the resolver, and the on-focus path only runs for

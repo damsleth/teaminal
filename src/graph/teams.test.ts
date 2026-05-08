@@ -5,9 +5,15 @@ import {
 } from '../auth/owaPiggy'
 import { __resetForTests, __setTransportForTests } from './client'
 import {
+  __resetForTests as resetChatsvc,
+  __setTransportForTests as setChatsvcTransport,
+} from './teamsChatsvc'
+import {
+  __resetChannelReadFallbackForTests,
   CHANNEL_MESSAGE_READ_SCOPE,
   CHANNEL_MESSAGE_SEND_SCOPE,
   listChannelMessages,
+  listChannelMessagesPage,
   listChannels,
   listJoinedTeams,
   paginateChannelMessages,
@@ -41,6 +47,8 @@ function primeAuth(): void {
 afterEach(() => {
   __resetForTests()
   resetAuth()
+  resetChatsvc()
+  __resetChannelReadFallbackForTests()
 })
 
 const TEAM: Team = {
@@ -169,6 +177,51 @@ describe('listChannelMessages', () => {
     )
     const msgs = await listChannelMessages('team-1', '19:abc')
     expect(msgs.map((x) => x.id)).toEqual(['oldest', 'middle', 'latest'])
+  })
+
+  test('falls back to Teams chatsvc when Graph 403s with missing-scope', async () => {
+    primeAuth()
+    let graphCalls = 0
+    let chatsvcCalls = 0
+    __setTransportForTests(async () => {
+      graphCalls++
+      return jsonResponse(
+        {
+          error: {
+            code: 'Forbidden',
+            message:
+              "Missing scope permissions on the request. API requires one of 'ChannelMessage.Read.All'.",
+          },
+        },
+        { status: 403 },
+      )
+    })
+    setChatsvcTransport(async () => {
+      chatsvcCalls++
+      return jsonResponse({
+        messages: [
+          {
+            id: '1717770000000',
+            originalarrivaltime: '2026-04-29T09:00:00Z',
+            messagetype: 'Text',
+            content: 'standup at 10',
+            from: 'https://emea.ng.msg.teams.microsoft.com/v1/users/ME/contacts/8:orgid:abc-uuid',
+            imdisplayname: 'Bjørn',
+          },
+        ],
+      })
+    })
+
+    const page = await listChannelMessagesPage('team-1', '19:abc@thread.tacv2')
+    expect(graphCalls).toBe(1)
+    expect(chatsvcCalls).toBe(1)
+    expect(page.messages.map((m) => m.id)).toEqual(['1717770000000'])
+
+    // Subsequent calls bypass Graph entirely (latched) and go straight
+    // to the chatsvc fallback.
+    await listChannelMessagesPage('team-1', '19:abc@thread.tacv2')
+    expect(graphCalls).toBe(1)
+    expect(chatsvcCalls).toBe(2)
   })
 })
 
