@@ -11,7 +11,12 @@
 //     where the user is only a shared-channel member; shared-channel
 //     discovery is parked for after v1
 
-import { graph, paginate } from './client'
+import { recordEvent } from '../log'
+import { graph, GraphError, paginate } from './client'
+import {
+  listChannelMessagesViaChatsvc,
+  listChannelMessagesViaChatsvcNextPage,
+} from './teamsChatsvc'
 import type { Channel, ChannelMessage, Team } from '../types'
 
 type CollectionResponse<T> = { value: T[]; '@odata.nextLink'?: string }
@@ -19,6 +24,32 @@ type CollectionResponse<T> = { value: T[]; '@odata.nextLink'?: string }
 const CHANNEL_MESSAGES_TOP_DEFAULT = 50
 export const CHANNEL_MESSAGE_READ_SCOPE = 'https://graph.microsoft.com/ChannelMessage.Read.All'
 export const CHANNEL_MESSAGE_SEND_SCOPE = 'https://graph.microsoft.com/ChannelMessage.Send'
+
+// Latched once Graph rejects channel message reads in this session
+// (typically tenants without ChannelMessage.Read.All preauth on the
+// Teams Web app id). All subsequent reads go straight to the chatsvc
+// fallback without re-trying Graph.
+let graphChannelReadsBlocked = false
+
+function isMissingScopeError(err: unknown): boolean {
+  if (!(err instanceof GraphError)) return false
+  if (err.status !== 403) return false
+  return /missing\s+scope|ChannelMessage\.Read\.All/i.test(err.message)
+}
+
+export function __resetChannelReadFallbackForTests(): void {
+  graphChannelReadsBlocked = false
+}
+
+function noteFallbackOnce(reason: string): void {
+  if (graphChannelReadsBlocked) return
+  graphChannelReadsBlocked = true
+  recordEvent(
+    'graph',
+    'warn',
+    `channel reads via Graph blocked (${reason}); falling back to Teams chatsvc for the rest of this session`,
+  )
+}
 
 export type ListJoinedTeamsOpts = {
   signal?: AbortSignal
@@ -78,23 +109,42 @@ export async function listChannelMessagesPage(
   channelId: string,
   opts?: ListChannelMessagesOpts,
 ): Promise<ChannelMessagesPage> {
-  const res = await graph<CollectionResponse<ChannelMessage>>({
-    method: 'GET',
-    path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages`,
-    query: { $top: opts?.top ?? CHANNEL_MESSAGES_TOP_DEFAULT },
-    scope: CHANNEL_MESSAGE_READ_SCOPE,
+  if (!graphChannelReadsBlocked) {
+    try {
+      const res = await graph<CollectionResponse<ChannelMessage>>({
+        method: 'GET',
+        path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages`,
+        query: { $top: opts?.top ?? CHANNEL_MESSAGES_TOP_DEFAULT },
+        scope: CHANNEL_MESSAGE_READ_SCOPE,
+        signal: opts?.signal,
+      })
+      return {
+        messages: res.value.slice().reverse(),
+        nextLink: res['@odata.nextLink'],
+      }
+    } catch (err) {
+      if (!isMissingScopeError(err)) throw err
+      noteFallbackOnce('Graph 403 missing ChannelMessage.Read.All')
+    }
+  }
+  const fallback = await listChannelMessagesViaChatsvc(channelId, {
+    pageSize: opts?.top ?? CHANNEL_MESSAGES_TOP_DEFAULT,
     signal: opts?.signal,
   })
-  return {
-    messages: res.value.slice().reverse(),
-    nextLink: res['@odata.nextLink'],
-  }
+  return { messages: fallback.messages, nextLink: fallback.backwardLink }
 }
 
 export async function listChannelMessagesNextPage(
   nextLink: string,
   opts?: { signal?: AbortSignal },
 ): Promise<ChannelMessagesPage> {
+  // chatsvc backward links live on teams.microsoft.com; Graph nextLinks
+  // live on graph.microsoft.com. Route by hostname so we never send a
+  // chatsvc URL through the Graph wrapper (and vice versa).
+  if (nextLink.includes('teams.microsoft.com')) {
+    const fallback = await listChannelMessagesViaChatsvcNextPage(nextLink, { signal: opts?.signal })
+    return { messages: fallback.messages, nextLink: fallback.backwardLink }
+  }
   const res = await graph<CollectionResponse<ChannelMessage>>({
     method: 'GET',
     path: nextLink,
