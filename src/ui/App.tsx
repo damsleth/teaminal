@@ -34,6 +34,7 @@ import {
   type Focus,
 } from '../state/store'
 import { AccountsModal } from './AccountsModal'
+import { AuthExpiredModal } from './AuthExpiredModal'
 import { ChatList } from './ChatList'
 import { Composer } from './Composer'
 import { DiagnosticsModal } from './DiagnosticsModal'
@@ -391,6 +392,8 @@ export function App() {
               <KeybindsModal />
             ) : modal.kind === 'accounts' ? (
               <AccountsModal />
+            ) : modal.kind === 'auth-expired' ? (
+              <AuthExpiredModal />
             ) : modal.kind === 'events' ? (
               <EventsModal />
             ) : modal.kind === 'network' ? (

@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { render } from 'ink'
+import { isRefreshExpiredError } from '../src/auth/owaPiggy'
 import { loadSettings } from '../src/config'
 import { runSession, type SessionHandle } from '../src/state/bootstrap'
 import { startForceAvailabilityDriver } from '../src/state/forceAvailability'
@@ -234,18 +235,39 @@ async function switchAccount(nextProfile: string | null): Promise<void> {
   }
 }
 
+function showAuthExpiredModal(profile: string | null, message: string): void {
+  store.set({
+    modal: { kind: 'auth-expired', profile, message, status: 'idle' },
+    inputZone: 'menu',
+  })
+}
+
 ;(async () => {
   try {
-    currentSession = await runSession({
-      store,
-      profile: activeProfile,
-      pollerHandleRef,
-      onFatal: (kind, msg) => {
-        ink.unmount()
-        process.stderr.write(`teaminal: auth failed (${kind}): ${msg}\n`)
-        process.exit(3)
-      },
-    })
+    try {
+      currentSession = await runSession({
+        store,
+        profile: activeProfile,
+        pollerHandleRef,
+        onFatal: (kind, msg) => {
+          ink.unmount()
+          process.stderr.write(`teaminal: auth failed (${kind}): ${msg}\n`)
+          process.exit(3)
+        },
+      })
+    } catch (err) {
+      // Refresh-token expiry: keep the UI mounted and offer
+      // reseed / switch / quit instead of dumping the AAD message.
+      // Any other bootstrap error still bubbles up to the outer
+      // catch and exits.
+      const message = err instanceof Error ? err.message : String(err)
+      if (isRefreshExpiredError(message)) {
+        warn(`bootstrap: refresh token expired for profile=${activeProfile ?? '(default)'}`)
+        showAuthExpiredModal(activeProfile, message)
+      } else {
+        throw err
+      }
+    }
 
     await ink.waitUntilExit()
   } catch (err) {

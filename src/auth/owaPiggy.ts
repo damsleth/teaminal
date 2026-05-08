@@ -74,6 +74,37 @@ function isPreauthFailure(stderr: string): boolean {
   return /AADSTS65002/i.test(stderr)
 }
 
+// AAD codes that mean "the refresh token is gone - the user must
+// re-authenticate this profile". 700084 is the SPA 24h hard expiry,
+// 700082 is generic refresh-token expired, 50173/50158/50076 are
+// re-auth required (password change, MFA gate, etc.).
+const REFRESH_EXPIRED_CODES = /AADSTS(700084|700082|50173|50158|50076|54005)/i
+
+export function isRefreshExpiredError(message: string | undefined | null): boolean {
+  if (!message) return false
+  return REFRESH_EXPIRED_CODES.test(message) || /invalid_grant/i.test(message)
+}
+
+export type ReseedOpts = {
+  profile?: string
+}
+
+export async function reseed(opts?: ReseedOpts): Promise<void> {
+  const args = ['reseed']
+  if (opts?.profile) args.push('--profile', opts.profile)
+  const { stderr, exitCode } = await runner(args)
+  if (exitCode !== 0) {
+    throw new OwaPiggyError(stderr.trim() || `owa-piggy reseed exited with code ${exitCode}`)
+  }
+  // Reseed rotates the refresh + access tokens; clear cached tokens
+  // and the per-scope failure set so the next getToken re-spawns
+  // against a fresh refresh token.
+  for (const key of Array.from(cache.keys())) {
+    if (!opts?.profile || key.startsWith(`${opts.profile}::`)) cache.delete(key)
+  }
+  scopeFallbacks.clear()
+}
+
 export type OwaPiggyProfileStatus = {
   profile: string
   valid: boolean

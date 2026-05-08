@@ -6,9 +6,11 @@ import {
   decodeJwtExp,
   getToken,
   invalidate,
+  isRefreshExpiredError,
   listProfilesFromStatus,
   OwaPiggyError,
   parseStatusProfiles,
+  reseed,
 } from './owaPiggy'
 
 function makeJwt(payload: Record<string, unknown>): string {
@@ -563,5 +565,60 @@ describe('listProfilesFromStatus', () => {
       exitCode: 1,
     }))
     await expect(listProfilesFromStatus()).rejects.toThrow(/no profiles configured/)
+  })
+})
+
+describe('isRefreshExpiredError', () => {
+  test('matches the SPA 24h hard-expiry code (AADSTS700084)', () => {
+    expect(
+      isRefreshExpiredError(
+        'invalid_grant: AADSTS700084: The refresh token was issued to a single page app',
+      ),
+    ).toBe(true)
+  })
+
+  test('matches generic invalid_grant without an AADSTS code', () => {
+    expect(isRefreshExpiredError('invalid_grant: refresh token expired')).toBe(true)
+  })
+
+  test('does not match unrelated errors', () => {
+    expect(isRefreshExpiredError('AADSTS65002: preauthorization required')).toBe(false)
+    expect(isRefreshExpiredError(undefined)).toBe(false)
+    expect(isRefreshExpiredError('')).toBe(false)
+  })
+})
+
+describe('reseed', () => {
+  test('passes --profile through and clears cached tokens for that profile', async () => {
+    const token = makeJwt({ exp: FAR_FUTURE })
+    const calls: string[][] = []
+    __setRunnerForTests(async (args) => {
+      calls.push(args)
+      return { stdout: token, stderr: '', exitCode: 0 }
+    })
+
+    // Warm the cache for two profiles.
+    await getToken({ profile: 'work' })
+    await getToken({ profile: 'home' })
+    expect(calls.length).toBe(2)
+
+    await reseed({ profile: 'work' })
+    expect(calls[2]).toEqual(['reseed', '--profile', 'work'])
+
+    // After reseed('work'), the work token must re-spawn but the
+    // home token is still cached.
+    await getToken({ profile: 'work' })
+    await getToken({ profile: 'home' })
+    expect(calls.length).toBe(4)
+    expect(calls[3]?.[0]).toBe('token')
+  })
+
+  test('throws OwaPiggyError on non-zero exit', async () => {
+    __setRunnerForTests(async () => ({
+      stdout: '',
+      stderr: 'reseed failed: no Edge sidecar profile configured',
+      exitCode: 1,
+    }))
+    await expect(reseed({ profile: 'work' })).rejects.toThrow(/reseed failed/)
   })
 })

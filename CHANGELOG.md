@@ -8,6 +8,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Auth-expired recovery prompt.** When the active owa-piggy profile's
+  refresh token has hit its hard expiry (e.g. the SPA 24h cap from
+  `AADSTS700084`, or any `invalid_grant`), teaminal now stays mounted
+  and offers `r` to reseed the profile (`owa-piggy reseed`), `s` to
+  switch to a different profile, or `q` to quit, instead of crashing
+  with the raw AAD message.
 - **Federated chat canonicalization.** New one-on-one chat creation now
   probes Teams' federated profile and canonical `consumptionhorizons`
   paths before falling back to Graph chat creation, so federated chats
