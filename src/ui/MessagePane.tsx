@@ -39,10 +39,15 @@ const TYPING_DOT = '…'
 // the typing indicator (when present) is another.
 const CHROME_RESERVED_ROWS = 10
 const MIN_VISIBLE_ROWS = 5
-// Narrow column - message rows show first name / nick only. The chat /
-// channel header above already shows the full display name(s), so the
-// per-row column doesn't need to disambiguate.
-const SENDER_COL_WIDTH = 10
+// Sender column width is computed per render from the longest first
+// name in the conversation, so short-name conversations stay tight and
+// long-name conversations don't truncate. Capped on both ends:
+//   - SENDER_COL_MIN keeps the column readable even for empty / system
+//     rows.
+//   - SENDER_COL_MAX prevents a single long-handle outlier (e.g. an
+//     external bot account) from pushing every body row absurdly right.
+const SENDER_COL_MIN = 4
+const SENDER_COL_MAX = 16
 
 export function MessagePane(props: {
   focusedMessageId?: string | null
@@ -88,7 +93,7 @@ export function MessagePane(props: {
 
   if (focus.kind === 'list') {
     return (
-      <Box flexDirection="column" flexGrow={1} paddingX={1}>
+      <Box flexDirection="column" flexGrow={1} paddingX={0}>
         <Text color="gray">Select a chat or channel · Enter to open · q to quit</Text>
       </Box>
     )
@@ -104,6 +109,7 @@ export function MessagePane(props: {
   //      body content - same outcome on the wire, blank "(system)" row.
   // In either case we'd rather show nothing than a meaningless line.
   const messages = rawMessages.filter((m) => isRenderableMessage(m))
+  const senderColWidth = computeSenderColWidth(messages)
   const cache = messageCacheByConvo[conv]
   const headerLabel = headerForFocus(focus, chats, teams, channelsByTeam, me?.id)
   const pageState = readMessagePageState(cache ?? messages)
@@ -157,7 +163,7 @@ export function MessagePane(props: {
   const hits = searchActive ? searchMessages(messages, searchQuery) : []
 
   return (
-    <Box flexDirection="column" flexGrow={1} paddingX={1}>
+    <Box flexDirection="column" flexGrow={1} paddingX={0}>
       {density === 'cozy' && <Text bold>{headerLabel}</Text>}
       {searchActive && (
         <Box>
@@ -200,6 +206,7 @@ export function MessagePane(props: {
                 myUserId={me?.id}
                 reactionDisplayMode={reactionDisplayMode}
                 readReceipts={readReceiptsByConvo[conv]}
+                senderColWidth={senderColWidth}
                 showTimestamp={showTimestamps}
                 theme={theme}
                 threadMeta={
@@ -225,6 +232,7 @@ function TimelineRow(props: {
   myUserId?: string
   reactionDisplayMode: 'off' | 'current' | 'all'
   readReceipts?: Record<string, ReadReceipt>
+  senderColWidth: number
   showTimestamp: boolean
   theme: Theme
   threadMeta?: ThreadMeta
@@ -260,6 +268,7 @@ function TimelineRow(props: {
       myUserId={props.myUserId}
       reactionDisplayMode={props.reactionDisplayMode}
       readReceipts={props.readReceipts}
+      senderColWidth={props.senderColWidth}
       showTimestamp={props.showTimestamp}
       theme={props.theme}
       threadMeta={props.threadMeta}
@@ -275,11 +284,12 @@ function MessageRow(props: {
   myUserId?: string
   reactionDisplayMode: 'off' | 'current' | 'all'
   readReceipts?: Record<string, ReadReceipt>
+  senderColWidth: number
   showTimestamp: boolean
   theme: Theme
   threadMeta?: ThreadMeta
 }) {
-  const { theme } = props
+  const { theme, senderColWidth } = props
   const m = props.message
   const time = m.createdDateTime.slice(11, 16)
   const isSystem = m.messageType === 'systemEventMessage'
@@ -290,8 +300,8 @@ function MessageRow(props: {
   const senderRaw = isSystem ? '' : (effectiveSenderName(m) ?? '')
   const senderShort = senderRaw ? shortName(senderRaw) : ''
   const senderTrimmed =
-    senderShort.length > SENDER_COL_WIDTH
-      ? senderShort.slice(0, SENDER_COL_WIDTH - 1) + '…'
+    senderShort.length > senderColWidth
+      ? senderShort.slice(0, senderColWidth - 1) + '…'
       : senderShort
   const isSelf = !!props.myUserId && m.from?.user?.id === props.myUserId
   const isSending = m._sending === true
@@ -322,7 +332,7 @@ function MessageRow(props: {
   const statusMarker = sendError ? '✗' : isSending ? '…' : ' '
   const timeCol = props.showTimestamp ? `${time} ` : ''
   const indicator = props.focused ? props.focusIndicatorChar.slice(0, 1) || '>' : ' '
-  const statusWidth = props.showTimestamp ? 8 : 2
+  const statusWidth = props.showTimestamp ? 7 : 2
 
   return (
     <>
@@ -339,12 +349,12 @@ function MessageRow(props: {
         </Box>
         <Box width={statusWidth} flexShrink={0}>
           <Text color={color} wrap="truncate-end">
-            {props.showTimestamp ? `${statusMarker} ${timeCol}` : `${statusMarker} `}
+            {props.showTimestamp ? `${statusMarker}${timeCol}` : `${statusMarker} `}
           </Text>
         </Box>
-        <Box width={SENDER_COL_WIDTH + 2} flexShrink={0}>
-          <Text color={color} wrap="truncate-end">
-            {`${senderTrimmed.padEnd(SENDER_COL_WIDTH)}  `}
+        <Box width={senderColWidth + 1} flexShrink={0}>
+          <Text color={color} bold={!isSystem && senderTrimmed.length > 0} wrap="truncate-end">
+            {`${senderTrimmed.padEnd(senderColWidth)} `}
           </Text>
         </Box>
         <Box flexGrow={1} flexShrink={1} minWidth={0}>
@@ -366,7 +376,7 @@ function MessageRow(props: {
         <Box flexDirection="row">
           <Box width={2} flexShrink={0} />
           <Box width={statusWidth} flexShrink={0} />
-          <Box width={SENDER_COL_WIDTH + 2} flexShrink={0} />
+          <Box width={senderColWidth + 1} flexShrink={0} />
           <Box flexGrow={1} flexShrink={1} minWidth={0}>
             <Text color={theme.mutedText} wrap="truncate-end">
               {`╰─ ${formatReplyCount(props.threadMeta)}`}
@@ -378,7 +388,7 @@ function MessageRow(props: {
         <Box flexDirection="row">
           <Box width={2} flexShrink={0} />
           <Box width={statusWidth} flexShrink={0} />
-          <Box width={SENDER_COL_WIDTH + 2} flexShrink={0} />
+          <Box width={senderColWidth + 1} flexShrink={0} />
           <Box flexGrow={1} flexShrink={1} minWidth={0}>
             <Text color={theme.mutedText} wrap="truncate-end">
               {readReceiptLine}
@@ -390,7 +400,7 @@ function MessageRow(props: {
         <Box flexDirection="row">
           <Box width={2} flexShrink={0} />
           <Box width={statusWidth} flexShrink={0} />
-          <Box width={SENDER_COL_WIDTH + 2} flexShrink={0} />
+          <Box width={senderColWidth + 1} flexShrink={0} />
           <Box flexGrow={1} flexShrink={1} minWidth={0}>
             <Text color={theme.warnText} wrap="truncate-end">
               {`send failed: ${sendError.slice(0, 120)}`}
@@ -417,6 +427,24 @@ function previewBody(m: ChatMessage): string {
     return raw.replace(/\s+/g, ' ').trim()
   }
   return htmlToText(raw)
+}
+
+// Sender column auto-sizes to the longest first name in the visible
+// conversation. Empty / system rows are ignored. The result is clamped
+// between SENDER_COL_MIN and SENDER_COL_MAX.
+export function computeSenderColWidth(messages: ChatMessage[]): number {
+  let max = 0
+  for (const m of messages) {
+    if (m.messageType === 'systemEventMessage') continue
+    const raw = effectiveSenderName(m) ?? ''
+    if (!raw) continue
+    const len = shortName(raw).length
+    if (len > max) max = len
+  }
+  if (max === 0) return SENDER_COL_MIN
+  if (max < SENDER_COL_MIN) return SENDER_COL_MIN
+  if (max > SENDER_COL_MAX) return SENDER_COL_MAX
+  return max
 }
 
 export function formatReplyCount(meta: ThreadMeta): string {

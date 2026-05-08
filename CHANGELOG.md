@@ -75,6 +75,15 @@ adheres to [Semantic Versioning](https://semver.org/).
   hidden from the timeline rather than rendered as a blank
   `(system event)` placeholder.
 
+### Changed
+
+- **Tighter message-pane density.** The chat timeline drops one column
+  of outer padding, one column of timestamp gutter, and one trailing
+  space after the sender column; sender names now render in bold and
+  the sender column auto-sizes to the longest first name in the
+  visible conversation (clamped 4–16) so short-name chats stay tight
+  and long-name chats no longer truncate.
+
 ### Fixed
 
 - **Channel access in tenants without `ChannelMessage.Read.All`
