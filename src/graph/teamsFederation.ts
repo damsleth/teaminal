@@ -165,6 +165,41 @@ function skypeCacheKey(opts?: TeamsFederationOpts): string {
   return profile(opts) ?? '<default>'
 }
 
+async function postAuthz(bearerToken: string, signal?: AbortSignal): Promise<Response> {
+  const startedAt = Date.now()
+  let res: Response
+  try {
+    res = await transport(TEAMS_AUTHZ_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${bearerToken}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: '{}',
+      signal,
+    })
+  } catch (err) {
+    recordRequest({
+      ts: startedAt,
+      method: 'POST',
+      path: '/api/authsvc/v1.0/authz',
+      status: null,
+      durationMs: Date.now() - startedAt,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+  recordRequest({
+    ts: startedAt,
+    method: 'POST',
+    path: '/api/authsvc/v1.0/authz',
+    status: res.status,
+    durationMs: Date.now() - startedAt,
+  })
+  return res
+}
+
 export async function getSkypeToken(opts?: TeamsFederationOpts): Promise<string> {
   const key = skypeCacheKey(opts)
   const now = Date.now() / 1000
@@ -175,44 +210,46 @@ export async function getSkypeToken(opts?: TeamsFederationOpts): Promise<string>
   const existing = skypeTokenInFlight.get(key)
   if (existing) return existing
   const promise = (async () => {
-    const graphToken = await getToken({ profile: profile(opts) })
-    const startedAt = Date.now()
-    let res: Response
-    try {
-      res = await transport(TEAMS_AUTHZ_URL, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${graphToken}`,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: '{}',
-        signal: opts?.signal,
-      })
-    } catch (err) {
-      recordRequest({
-        ts: startedAt,
-        method: 'POST',
-        path: '/api/authsvc/v1.0/authz',
-        status: null,
-        durationMs: Date.now() - startedAt,
-        error: err instanceof Error ? err.message : String(err),
-      })
-      throw err
-    }
-    const durationMs = Date.now() - startedAt
-    recordRequest({
-      ts: startedAt,
-      method: 'POST',
-      path: '/api/authsvc/v1.0/authz',
-      status: res.status,
-      durationMs,
+    // The authsvc endpoint wants a Teams-audience token, not the
+    // default Graph token. Try that scope first; owa-piggy's scope
+    // fallback will quietly downgrade to the default Graph audience
+    // if the tenant has not preauthorized teams.microsoft.com.
+    const teamsAudienceToken = await getToken({
+      profile: profile(opts),
+      scope: 'https://teams.microsoft.com/.default',
     })
+    let res = await postAuthz(teamsAudienceToken, opts?.signal)
+    if (res.status === 401) {
+      // Some tenants accept the spaces-scoped token at authsvc instead.
+      // Try that before giving up.
+      const spacesToken = await getToken({
+        profile: profile(opts),
+        scope: TEAMS_SPACES_SCOPE,
+      })
+      if (spacesToken !== teamsAudienceToken) {
+        res = await postAuthz(spacesToken, opts?.signal)
+      }
+    }
     if (!res.ok) {
       const text = await safeText(res)
+      const challenge = res.headers.get('www-authenticate') ?? ''
+      const correlation =
+        res.headers.get('x-ms-correlation-id') ?? res.headers.get('request-id') ?? ''
+      const aadCode = text.match(/AADSTS\d{4,}/)?.[0] ?? ''
+      // Surface the diagnostics trouter already records, so the network
+      // panel shows *why* authsvc refused us instead of "request failed".
+      recordEvent('graph', 'warn', `teams authz ${res.status} ${res.statusText || ''}`)
+      if (aadCode) recordEvent('graph', 'warn', `teams authz aadcode ${aadCode}`)
+      if (challenge) {
+        recordEvent('graph', 'warn', `teams authz challenge ${challenge.slice(0, 240)}`)
+      }
+      if (correlation) recordEvent('graph', 'warn', `teams authz corr ${correlation}`)
+      if (text) {
+        recordEvent('graph', 'warn', `teams authz body ${text.slice(0, 240).replace(/\s+/g, ' ')}`)
+      }
       throw new TeamsFederationError(
         res.status,
-        `teams authz ${res.status}: ${text || 'request failed'}`,
+        `teams authz ${res.status}: ${aadCode || text || 'request failed'}`,
       )
     }
     const raw = (await res.json().catch(() => ({}))) as unknown

@@ -100,6 +100,13 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Skype-token exchange now tries the Teams audience first.** The
+  `authsvc/v1.0/authz` endpoint frequently rejects default Graph
+  audience tokens with a 401 + empty body. teaminal now requests a
+  `https://teams.microsoft.com/.default` token, falls back to the
+  spaces-scoped token on 401, and surfaces AAD code, www-authenticate
+  challenge, correlation id, and body excerpt in the Network panel
+  so further failures are diagnosable instead of opaque.
 - **Channel reads in tenants without `ChannelMessage.Read.All`
   preauthorization or admin consent.** When Graph returns the 403
   "Missing scope permissions" response, teaminal now falls back to
