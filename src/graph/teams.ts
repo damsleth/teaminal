@@ -16,6 +16,7 @@ import { graph, GraphError, paginate } from './client'
 import {
   listChannelMessagesViaChatsvc,
   listChannelMessagesViaChatsvcNextPage,
+  sendChannelMessageViaChatsvc,
 } from './teamsChatsvc'
 import type { Channel, ChannelMessage, Team } from '../types'
 
@@ -185,13 +186,21 @@ export async function sendChannelMessage(
   content: string,
   opts?: SendChannelMessageOpts,
 ): Promise<ChannelMessage> {
-  return graph<ChannelMessage>({
-    method: 'POST',
-    path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages`,
-    body: { body: { contentType: 'text', content } },
-    scope: CHANNEL_MESSAGE_SEND_SCOPE,
-    signal: opts?.signal,
-  })
+  if (!graphChannelReadsBlocked) {
+    try {
+      return await graph<ChannelMessage>({
+        method: 'POST',
+        path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages`,
+        body: { body: { contentType: 'text', content } },
+        scope: CHANNEL_MESSAGE_SEND_SCOPE,
+        signal: opts?.signal,
+      })
+    } catch (err) {
+      if (!isMissingScopeError(err)) throw err
+      noteFallbackOnce('Graph 403 missing ChannelMessage.Send')
+    }
+  }
+  return sendChannelMessageViaChatsvc(channelId, content, { signal: opts?.signal })
 }
 
 // --- Channel replies (threaded messages) ---
@@ -272,11 +281,22 @@ export async function postChannelReply(
   content: string,
   opts?: SendChannelMessageOpts,
 ): Promise<ChannelMessage> {
-  return graph<ChannelMessage>({
-    method: 'POST',
-    path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(rootId)}/replies`,
-    body: { body: { contentType: 'text', content } },
-    scope: CHANNEL_MESSAGE_SEND_SCOPE,
+  if (!graphChannelReadsBlocked) {
+    try {
+      return await graph<ChannelMessage>({
+        method: 'POST',
+        path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(rootId)}/replies`,
+        body: { body: { contentType: 'text', content } },
+        scope: CHANNEL_MESSAGE_SEND_SCOPE,
+        signal: opts?.signal,
+      })
+    } catch (err) {
+      if (!isMissingScopeError(err)) throw err
+      noteFallbackOnce('Graph 403 missing ChannelMessage.Send')
+    }
+  }
+  return sendChannelMessageViaChatsvc(channelId, content, {
+    replyToId: rootId,
     signal: opts?.signal,
   })
 }

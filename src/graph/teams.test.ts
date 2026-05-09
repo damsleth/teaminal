@@ -290,6 +290,49 @@ describe('sendChannelMessage', () => {
     expect(seenArgs).toEqual(['token', '--scope', CHANNEL_MESSAGE_SEND_SCOPE])
   })
 
+  test('falls back to Teams chatsvc send when Graph 403s with missing-scope', async () => {
+    primeAuth()
+    let graphCalls = 0
+    let chatsvcCalls = 0
+    __setTransportForTests(async () => {
+      graphCalls++
+      return jsonResponse(
+        {
+          error: {
+            code: 'Forbidden',
+            message:
+              "Missing scope permissions on the request. API requires one of 'ChannelMessage.Send'.",
+          },
+        },
+        { status: 403 },
+      )
+    })
+    setChatsvcTransport(async () => {
+      chatsvcCalls++
+      return new Response(JSON.stringify({ OriginalArrivalTime: '2026-04-29T09:01:00Z' }), {
+        status: 201,
+        headers: {
+          'content-type': 'application/json',
+          Location:
+            'https://emea.ng.msg.teams.microsoft.com/v1/users/ME/conversations/19%3Aabc%40thread.tacv2/messages/9876543210000',
+        },
+      })
+    })
+    setFederationTransport(async () =>
+      jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }),
+    )
+
+    const sent = await sendChannelMessage('team-1', '19:abc@thread.tacv2', 'hi channel')
+    expect(graphCalls).toBe(1)
+    expect(chatsvcCalls).toBe(1)
+    expect(sent.id).toBe('9876543210000')
+
+    // Latched: subsequent sends skip Graph and go straight to chatsvc.
+    await sendChannelMessage('team-1', '19:abc@thread.tacv2', 'second')
+    expect(graphCalls).toBe(1)
+    expect(chatsvcCalls).toBe(2)
+  })
+
   test('forwards AbortSignal', async () => {
     primeAuth()
     let seenSignal: AbortSignal | undefined

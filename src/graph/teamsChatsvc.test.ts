@@ -8,6 +8,8 @@ import {
   __setTransportForTests,
   listChannelMessagesViaChatsvc,
   parseFrom,
+  parseReactions,
+  sendChannelMessageViaChatsvc,
   skypeToChannelMessage,
 } from './teamsChatsvc'
 import {
@@ -198,5 +200,129 @@ describe('listChannelMessagesViaChatsvc', () => {
     )
     const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2')
     expect(page.messages.map((m) => m.id)).toEqual(['1'])
+  })
+})
+
+describe('parseReactions', () => {
+  test('flattens Skype `properties.emotions` into one Reaction per (type, user)', () => {
+    const reactions = parseReactions([
+      {
+        key: 'like',
+        users: [
+          { mri: '8:orgid:4bc16140-a25f-46fa-af77-572d8b946c1c', time: 1745000000000 },
+          { mri: '8:orgid:0caa699d-79d5-4660-81d0-ce05b8954fc7', time: 1745000001000 },
+        ],
+      },
+      {
+        key: 'heart',
+        users: [{ mri: '8:orgid:4bc16140-a25f-46fa-af77-572d8b946c1c' }],
+      },
+    ])
+    expect(reactions).toHaveLength(3)
+    expect(reactions[0]).toEqual({
+      reactionType: 'like',
+      createdDateTime: new Date(1745000000000).toISOString(),
+      user: { user: { id: '4bc16140-a25f-46fa-af77-572d8b946c1c' } },
+    })
+    expect(reactions[2]).toEqual({
+      reactionType: 'heart',
+      user: { user: { id: '4bc16140-a25f-46fa-af77-572d8b946c1c' } },
+    })
+  })
+
+  test('returns empty list for missing or malformed input', () => {
+    expect(parseReactions(undefined)).toEqual([])
+    expect(parseReactions([])).toEqual([])
+    expect(parseReactions([{ key: undefined, users: [] }])).toEqual([])
+  })
+})
+
+describe('skypeToChannelMessage with reactions', () => {
+  test('attaches reactions parsed from properties.emotions', () => {
+    const msg = skypeToChannelMessage({
+      id: '1',
+      originalarrivaltime: '2026-04-29T09:00:00Z',
+      messagetype: 'Text',
+      content: 'standup at 10',
+      properties: {
+        emotions: [
+          {
+            key: 'like',
+            users: [{ mri: '8:orgid:4bc16140-a25f-46fa-af77-572d8b946c1c', time: 1745000000000 }],
+          },
+        ],
+      },
+    })
+    expect(msg.reactions).toEqual([
+      {
+        reactionType: 'like',
+        createdDateTime: new Date(1745000000000).toISOString(),
+        user: { user: { id: '4bc16140-a25f-46fa-af77-572d8b946c1c' } },
+      },
+    ])
+  })
+})
+
+describe('sendChannelMessageViaChatsvc', () => {
+  test('POSTs the Skype-shaped body to the chatsvc messages endpoint', async () => {
+    primeAuth()
+    const captured: { url?: string; auth?: string; body?: Record<string, unknown> } = {}
+    __setTransportForTests(async (url, init) => {
+      captured.url = url
+      const headers = new Headers(init.headers as Record<string, string>)
+      captured.auth = headers.get('authentication') ?? ''
+      captured.body = JSON.parse(String(init.body)) as Record<string, unknown>
+      return new Response(JSON.stringify({ OriginalArrivalTime: '2026-04-29T09:01:00Z' }), {
+        status: 201,
+        headers: {
+          'content-type': 'application/json',
+          Location:
+            'https://emea.ng.msg.teams.microsoft.com/v1/users/ME/conversations/19%3Aabc%40thread.tacv2/messages/9876543210000',
+        },
+      })
+    })
+
+    const sent = await sendChannelMessageViaChatsvc('19:abc@thread.tacv2', 'standup at 10', {
+      imdisplayname: 'Carl',
+      fromUserId: '4bc16140-a25f-46fa-af77-572d8b946c1c',
+    })
+
+    expect(captured.url).toBe(
+      'https://teams.microsoft.com/api/chatsvc/emea/v1/users/ME/conversations/19%3Aabc%40thread.tacv2/messages',
+    )
+    expect(captured.auth).toBe('skypetoken=skype-test-token')
+    expect(captured.body).toMatchObject({
+      content: 'standup at 10',
+      messagetype: 'Text',
+      contenttype: 'text',
+      imdisplayname: 'Carl',
+    })
+    expect(sent.id).toBe('9876543210000')
+    expect(sent.createdDateTime).toBe(new Date('2026-04-29T09:01:00Z').toISOString())
+    expect(sent.from?.user?.id).toBe('4bc16140-a25f-46fa-af77-572d8b946c1c')
+  })
+
+  test('encodes a reply via properties.parentmessageid and returns replyToId', async () => {
+    primeAuth()
+    const captured: { body?: Record<string, unknown> } = {}
+    __setTransportForTests(async (_url, init) => {
+      captured.body = JSON.parse(String(init.body)) as Record<string, unknown>
+      return new Response('{}', {
+        status: 201,
+        headers: {
+          'content-type': 'application/json',
+          Location:
+            'https://emea.ng.msg.teams.microsoft.com/v1/users/ME/conversations/19%3Aabc%40thread.tacv2/messages/200',
+        },
+      })
+    })
+
+    const sent = await sendChannelMessageViaChatsvc('19:abc@thread.tacv2', 'reply text', {
+      replyToId: '100',
+    })
+
+    expect(captured.body?.properties).toEqual({ parentmessageid: '100' })
+    expect(sent.replyToId).toBe('100')
+    expect(sent.id).toBe('200')
   })
 })
