@@ -16,7 +16,7 @@
 // already consumes.
 
 import { recordRequest } from '../log'
-import type { ChatMessage } from '../types'
+import type { ChatMessage, Reaction } from '../types'
 import { getActiveProfile } from './client'
 import { getSkypeToken } from './teamsFederation'
 
@@ -117,6 +117,17 @@ async function chatsvcGet<T>(
   return { status: res.status, body: parsed, text }
 }
 
+type SkypeEmotionUser = {
+  mri?: string
+  time?: number
+  value?: string
+}
+
+type SkypeEmotion = {
+  key?: string
+  users?: SkypeEmotionUser[]
+}
+
 type SkypeMessage = {
   id?: string
   originalarrivaltime?: string
@@ -132,6 +143,7 @@ type SkypeMessage = {
     deletetime?: string | number
     parentmessageid?: string
     subject?: string
+    emotions?: SkypeEmotion[]
     [key: string]: unknown
   }
   [key: string]: unknown
@@ -192,11 +204,36 @@ const SKYPE_SYSTEM_TYPES = new Set([
   'Event/Meeting',
 ])
 
+// Skype expresses reactions as a `properties.emotions` array, with one
+// entry per reaction type and a nested user list. The Graph shape uses
+// one Reaction per (type, user) tuple, so we flatten here. Skype keys
+// usually match Graph's documented set ('like'/'heart'/'laugh'/...);
+// custom emoji keys pass through verbatim - the existing reactions
+// renderer already tolerates open-string values.
+export function parseReactions(emotions: SkypeEmotion[] | undefined): Reaction[] {
+  if (!Array.isArray(emotions) || emotions.length === 0) return []
+  const out: Reaction[] = []
+  for (const e of emotions) {
+    if (!e.key || !Array.isArray(e.users)) continue
+    for (const u of e.users) {
+      const userId = parseFrom(u.mri).userId
+      const created = u.time ? toIsoFromAny(u.time) : undefined
+      out.push({
+        reactionType: e.key,
+        ...(created ? { createdDateTime: created } : {}),
+        ...(userId ? { user: { user: { id: userId } } } : {}),
+      })
+    }
+  }
+  return out
+}
+
 // Map a Skype-shaped message into the ChannelMessage shape the UI
-// already consumes. We only fill fields the renderer actually reads;
-// anything missing falls through as undefined. Reactions, attachments,
-// and mentions are not yet parsed - they'll show as empty until we
-// extend the mapper.
+// already consumes. Covers id, body (text/html), createdDateTime,
+// edits (lastModifiedDateTime), deletes (deletedDateTime), sender
+// (from.user.id + displayName), reply parent (replyToId), reactions,
+// and a small set of system-event subtypes. Attachments and mentions
+// are intentionally left empty - the existing renderer ignores them.
 export function skypeToChannelMessage(raw: SkypeMessage): ChatMessage {
   const created =
     toIsoFromAny(raw.originalarrivaltime) ??
@@ -212,6 +249,7 @@ export function skypeToChannelMessage(raw: SkypeMessage): ChatMessage {
     typeof replyToRaw === 'string' && replyToRaw.length > 0 && replyToRaw !== raw.id
       ? replyToRaw
       : undefined
+  const reactions = parseReactions(raw.properties?.emotions)
 
   return {
     id: raw.id ?? '',
@@ -223,6 +261,7 @@ export function skypeToChannelMessage(raw: SkypeMessage): ChatMessage {
       contentType: isHtml ? 'html' : 'text',
       content: raw.content ?? '',
     },
+    ...(reactions.length > 0 ? { reactions } : {}),
     ...(userId || raw.imdisplayname
       ? {
           from: {
@@ -294,6 +333,114 @@ export async function listChannelMessagesViaChatsvcNextPage(
   return {
     messages: mapped,
     backwardLink: res.body?._metadata?.backwardLink,
+  }
+}
+
+export type SendChatsvcOpts = ChatsvcOpts & {
+  /** When set, the message is posted as a reply to this thread root. */
+  replyToId?: string
+  /** Display name surfaced as the sender in the optimistic local row. */
+  imdisplayname?: string
+  /** Author MRI for the optimistic from.user.id (caller passes it; we don't echo). */
+  fromUserId?: string
+}
+
+function clientMessageId(): string {
+  // Skype expects a numeric string. 19 digits keeps it well inside the
+  // documented signed-64-bit range while still being collision-safe.
+  const millis = Date.now().toString()
+  const rand = Math.floor(Math.random() * 1_000_000)
+    .toString()
+    .padStart(6, '0')
+  return `${millis}${rand}`
+}
+
+// Posts a message (root or reply) into a channel via chatsvc. Returns
+// the canonical ChannelMessage shape so the UI can replace its
+// optimistic row in place. Reply semantics: chatsvc encodes the
+// parent in `properties.parentmessageid`, not via a separate
+// /replies endpoint as Graph does.
+export async function sendChannelMessageViaChatsvc(
+  threadId: string,
+  content: string,
+  opts?: SendChatsvcOpts,
+): Promise<ChatMessage> {
+  const url = `${TEAMS_ORIGIN}/api/chatsvc/${region(opts)}/v1/users/ME/conversations/${encodeURIComponent(
+    threadId,
+  )}/messages`
+  const cmid = clientMessageId()
+  const body: Record<string, unknown> = {
+    content,
+    messagetype: 'Text',
+    contenttype: 'text',
+    clientmessageid: cmid,
+    ...(opts?.imdisplayname ? { imdisplayname: opts.imdisplayname } : {}),
+    ...(opts?.replyToId ? { properties: { parentmessageid: opts.replyToId } } : {}),
+  }
+  const skypeToken = await getSkypeToken({ profile: profile(opts), signal: opts?.signal })
+  const startedAt = Date.now()
+  const path = new URL(url).pathname
+  let res: Response
+  try {
+    res = await transport(url, {
+      method: 'POST',
+      headers: chatsvcHeaders(skypeToken),
+      body: JSON.stringify(body),
+      signal: opts?.signal,
+    })
+  } catch (err) {
+    recordRequest({
+      ts: startedAt,
+      method: 'POST',
+      path,
+      status: null,
+      durationMs: Date.now() - startedAt,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+  const durationMs = Date.now() - startedAt
+  recordRequest({ ts: startedAt, method: 'POST', path, status: res.status, durationMs })
+  const text = await safeText(res)
+  if (res.status < 200 || res.status >= 300) {
+    throw new TeamsChatsvcError(
+      res.status,
+      `teams chatsvc send ${res.status}: ${text || 'request failed'}`,
+    )
+  }
+  let parsed: { OriginalArrivalTime?: string; id?: string } | null = null
+  if (text) {
+    try {
+      parsed = JSON.parse(text) as { OriginalArrivalTime?: string; id?: string }
+    } catch {
+      parsed = null
+    }
+  }
+  // Skype responds 201 with `{ OriginalArrivalTime }` and a Location
+  // header containing the canonical message id. Some regions also
+  // return the id in the body. Prefer the body id when present.
+  const location = res.headers.get('Location') ?? res.headers.get('location') ?? ''
+  const locationMatch = location.match(/\/messages\/([^/?]+)/)
+  const messageId = parsed?.id ?? (locationMatch ? locationMatch[1]! : cmid)
+  const created = parsed?.OriginalArrivalTime
+    ? toIsoFromAny(parsed.OriginalArrivalTime) ?? new Date().toISOString()
+    : new Date().toISOString()
+  return {
+    id: messageId,
+    createdDateTime: created,
+    messageType: 'message',
+    body: { contentType: 'text', content },
+    ...(opts?.replyToId ? { replyToId: opts.replyToId } : {}),
+    ...(opts?.fromUserId
+      ? {
+          from: {
+            user: {
+              id: opts.fromUserId,
+              ...(opts.imdisplayname ? { displayName: opts.imdisplayname } : {}),
+            },
+          },
+        }
+      : {}),
   }
 }
 

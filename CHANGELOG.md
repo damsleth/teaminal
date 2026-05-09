@@ -8,6 +8,20 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Channel send + reply fallback to Teams chatsvc.** When Graph 403s
+  with "Missing scope permissions" for `ChannelMessage.Send`,
+  `sendChannelMessage` and `postChannelReply` now POST to
+  `teams.microsoft.com/api/chatsvc/{region}/v1/users/ME/conversations
+  /{threadId}/messages` with a Skype-shaped body
+  (`messagetype`/`contenttype`/`clientmessageid`, plus
+  `properties.parentmessageid` for replies). The canonical message id
+  is parsed from the response `Location` header so the optimistic
+  composer row is replaced in place.
+- **Reactions in chatsvc-fallback channels.** `skypeToChannelMessage`
+  now flattens `properties.emotions` into the existing Graph
+  `Reaction[]` shape (one entry per (type, user) tuple), so
+  `(👍|😊3)` summaries render in fallback channels exactly like
+  Graph-served chats.
 - **Auth-expired recovery prompt.** When the active owa-piggy profile's
   refresh token has hit its hard expiry (e.g. the SPA 24h cap from
   `AADSTS700084`, or any `invalid_grant`), teaminal now stays mounted
