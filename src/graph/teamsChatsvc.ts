@@ -15,7 +15,7 @@
 // each message into the ChannelMessage shape the rest of the app
 // already consumes.
 
-import { recordRequest } from '../log'
+import { recordEvent, recordRequest } from '../log'
 import type { ChatMessage, Reaction } from '../types'
 import { getActiveProfile } from './client'
 import { getSkypeToken } from './teamsFederation'
@@ -284,6 +284,31 @@ export function skypeToChannelMessage(raw: SkypeMessage): ChatMessage {
 // returning so the caller can append in render order. Replies are
 // filtered out at the chatsvc layer too (the UI fetches replies via a
 // separate path).
+// Latched when we've already logged a "successful but empty/unparsed
+// chatsvc response" diagnostic for the current session, so the network
+// panel doesn't fill up with one event per active poll.
+const emptyResponseLogged = new Set<string>()
+
+function diagnoseEmptyResponse(threadId: string, status: number, body: unknown, text: string): void {
+  if (emptyResponseLogged.has(threadId)) return
+  emptyResponseLogged.add(threadId)
+  const obj = body && typeof body === 'object' ? (body as Record<string, unknown>) : null
+  const keys = obj ? Object.keys(obj).slice(0, 12).join(',') : '(non-object)'
+  const msgCount =
+    obj && Array.isArray(obj.messages) ? (obj.messages as unknown[]).length : '(missing)'
+  const excerpt = text ? text.slice(0, 240).replace(/\s+/g, ' ') : '(empty body)'
+  recordEvent(
+    'graph',
+    'warn',
+    `chatsvc ${status} no usable messages for ${threadId.slice(0, 24)}... keys=[${keys}] messages=${msgCount}`,
+  )
+  recordEvent('graph', 'warn', `chatsvc body excerpt: ${excerpt}`)
+}
+
+export function __resetChatsvcDiagnosticsForTests(): void {
+  emptyResponseLogged.clear()
+}
+
 export async function listChannelMessagesViaChatsvc(
   threadId: string,
   opts?: ChatsvcOpts & { pageSize?: number },
@@ -305,6 +330,9 @@ export async function listChannelMessagesViaChatsvc(
     .map(skypeToChannelMessage)
     .filter((m) => m.id.length > 0)
     .reverse()
+  if (mapped.length === 0) {
+    diagnoseEmptyResponse(threadId, res.status, res.body, res.text)
+  }
   return {
     messages: mapped,
     backwardLink: res.body?._metadata?.backwardLink,
@@ -450,4 +478,5 @@ export function __setTransportForTests(t: Transport): void {
 
 export function __resetForTests(): void {
   transport = realTransport
+  emptyResponseLogged.clear()
 }

@@ -14,8 +14,6 @@ import {
 } from './teamsFederation'
 import {
   __resetChannelReadFallbackForTests,
-  CHANNEL_MESSAGE_READ_SCOPE,
-  CHANNEL_MESSAGE_SEND_SCOPE,
   listChannelMessages,
   listChannelMessagesPage,
   listChannels,
@@ -132,74 +130,61 @@ describe('listChannels', () => {
 })
 
 describe('listChannelMessages', () => {
-  test('GETs the channel messages path with $top=50 by default', async () => {
+  test('hits chatsvc messages with pageSize=50 by default', async () => {
     primeAuth()
-    let seenArgs: string[] = []
-    setAuthRunner(async (args) => {
-      seenArgs = args
-      return { stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }
-    })
     let seenUrl = ''
-    __setTransportForTests(async (url) => {
+    setChatsvcTransport(async (url) => {
       seenUrl = url
-      return jsonResponse({ value: [CHANNEL_MESSAGE] })
+      return jsonResponse({ messages: [] })
     })
-    await listChannelMessages('team-1', '19:abc@thread.tacv2')
-    expect(seenUrl).toBe(
-      'https://graph.microsoft.com/v1.0/teams/team-1/channels/19%3Aabc%40thread.tacv2/messages?%24top=50',
+    setFederationTransport(async () =>
+      jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }),
     )
-    expect(seenUrl).not.toContain('%24orderby')
-    expect(seenUrl).not.toContain('%24filter')
-    expect(seenArgs).toEqual(['token', '--scope', CHANNEL_MESSAGE_READ_SCOPE])
+    await listChannelMessages('team-1', '19:abc@thread.tacv2')
+    expect(seenUrl).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
+    expect(seenUrl).toContain(encodeURIComponent('19:abc@thread.tacv2'))
+    expect(seenUrl).toContain('pageSize=50')
   })
 
-  test('honors a custom $top', async () => {
+  test('honors a custom pageSize via top', async () => {
     primeAuth()
     let seenUrl = ''
-    __setTransportForTests(async (url) => {
+    setChatsvcTransport(async (url) => {
       seenUrl = url
-      return jsonResponse({ value: [] })
+      return jsonResponse({ messages: [] })
     })
+    setFederationTransport(async () =>
+      jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }),
+    )
     await listChannelMessages('team-1', '19:abc', { top: 10 })
-    expect(seenUrl).toContain('%24top=10')
+    expect(seenUrl).toContain('pageSize=10')
   })
 
-  test('reverses descending API order into chronological for the UI', async () => {
+  test('reverses Skype descending order into chronological for the UI', async () => {
     primeAuth()
-    const m = (id: string, t: string): ChannelMessage => ({
-      id,
-      createdDateTime: t,
-      body: { contentType: 'text', content: id },
-    })
-    __setTransportForTests(async () =>
+    setChatsvcTransport(async () =>
       jsonResponse({
-        value: [
-          m('latest', '2026-04-29T09:15:00Z'),
-          m('middle', '2026-04-29T09:10:00Z'),
-          m('oldest', '2026-04-29T09:00:00Z'),
+        messages: [
+          { id: '3', originalarrivaltime: '2026-04-29T09:15:00Z', messagetype: 'Text' },
+          { id: '2', originalarrivaltime: '2026-04-29T09:10:00Z', messagetype: 'Text' },
+          { id: '1', originalarrivaltime: '2026-04-29T09:00:00Z', messagetype: 'Text' },
         ],
       }),
     )
+    setFederationTransport(async () =>
+      jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }),
+    )
     const msgs = await listChannelMessages('team-1', '19:abc')
-    expect(msgs.map((x) => x.id)).toEqual(['oldest', 'middle', 'latest'])
+    expect(msgs.map((x) => x.id)).toEqual(['1', '2', '3'])
   })
 
-  test('falls back to Teams chatsvc when Graph 403s with missing-scope', async () => {
+  test('reads channel messages via Teams chatsvc, never via Graph', async () => {
     primeAuth()
     let graphCalls = 0
     let chatsvcCalls = 0
     __setTransportForTests(async () => {
       graphCalls++
-      return jsonResponse(
-        {
-          error: {
-            code: 'Forbidden',
-            message:
-              "Missing scope permissions on the request. API requires one of 'ChannelMessage.Read.All'.",
-          },
-        },
-        { status: 403 },
-      )
+      return jsonResponse({}, { status: 500 })
     })
     setChatsvcTransport(async () => {
       chatsvcCalls++
@@ -223,14 +208,13 @@ describe('listChannelMessages', () => {
     )
 
     const page = await listChannelMessagesPage('team-1', '19:abc@thread.tacv2')
-    expect(graphCalls).toBe(1)
+    expect(graphCalls).toBe(0)
     expect(chatsvcCalls).toBe(1)
     expect(page.messages.map((m) => m.id)).toEqual(['1717770000000'])
 
-    // Subsequent calls bypass Graph entirely (latched) and go straight
-    // to the chatsvc fallback.
+    // Every subsequent call also goes to chatsvc.
     await listChannelMessagesPage('team-1', '19:abc@thread.tacv2')
-    expect(graphCalls).toBe(1)
+    expect(graphCalls).toBe(0)
     expect(chatsvcCalls).toBe(2)
   })
 })
@@ -262,53 +246,20 @@ describe('paginateChannelMessages', () => {
 })
 
 describe('sendChannelMessage', () => {
-  test('POSTs Graph-wrapped {body: {contentType: text, content}}', async () => {
-    primeAuth()
-    let seenArgs: string[] = []
-    setAuthRunner(async (args) => {
-      seenArgs = args
-      return { stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }
-    })
-    let seenMethod = ''
-    let seenBody = ''
-    let seenUrl = ''
-    __setTransportForTests(async (url, init) => {
-      seenUrl = url
-      seenMethod = init.method ?? ''
-      seenBody = typeof init.body === 'string' ? init.body : ''
-      return jsonResponse({ ...CHANNEL_MESSAGE, id: 'cm-new' })
-    })
-    const created = await sendChannelMessage('team-1', '19:abc@thread.tacv2', 'hi channel')
-    expect(seenMethod).toBe('POST')
-    expect(seenUrl).toBe(
-      'https://graph.microsoft.com/v1.0/teams/team-1/channels/19%3Aabc%40thread.tacv2/messages',
-    )
-    expect(JSON.parse(seenBody)).toEqual({
-      body: { contentType: 'text', content: 'hi channel' },
-    })
-    expect(created.id).toBe('cm-new')
-    expect(seenArgs).toEqual(['token', '--scope', CHANNEL_MESSAGE_SEND_SCOPE])
-  })
-
-  test('falls back to Teams chatsvc send when Graph 403s with missing-scope', async () => {
+  test('POSTs to Teams chatsvc, never to Graph', async () => {
     primeAuth()
     let graphCalls = 0
     let chatsvcCalls = 0
+    let chatsvcUrl = ''
+    let chatsvcBody = ''
     __setTransportForTests(async () => {
       graphCalls++
-      return jsonResponse(
-        {
-          error: {
-            code: 'Forbidden',
-            message:
-              "Missing scope permissions on the request. API requires one of 'ChannelMessage.Send'.",
-          },
-        },
-        { status: 403 },
-      )
+      return jsonResponse({}, { status: 500 })
     })
-    setChatsvcTransport(async () => {
+    setChatsvcTransport(async (url, init) => {
       chatsvcCalls++
+      chatsvcUrl = url
+      chatsvcBody = typeof init.body === 'string' ? init.body : ''
       return new Response(JSON.stringify({ OriginalArrivalTime: '2026-04-29T09:01:00Z' }), {
         status: 201,
         headers: {
@@ -323,23 +274,34 @@ describe('sendChannelMessage', () => {
     )
 
     const sent = await sendChannelMessage('team-1', '19:abc@thread.tacv2', 'hi channel')
-    expect(graphCalls).toBe(1)
+    expect(graphCalls).toBe(0)
     expect(chatsvcCalls).toBe(1)
+    expect(chatsvcUrl).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
+    expect(JSON.parse(chatsvcBody)).toMatchObject({
+      content: 'hi channel',
+      messagetype: 'Text',
+      contenttype: 'text',
+    })
     expect(sent.id).toBe('9876543210000')
-
-    // Latched: subsequent sends skip Graph and go straight to chatsvc.
-    await sendChannelMessage('team-1', '19:abc@thread.tacv2', 'second')
-    expect(graphCalls).toBe(1)
-    expect(chatsvcCalls).toBe(2)
   })
 
   test('forwards AbortSignal', async () => {
     primeAuth()
     let seenSignal: AbortSignal | undefined
-    __setTransportForTests(async (_url, init) => {
+    setChatsvcTransport(async (_url, init) => {
       seenSignal = init.signal ?? undefined
-      return jsonResponse(CHANNEL_MESSAGE)
+      return new Response(JSON.stringify({}), {
+        status: 201,
+        headers: {
+          'content-type': 'application/json',
+          Location:
+            'https://emea.ng.msg.teams.microsoft.com/v1/users/ME/conversations/19%3Aabc/messages/1',
+        },
+      })
     })
+    setFederationTransport(async () =>
+      jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }),
+    )
     const ctrl = new AbortController()
     await sendChannelMessage('team-1', '19:abc', 'hi', { signal: ctrl.signal })
     expect(seenSignal).toBe(ctrl.signal)

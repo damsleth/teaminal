@@ -11,8 +11,7 @@
 //     where the user is only a shared-channel member; shared-channel
 //     discovery is parked for after v1
 
-import { recordEvent } from '../log'
-import { graph, GraphError, paginate } from './client'
+import { graph, paginate } from './client'
 import {
   listChannelMessagesViaChatsvc,
   listChannelMessagesViaChatsvcNextPage,
@@ -23,33 +22,20 @@ import type { Channel, ChannelMessage, Team } from '../types'
 type CollectionResponse<T> = { value: T[]; '@odata.nextLink'?: string }
 
 const CHANNEL_MESSAGES_TOP_DEFAULT = 50
+
+// Channel message endpoints under Microsoft Graph require
+// ChannelMessage.Read.All / ChannelMessage.Send. owa-piggy / FOCI never
+// issues those scopes (they're not in the OWA token's consented set,
+// and AADSTS65002 blocks the explicit upgrade), so we don't try Graph
+// at all - reads, sends, and replies always go through the Teams chat
+// service. The constants below are kept for documentation only.
 export const CHANNEL_MESSAGE_READ_SCOPE = 'https://graph.microsoft.com/ChannelMessage.Read.All'
 export const CHANNEL_MESSAGE_SEND_SCOPE = 'https://graph.microsoft.com/ChannelMessage.Send'
 
-// Latched once Graph rejects channel message reads in this session
-// (typically tenants without ChannelMessage.Read.All preauth on the
-// Teams Web app id). All subsequent reads go straight to the chatsvc
-// fallback without re-trying Graph.
-let graphChannelReadsBlocked = false
-
-function isMissingScopeError(err: unknown): boolean {
-  if (!(err instanceof GraphError)) return false
-  if (err.status !== 403) return false
-  return /missing\s+scope|ChannelMessage\.Read\.All/i.test(err.message)
-}
-
+// Test compatibility shim - the previous Graph fallback flag is no
+// longer needed but tests still call the reset helper.
 export function __resetChannelReadFallbackForTests(): void {
-  graphChannelReadsBlocked = false
-}
-
-function noteFallbackOnce(reason: string): void {
-  if (graphChannelReadsBlocked) return
-  graphChannelReadsBlocked = true
-  recordEvent(
-    'graph',
-    'warn',
-    `channel reads via Graph blocked (${reason}); falling back to Teams chatsvc for the rest of this session`,
-  )
+  /* nothing to reset - chatsvc is the only path */
 }
 
 export type ListJoinedTeamsOpts = {
@@ -106,28 +92,14 @@ export async function listChannelMessages(
 }
 
 export async function listChannelMessagesPage(
-  teamId: string,
+  _teamId: string,
   channelId: string,
   opts?: ListChannelMessagesOpts,
 ): Promise<ChannelMessagesPage> {
-  if (!graphChannelReadsBlocked) {
-    try {
-      const res = await graph<CollectionResponse<ChannelMessage>>({
-        method: 'GET',
-        path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages`,
-        query: { $top: opts?.top ?? CHANNEL_MESSAGES_TOP_DEFAULT },
-        scope: CHANNEL_MESSAGE_READ_SCOPE,
-        signal: opts?.signal,
-      })
-      return {
-        messages: res.value.slice().reverse(),
-        nextLink: res['@odata.nextLink'],
-      }
-    } catch (err) {
-      if (!isMissingScopeError(err)) throw err
-      noteFallbackOnce('Graph 403 missing ChannelMessage.Read.All')
-    }
-  }
+  // Graph would 403 with "Missing scope permissions on the request.
+  // API requires one of 'ChannelMessage.Read.All'" because owa-piggy /
+  // FOCI cannot mint that scope from the OWA refresh token. Always go
+  // through the Teams chat service.
   const fallback = await listChannelMessagesViaChatsvc(channelId, {
     pageSize: opts?.top ?? CHANNEL_MESSAGES_TOP_DEFAULT,
     signal: opts?.signal,
@@ -139,23 +111,8 @@ export async function listChannelMessagesNextPage(
   nextLink: string,
   opts?: { signal?: AbortSignal },
 ): Promise<ChannelMessagesPage> {
-  // chatsvc backward links live on teams.microsoft.com; Graph nextLinks
-  // live on graph.microsoft.com. Route by hostname so we never send a
-  // chatsvc URL through the Graph wrapper (and vice versa).
-  if (nextLink.includes('teams.microsoft.com')) {
-    const fallback = await listChannelMessagesViaChatsvcNextPage(nextLink, { signal: opts?.signal })
-    return { messages: fallback.messages, nextLink: fallback.backwardLink }
-  }
-  const res = await graph<CollectionResponse<ChannelMessage>>({
-    method: 'GET',
-    path: nextLink,
-    scope: CHANNEL_MESSAGE_READ_SCOPE,
-    signal: opts?.signal,
-  })
-  return {
-    messages: res.value.slice().reverse(),
-    nextLink: res['@odata.nextLink'],
-  }
+  const fallback = await listChannelMessagesViaChatsvcNextPage(nextLink, { signal: opts?.signal })
+  return { messages: fallback.messages, nextLink: fallback.backwardLink }
 }
 
 // AsyncGenerator of channel-message pages following @odata.nextLink. Each
@@ -181,25 +138,13 @@ export type SendChannelMessageOpts = {
 }
 
 export async function sendChannelMessage(
-  teamId: string,
+  _teamId: string,
   channelId: string,
   content: string,
   opts?: SendChannelMessageOpts,
 ): Promise<ChannelMessage> {
-  if (!graphChannelReadsBlocked) {
-    try {
-      return await graph<ChannelMessage>({
-        method: 'POST',
-        path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages`,
-        body: { body: { contentType: 'text', content } },
-        scope: CHANNEL_MESSAGE_SEND_SCOPE,
-        signal: opts?.signal,
-      })
-    } catch (err) {
-      if (!isMissingScopeError(err)) throw err
-      noteFallbackOnce('Graph 403 missing ChannelMessage.Send')
-    }
-  }
+  // Graph send needs ChannelMessage.Send which FOCI never issues.
+  // Route through chatsvc unconditionally.
   return sendChannelMessageViaChatsvc(channelId, content, { signal: opts?.signal })
 }
 
@@ -275,26 +220,12 @@ export async function listChannelRepliesNextPage(
  * `replyToId` set to the root.
  */
 export async function postChannelReply(
-  teamId: string,
+  _teamId: string,
   channelId: string,
   rootId: string,
   content: string,
   opts?: SendChannelMessageOpts,
 ): Promise<ChannelMessage> {
-  if (!graphChannelReadsBlocked) {
-    try {
-      return await graph<ChannelMessage>({
-        method: 'POST',
-        path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(rootId)}/replies`,
-        body: { body: { contentType: 'text', content } },
-        scope: CHANNEL_MESSAGE_SEND_SCOPE,
-        signal: opts?.signal,
-      })
-    } catch (err) {
-      if (!isMissingScopeError(err)) throw err
-      noteFallbackOnce('Graph 403 missing ChannelMessage.Send')
-    }
-  }
   return sendChannelMessageViaChatsvc(channelId, content, {
     replyToId: rootId,
     signal: opts?.signal,
