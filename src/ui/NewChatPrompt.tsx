@@ -8,6 +8,7 @@
 import { Box, Text, useApp, useInput } from 'ink'
 import { useEffect, useState } from 'react'
 import { searchChatUsers } from '../graph/chats'
+import { searchExternalUsers } from '../graph/teamsExternalSearch'
 import { clampCursor } from '../state/selectables'
 import type { DirectoryUser } from '../types'
 import { isNewChatQueryCandidate } from './ChatList'
@@ -15,6 +16,10 @@ import { isNewChatQueryCandidate } from './ChatList'
 const DEBOUNCE_MS = 250
 const RESULT_LIMIT = 5
 type PromptZone = 'input' | 'results'
+
+function looksLikeEmail(query: string): boolean {
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(query.trim())
+}
 
 export function NewChatPrompt(props: {
   initialQuery: string
@@ -28,6 +33,7 @@ export function NewChatPrompt(props: {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [zone, setZone] = useState<PromptZone>('input')
+  const [externalLookup, setExternalLookup] = useState<'idle' | 'in-flight' | 'no-hit'>('idle')
 
   useEffect(() => {
     const q = query.trim()
@@ -90,14 +96,41 @@ export function NewChatPrompt(props: {
         }
       }
       if (key.return) {
+        if (loading || externalLookup === 'in-flight') return
         const selected = results[clampCursor(cursor, results.length)]
-        if (!selected || loading) return
-        setLoading(true)
-        setError(null)
-        props.onSelectUser(selected).catch((err) => {
-          setError(err instanceof Error ? err.message : 'create chat failed')
-          setLoading(false)
-        })
+        if (selected) {
+          setLoading(true)
+          setError(null)
+          props.onSelectUser(selected).catch((err) => {
+            setError(err instanceof Error ? err.message : 'create chat failed')
+            setLoading(false)
+          })
+          return
+        }
+        // No Graph results. If the typed query looks like an email,
+        // fall back to the Teams external-tenant search before
+        // surrendering. This is the only path that reaches users in
+        // unlinked tenants.
+        const trimmed = query.trim()
+        if (results.length === 0 && looksLikeEmail(trimmed)) {
+          setExternalLookup('in-flight')
+          setError(null)
+          searchExternalUsers(trimmed, { top: RESULT_LIMIT })
+            .then((users) => {
+              if (users.length === 0) {
+                setExternalLookup('no-hit')
+                return
+              }
+              setResults(users)
+              setCursor(0)
+              setZone('results')
+              setExternalLookup('idle')
+            })
+            .catch((err) => {
+              setExternalLookup('idle')
+              setError(err instanceof Error ? err.message : 'external search failed')
+            })
+        }
         return
       }
       if (key.backspace || key.delete) {
@@ -124,10 +157,18 @@ export function NewChatPrompt(props: {
           <Text color={zone === 'input' ? 'cyan' : 'gray'}>█</Text>
         </Text>
         {loading && <Text color="gray">Searching...</Text>}
-        {error && <Text color="red">{error.slice(0, 120)}</Text>}
-        {!loading && !error && results.length === 0 && query.trim() && (
-          <Text color="gray">No matches</Text>
+        {externalLookup === 'in-flight' && (
+          <Text color="gray">Searching external tenants for {query.trim()}...</Text>
         )}
+        {externalLookup === 'no-hit' && (
+          <Text color="gray">No external match for {query.trim()}</Text>
+        )}
+        {error && <Text color="red">{error.slice(0, 120)}</Text>}
+        {!loading &&
+          !error &&
+          externalLookup === 'idle' &&
+          results.length === 0 &&
+          query.trim() && <Text color="gray">No matches (Enter to search externally)</Text>}
         {results.map((user, i) => {
           const selected = zone === 'results' && i === clampCursor(cursor, results.length)
           const detail = user.mail ?? user.userPrincipalName ?? user.id

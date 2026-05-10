@@ -1,14 +1,15 @@
 import { searchChatUsers } from '../../src/graph/chats'
+import { searchExternalUsers } from '../../src/graph/teamsExternalSearch'
 import type { E2ETest } from '../types'
 
-// Resolve the configured external test users via Graph people + users
-// search (the same union teaminal's "new chat" prompt uses). Failure
-// here usually means the search permissions are stricter than expected
-// or the email is mistyped - either way it blocks federated chat
-// creation.
+// Resolve every configured external test user via the same two-step
+// path the new-chat prompt uses: Graph search first (in-tenant + B2B
+// linked), then a Teams chatsvc-side `searchUsers` fallback for
+// fully-external tenants. The test passes if every user is reachable
+// via at least one path.
 const test: E2ETest = {
   name: 'resolveExternalUsers',
-  description: 'Graph search resolves the configured federated test users',
+  description: 'Graph + Teams external search resolves the configured federated test users',
   async run(ctx) {
     if (ctx.externalUsers.length === 0) {
       throw new Error('no external users configured (--external-users)')
@@ -21,12 +22,28 @@ const test: E2ETest = {
           m.userPrincipalName?.toLowerCase() === email.toLowerCase() ||
           m.mail?.toLowerCase() === email.toLowerCase(),
       )
-      if (!direct) {
-        ctx.log(`MISS "${email}" (search returned ${matches.length} candidates)`)
-        failures.push(email)
+      if (direct) {
+        ctx.log(
+          `HIT (Graph)    "${email}" -> ${direct.displayName ?? '(unnamed)'} (${direct.id})`,
+        )
         continue
       }
-      ctx.log(`HIT  "${email}" -> ${direct.displayName ?? '(unnamed)'} (${direct.id})`)
+      const externalHits = await searchExternalUsers(email, { top: 5 })
+      const externalDirect = externalHits.find(
+        (m) =>
+          m.userPrincipalName?.toLowerCase() === email.toLowerCase() ||
+          m.mail?.toLowerCase() === email.toLowerCase(),
+      )
+      if (externalDirect) {
+        ctx.log(
+          `HIT (external) "${email}" -> ${externalDirect.displayName ?? '(unnamed)'} (${externalDirect.id})`,
+        )
+        continue
+      }
+      ctx.log(
+        `MISS           "${email}" (Graph hits=${matches.length}, external hits=${externalHits.length})`,
+      )
+      failures.push(email)
     }
     if (failures.length > 0) {
       throw new Error(`failed to resolve: ${failures.join(', ')}`)

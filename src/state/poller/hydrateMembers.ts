@@ -8,12 +8,10 @@
 // every list poll is wasted work — the `hydrated` set tracks which
 // chats we've already issued a getChat($expand=members) call for.
 
-import { getChat } from '../../graph/chats'
+import { getChatsBatch } from '../../graph/chats'
 import type { Chat } from '../../types'
 import type { AppState, Store } from '../store'
 import { isAbortError } from './intervals'
-
-const CONCURRENCY = 5
 
 export type HydrateMembersDeps = {
   store: Store<AppState>
@@ -39,24 +37,25 @@ export async function hydrateMissingMembers(
     return true
   })
   if (targets.length === 0) return
-  for (let i = 0; i < targets.length; i += CONCURRENCY) {
-    if (isStopped() || signal.aborted) return
-    const batch = targets.slice(i, i + CONCURRENCY)
-    await Promise.all(
-      batch.map(async (chat) => {
-        try {
-          const full = await getChat(chat.id, { members: true, signal })
-          hydrated.add(chat.id)
-          if (full.members && full.members.length > 0) {
-            store.set((s) => ({
-              chats: s.chats.map((c) => (c.id === chat.id ? { ...c, members: full.members } : c)),
-            }))
-          }
-        } catch (err) {
-          if (isAbortError(err)) return
-          reportError(err)
-        }
-      }),
+  if (isStopped() || signal.aborted) return
+  try {
+    const result = await getChatsBatch(
+      targets.map((c) => c.id),
+      { members: true, signal },
     )
+    for (const id of result.hydrated.keys()) hydrated.add(id)
+    for (const id of result.errors.keys()) hydrated.add(id) // don't retry per-chat 4xx
+    if (result.hydrated.size > 0) {
+      store.set((s) => ({
+        chats: s.chats.map((c) => {
+          const full = result.hydrated.get(c.id)
+          if (!full || !full.members || full.members.length === 0) return c
+          return { ...c, members: full.members }
+        }),
+      }))
+    }
+  } catch (err) {
+    if (isAbortError(err)) return
+    reportError(err)
   }
 }
