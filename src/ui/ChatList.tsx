@@ -293,22 +293,28 @@ export function ChatList() {
   }
 
   return (
-    <Box flexDirection="column" paddingLeft={0} paddingRight={1}>
+    <Box
+      flexDirection="column"
+      flexShrink={0}
+      overflow="hidden"
+      paddingLeft={0}
+      paddingRight={1}
+    >
       {filterBanner}
       {visible.map((row, i) => {
         if (row.kind === 'header') {
           return (
-            <Text key={`h-${row.label}-${i}`} bold>
-              {row.label}
-            </Text>
+            <Box key={`h-${row.label}-${i}`} flexShrink={0}>
+              <Text bold>{row.label}</Text>
+            </Box>
           )
         }
-        if (row.kind === 'spacer') return <Box key={`sp-${i}`} height={1} />
+        if (row.kind === 'spacer') return <Box key={`sp-${i}`} height={1} flexShrink={0} />
 
         if (row.kind === 'synthetic-new-chat') {
           const isSelected = row.index === safeCursor
           return (
-            <Box key={`new-chat-${row.query}`} flexDirection="row">
+            <Box key={`new-chat-${row.query}`} flexDirection="row" flexShrink={0}>
               {density === 'cozy' && <Box width={2} flexShrink={0} />}
               {density === 'cozy' && (
                 <Box width={2} flexShrink={0}>
@@ -352,7 +358,7 @@ export function ChatList() {
         const presenceText = presence ? presence.dot : ' '
         const presenceColor = presence?.color
         return (
-          <Box key={`${row.item.kind}-${row.index}`} flexDirection="row">
+          <Box key={`${row.item.kind}-${row.index}`} flexDirection="row" flexShrink={0}>
             {showGutter && (
               <Box width={2} flexShrink={0}>
                 <Text color={presenceColor}>{`${presenceText} `}</Text>
