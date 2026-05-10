@@ -8,18 +8,35 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **External-tenant user search.** When typing an email in the
-  new-chat prompt and Graph search returns 0, pressing Enter now
-  triggers a fallback against the Teams `users/fetch` endpoint
-  (`/api/mt/part/{region}/beta/users/fetch?isMailAddress=true&...`)
-  with the email in the request body. The same path Teams web uses
-  to resolve users in fully external tenants. Cached per term for 5
-  minutes, with a one-line "Searching external tenants..." status in
-  the prompt while in flight. See `docs/external-user-search.md` for
-  the full implementation plan, including the endpoint discovery
-  trail and the tenant-federation-policy caveat (a 200 with empty
-  results means the destination tenant has not authorised inbound
-  discovery from your tenant - it is not a teaminal bug).
+- **External-tenant user search via the Teams-web `searchV2` path.**
+  HAR-confirmed: when typing an email in the new-chat prompt and
+  Graph search returns 0, pressing Enter now POSTs to
+  `/api/mt/part/{region}/beta/users/searchV2?...&source=newChat`
+  with the bare email as a JSON-string body. Same endpoint Teams
+  web uses for the people-picker. Replaces the earlier `users/fetch`
+  attempt (which never returned results in our tenant). Cached per
+  term for 5 minutes.
+- **Direct AAD object id input as the unlinked-tenant escape hatch.**
+  HAR shows Teams web only resolves unlinked-tenant users when their
+  OID is already cached in IndexedDB - the API alone can't resolve
+  email→OID for tenants with no prior interaction. The new-chat
+  prompt now accepts a UUID pasted directly as the peer's AAD
+  object id and proceeds straight to chat creation. The OID can be
+  recovered from any existing thread id
+  (`19:selfOid_otherOid@unq.gbl.spaces`).
+- **Chatsvc-based 1:1 chat creation when Graph rejects.**
+  `createOneOnOneChat` now falls back to
+  `POST teams.microsoft.com/api/chatsvc/{region}/v1/threads`
+  (Skype-token auth) on Graph 403/404. This is the actual path
+  Teams web uses for cross-tenant chats. Verified live: chat
+  creation with `kim@damsleth.no`'s OID returns 201 + the canonical
+  `unq.gbl.spaces` thread id.
+- **Batched chat-member hydration via Graph `/$batch`.** `Shift+R`
+  (hard refresh) now clears the per-session "already hydrated" set
+  and re-hydrates every chat in 20-chat batches, so chats that show
+  as `(1:1)` because their members never loaded resolve to their
+  full names. Previously the lazy-on-focus path meant a refresh
+  could leave 80%+ of chats unresolved.
 - **Batched chat-member hydration via Graph `/$batch`.** `Shift+R`
   (hard refresh) now clears the per-session "already hydrated" set
   and re-hydrates every chat in 20-chat batches, so chats that show

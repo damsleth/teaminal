@@ -78,15 +78,20 @@ async function safeFullText(res: Response): Promise<string> {
   }
 }
 
-// Skype `searchUsers` rows. Multiple shapes have been observed in the
-// wild; we cover the union.
+// searchV2 row shape. The endpoint also returns `objectId` (raw AAD
+// UUID) alongside the MRI; fall back to it when the MRI is missing.
 type SkypeSearchUser = {
   mri?: string
+  objectId?: string
   displayName?: string
   email?: string
+  mail?: string
   userPrincipalName?: string
   upn?: string
   tenantId?: string
+  givenName?: string
+  surname?: string
+  jobTitle?: string
   type?: string
   [key: string]: unknown
 }
@@ -118,15 +123,17 @@ export function userIdFromMri(mri: string | undefined): string | null {
 }
 
 export function skypeRowToDirectoryUser(row: SkypeSearchUser): DirectoryUser | null {
-  const id = userIdFromMri(row.mri)
+  const id = userIdFromMri(row.mri) ?? (row.objectId ?? null)
   if (!id) return null
+  const mail = row.mail ?? row.email
   return {
     id,
     ...(row.displayName ? { displayName: row.displayName } : {}),
     ...(row.userPrincipalName || row.upn
       ? { userPrincipalName: row.userPrincipalName ?? row.upn }
       : {}),
-    ...(row.email ? { mail: row.email } : {}),
+    ...(mail ? { mail } : {}),
+    ...(row.jobTitle ? { jobTitle: row.jobTitle } : {}),
   }
 }
 
@@ -163,22 +170,16 @@ export async function searchExternalUsers(
   const cached = cacheGet(cacheKey)
   if (cached) return cached.slice(0, opts?.top ?? cached.length)
 
-  // Teams expects a single userId-like value here (UPN, AAD object id,
-  // or Skype MRI). 400 InvalidUserId is what comes back if the param
-  // name or value shape is wrong; we use `userId=` because the error
-  // message itself is "UserId should be Skype Mri or ADObjectId or
-  // UPN" - the param name maps to that error.
-  // Teams web's "find user by email" path is a POST against
-  // /api/mt/part/{region}/beta/users/fetch with the email(s) in the
-  // request body and `isMailAddress`/`canBeSmtpAddress` query flags
-  // set so the server treats the entries as SMTP-style identifiers.
-  // Confirmed via captured HAR; the previously-tried `searchUsers`
-  // endpoint is for pre-resolved MRIs/UPNs only and 400s on plain
-  // emails ("UserId should be Skype Mri or ADObjectId or UPN").
+  // Teams web's actual person-search path (verified from HAR) is
+  // `searchV2`, NOT `searchUsers` or `users/fetch`. Body is the bare
+  // email/UPN as a JSON-string. Returns
+  // { type, value: [{ mri, displayName, email, ... }] } - matches all
+  // the fields we need to construct a DirectoryUser.
   const url =
-    `${TEAMS_ORIGIN}/api/mt/part/${region(opts)}/beta/users/fetch` +
-    `?isMailAddress=true&canBeSmtpAddress=true&enableGuest=true` +
-    `&skypeTeamsInfo=true&includeIBBarredUsers=true&includeDisabledAccounts=true`
+    `${TEAMS_ORIGIN}/api/mt/part/${region(opts)}/beta/users/searchV2` +
+    `?includeDLs=true&enableGuest=true&includeBots=true&includeMTOUsers=true` +
+    `&includeChats=false&includeChannels=false&includeTeams=false` +
+    `&skypeTeamsInfo=true&source=newChat`
   const spacesToken = await getToken({
     profile: profile(opts),
     scope: TEAMS_SPACES_SCOPE,
@@ -189,14 +190,14 @@ export async function searchExternalUsers(
     res = await transport(url, {
       method: 'POST',
       headers: { ...searchHeaders(spacesToken), 'Content-Type': 'application/json;charset=UTF-8' },
-      body: JSON.stringify([trimmed]),
+      body: JSON.stringify(trimmed),
       signal: opts?.signal,
     })
   } catch (err) {
     recordRequest({
       ts: startedAt,
       method: 'POST',
-      path: '/api/mt/part/.../beta/users/fetch',
+      path: '/api/mt/part/.../beta/users/searchV2',
       status: null,
       durationMs: Date.now() - startedAt,
       error: err instanceof Error ? err.message : String(err),
@@ -206,7 +207,7 @@ export async function searchExternalUsers(
   recordRequest({
     ts: startedAt,
     method: 'POST',
-    path: '/api/mt/part/.../beta/users/fetch',
+    path: '/api/mt/part/.../beta/users/searchV2',
     status: res.status,
     durationMs: Date.now() - startedAt,
   })
@@ -218,7 +219,7 @@ export async function searchExternalUsers(
   if (res.status < 200 || res.status >= 300) {
     throw new TeamsExternalSearchError(
       res.status,
-      `teams external users/fetch ${res.status}: ${text.slice(0, 240) || 'request failed'}`,
+      `teams external searchV2 ${res.status}: ${text.slice(0, 240) || 'request failed'}`,
     )
   }
   let parsed: SkypeSearchResponse | null = null

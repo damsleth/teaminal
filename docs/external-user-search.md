@@ -79,81 +79,83 @@ export async function searchExternalUsers(
 ```
 
 POSTs to
-`https://teams.microsoft.com/api/mt/part/{region}/beta/users/fetch?isMailAddress=true&canBeSmtpAddress=true&enableGuest=true&skypeTeamsInfo=true&includeIBBarredUsers=true&includeDisabledAccounts=true`
-with the email(s) as a JSON body array (`["user@domain.tld"]`).
+`https://teams.microsoft.com/api/mt/part/{region}/beta/users/searchV2?includeDLs=true&enableGuest=true&includeBots=true&includeMTOUsers=true&includeChats=false&includeChannels=false&includeTeams=false&skypeTeamsInfo=true&source=newChat`
+with the email/UPN as a bare JSON-string body (`"user@domain.tld"`).
 Auth: spaces token via `Authorization: Bearer` (same as
 `fetchFederated`; chatsvc-side `/v1/users/ME/*` endpoints are the
 ones that want the Skype token via `Authentication`).
 
-Note on endpoint discovery: we tried several `/api/mt/*` variants
-before settling on `users/fetch`:
+Note on endpoint discovery: we walked through several `/api/mt/*`
+variants and one Substrate variant before settling on `searchV2`,
+guided by a HAR capture of Teams web doing the equivalent action.
 
-| Endpoint | Result for `kim@damsleth.no` |
+| Endpoint | Result |
 |---|---|
-| `users/searchUsers?searchTerm=...` (GET) | 400 InvalidUserId - expects an MRI/AAD-id/UPN, not free text |
+| `users/searchUsers?searchTerm=...` (GET) | 400 - expects an MRI/AAD-id/UPN, not free text |
 | `users/{upn}` (GET) | 404 UserNotFound |
 | `users/searchV3` (POST) | 405 Method Not Allowed |
 | `users/fetchFederated` (POST, email body) | 400 - "UserId should be AD ObjectId" |
-| `users/fetch` (POST, email body, `isMailAddress=true`) | 200 + result array (or empty when tenant policy blocks) |
-| `users/fetchShortProfile` (POST, email body) | 200 - same shape as `fetch` |
+| `users/fetch` (POST, email body, `isMailAddress=true`) | 200 + result array but never surfaced unlinked-tenant users in our tenant |
+| `users/fetchShortProfile` (POST, email body) | same as `fetch` |
+| Substrate `search/api/v1/suggestions?scenario=peoplepicker.newChat` | 200 - returns IndexedDB-backed cache results, never live-resolves unknown externals |
+| `users/searchV2` (POST, JSON-string body) | **chosen** - 200 + results for in-tenant + B2B-linked + cached cross-tenant |
 
-Response is `{ type: ..., value: SkypeUser[] }` or a bare
-`SkypeUser[]`; `extractRows()` handles both. Map each entry into the
+Response is `{ type, value: SearchUser[] }`; map each entry into the
 existing `DirectoryUser` shape so the UI can keep using one type.
 
 ### Tenant federation policy
 
-A 200 response with `value: []` does *not* mean the user doesn't
-exist. It means the searched user's tenant has not authorised
-inbound discovery / chat from the caller's tenant. The `damsleth.no`
-test tenant returned empty for every Teams endpoint variant we
-tried; this is a tenant policy decision (Teams admin → external
-access settings), not a teaminal bug. The plumbing is correct, the
-endpoint accepts the request - the upstream just refuses to surface
-the user.
+`searchV2` returning `value: []` does *not* always mean the user
+doesn't exist. Microsoft's search is fundamentally bounded by:
 
-If the test for `kim@damsleth.no` fails with "external hits=0" while
-the linked-tenant user resolves cleanly, the fix is on the Teams
-admin side of the destination tenant, not in teaminal.
+1. The destination tenant's external-access policy (Teams admin →
+   external access settings) must allow inbound discovery from the
+   caller's tenant.
+2. The user must be in *some* directory the caller's tenant can
+   read - either the caller's own AAD, a B2B-linked tenant's AAD,
+   or a cached entry from a prior interaction (Teams' IndexedDB).
 
-Skype response fields we care about:
+For genuinely unlinked tenants where no prior interaction exists,
+neither `searchV2` nor `users/fetch` will surface the user - we
+confirmed this by capturing a HAR of Teams web opening a chat with
+`kim@damsleth.no`: `searchV2` returned empty in that capture too.
+Teams web only succeeded because it had the user's AAD object id
+cached locally from previous sessions.
 
-- `mri` (e.g. `8:orgid:UUID` or `8:live:cid-123`) - the canonical id.
-- `displayName`
-- `email`
-- `userPrincipalName` (when AAD-backed)
-- `tenantId` (when AAD-backed)
+For that scenario, teaminal lets the user paste the AAD object id
+directly into the new-chat prompt - if the input matches the UUID
+pattern, we treat it as the peer's id and proceed straight to chat
+creation. The peer's OID can be obtained from any existing thread
+id (the `19:selfOid_otherOid@unq.gbl.spaces` shape), from the peer
+themselves, or from a prior Teams web session.
 
-Map to `DirectoryUser`:
+### Module: `src/graph/chats.ts` + `src/graph/teamsFederation.ts` (extended)
 
-- `id` ← AAD UUID extracted from MRI (the orgid suffix), or the raw
-  MRI if not orgid-shaped (consumer accounts).
-- `displayName` ← `displayName`
-- `userPrincipalName` ← `userPrincipalName ?? email`
-- `mail` ← `email`
+`createOneOnOneChat(myId, otherId)` posts to Graph `/chats` first.
+When Graph rejects (403/404 - the cross-tenant Chat.Create scope is
+not in the FOCI-issued token), we fall back to a chatsvc create:
 
-Open shape questions (validate against a real call - we don't have a
-HAR yet for this exact endpoint):
+```
+POST https://teams.microsoft.com/api/chatsvc/{region}/v1/threads
+Authentication: skypetoken=<token>
+Body: {
+  "members": [
+    { "id": "8:orgid:<selfOid>", "role": "Admin" },
+    { "id": "8:orgid:<otherOid>", "role": "Admin" }
+  ],
+  "properties": {
+    "threadType": "chat",
+    "fixedRoster": true,
+    "uniquerosterthread": true
+  }
+}
+```
 
-- Does the response come back as `{ value: [...] }` or as a bare
-  array? Code handles both.
-- What's the failure mode for "no such user"? 200 + empty array, or
-  404? Treat both as "no match".
-
-### Module: `src/graph/chats.ts` (extend)
-
-`createOneOnOneChat(myId, otherId)` currently posts to Graph
-`/chats`. Graph 403s for users it doesn't know about (unlinked
-tenants). When `createOneOnOneChat` 403s with that signature, fall
-back to the chatsvc thread-creation path (the same endpoint Teams web
-uses for external-tenant 1:1s). Mirror the chatsvc-channel-fallback
-shape we already have - the `Authorization` token is the Skype
-token, and the body is Skype-shaped.
-
-A simpler tactical option: skip the fallback for v1, and surface a
-clear error if Graph rejects. The user can still see the candidate
-in the picker and learn that the chat-creation step needs more work.
-Keep this as an explicit follow-up in the changelog.
+This is the canonical Teams-web path (verified via HAR). It returns
+201 + a `Location` header containing the canonical
+`19:selfOid_otherOid@unq.gbl.spaces` thread id. The fallback only
+triggers when Graph rejects, so in-tenant chats keep using the
+richer Graph shape.
 
 ### NewChatPrompt UX
 

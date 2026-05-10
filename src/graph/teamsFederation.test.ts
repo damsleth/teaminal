@@ -3,6 +3,7 @@ import {
   __resetForTests,
   __setTransportForTests,
   conversationExistsInTeams,
+  createOneOnOneThreadViaChatsvc,
   federatedUserOids,
   fetchFederatedUsers,
   getMsnp24EquivalentConversationId,
@@ -185,5 +186,78 @@ describe('resolveFederatedEquivalentConversationId', () => {
 
     expect(resolved).toBe(`19:${canonical}_${self}@unq.gbl.spaces`)
     expect(urls[1]).toContain(`19%3A${canonical}_${self}%40unq.gbl.spaces`)
+  })
+})
+
+describe('createOneOnOneThreadViaChatsvc', () => {
+  test('POSTs the orgid MRI roster to chatsvc/v1/threads with the Skype token', async () => {
+    primeAuth()
+    let seenUrl = ''
+    let seenAuth = ''
+    let seenBody = ''
+    __setTransportForTests(async (url, init) => {
+      // First request is the authsvc Skype-token exchange; subsequent
+      // is the actual thread create. We satisfy both with the same
+      // transport stub.
+      if (url.includes('/authsvc/')) {
+        return jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } })
+      }
+      seenUrl = url
+      const headers = new Headers(init.headers as Record<string, string>)
+      seenAuth = headers.get('authentication') ?? ''
+      seenBody = typeof init.body === 'string' ? init.body : ''
+      return new Response('{}', {
+        status: 201,
+        headers: {
+          'content-type': 'application/json',
+          Location:
+            'https://emea.ng.msg.teams.microsoft.com/v1/threads/19:6555c7ee-7c68-4aa8-9f0c-05164c288c36_82568d8b-93c6-478d-94ed-818c97a7dfd0@unq.gbl.spaces',
+        },
+      })
+    })
+
+    const threadId = await createOneOnOneThreadViaChatsvc(
+      '6555c7ee-7c68-4aa8-9f0c-05164c288c36',
+      '82568d8b-93c6-478d-94ed-818c97a7dfd0',
+    )
+
+    expect(seenUrl).toBe('https://teams.microsoft.com/api/chatsvc/emea/v1/threads')
+    expect(seenAuth).toBe('skypetoken=skype-test-token')
+    const body = JSON.parse(seenBody) as {
+      members: { id: string; role: string }[]
+      properties: Record<string, unknown>
+    }
+    expect(body.members).toEqual([
+      { id: '8:orgid:6555c7ee-7c68-4aa8-9f0c-05164c288c36', role: 'Admin' },
+      { id: '8:orgid:82568d8b-93c6-478d-94ed-818c97a7dfd0', role: 'Admin' },
+    ])
+    expect(body.properties).toEqual({
+      threadType: 'chat',
+      fixedRoster: true,
+      uniquerosterthread: true,
+    })
+    // Returns the deterministic unq.gbl.spaces id.
+    expect(threadId).toBe(
+      '19:6555c7ee-7c68-4aa8-9f0c-05164c288c36_82568d8b-93c6-478d-94ed-818c97a7dfd0@unq.gbl.spaces',
+    )
+  })
+
+  test('throws TeamsFederationError when chatsvc rejects the create', async () => {
+    primeAuth()
+    __setTransportForTests(async (url) => {
+      if (url.includes('/authsvc/')) {
+        return jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } })
+      }
+      return jsonResponse(
+        {
+          errorCode: 209,
+          message: 'RosterCreationNotAllowed',
+        },
+        { status: 403 },
+      )
+    })
+    await expect(
+      createOneOnOneThreadViaChatsvc('a', 'b'),
+    ).rejects.toThrow(/chatsvc create thread 403/)
   })
 })

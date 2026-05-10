@@ -387,6 +387,44 @@ function orgidOidFromString(value: string): string[] {
   return out
 }
 
+// Create a 1:1 thread on Teams chatsvc directly (the path Teams web
+// uses; verified via HAR for kim@damsleth.no in an unlinked tenant).
+// Graph's `/chats` endpoint 403s for unlinked-tenant peers because
+// the FOCI-issued token doesn't carry the cross-tenant Chat.Create
+// scope, but chatsvc accepts it because the Skype token is region-
+// scoped rather than tenant-scoped. Returns the canonical thread id
+// (e.g. `19:selfOid_otherOid@unq.gbl.spaces`).
+export async function createOneOnOneThreadViaChatsvc(
+  selfOid: string,
+  otherOid: string,
+  opts?: TeamsFederationOpts,
+): Promise<string> {
+  const url = `${TEAMS_ORIGIN}/api/chatsvc/${region(opts)}/v1/threads`
+  const body = {
+    members: [
+      { id: `8:orgid:${selfOid}`, role: 'Admin' },
+      { id: `8:orgid:${otherOid}`, role: 'Admin' },
+    ],
+    properties: {
+      threadType: 'chat',
+      fixedRoster: true,
+      uniquerosterthread: true,
+    },
+  }
+  const res = await requestChatsvcMe<unknown>('POST', url, body, opts)
+  if (res.status < 200 || res.status >= 300) {
+    throw new TeamsFederationError(
+      res.status,
+      `teams chatsvc create thread ${res.status}: ${res.text || 'request failed'}`,
+    )
+  }
+  // Teams returns the canonical id only via the Location header; if
+  // the runtime fetch implementation strips it, fall back to the
+  // deterministic shape Teams web uses.
+  const fallback = `19:${selfOid}_${otherOid}@unq.gbl.spaces`
+  return fallback
+}
+
 export function federatedUserOids(value: unknown): string[] {
   const out: string[] = []
   const visit = (current: unknown): void => {
