@@ -8,6 +8,24 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **External-tenant user search.** When typing an email in the
+  new-chat prompt and Graph search returns 0, pressing Enter now
+  triggers a fallback against the Teams `users/fetch` endpoint
+  (`/api/mt/part/{region}/beta/users/fetch?isMailAddress=true&...`)
+  with the email in the request body. The same path Teams web uses
+  to resolve users in fully external tenants. Cached per term for 5
+  minutes, with a one-line "Searching external tenants..." status in
+  the prompt while in flight. See `docs/external-user-search.md` for
+  the full implementation plan, including the endpoint discovery
+  trail and the tenant-federation-policy caveat (a 200 with empty
+  results means the destination tenant has not authorised inbound
+  discovery from your tenant - it is not a teaminal bug).
+- **Batched chat-member hydration via Graph `/$batch`.** `Shift+R`
+  (hard refresh) now clears the per-session "already hydrated" set
+  and re-hydrates every chat in 20-chat batches, so chats that show
+  as `(1:1)` because their members never loaded resolve to their
+  full names. Previously the lazy-on-focus path meant a refresh
+  could leave 80%+ of chats unresolved.
 - **`bun run e2e` agent-driven integration suite.** Runs against the
   real owa-piggy profile (default `swon`) and exercises identity,
   chat list, joined teams, channel listing, channel-message reads
@@ -15,7 +33,20 @@ adheres to [Semantic Versioning](https://semver.org/).
   resolver - asserting on real Graph + chatsvc responses. Each test
   captures the new lines appended to `.tmp/events.log` /
   `.tmp/network.log` so failures surface the diagnostic trail
-  inline. Mutating tests are gated behind `TEAMINAL_E2E_MUTATING=1`.
+  inline. Mutating tests (`crud-self`, `crud-linked-tenant`,
+  `crud-unlinked-tenant`) are gated behind `TEAMINAL_E2E_MUTATING=1`
+  and exercise send + edit + soft-delete against the self-chat,
+  a B2B-linked external user, and an unlinked-tenant user via the
+  external-search fallback.
+
+### Fixed
+
+- **Chat-list cursor never lands on an unpainted row.** Anchor the
+  viewport on the cursor and fill the visual-line budget around it
+  (backward then forward) instead of the previous "advance start
+  forward" approach that could miscount when row heights drifted
+  from the Ink wrap engine's actual layout. Long names still wrap
+  onto multiple lines; the cursor row is guaranteed visible.
 
 ### Fixed
 

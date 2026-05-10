@@ -119,6 +119,11 @@ export function startPoller(opts: PollerOpts): PollerHandle {
   // the per-iteration listAbort.
   const hydrateAbort = new AbortController()
 
+  // Set of chat IDs already hydrated via $batch. Owned here so
+  // hardRefresh can clear it (otherwise unresolved chat names would
+  // stay stale across the explicit refresh the user just asked for).
+  const memberHydrated = new Set<string>()
+
   // Wake the active loop and abort its in-flight fetch when focus changes.
   let lastFocusKey = focusKey(store.get().focus)
   const unsubscribe = store.subscribe((state) => {
@@ -164,6 +169,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
     isStopped,
     onMention,
     reportError: (err) => reportError('list', err),
+    memberHydrated,
   })
 
   const runPresenceLoop = makePresenceLoop({
@@ -204,6 +210,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
     hardRefresh() {
       recordEvent('poller', 'info', 'hard refresh requested')
       seen.clear()
+      memberHydrated.clear()
       activeAbort?.abort()
       store.set({
         chats: [],

@@ -34,20 +34,29 @@ export type ListLoopDeps = {
   isStopped: () => boolean
   onMention?: (event: MentionEvent) => void
   reportError: (err: unknown) => void
+  // Set of chat IDs already hydrated via $batch. Owned by the parent
+  // poller so hardRefresh can clear it and force re-hydration of every
+  // chat (otherwise unresolved "(1:1)" labels stay stale across the
+  // refresh).
+  memberHydrated: Set<string>
 }
 
 export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
-  const { store, sleeper, intervalMs, seen, hydrateSignal, isStopped, onMention, reportError } =
-    deps
+  const {
+    store,
+    sleeper,
+    intervalMs,
+    seen,
+    hydrateSignal,
+    isStopped,
+    onMention,
+    reportError,
+    memberHydrated,
+  } = deps
 
   // Per-chat snapshot of the last seen lastMessagePreview.id.
   const prevPreviewIds = new Map<string, string>()
   let firstListPoll = true
-
-  // Set of chat IDs hydrated via getChat($expand=members). Once
-  // populated, the entry is carried forward via mergeChatMembers so we
-  // don't refetch on every list poll.
-  const memberHydrated = new Set<string>()
 
   return async function run(): Promise<void> {
     let consecutiveErrors = 0

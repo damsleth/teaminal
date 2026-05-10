@@ -209,42 +209,57 @@ export function ChatList() {
     return h
   })
 
-  // Find the cursor row's index and slide the viewport based on visual
-  // lines. Scroll up when the cursor is above the window; advance start
-  // forward until the focused row's tail fits inside the budget.
+  // Anchor the viewport on the cursor row, then fill the visual-line
+  // budget around it (backward first so j/k feels sticky, forward to
+  // top up). Anchoring makes it impossible for the cursor to land on a
+  // row outside the visible slice - earlier height-estimate-drift
+  // produced exactly that "skip" bug, where cursor landed on a row
+  // that was navigable but not painted.
   const cursorRowIdx = rows.findIndex((r) => r.kind === 'item' && r.index === safeCursor)
   const viewportRef = useRef(0)
-  const viewStart = (() => {
+  const { viewStart, visibleEnd } = (() => {
+    if (rows.length === 0) return { viewStart: 0, visibleEnd: 0 }
     const cur = cursorRowIdx === -1 ? 0 : cursorRowIdx
-    let start = viewportRef.current
-    if (start > rows.length) start = 0
-    if (cur < start) start = cur
-    let consumed = 0
-    for (let i = start; i <= cur; i++) consumed += heights[i] ?? 1
-    while (consumed > rowsVisible && start < cur) {
-      consumed -= heights[start] ?? 1
-      start++
+    const previousStart = viewportRef.current
+    let start = cur
+    let end = cur + 1
+    let consumed = heights[cur] ?? 1
+    // Sticky scroll: prefer to keep `previousStart` if the cursor is
+    // already inside it (and the cumulative budget still fits).
+    if (
+      previousStart >= 0 &&
+      previousStart <= cur &&
+      previousStart < rows.length
+    ) {
+      let trial = consumed
+      let trialStart = cur
+      while (trialStart > previousStart) {
+        const h = heights[trialStart - 1] ?? 1
+        if (trial + h > rowsVisible) break
+        trialStart--
+        trial += h
+      }
+      if (trialStart === previousStart) {
+        start = previousStart
+        consumed = trial
+      }
     }
-    if (start < 0) start = 0
-    viewportRef.current = start
-    return start
-  })()
-
-  // Slice forward from viewStart until we exhaust the visual-row budget.
-  const visibleEnd = (() => {
-    let consumed = 0
-    let end = viewStart
+    // Backward fill: include older rows until budget is exhausted.
+    while (start > 0) {
+      const h = heights[start - 1] ?? 1
+      if (consumed + h > rowsVisible) break
+      start--
+      consumed += h
+    }
+    // Forward fill: top off the budget with newer rows.
     while (end < rows.length) {
       const h = heights[end] ?? 1
       if (consumed + h > rowsVisible) break
       consumed += h
       end++
     }
-    // Always show at least the cursor row, even if its visual height
-    // alone exceeds the budget (e.g. a 30-col-wide chat name wrapping
-    // onto 4 lines on a tiny terminal).
-    if (end === viewStart && viewStart < rows.length) end = viewStart + 1
-    return end
+    viewportRef.current = start
+    return { viewStart: start, visibleEnd: end }
   })()
   const visible = rows.slice(viewStart, visibleEnd)
 

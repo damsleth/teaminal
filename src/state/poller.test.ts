@@ -89,6 +89,30 @@ function installTransport(handlers: MutableHandlers): void {
     if (url === 'https://graph.microsoft.com/v1.0/me/joinedTeams') {
       return handlers['/me/joinedTeams'](init)
     }
+    // /$batch: synthesize the batched response by routing each
+    // sub-request through the per-chat getChat handler.
+    if (url === 'https://graph.microsoft.com/v1.0/$batch') {
+      const body = JSON.parse(String(init.body ?? '{}')) as {
+        requests?: { id: string; method: string; url: string }[]
+      }
+      const responses = await Promise.all(
+        (body.requests ?? []).map(async (req) => {
+          const m = req.url.match(/^\/chats\/([^/?]+)/)
+          if (!m) return { id: req.id, status: 404, body: { error: { message: 'no match' } } }
+          const subRes = handlers.getChat(decodeURIComponent(m[1]!), init)
+          const subStatus = subRes.status
+          const text = await subRes.text()
+          let parsed: unknown = undefined
+          try {
+            parsed = text ? JSON.parse(text) : undefined
+          } catch {
+            parsed = text
+          }
+          return { id: req.id, status: subStatus, body: parsed }
+        }),
+      )
+      return jsonResponse({ responses })
+    }
     const chatMessagesMatch = url.match(/\/v1\.0\/chats\/([^/]+)\/messages/)
     if (chatMessagesMatch) {
       return handlers.chatMessages(decodeURIComponent(chatMessagesMatch[1]!), init)

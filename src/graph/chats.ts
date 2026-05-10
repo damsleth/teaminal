@@ -51,6 +51,70 @@ export async function getChat(chatId: string, opts?: GetChatOpts): Promise<Chat>
   })
 }
 
+export type GetChatsBatchOpts = {
+  members?: boolean
+  signal?: AbortSignal
+}
+
+export type GetChatsBatchResult = {
+  /** Chats that returned 2xx, keyed by id. */
+  hydrated: Map<string, Chat>
+  /** Chats that returned non-2xx, with the per-request status + message. */
+  errors: Map<string, { status: number; message: string }>
+}
+
+type BatchResponseEntry = {
+  id: string
+  status: number
+  body?: unknown
+}
+
+type BatchResponse = {
+  responses?: BatchResponseEntry[]
+}
+
+const GRAPH_BATCH_MAX = 20
+
+// Microsoft Graph supports up to 20 sub-requests per `$batch` call, so
+// hydrating 100+ chats in one Shift+R cuts the round-trip cost by 20x
+// vs. one getChat per chat. Per-sub-request errors are surfaced in the
+// `errors` map rather than thrown - one bad chat shouldn't abort the
+// whole hydration pass.
+export async function getChatsBatch(
+  chatIds: string[],
+  opts?: GetChatsBatchOpts,
+): Promise<GetChatsBatchResult> {
+  const hydrated = new Map<string, Chat>()
+  const errors = new Map<string, { status: number; message: string }>()
+  for (let i = 0; i < chatIds.length; i += GRAPH_BATCH_MAX) {
+    if (opts?.signal?.aborted) break
+    const slice = chatIds.slice(i, i + GRAPH_BATCH_MAX)
+    const requests = slice.map((id, n) => ({
+      id: String(n),
+      method: 'GET',
+      url: `/chats/${encodeURIComponent(id)}${opts?.members ? '?$expand=members' : ''}`,
+    }))
+    const res = await graph<BatchResponse>({
+      method: 'POST',
+      path: '/$batch',
+      body: { requests },
+      signal: opts?.signal,
+    })
+    for (const entry of res.responses ?? []) {
+      const idx = Number(entry.id)
+      const chatId = slice[idx]
+      if (!chatId) continue
+      if (entry.status >= 200 && entry.status < 300) {
+        hydrated.set(chatId, entry.body as Chat)
+        continue
+      }
+      const err = (entry.body as { error?: { message?: string } } | undefined)?.error
+      errors.set(chatId, { status: entry.status, message: err?.message ?? `status ${entry.status}` })
+    }
+  }
+  return { hydrated, errors }
+}
+
 export type ListMessagesOpts = {
   top?: number
   // ISO 8601 timestamp; returns messages strictly older than this. Pass the
@@ -126,6 +190,38 @@ export async function sendMessage(
     method: 'POST',
     path: `/chats/${encodeURIComponent(chatId)}/messages`,
     body: { body: { contentType: 'text', content } },
+    signal: opts?.signal,
+  })
+}
+
+export async function editMessage(
+  chatId: string,
+  messageId: string,
+  content: string,
+  opts?: SendMessageOpts,
+): Promise<void> {
+  // Graph PATCH on chat messages returns 204; the wrapper resolves to
+  // undefined - no return value needed.
+  await graph<void>({
+    method: 'PATCH',
+    path: `/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}`,
+    body: { body: { contentType: 'text', content } },
+    signal: opts?.signal,
+  })
+}
+
+// Soft-delete the message (the delegated-auth equivalent of DELETE).
+// Returns void on success; the message stays in the conversation as a
+// tombstone with deletedDateTime set, which the UI renders as a
+// "(message deleted)" placeholder.
+export async function softDeleteMessage(
+  chatId: string,
+  messageId: string,
+  opts?: SendMessageOpts,
+): Promise<void> {
+  await graph<void>({
+    method: 'POST',
+    path: `/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}/softDelete`,
     signal: opts?.signal,
   })
 }
