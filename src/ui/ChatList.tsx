@@ -27,12 +27,37 @@ import { useAppState, useTheme } from './StoreContext'
 import type { PresenceColorKey, Theme } from './theme'
 
 const CHROME_ROWS_ESTIMATE = 8
+// Mirrors LIST_PANE_WIDTH in App.tsx. Re-declared here so the chat-list
+// row-height math (visual lines per wrapped label) doesn't need to
+// thread the width through props.
+const LIST_PANE_WIDTH = 30
 
 type Row =
   | { kind: 'header'; label: string }
   | { kind: 'item'; item: SelectableItem; index: number }
   | { kind: 'synthetic-new-chat'; query: string; index: number }
   | { kind: 'spacer' }
+
+// Cells available for the wrappable label/preview text after the
+// presence/selector gutters and indent. Used to convert label length
+// into a visual row count for the viewport slicing math.
+function labelContentWidth(
+  density: ChatListDensity,
+  showPresence: boolean,
+  indent: string,
+): number {
+  let width = LIST_PANE_WIDTH - 2 // round border (1 each side)
+  width -= 1 // paddingRight on the column container
+  if (density === 'cozy' || showPresence) width -= 2 // presence gutter
+  if (density === 'cozy') width -= 2 // selector gutter
+  width -= indent.length
+  return Math.max(1, width)
+}
+
+function visualLines(text: string, contentWidth: number): number {
+  if (!text) return 1
+  return Math.max(1, Math.ceil(text.length / contentWidth))
+}
 
 function buildRows(
   items: SelectableItem[],
@@ -157,21 +182,71 @@ export function ChatList() {
   const safeCursor = clampCursor(cursor, selectableCount)
   const rows = buildRows(items, density, syntheticNewChatQuery)
 
-  // Find the visual index of the row holding the cursor item, then keep it
-  // on-screen by sliding a viewport sized from the live terminal height.
+  // Visual height per logical row. Long chat names wrap onto multiple
+  // visual lines, and unread previews add another line in cozy density;
+  // the viewport math below counts visual lines so wrapping never
+  // pushes adjacent rows off-screen or into the composer.
+  const heights = rows.map((row) => {
+    if (row.kind === 'header' || row.kind === 'spacer') return 1
+    if (row.kind === 'synthetic-new-chat') {
+      const cw = labelContentWidth(density, showPresence, '')
+      return visualLines(`Create chat with "${row.query}"`, cw)
+    }
+    const indent = density === 'cozy' ? rowIndent(row.item) : ''
+    const cw = labelContentWidth(density, showPresence, indent)
+    const label = rowLabel(row.item, me?.id, shortNames)
+    const unread = row.item.kind === 'chat' ? unreadByChatId[row.item.chat.id] : undefined
+    const hasMention = !!unread && unread.mentionCount > 0
+    const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
+    const unreadBadge = hasMention ? ' @' : hasUnread ? ' ●' : ''
+    let h = visualLines(label + unreadBadge, cw)
+    if (density === 'cozy' && hasUnread && row.item.kind === 'chat') {
+      const preview = unread?.lastSenderName
+        ? `${shortName(unread.lastSenderName)} ${previewChat(row.item.chat)}`
+        : previewChat(row.item.chat)
+      h += visualLines(preview, cw)
+    }
+    return h
+  })
+
+  // Find the cursor row's index and slide the viewport based on visual
+  // lines. Scroll up when the cursor is above the window; advance start
+  // forward until the focused row's tail fits inside the budget.
   const cursorRowIdx = rows.findIndex((r) => r.kind === 'item' && r.index === safeCursor)
   const viewportRef = useRef(0)
   const viewStart = (() => {
     const cur = cursorRowIdx === -1 ? 0 : cursorRowIdx
     let start = viewportRef.current
+    if (start > rows.length) start = 0
     if (cur < start) start = cur
-    if (cur >= start + rowsVisible) start = cur - rowsVisible + 1
+    let consumed = 0
+    for (let i = start; i <= cur; i++) consumed += heights[i] ?? 1
+    while (consumed > rowsVisible && start < cur) {
+      consumed -= heights[start] ?? 1
+      start++
+    }
     if (start < 0) start = 0
     viewportRef.current = start
     return start
   })()
 
-  const visible = rows.slice(viewStart, viewStart + rowsVisible)
+  // Slice forward from viewStart until we exhaust the visual-row budget.
+  const visibleEnd = (() => {
+    let consumed = 0
+    let end = viewStart
+    while (end < rows.length) {
+      const h = heights[end] ?? 1
+      if (consumed + h > rowsVisible) break
+      consumed += h
+      end++
+    }
+    // Always show at least the cursor row, even if its visual height
+    // alone exceeds the budget (e.g. a 30-col-wide chat name wrapping
+    // onto 4 lines on a tiny terminal).
+    if (end === viewStart && viewStart < rows.length) end = viewStart + 1
+    return end
+  })()
+  const visible = rows.slice(viewStart, visibleEnd)
 
   // Filter banner: shown while typing a filter, and when a filter is
   // applied but the user isn't actively editing it.
@@ -224,11 +299,7 @@ export function ChatList() {
                 </Box>
               )}
               <Box flexGrow={1} flexShrink={1} minWidth={0}>
-                <Text
-                  color={isSelected ? theme.selected : 'gray'}
-                  bold={isSelected}
-                  wrap="truncate-end"
-                >
+                <Text color={isSelected ? theme.selected : 'gray'} bold={isSelected} wrap="wrap">
                   {`Create chat with "${row.query}"`}
                 </Text>
               </Box>
@@ -284,13 +355,13 @@ export function ChatList() {
               <Text
                 color={isSelected ? theme.selected : hasUnread ? theme.unread : undefined}
                 bold={isSelected || hasUnread}
-                wrap="truncate-end"
+                wrap="wrap"
               >
                 {label}
                 {unreadBadge}
               </Text>
               {density === 'cozy' && hasUnread && row.item.kind === 'chat' && (
-                <Text color={theme.unread} bold wrap="truncate-end">
+                <Text color={theme.unread} bold wrap="wrap">
                   {unread?.lastSenderName
                     ? `${shortName(unread.lastSenderName)} ${previewChat(row.item.chat)}`
                     : previewChat(row.item.chat)}

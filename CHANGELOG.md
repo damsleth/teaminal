@@ -136,6 +136,13 @@ adheres to [Semantic Versioning](https://semver.org/).
   short-circuits the resolver, and the on-focus path only runs for
   detached chats with no `lastMessagePreview` so populated in-tenant
   chats stop generating Teams chatsvc 401 noise.
+- **Chat-list names wrap again, and the viewport tracks visual lines.**
+  Long chat names (group rosters, federated externals) wrap onto
+  multiple lines; the sidebar viewport now slides based on the
+  cumulative *visual* row count instead of logical row count, so
+  wrapped labels no longer push neighbours off-screen or squash the
+  composer. Truncation is reserved for terminals so narrow that even
+  one row's label exceeds the visible budget.
 - **Chat-list rendering no longer overlaps adjacent rows.** Long chat
   names and unread previews are truncated instead of wrapping, so the
   sidebar viewport calculation stays in sync with rendered rows and
