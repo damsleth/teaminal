@@ -6,11 +6,27 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Channel reads, sends, and replies always go through Teams
+  chatsvc.** owa-piggy / FOCI never issues `ChannelMessage.Read.All`
+  or `ChannelMessage.Send` from the OWA refresh token, so the Graph
+  attempt was guaranteed-noise. teaminal no longer pings Graph for
+  channel messages at all - the chatsvc transport is the only path.
+  The `graphChannelReadsBlocked` latch and the "channel reads via
+  Graph blocked..." event are gone with it.
+- **Diagnostic event when chatsvc returns no usable messages.** When
+  the chatsvc messages endpoint returns 2xx but the response is
+  empty / shaped differently than expected, teaminal now logs a
+  one-shot warning containing the top-level keys, the `messages`
+  array length, and a 240-char body excerpt - so an opening channel
+  that stays at "loading..." surfaces *why* in the network panel
+  instead of looking like a hung poll.
+
 ### Added
 
-- **Channel send + reply fallback to Teams chatsvc.** When Graph 403s
-  with "Missing scope permissions" for `ChannelMessage.Send`,
-  `sendChannelMessage` and `postChannelReply` now POST to
+- **Channel send + reply via Teams chatsvc.**
+  `sendChannelMessage` and `postChannelReply` POST to
   `teams.microsoft.com/api/chatsvc/{region}/v1/users/ME/conversations
   /{threadId}/messages` with a Skype-shaped body
   (`messagetype`/`contenttype`/`clientmessageid`, plus
