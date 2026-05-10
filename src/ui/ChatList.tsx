@@ -107,10 +107,14 @@ function rowLabel(item: SelectableItem, myUserId?: string, shortNames = false): 
   return `# ${item.label}`
 }
 
+// Cozy-density indent before the row label. Chats sit flush against
+// the selector gutter so the focus indicator (`>`) is one column
+// away from the name; teams + channels keep their indent to preserve
+// the visual hierarchy under the "Teams" header.
 function rowIndent(item: SelectableItem): string {
   if (item.kind === 'channel') return '    '
   if (item.kind === 'team') return '  '
-  return '  '
+  return ''
 }
 
 export function isNewChatQueryCandidate(filter: string): boolean {
