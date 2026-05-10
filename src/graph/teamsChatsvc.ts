@@ -70,9 +70,9 @@ function chatsvcHeaders(skypeToken: string): Record<string, string> {
   }
 }
 
-async function safeText(res: Response): Promise<string> {
+async function safeFullText(res: Response): Promise<string> {
   try {
-    return (await res.text()).slice(0, 1024)
+    return await res.text()
   } catch {
     return ''
   }
@@ -105,16 +105,19 @@ async function chatsvcGet<T>(
   }
   const durationMs = Date.now() - startedAt
   recordRequest({ ts: startedAt, method: 'GET', path, status: res.status, durationMs })
-  const text = await safeText(res)
+  // Read the FULL body for parsing - chatsvc message responses
+  // routinely exceed any reasonable diagnostic clip. Truncate only the
+  // copy returned for diagnostics so logs stay bounded.
+  const fullText = await safeFullText(res)
   let parsed: T | null = null
-  if (text) {
+  if (fullText) {
     try {
-      parsed = JSON.parse(text) as T
+      parsed = JSON.parse(fullText) as T
     } catch {
       parsed = null
     }
   }
-  return { status: res.status, body: parsed, text }
+  return { status: res.status, body: parsed, text: fullText.slice(0, 1024) }
 }
 
 type SkypeEmotionUser = {
@@ -429,11 +432,11 @@ export async function sendChannelMessageViaChatsvc(
   }
   const durationMs = Date.now() - startedAt
   recordRequest({ ts: startedAt, method: 'POST', path, status: res.status, durationMs })
-  const text = await safeText(res)
+  const text = await safeFullText(res)
   if (res.status < 200 || res.status >= 300) {
     throw new TeamsChatsvcError(
       res.status,
-      `teams chatsvc send ${res.status}: ${text || 'request failed'}`,
+      `teams chatsvc send ${res.status}: ${text.slice(0, 1024) || 'request failed'}`,
     )
   }
   let parsed: { OriginalArrivalTime?: string; id?: string } | null = null

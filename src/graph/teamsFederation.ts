@@ -81,9 +81,14 @@ function federationHeaders(token: string): Record<string, string> {
   }
 }
 
+// Reads the full body. Callers must clip themselves before
+// recording / displaying. We previously sliced to 400 chars here for
+// log safety, but that silently truncated valid JSON whenever a
+// chatsvc/messages response exceeded the clip - JSON.parse would fail
+// and the caller would see "no usable messages" on a successful 200.
 async function safeText(res: Response): Promise<string> {
   try {
-    return (await res.text()).slice(0, 400)
+    return await res.text()
   } catch {
     return ''
   }
@@ -119,16 +124,16 @@ async function requestTeams<T>(
   }
   const durationMs = Date.now() - startedAt
   recordRequest({ ts: startedAt, method, path, status: res.status, durationMs })
-  const text = await safeText(res)
+  const fullText = await safeText(res)
   let parsed: T | null = null
-  if (text) {
+  if (fullText) {
     try {
-      parsed = JSON.parse(text) as T
+      parsed = JSON.parse(fullText) as T
     } catch {
       parsed = null
     }
   }
-  return { status: res.status, body: parsed, text }
+  return { status: res.status, body: parsed, text: fullText.slice(0, 1024) }
 }
 
 type SkypeTokenResponse = {
@@ -318,16 +323,16 @@ export async function requestChatsvcMe<T>(
   }
   const durationMs = Date.now() - startedAt
   recordRequest({ ts: startedAt, method, path, status: res.status, durationMs })
-  const text = await safeText(res)
+  const fullText = await safeText(res)
   let parsed: T | null = null
-  if (text) {
+  if (fullText) {
     try {
-      parsed = JSON.parse(text) as T
+      parsed = JSON.parse(fullText) as T
     } catch {
       parsed = null
     }
   }
-  return { status: res.status, body: parsed, text }
+  return { status: res.status, body: parsed, text: fullText.slice(0, 1024) }
 }
 
 export class TeamsInTenantLookupError extends TeamsFederationError {
