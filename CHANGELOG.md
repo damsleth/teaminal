@@ -6,6 +6,25 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`bun run e2e` agent-driven integration suite.** Runs against the
+  real owa-piggy profile (default `swon`) and exercises identity,
+  chat list, joined teams, channel listing, channel-message reads
+  via chatsvc, external-user search, and federated-conversation
+  resolver - asserting on real Graph + chatsvc responses. Each test
+  captures the new lines appended to `.tmp/events.log` /
+  `.tmp/network.log` so failures surface the diagnostic trail
+  inline. Mutating tests are gated behind `TEAMINAL_E2E_MUTATING=1`.
+
+### Fixed
+
+- **Channel messages no longer "loading..." forever.** `safeText` in
+  the chatsvc and federation transports was clipping the response
+  body to 1024/400 chars *before* `JSON.parse`, which silently
+  truncated valid multi-message bodies into invalid JSON. Reads now
+  parse the full body and only clip the diagnostic-display copy.
+
 ### Changed
 
 - **Channel reads, sends, and replies always go through Teams
