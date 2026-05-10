@@ -8,7 +8,8 @@
 //   - Member expansion is capped at 25 so we hydrate lazily, only on
 //     visible/active chats
 
-import { graph } from './client'
+import { graph, GraphError } from './client'
+import { createOneOnOneThreadViaChatsvc } from './teamsFederation'
 import type { Chat, ChatMessage, DirectoryUser, Person } from '../types'
 
 type CollectionResponse<T> = { value: T[]; '@odata.nextLink'?: string }
@@ -398,7 +399,35 @@ export async function createOneOnOneChat(
   otherUserId: string,
   opts?: CreateChatOpts,
 ): Promise<Chat> {
-  return createChat('oneOnOne', [selfUserId, otherUserId], opts)
+  try {
+    return await createChat('oneOnOne', [selfUserId, otherUserId], opts)
+  } catch (err) {
+    // Graph rejects unlinked-tenant peers with 403/404 (the Chat.Create
+    // path requires either same-tenant or B2B-linked membership).
+    // Teams web works around this by POSTing to chatsvc/v1/threads
+    // directly with the spaces-Bearer token; we mirror that.
+    if (!isUnlinkedPeerCreateRejection(err)) throw err
+    const threadId = await createOneOnOneThreadViaChatsvc(selfUserId, otherUserId, {
+      signal: opts?.signal,
+    })
+    return {
+      id: threadId,
+      chatType: 'oneOnOne',
+      createdDateTime: new Date().toISOString(),
+    }
+  }
+}
+
+function isUnlinkedPeerCreateRejection(err: unknown): boolean {
+  if (!(err instanceof GraphError)) return false
+  if (err.status !== 403 && err.status !== 404) return false
+  // The Graph 403/404 messages we've observed for cross-tenant create
+  // include "BadRequest", "Forbidden", "Could not find member" - none
+  // of them carry a single canonical signal, so we fall back on any
+  // 403/404 from this specific path. Same-tenant typos still surface
+  // as 4xx; the chatsvc retry will fail in that case too, with a
+  // clearer error.
+  return true
 }
 
 export type CreateGroupChatOpts = CreateChatOpts & {

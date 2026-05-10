@@ -21,6 +21,24 @@ function looksLikeEmail(query: string): boolean {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(query.trim())
 }
 
+// Accept a bare AAD object id (UUID) as a direct user reference.
+// Useful for unlinked-tenant cases where neither Graph search nor
+// Teams searchV2 surface the user but the OID is known (e.g. copied
+// from an existing chat thread id or shared by the peer directly).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function looksLikeAadOid(query: string): boolean {
+  return UUID_RE.test(query.trim())
+}
+
+function userFromOid(oid: string): DirectoryUser {
+  const lower = oid.trim().toLowerCase()
+  return {
+    id: lower,
+    displayName: `OID ${lower.slice(0, 8)}...`,
+  }
+}
+
 export function NewChatPrompt(props: {
   initialQuery: string
   onClose: () => void
@@ -107,11 +125,25 @@ export function NewChatPrompt(props: {
           })
           return
         }
-        // No Graph results. If the typed query looks like an email,
-        // fall back to the Teams external-tenant search before
-        // surrendering. This is the only path that reaches users in
-        // unlinked tenants.
         const trimmed = query.trim()
+        // Direct OID path: if the user pasted a UUID, treat it as the
+        // peer's AAD object id and proceed to chat creation. Lets us
+        // start chats with unlinked-tenant users whose OID is known
+        // even when no search surfaces resolves their email.
+        if (results.length === 0 && looksLikeAadOid(trimmed)) {
+          const directUser = userFromOid(trimmed)
+          setLoading(true)
+          setError(null)
+          props.onSelectUser(directUser).catch((err) => {
+            setError(err instanceof Error ? err.message : 'create chat failed')
+            setLoading(false)
+          })
+          return
+        }
+        // No Graph results. If the typed query looks like an email,
+        // fall back to the Teams external-tenant search (`searchV2`)
+        // before surrendering. This is the only path that reaches
+        // users in unlinked tenants without an OID on hand.
         if (results.length === 0 && looksLikeEmail(trimmed)) {
           setExternalLookup('in-flight')
           setError(null)
@@ -168,7 +200,12 @@ export function NewChatPrompt(props: {
           !error &&
           externalLookup === 'idle' &&
           results.length === 0 &&
-          query.trim() && <Text color="gray">No matches (Enter to search externally)</Text>}
+          query.trim() &&
+          (looksLikeAadOid(query) ? (
+            <Text color="gray">Enter starts a chat with OID {query.trim().slice(0, 8)}...</Text>
+          ) : (
+            <Text color="gray">No matches (Enter to search externally)</Text>
+          ))}
         {results.map((user, i) => {
           const selected = zone === 'results' && i === clampCursor(cursor, results.length)
           const detail = user.mail ?? user.userPrincipalName ?? user.id

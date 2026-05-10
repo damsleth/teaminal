@@ -99,7 +99,7 @@ describe('skypeRowToDirectoryUser', () => {
 })
 
 describe('searchExternalUsers', () => {
-  test('POSTs the email body to /api/mt/part/{region}/beta/users/fetch with the spaces token', async () => {
+  test('POSTs the email body to /api/mt/part/{region}/beta/users/searchV2 with the spaces token', async () => {
     primeAuth()
     let seenUrl = ''
     let seenAuth = ''
@@ -112,11 +112,14 @@ describe('searchExternalUsers', () => {
       const headers = new Headers(init.headers as Record<string, string>)
       seenAuth = headers.get('authorization') ?? ''
       return jsonResponse({
+        type: 'Microsoft.Teams.MiddleTier.Search.Contracts.Search.SearchResults',
         value: [
           {
             mri: '8:orgid:22222222-2222-2222-2222-222222222222',
+            objectId: '22222222-2222-2222-2222-222222222222',
             displayName: 'Nordmann, Kari Anne',
             email: 'kari@example.com',
+            userPrincipalName: 'kari@example.com',
           },
         ],
       })
@@ -124,11 +127,12 @@ describe('searchExternalUsers', () => {
 
     const users = await searchExternalUsers('kari@example.com')
     expect(seenMethod).toBe('POST')
-    expect(seenUrl).toContain('https://teams.microsoft.com/api/mt/part/emea/beta/users/fetch')
-    expect(seenUrl).toContain('isMailAddress=true')
-    expect(seenUrl).toContain('canBeSmtpAddress=true')
+    expect(seenUrl).toContain('https://teams.microsoft.com/api/mt/part/emea/beta/users/searchV2')
+    expect(seenUrl).toContain('source=newChat')
+    expect(seenUrl).toContain('skypeTeamsInfo=true')
     expect(seenAuth).toMatch(/^Bearer /)
-    expect(JSON.parse(seenBody)).toEqual(['kari@example.com'])
+    // Body is the bare email as a JSON string (HAR-confirmed shape).
+    expect(JSON.parse(seenBody)).toBe('kari@example.com')
     expect(users).toHaveLength(1)
     expect(users[0]?.id).toBe('22222222-2222-2222-2222-222222222222')
     expect(users[0]?.mail).toBe('kari@example.com')
@@ -174,7 +178,7 @@ describe('searchExternalUsers', () => {
     __setTransportForTests(async () =>
       jsonResponse({ message: 'boom' }, { status: 500 }),
     )
-    await expect(searchExternalUsers('boom@example.com')).rejects.toThrow(/users\/fetch 500/)
+    await expect(searchExternalUsers('boom@example.com')).rejects.toThrow(/searchV2 500/)
   })
 
   test('returns [] for empty query without hitting the network', async () => {
