@@ -15,7 +15,7 @@ It does **not** surface:
    a `corp.example` account returns 0 results because `external.example`
    has no B2B trust with `corp.example`.
 
-Teams web *can* start chats with these users. The endpoint it uses is
+Teams web _can_ start chats with these users. The endpoint it uses is
 not Graph - it's the chatsvc-side "external user search":
 
 ```
@@ -68,7 +68,7 @@ unlinked tenants but at least surfaces the search miss explicitly).
 ```ts
 export type ExternalSearchOpts = {
   profile?: string
-  region?: string  // 'emea' default
+  region?: string // 'emea' default
   signal?: AbortSignal
 }
 
@@ -89,29 +89,29 @@ Note on endpoint discovery: we walked through several `/api/mt/*`
 variants and one Substrate variant before settling on `searchV2`,
 guided by a HAR capture of Teams web doing the equivalent action.
 
-| Endpoint | Result |
-|---|---|
-| `users/searchUsers?searchTerm=...` (GET) | 400 - expects an MRI/AAD-id/UPN, not free text |
-| `users/{upn}` (GET) | 404 UserNotFound |
-| `users/searchV3` (POST) | 405 Method Not Allowed |
-| `users/fetchFederated` (POST, email body) | 400 - "UserId should be AD ObjectId" |
-| `users/fetch` (POST, email body, `isMailAddress=true`) | 200 + result array but never surfaced unlinked-tenant users in our tenant |
-| `users/fetchShortProfile` (POST, email body) | same as `fetch` |
+| Endpoint                                                            | Result                                                                              |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `users/searchUsers?searchTerm=...` (GET)                            | 400 - expects an MRI/AAD-id/UPN, not free text                                      |
+| `users/{upn}` (GET)                                                 | 404 UserNotFound                                                                    |
+| `users/searchV3` (POST)                                             | 405 Method Not Allowed                                                              |
+| `users/fetchFederated` (POST, email body)                           | 400 - "UserId should be AD ObjectId"                                                |
+| `users/fetch` (POST, email body, `isMailAddress=true`)              | 200 + result array but never surfaced unlinked-tenant users in our tenant           |
+| `users/fetchShortProfile` (POST, email body)                        | same as `fetch`                                                                     |
 | Substrate `search/api/v1/suggestions?scenario=peoplepicker.newChat` | 200 - returns IndexedDB-backed cache results, never live-resolves unknown externals |
-| `users/searchV2` (POST, JSON-string body) | **chosen** - 200 + results for in-tenant + B2B-linked + cached cross-tenant |
+| `users/searchV2` (POST, JSON-string body)                           | **chosen** - 200 + results for in-tenant + B2B-linked + cached cross-tenant         |
 
 Response is `{ type, value: SearchUser[] }`; map each entry into the
 existing `DirectoryUser` shape so the UI can keep using one type.
 
 ### Tenant federation policy
 
-`searchV2` returning `value: []` does *not* always mean the user
+`searchV2` returning `value: []` does _not_ always mean the user
 doesn't exist. Microsoft's search is fundamentally bounded by:
 
 1. The destination tenant's external-access policy (Teams admin →
    external access settings) must allow inbound discovery from the
    caller's tenant.
-2. The user must be in *some* directory the caller's tenant can
+2. The user must be in _some_ directory the caller's tenant can
    read - either the caller's own AAD, a B2B-linked tenant's AAD,
    or a cached entry from a prior interaction (Teams' IndexedDB).
 
@@ -196,14 +196,14 @@ on each call so the network panel surfaces what teaminal is doing.
 
 ### Failure modes & their visible behaviour
 
-| Case | Behaviour |
-|---|---|
-| Graph search hits | Existing flow. External search not called. |
-| Graph search misses, external search hits | Pick up the chat creation flow with the resolved AAD id. |
+| Case                                        | Behaviour                                                        |
+| ------------------------------------------- | ---------------------------------------------------------------- |
+| Graph search hits                           | Existing flow. External search not called.                       |
+| Graph search misses, external search hits   | Pick up the chat creation flow with the resolved AAD id.         |
 | Graph search misses, external search misses | Synthetic-row create proceeds (likely fails with a clear error). |
-| External search returns 401 | Surface AAD code + body excerpt to network panel; treat as miss. |
-| External search returns 429 | Same; treat as miss; user can retry. |
-| Skype-token exchange fails | Treat as miss; record the failure once per session. |
+| External search returns 401                 | Surface AAD code + body excerpt to network panel; treat as miss. |
+| External search returns 429                 | Same; treat as miss; user can retry.                             |
+| Skype-token exchange fails                  | Treat as miss; record the failure once per session.              |
 
 ## Implementation order
 

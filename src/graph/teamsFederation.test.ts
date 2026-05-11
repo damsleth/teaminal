@@ -142,7 +142,10 @@ describe('resolveFederatedEquivalentConversationId', () => {
     __setTransportForTests(async (url) => {
       urls.push(url)
       return jsonResponse(
-        { errorCode: 'NotFound', message: 'Federated lookup being incorrectly called for in-tenant users.' },
+        {
+          errorCode: 'NotFound',
+          message: 'Federated lookup being incorrectly called for in-tenant users.',
+        },
         { status: 404 },
       )
     })
@@ -256,8 +259,8 @@ describe('createOneOnOneThreadViaChatsvc', () => {
         { status: 403 },
       )
     })
-    await expect(
-      createOneOnOneThreadViaChatsvc('a', 'b'),
-    ).rejects.toThrow(/chatsvc create thread 403/)
+    await expect(createOneOnOneThreadViaChatsvc('a', 'b')).rejects.toThrow(
+      /chatsvc create thread 403/,
+    )
   })
 })

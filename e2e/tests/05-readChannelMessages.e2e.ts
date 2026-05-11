@@ -50,10 +50,7 @@ const test: E2ETest = {
       }
     }
     if (probed === 0) throw new Error('no channels found across the first 5 teams')
-    throw (
-      lastError ??
-      new Error(`exhausted ${probed} channels without finding any with messages`)
-    )
+    throw lastError ?? new Error(`exhausted ${probed} channels without finding any with messages`)
   },
 }
 

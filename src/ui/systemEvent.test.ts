@@ -29,13 +29,17 @@ describe('describeSystemEvent', () => {
 
   test('returns null for unknown subtypes', () => {
     expect(
-      describeSystemEvent(sysMsg({ '@odata.type': '#microsoft.graph.somethingNewEventMessageDetail' })),
+      describeSystemEvent(
+        sysMsg({ '@odata.type': '#microsoft.graph.somethingNewEventMessageDetail' }),
+      ),
     ).toBeNull()
   })
 
   test('chatCreated → "chat created"', () => {
     expect(
-      describeSystemEvent(sysMsg({ '@odata.type': '#microsoft.graph.chatCreatedEventMessageDetail' })),
+      describeSystemEvent(
+        sysMsg({ '@odata.type': '#microsoft.graph.chatCreatedEventMessageDetail' }),
+      ),
     ).toBe('chat created')
   })
 

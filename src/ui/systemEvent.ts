@@ -11,9 +11,7 @@ import type { ChatMessage, SystemEventDetail } from '../types'
 
 function memberNames(members: SystemEventDetail['members']): string {
   if (!members || members.length === 0) return 'someone'
-  const names = members
-    .map((m) => (m.displayName ?? '').trim())
-    .filter((n) => n.length > 0)
+  const names = members.map((m) => (m.displayName ?? '').trim()).filter((n) => n.length > 0)
   if (names.length === 0) return 'someone'
   if (names.length === 1) return names[0]!
   if (names.length === 2) return `${names[0]} and ${names[1]}`
@@ -77,7 +75,8 @@ export function describeSystemEvent(message: ChatMessage): string | null {
     case 'callEnded':
     case 'callRecording':
     case 'callTranscript': {
-      const kind = subtype === 'callEnded' ? 'Call' : subtype === 'callRecording' ? 'Recording' : 'Transcript'
+      const kind =
+        subtype === 'callEnded' ? 'Call' : subtype === 'callRecording' ? 'Recording' : 'Transcript'
       const duration = (detail.callDuration ?? '').toString().trim()
       return duration ? `${kind} ended (${formatIsoDuration(duration)})` : `${kind} ended`
     }

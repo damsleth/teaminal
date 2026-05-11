@@ -167,17 +167,13 @@ describe('searchExternalUsers', () => {
 
   test('returns empty list on 404', async () => {
     primeAuth()
-    __setTransportForTests(async () =>
-      jsonResponse({ message: 'not found' }, { status: 404 }),
-    )
+    __setTransportForTests(async () => jsonResponse({ message: 'not found' }, { status: 404 }))
     await expect(searchExternalUsers('nobody@nope.example')).resolves.toEqual([])
   })
 
   test('throws TeamsExternalSearchError on 500', async () => {
     primeAuth()
-    __setTransportForTests(async () =>
-      jsonResponse({ message: 'boom' }, { status: 500 }),
-    )
+    __setTransportForTests(async () => jsonResponse({ message: 'boom' }, { status: 500 }))
     await expect(searchExternalUsers('boom@example.com')).rejects.toThrow(/searchV2 500/)
   })
 

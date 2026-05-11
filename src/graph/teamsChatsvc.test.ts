@@ -39,11 +39,15 @@ function primeAuth(): void {
   // exchange route the authsvc POST through the federation transport
   // and return a stable token; the chatsvc transport in __setTransport
   // For Tests is what each test actually inspects.
-  setFederationTransport(async () =>
-    new Response(JSON.stringify({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    }),
+  setFederationTransport(
+    async () =>
+      new Response(
+        JSON.stringify({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      ),
   )
 }
 

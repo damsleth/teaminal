@@ -102,11 +102,7 @@ function NetworkTail({ theme }: { theme: Theme }) {
         tail.map((r, i) => {
           const status = r.status === null ? 'ERR' : String(r.status)
           return (
-            <Text
-              key={`${r.ts}-${i}`}
-              color={colorForStatus(theme, r.status)}
-              wrap="truncate-end"
-            >
+            <Text key={`${r.ts}-${i}`} color={colorForStatus(theme, r.status)} wrap="truncate-end">
               {formatTs(r.ts)} {r.method.padEnd(5)} {status.padStart(3)} {r.durationMs}ms {r.path}
             </Text>
           )

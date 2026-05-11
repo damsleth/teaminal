@@ -292,7 +292,12 @@ export function skypeToChannelMessage(raw: SkypeMessage): ChatMessage {
 // panel doesn't fill up with one event per active poll.
 const emptyResponseLogged = new Set<string>()
 
-function diagnoseEmptyResponse(threadId: string, status: number, body: unknown, text: string): void {
+function diagnoseEmptyResponse(
+  threadId: string,
+  status: number,
+  body: unknown,
+  text: string,
+): void {
   if (emptyResponseLogged.has(threadId)) return
   emptyResponseLogged.add(threadId)
   const obj = body && typeof body === 'object' ? (body as Record<string, unknown>) : null
@@ -454,7 +459,7 @@ export async function sendChannelMessageViaChatsvc(
   const locationMatch = location.match(/\/messages\/([^/?]+)/)
   const messageId = parsed?.id ?? (locationMatch ? locationMatch[1]! : cmid)
   const created = parsed?.OriginalArrivalTime
-    ? toIsoFromAny(parsed.OriginalArrivalTime) ?? new Date().toISOString()
+    ? (toIsoFromAny(parsed.OriginalArrivalTime) ?? new Date().toISOString())
     : new Date().toISOString()
   return {
     id: messageId,
