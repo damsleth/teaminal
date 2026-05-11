@@ -1,16 +1,65 @@
 # teaminal
 
-Lightweight terminal Microsoft Teams client. Bun + TypeScript + Ink + Microsoft Graph.
+[![CI](https://github.com/damsleth/teaminal/actions/workflows/ci.yml/badge.svg)](https://github.com/damsleth/teaminal/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/damsleth/teaminal.svg)](https://github.com/damsleth/teaminal/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Bun](https://img.shields.io/badge/runtime-bun-black.svg)](https://bun.sh)
 
-Auth is delegated to [`owa-piggy`](https://github.com/damsleth/owa-piggy) via subprocess. teaminal uses the default raw-token output and never asks `owa-piggy` for JSON, because the JSON mode can expose rotated refresh tokens.
+Lightweight, keyboard-driven terminal Microsoft Teams client. Read your
+chats and channels, send messages, manage presence, and skim mentions
+without opening the desktop app. Bun + TypeScript + Ink + Microsoft Graph.
 
-## Status
+Auth is delegated to [`owa-piggy`](https://github.com/damsleth/owa-piggy)
+via subprocess - teaminal never sees your refresh token and is not an
+Azure AD app registration.
 
-Pre-alpha. See `.plans/teaminal.md` for the design contract and `AGENTS.md` for module structure.
+> Status: pre-1.0. The chat surface is solid; channels, presence, and
+> notifications are usable; the experimental real-time push transport
+> is opt-in. See [CHANGELOG.md](./CHANGELOG.md) for what's shipped.
 
-## Platform Support
+## Install
 
-Compiled release binaries support macOS, Linux, and Windows:
+Homebrew (recommended on macOS):
+
+```bash
+brew install damsleth/tap/owa-piggy   # auth broker (one-time setup)
+brew install damsleth/tap/teaminal
+```
+
+Build from source (any platform with Bun `>= 1.1.0`):
+
+```bash
+git clone https://github.com/damsleth/teaminal
+cd teaminal
+bun install
+bun run build
+./dist/teaminal
+```
+
+Release binaries are attached to each [GitHub Release][releases] for
+macOS (arm64 + x64), Linux (x64 + arm64), and Windows (x64).
+
+[releases]: https://github.com/damsleth/teaminal/releases
+
+## Quickstart
+
+```bash
+# 1. One-time owa-piggy setup (opens Edge, signs you in, captures a
+#    refresh token tied to your existing Outlook web session).
+owa-piggy setup --profile work --email you@yourcompany.com
+
+# 2. Verify owa-piggy can mint a Graph token.
+owa-piggy token --audience graph >/dev/null
+
+# 3. Launch teaminal.
+teaminal --profile work
+```
+
+Channel message reads and sends require delegated Graph scopes
+`ChannelMessage.Read.All` and `ChannelMessage.Send`. Broader group
+scopes such as `Group.ReadWrite.All` do not satisfy those endpoints.
+
+## Platform support
 
 | Platform            | Release artifact suffix |
 | ------------------- | ----------------------- |
@@ -20,69 +69,54 @@ Compiled release binaries support macOS, Linux, and Windows:
 | Linux arm64         | `linux-arm64.tar.gz`    |
 | Windows x64         | `windows-x64.zip`       |
 
-## Prerequisites
-
-- Bun for development and local builds.
-- `owa-piggy` installed and authenticated for Microsoft Graph access.
-- A terminal with raw-mode input support.
-
-Set up `owa-piggy` first and verify it can return a Graph token:
-
-```bash
-owa-piggy token --audience graph >/dev/null
-```
-
-Channel message reads and sends require delegated Graph scopes
-`ChannelMessage.Read.All` and `ChannelMessage.Send`. Broader group
-scopes such as `Group.ReadWrite.All` do not satisfy those endpoints.
-
-Use a named profile when needed:
-
-```bash
-teaminal --profile work
-```
-
-## Install
-
-Homebrew support is provided through the `damsleth/tap` tap:
-
-```bash
-brew install damsleth/tap/teaminal
-```
-
-The current formula builds from source using Bun while release archives are
-pending. You can also build directly from this repository:
-
-```bash
-bun install
-bun run build
-./dist/teaminal
-```
-
 ## Develop
 
 ```bash
 bun install
-bun run dev
+bun run dev              # run from source with debug log
+bun run dev:watch        # auto-reload on file changes
 ```
 
 Useful commands:
 
 ```bash
-bun test
-bun run typecheck
-bun run format
+bun test                 # unit tests (no network)
+bun run test:coverage    # unit tests + coverage report
+bun run typecheck        # tsc --noEmit
+bun run format           # prettier
+bun run e2e              # integration suite against a real owa-piggy profile
+bun run build            # single-file binary at dist/teaminal
 ```
+
+The unit tests use only synthetic JWTs and HTTP fixtures - no real
+tokens, no real account IDs - so they are safe to run in CI on every
+push. The e2e suite hits Microsoft Graph through your active
+owa-piggy profile; see [`e2e/README.md`](./e2e/README.md).
+
+## Architecture
+
+```
+bin/teaminal.tsx   -> src/ui/   -> src/state/ -> src/graph/ -> src/auth/
+```
+
+Lower layers never import upward. Only `src/auth/owaPiggy.ts` spawns
+subprocesses. Only `src/graph/client.ts` injects `Authorization`
+headers. All data freshness comes from `src/state/poller.ts`; UI
+components never call `src/graph/*` directly.
+
+See [`AGENTS.md`](./AGENTS.md) for the full module map, code patterns,
+and known pitfalls (`/chats` ordering, `$expand=members` limits,
+self-mention matching, seed-on-startup, etc.).
 
 ## Build
 
-Build for the current supported host:
+Build for the current host:
 
 ```bash
 bun run build
 ```
 
-Cross-build one of the supported targets:
+Cross-build any supported target:
 
 ```bash
 TARGET=bun-darwin-arm64 ./scripts/build.sh
@@ -92,7 +126,11 @@ TARGET=bun-linux-arm64 ./scripts/build.sh
 TARGET=bun-windows-x64 OUT=dist/teaminal.exe ./scripts/build.sh
 ```
 
-The binary is written to `dist/teaminal`. The build script runs `dist/teaminal --version` as a smoke test after compilation.
+The binary is written to `dist/teaminal`. The build script runs
+`dist/teaminal --version` as a smoke test after compilation.
+
+For tag-driven release builds and the Homebrew tap, see
+[`RELEASING.md`](./RELEASING.md).
 
 ## Configuration
 
@@ -102,7 +140,8 @@ teaminal reads JSON settings once at startup from:
 ${XDG_CONFIG_HOME:-~/.config}/teaminal/config.json
 ```
 
-All keys are optional. Unknown keys and invalid values produce stderr warnings and fall back to defaults.
+All keys are optional. Unknown keys and invalid values produce stderr
+warnings and fall back to defaults.
 
 ```json
 {
@@ -181,4 +220,32 @@ The in-app Settings menu persists changes back to `config.json`.
 | `q`            | list / menu       | Quit.                                                          |
 | Ctrl+C         | any               | Quit.                                                          |
 
-Open the in-app keybindings reference with `?` from the list or through Help -> Keybindings.
+Open the in-app keybindings reference with `?` from the list or
+through Help -> Keybindings.
+
+## Security
+
+teaminal piggybacks on
+[`owa-piggy`](https://github.com/damsleth/owa-piggy) for auth, which
+itself piggybacks on Microsoft's first-party OWA SPA client. There is
+no app registration, no client secret, no tenant admin ask - and no
+SLA. Microsoft can change the rules any Tuesday.
+
+The threat model and the boundaries teaminal enforces (no
+`--json`-mode `owa-piggy` calls, no logged `Authorization` headers,
+no shell interpolation in notifications) are documented in
+[`SECURITY.md`](./SECURITY.md). Report vulnerabilities via GitHub's
+[private vulnerability reporting][advisory] for this repo.
+
+[advisory]: https://github.com/damsleth/teaminal/security/advisories/new
+
+## Contributing
+
+Patches, bug reports, and design feedback welcome. See
+[`CONTRIBUTING.md`](./CONTRIBUTING.md) for the setup flow, architecture
+rules, test expectations, and the do/don't list. Read
+[`AGENTS.md`](./AGENTS.md) before changing anything non-trivial.
+
+## License
+
+[MIT](./LICENSE).

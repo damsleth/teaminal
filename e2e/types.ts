@@ -1,8 +1,8 @@
 // e2e test definition shape.
 //
 // Each file under e2e/tests/ exports a default E2ETest. The runner
-// imports them, runs them sequentially against the real owa-piggy
-// profile (default = swon), and prints a pass/fail summary.
+// imports them, runs them sequentially against the active owa-piggy
+// profile, and prints a pass/fail summary.
 
 export type E2EContext = {
   profile: string

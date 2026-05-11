@@ -388,7 +388,7 @@ function orgidOidFromString(value: string): string[] {
 }
 
 // Create a 1:1 thread on Teams chatsvc directly (the path Teams web
-// uses; verified via HAR for kim@damsleth.no in an unlinked tenant).
+// uses; verified via HAR against an external/unlinked-tenant peer).
 // Graph's `/chats` endpoint 403s for unlinked-tenant peers because
 // the FOCI-issued token doesn't carry the cross-tenant Chat.Create
 // scope, but chatsvc accepts it because the Skype token is region-

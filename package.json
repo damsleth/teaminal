@@ -15,6 +15,7 @@
     "dev:watch": "bun --watch run bin/teaminal.tsx --log-file .tmp/events.log --network-log .tmp/network.log",
     "build": "bash scripts/build.sh",
     "test": "bun test",
+    "test:coverage": "bun test --coverage",
     "e2e": "bun run e2e/runner.ts",
     "typecheck": "bunx tsc --noEmit",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\""

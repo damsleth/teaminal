@@ -471,14 +471,14 @@ describe('parseStatusProfiles', () => {
   test('parses real owa-piggy status output with `profile:` header lines', () => {
     const profiles = parseStatusProfiles(
       [
-        'profile:      brkh',
+        'profile:      work',
         'authtoken:    expires 2026-05-04T17:51:37Z',
         'refreshtoken: expires 2026-05-05T16:24:08Z',
         'audience:     graph (https://graph.microsoft.com)',
         'scope(s):     AuditLog.Create, Channel.ReadBasic.All, Chat.Read, ... (26 scopes)',
         'launchd:      true',
         '',
-        'profile:      crayon',
+        'profile:      personal',
         'authtoken:    expires 2026-05-04T17:48:53Z',
         'refreshtoken: expires 2026-05-05T11:55:04Z',
         'audience:     graph (https://graph.microsoft.com)',
@@ -488,12 +488,12 @@ describe('parseStatusProfiles', () => {
     )
     expect(profiles).toHaveLength(2)
     expect(profiles[0]).toMatchObject({
-      profile: 'brkh',
+      profile: 'work',
       valid: true,
       accessTokenExpiresAt: '2026-05-04T17:51:37Z',
     })
     expect(profiles[1]).toMatchObject({
-      profile: 'crayon',
+      profile: 'personal',
       valid: true,
       accessTokenExpiresAt: '2026-05-04T17:48:53Z',
     })

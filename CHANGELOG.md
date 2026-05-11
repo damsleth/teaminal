@@ -29,8 +29,8 @@ adheres to [Semantic Versioning](https://semver.org/).
   `POST teams.microsoft.com/api/chatsvc/{region}/v1/threads`
   (Skype-token auth) on Graph 403/404. This is the actual path
   Teams web uses for cross-tenant chats. Verified live: chat
-  creation with `kim@damsleth.no`'s OID returns 201 + the canonical
-  `unq.gbl.spaces` thread id.
+  creation against an unlinked-tenant peer's OID returns 201 +
+  the canonical `unq.gbl.spaces` thread id.
 - **Batched chat-member hydration via Graph `/$batch`.** `Shift+R`
   (hard refresh) now clears the per-session "already hydrated" set
   and re-hydrates every chat in 20-chat batches, so chats that show
@@ -44,7 +44,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   full names. Previously the lazy-on-focus path meant a refresh
   could leave 80%+ of chats unresolved.
 - **`bun run e2e` agent-driven integration suite.** Runs against the
-  real owa-piggy profile (default `swon`) and exercises identity,
+  active owa-piggy profile and exercises identity,
   chat list, joined teams, channel listing, channel-message reads
   via chatsvc, external-user search, and federated-conversation
   resolver - asserting on real Graph + chatsvc responses. Each test

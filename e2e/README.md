@@ -7,10 +7,17 @@ and the rest of the Microsoft 365 surface area without spawning a UI.
 ## Run
 
 ```bash
-bun run e2e                     # all read-only tests, profile=swon
-bun run e2e -- --profile work   # other owa-piggy profile
+bun run e2e                     # all read-only tests, default profile
+bun run e2e -- --profile work   # explicit owa-piggy profile
 bun run e2e -- --filter chat    # only tests with "chat" in the name
 bun run e2e -- --external-users alice@a.com,bob@b.com
+```
+
+Set defaults via env so you don't have to repeat the flags:
+
+```bash
+export TEAMINAL_E2E_PROFILE=work
+export TEAMINAL_E2E_EXTERNAL_USERS=alice@a.com,bob@b.com
 ```
 
 Mutating tests (sending messages, creating chats) are gated behind

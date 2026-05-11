@@ -11,9 +11,9 @@ teaminal's "new chat" prompt searches users via Microsoft Graph
 
 It does **not** surface:
 
-3. Users in unlinked tenants. e.g. searching for `kim@damsleth.no` from
-   a `softwareone.com` account returns 0 results because `damsleth.no`
-   has no B2B trust with `softwareone.com`.
+3. Users in unlinked tenants. e.g. searching for `peer@external.example` from
+   a `corp.example` account returns 0 results because `external.example`
+   has no B2B trust with `corp.example`.
 
 Teams web *can* start chats with these users. The endpoint it uses is
 not Graph - it's the chatsvc-side "external user search":
@@ -29,7 +29,7 @@ follows up with `fetchFederated` + `chats` create.
 ## Goals
 
 - Allow starting a chat with a user in a fully external tenant (no B2B
-  link), e.g. `kim@damsleth.no`.
+  link), e.g. `peer@external.example`.
 - Don't change behaviour for in-tenant / B2B-linked searches - those
   must still flow through Graph (faster, richer profile data).
 - Don't fire the external endpoint on every keystroke - it's slower
@@ -118,7 +118,7 @@ doesn't exist. Microsoft's search is fundamentally bounded by:
 For genuinely unlinked tenants where no prior interaction exists,
 neither `searchV2` nor `users/fetch` will surface the user - we
 confirmed this by capturing a HAR of Teams web opening a chat with
-`kim@damsleth.no`: `searchV2` returned empty in that capture too.
+`peer@external.example`: `searchV2` returned empty in that capture too.
 Teams web only succeeded because it had the user's AAD object id
 cached locally from previous sessions.
 
@@ -160,9 +160,9 @@ richer Graph shape.
 ### NewChatPrompt UX
 
 ```
-1. User types `kim@damsleth.no`.
+1. User types `peer@external.example`.
 2. Graph search runs as the user types; returns 0.
-3. The synthetic "Create chat with kim@damsleth.no" row appears
+3. The synthetic "Create chat with peer@external.example" row appears
    under the empty list.
 4. User presses Enter on that row.
 5. Before calling createOneOnOneChat-with-email, we try
@@ -173,7 +173,7 @@ richer Graph shape.
    - If miss: keep the synthetic row, fall through to existing
      create flow (and let it fail / proceed naturally).
 6. State during the lookup: a single-line "looking up
-   kim@damsleth.no externally..." status under the list, so the
+   peer@external.example externally..." status under the list, so the
    user knows we're not just hung.
 ```
 
@@ -211,10 +211,10 @@ on each call so the network panel surfaces what teaminal is doing.
    mapping. (No real HTTP - mock the transport.)
 2. Wire into `NewChatPrompt` Enter handler. Add an in-flight status
    indicator.
-3. Add an e2e test: external lookup for `kim@damsleth.no` returns a
+3. Add an e2e test: external lookup for `peer@external.example` returns a
    candidate. Read-only by default.
 4. Add e2e CRUD tests (mutating-gated) that:
-   - Resolve `kim@damsleth.no` via external search.
+   - Resolve `peer@external.example` via external search.
    - Create a 1:1 chat.
    - Send a message.
    - Read it back.

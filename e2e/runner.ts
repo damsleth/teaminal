@@ -2,15 +2,19 @@
 // e2e test runner.
 //
 // Discovers files in e2e/tests/, runs each against the real owa-piggy
-// profile (default: swon), and prints a pass/fail/skip summary. Each
-// test gets a per-test log tail of .tmp/events.log + .tmp/network.log
-// so failures show what teaminal recorded during the run.
+// profile, and prints a pass/fail/skip summary. Each test gets a
+// per-test log tail of .tmp/events.log + .tmp/network.log so failures
+// show what teaminal recorded during the run.
 //
 // Usage:
-//   bun run e2e                     # all read-only tests
-//   bun run e2e -- --profile swon   # explicit profile
-//   bun run e2e -- --filter chats   # run only tests with "chats" in name
-//   TEAMINAL_E2E_MUTATING=1 bun run e2e   # also run mutating tests
+//   bun run e2e                          # all read-only tests, default profile
+//   bun run e2e -- --profile work        # explicit owa-piggy profile
+//   bun run e2e -- --filter chats        # run only tests with "chats" in name
+//   bun run e2e -- --external-users a@x,b@y   # for federation/search tests
+//   TEAMINAL_E2E_MUTATING=1 bun run e2e        # also run mutating tests
+//
+// Defaults can be set via env: TEAMINAL_E2E_PROFILE,
+// TEAMINAL_E2E_EXTERNAL_USERS (comma-separated).
 //
 // Tests are READ-ONLY unless they opt in via { mutating: true }, and
 // mutating tests refuse to run without the env var. We don't want a
@@ -22,8 +26,11 @@ import { setActiveProfile } from '../src/graph/client'
 import { EVENTS_LOG, NETWORK_LOG, installLogging, logFileSize, tailFromOffset } from './log'
 import type { E2EContext, E2ETest } from './types'
 
-const DEFAULT_PROFILE = 'swon'
-const DEFAULT_EXTERNAL_USERS = ['carl.joakim.damsleth@crayon.no', 'kim@damsleth.no']
+const DEFAULT_PROFILE = process.env.TEAMINAL_E2E_PROFILE || 'default'
+const DEFAULT_EXTERNAL_USERS = (process.env.TEAMINAL_E2E_EXTERNAL_USERS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
 
 type CliArgs = {
   profile: string

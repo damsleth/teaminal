@@ -8,7 +8,12 @@ For the current release see [CHANGELOG.md](./CHANGELOG.md).
 ## Reporting a vulnerability
 
 Please **do not** open a public GitHub issue for suspected vulnerabilities.
-Instead, email `Carl.Joakim.Damsleth@crayon.no` with:
+
+Use GitHub's [private vulnerability reporting][gh-advisory] for this repo:
+
+[gh-advisory]: https://github.com/damsleth/teaminal/security/advisories/new
+
+Include:
 
 - A description of the issue and the affected component (auth wrapper,
   Graph client, UI, etc.)
@@ -16,7 +21,8 @@ Instead, email `Carl.Joakim.Damsleth@crayon.no` with:
 - The teaminal version (`teaminal --version`) and host OS
 
 You can expect an acknowledgement within a few business days. Coordinated
-disclosure timelines will be agreed per-report.
+disclosure timelines will be agreed per-report. There is no embargo SLA -
+this is a personal project with no deployed service to embargo.
 
 ## Threat model
 

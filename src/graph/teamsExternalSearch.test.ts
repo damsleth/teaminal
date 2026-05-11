@@ -74,14 +74,14 @@ describe('skypeRowToDirectoryUser', () => {
     const out = skypeRowToDirectoryUser({
       mri: '8:orgid:4bc16140-a25f-46fa-af77-572d8b946c1c',
       displayName: 'Damsleth, Carl Joakim',
-      email: 'kim@damsleth.no',
-      userPrincipalName: 'kim@damsleth.no',
+      email: 'alice@example.com',
+      userPrincipalName: 'alice@example.com',
     })
     expect(out).toEqual({
       id: '4bc16140-a25f-46fa-af77-572d8b946c1c',
       displayName: 'Damsleth, Carl Joakim',
-      userPrincipalName: 'kim@damsleth.no',
-      mail: 'kim@damsleth.no',
+      userPrincipalName: 'alice@example.com',
+      mail: 'alice@example.com',
     })
   })
 
@@ -92,9 +92,9 @@ describe('skypeRowToDirectoryUser', () => {
   test('falls back to upn when userPrincipalName is missing', () => {
     const out = skypeRowToDirectoryUser({
       mri: '8:orgid:4bc16140-a25f-46fa-af77-572d8b946c1c',
-      upn: 'kim@damsleth.no',
+      upn: 'alice@example.com',
     })
-    expect(out?.userPrincipalName).toBe('kim@damsleth.no')
+    expect(out?.userPrincipalName).toBe('alice@example.com')
   })
 })
 
@@ -118,24 +118,24 @@ describe('searchExternalUsers', () => {
             mri: '8:orgid:4bc16140-a25f-46fa-af77-572d8b946c1c',
             objectId: '4bc16140-a25f-46fa-af77-572d8b946c1c',
             displayName: 'Damsleth, Carl Joakim',
-            email: 'kim@damsleth.no',
-            userPrincipalName: 'kim@damsleth.no',
+            email: 'alice@example.com',
+            userPrincipalName: 'alice@example.com',
           },
         ],
       })
     })
 
-    const users = await searchExternalUsers('kim@damsleth.no')
+    const users = await searchExternalUsers('alice@example.com')
     expect(seenMethod).toBe('POST')
     expect(seenUrl).toContain('https://teams.microsoft.com/api/mt/part/emea/beta/users/searchV2')
     expect(seenUrl).toContain('source=newChat')
     expect(seenUrl).toContain('skypeTeamsInfo=true')
     expect(seenAuth).toMatch(/^Bearer /)
     // Body is the bare email as a JSON string (HAR-confirmed shape).
-    expect(JSON.parse(seenBody)).toBe('kim@damsleth.no')
+    expect(JSON.parse(seenBody)).toBe('alice@example.com')
     expect(users).toHaveLength(1)
     expect(users[0]?.id).toBe('4bc16140-a25f-46fa-af77-572d8b946c1c')
-    expect(users[0]?.mail).toBe('kim@damsleth.no')
+    expect(users[0]?.mail).toBe('alice@example.com')
   })
 
   test('handles bare-array response shape', async () => {
