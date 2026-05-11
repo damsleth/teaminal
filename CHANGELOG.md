@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.14] - 2026-05-11
+
 ### Fixed
 
 - **Chat list and message pane no longer bleed past their containers
@@ -689,7 +691,20 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.12.14...HEAD
+[0.12.14]: https://github.com/damsleth/teaminal/compare/v0.12.13...v0.12.14
+[0.12.13]: https://github.com/damsleth/teaminal/compare/v0.12.12...v0.12.13
+[0.12.12]: https://github.com/damsleth/teaminal/compare/v0.12.11...v0.12.12
+[0.12.11]: https://github.com/damsleth/teaminal/compare/v0.12.10...v0.12.11
+[0.12.10]: https://github.com/damsleth/teaminal/compare/v0.12.9...v0.12.10
+[0.12.9]: https://github.com/damsleth/teaminal/compare/v0.12.4...v0.12.9
+[0.12.4]: https://github.com/damsleth/teaminal/compare/v0.12.3...v0.12.4
+[0.12.3]: https://github.com/damsleth/teaminal/compare/v0.12.2...v0.12.3
+[0.12.2]: https://github.com/damsleth/teaminal/compare/v0.12.1...v0.12.2
+[0.12.1]: https://github.com/damsleth/teaminal/compare/v0.12.0...v0.12.1
+[0.12.0]: https://github.com/damsleth/teaminal/compare/v0.7.2...v0.12.0
+[0.7.2]: https://github.com/damsleth/teaminal/compare/v0.5.0...v0.7.2
+[0.5.0]: https://github.com/damsleth/teaminal/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/damsleth/teaminal/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/damsleth/teaminal/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/damsleth/teaminal/compare/v0.3.0...v0.3.1
