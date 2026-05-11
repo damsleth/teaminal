@@ -323,7 +323,7 @@ export function ChatList() {
                   </Text>
                 </Box>
               )}
-              <Box flexGrow={1} flexShrink={1} minWidth={0}>
+              <Box width={labelContentWidth(density, showPresence, '')} flexShrink={0}>
                 <Text color={isSelected ? theme.selected : 'gray'} bold={isSelected} wrap="wrap">
                   {`Create chat with "${row.query}"`}
                 </Text>
@@ -376,7 +376,7 @@ export function ChatList() {
                 <Text>{indent}</Text>
               </Box>
             )}
-            <Box flexGrow={1} flexShrink={1} minWidth={0}>
+            <Box width={labelContentWidth(density, showPresence, indent)} flexShrink={0}>
               <Text
                 color={isSelected ? theme.selected : hasUnread ? theme.unread : undefined}
                 bold={isSelected || hasUnread}
