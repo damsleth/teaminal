@@ -74,14 +74,14 @@ describe('skypeRowToDirectoryUser', () => {
     const out = skypeRowToDirectoryUser({
       mri: '8:orgid:22222222-2222-2222-2222-222222222222',
       displayName: 'Nordmann, Kari Anne',
-      email: 'kari@example.com',
-      userPrincipalName: 'kari@example.com',
+      email: 'alice@example.com',
+      userPrincipalName: 'alice@example.com',
     })
     expect(out).toEqual({
       id: '22222222-2222-2222-2222-222222222222',
       displayName: 'Nordmann, Kari Anne',
-      userPrincipalName: 'kari@example.com',
-      mail: 'kari@example.com',
+      userPrincipalName: 'alice@example.com',
+      mail: 'alice@example.com',
     })
   })
 
@@ -92,9 +92,9 @@ describe('skypeRowToDirectoryUser', () => {
   test('falls back to upn when userPrincipalName is missing', () => {
     const out = skypeRowToDirectoryUser({
       mri: '8:orgid:22222222-2222-2222-2222-222222222222',
-      upn: 'kari@example.com',
+      upn: 'alice@example.com',
     })
-    expect(out?.userPrincipalName).toBe('kari@example.com')
+    expect(out?.userPrincipalName).toBe('alice@example.com')
   })
 })
 
@@ -118,24 +118,24 @@ describe('searchExternalUsers', () => {
             mri: '8:orgid:22222222-2222-2222-2222-222222222222',
             objectId: '22222222-2222-2222-2222-222222222222',
             displayName: 'Nordmann, Kari Anne',
-            email: 'kari@example.com',
-            userPrincipalName: 'kari@example.com',
+            email: 'alice@example.com',
+            userPrincipalName: 'alice@example.com',
           },
         ],
       })
     })
 
-    const users = await searchExternalUsers('kari@example.com')
+    const users = await searchExternalUsers('alice@example.com')
     expect(seenMethod).toBe('POST')
     expect(seenUrl).toContain('https://teams.microsoft.com/api/mt/part/emea/beta/users/searchV2')
     expect(seenUrl).toContain('source=newChat')
     expect(seenUrl).toContain('skypeTeamsInfo=true')
     expect(seenAuth).toMatch(/^Bearer /)
     // Body is the bare email as a JSON string (HAR-confirmed shape).
-    expect(JSON.parse(seenBody)).toBe('kari@example.com')
+    expect(JSON.parse(seenBody)).toBe('alice@example.com')
     expect(users).toHaveLength(1)
     expect(users[0]?.id).toBe('22222222-2222-2222-2222-222222222222')
-    expect(users[0]?.mail).toBe('kari@example.com')
+    expect(users[0]?.mail).toBe('alice@example.com')
   })
 
   test('handles bare-array response shape', async () => {

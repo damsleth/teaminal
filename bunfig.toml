@@ -1,4 +1,8 @@
 # Bun configuration. See https://bun.sh/docs/runtime/bunfig
 
 [test]
-# bun test discovers *.test.ts files automatically; add config here as needed
+# bun test discovers *.test.ts files automatically; e2e/*.e2e.ts is run
+# explicitly through e2e/runner.ts and excluded here.
+coverage = false
+coverageReporter = ["text"]
+coverageSkipTestFiles = true
