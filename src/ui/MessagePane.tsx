@@ -163,7 +163,14 @@ export function MessagePane(props: {
   const hits = searchActive ? searchMessages(messages, searchQuery) : []
 
   return (
-    <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden" paddingX={0}>
+    <Box
+      flexDirection="column"
+      flexGrow={1}
+      flexShrink={1}
+      minWidth={0}
+      overflow="hidden"
+      paddingX={0}
+    >
       {density === 'cozy' && <Text bold>{headerLabel}</Text>}
       {searchActive && (
         <Box>

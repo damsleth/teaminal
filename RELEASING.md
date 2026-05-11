@@ -16,13 +16,13 @@ the release artifacts are the binaries.
 
 ## Supported targets
 
-| Platform            | Release artifact suffix       |
-| ------------------- | ----------------------------- |
-| macOS Apple Silicon | `darwin-arm64.tar.gz`         |
-| macOS Intel         | `darwin-x64.tar.gz`           |
-| Linux x64           | `linux-x64.tar.gz`            |
-| Linux arm64         | `linux-arm64.tar.gz`          |
-| Windows x64         | `windows-x64.zip`             |
+| Platform            | Release artifact suffix |
+| ------------------- | ----------------------- |
+| macOS Apple Silicon | `darwin-arm64.tar.gz`   |
+| macOS Intel         | `darwin-x64.tar.gz`     |
+| Linux x64           | `linux-x64.tar.gz`      |
+| Linux arm64         | `linux-arm64.tar.gz`    |
+| Windows x64         | `windows-x64.zip`       |
 
 Each archive contains a single binary named `teaminal`
 (`teaminal.exe` on Windows). Checksums land in `SHA256SUMS.txt`.

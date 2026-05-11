@@ -25,7 +25,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   errors are now latched per-conv on 403 (Graph rejects
   `/chats/{id}/messages` for chats the FOCI delegated token has no
   scope for). The chat is logged once as `active refresh blocked
-  (403, will not retry)` and skipped on subsequent polls. Other
+(403, will not retry)` and skipped on subsequent polls. Other
   error classes still surface every interval as before.
 
 ### Changed
@@ -100,7 +100,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 - **Channel messages no longer "loading..." forever.** `safeText` in
   the chatsvc and federation transports was clipping the response
-  body to 1024/400 chars *before* `JSON.parse`, which silently
+  body to 1024/400 chars _before_ `JSON.parse`, which silently
   truncated valid multi-message bodies into invalid JSON. Reads now
   parse the full body and only clip the diagnostic-display copy.
 
@@ -118,7 +118,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   empty / shaped differently than expected, teaminal now logs a
   one-shot warning containing the top-level keys, the `messages`
   array length, and a 240-char body excerpt - so an opening channel
-  that stays at "loading..." surfaces *why* in the network panel
+  that stays at "loading..." surfaces _why_ in the network panel
   instead of looking like a hung poll.
 
 ### Added
@@ -126,7 +126,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 - **Channel send + reply via Teams chatsvc.**
   `sendChannelMessage` and `postChannelReply` POST to
   `teams.microsoft.com/api/chatsvc/{region}/v1/users/ME/conversations
-  /{threadId}/messages` with a Skype-shaped body
+/{threadId}/messages` with a Skype-shaped body
   (`messagetype`/`contenttype`/`clientmessageid`, plus
   `properties.parentmessageid` for replies). The canonical message id
   is parsed from the response `Location` header so the optimistic
@@ -225,7 +225,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   preauthorization or admin consent.** When Graph returns the 403
   "Missing scope permissions" response, teaminal now falls back to
   the Teams chat service (`teams.microsoft.com/api/chatsvc/{region}/v1
-  /users/ME/conversations/{threadId}/messages`) authenticated with a
+/users/ME/conversations/{threadId}/messages`) authenticated with a
   Skype token exchanged via `teams.microsoft.com/api/authsvc/v1.0/authz`
   (the same exchange the trouter transport already does), translates
   the Skype-shaped payload into the existing `ChannelMessage` shape,
@@ -253,7 +253,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 - **Chat-list names wrap again, and the viewport tracks visual lines.**
   Long chat names (group rosters, federated externals) wrap onto
   multiple lines; the sidebar viewport now slides based on the
-  cumulative *visual* row count instead of logical row count, so
+  cumulative _visual_ row count instead of logical row count, so
   wrapped labels no longer push neighbours off-screen or squash the
   composer. Truncation is reserved for terminals so narrow that even
   one row's label exceeds the visible budget.

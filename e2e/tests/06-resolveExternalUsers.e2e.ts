@@ -23,9 +23,7 @@ const test: E2ETest = {
           m.mail?.toLowerCase() === email.toLowerCase(),
       )
       if (direct) {
-        ctx.log(
-          `HIT (Graph)    "${email}" -> ${direct.displayName ?? '(unnamed)'} (${direct.id})`,
-        )
+        ctx.log(`HIT (Graph)    "${email}" -> ${direct.displayName ?? '(unnamed)'} (${direct.id})`)
         continue
       }
       const externalHits = await searchExternalUsers(email, { top: 5 })

@@ -64,7 +64,10 @@ function parseArgs(argv: string[]): CliArgs {
         console.error('e2e: --external-users requires a comma-separated list')
         process.exit(2)
       }
-      out.externalUsers = v.split(',').map((s) => s.trim()).filter(Boolean)
+      out.externalUsers = v
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
       i++
     } else if (a === '--help' || a === '-h') {
       process.stdout.write(
@@ -192,7 +195,9 @@ async function main(): Promise<void> {
 
   const tests = await loadTests()
   const filtered = args.filter
-    ? tests.filter(({ module }) => module.default.name.toLowerCase().includes(args.filter!.toLowerCase()))
+    ? tests.filter(({ module }) =>
+        module.default.name.toLowerCase().includes(args.filter!.toLowerCase()),
+      )
     : tests
 
   if (filtered.length === 0) {
@@ -226,13 +231,9 @@ async function main(): Promise<void> {
     const result = await runOne(test, ctx)
     results.push(result)
     if (result.status === 'pass') {
-      console.log(
-        `  ${color(process.stdout, 'PASS', ANSI.green)} ${result.durationMs}ms\n`,
-      )
+      console.log(`  ${color(process.stdout, 'PASS', ANSI.green)} ${result.durationMs}ms\n`)
     } else if (result.status === 'skip') {
-      console.log(
-        `  ${color(process.stdout, 'SKIP', ANSI.yellow)} ${result.reason ?? ''}\n`,
-      )
+      console.log(`  ${color(process.stdout, 'SKIP', ANSI.yellow)} ${result.reason ?? ''}\n`)
     } else {
       console.log(`  ${color(process.stdout, 'FAIL', ANSI.red)} ${result.durationMs}ms`)
       if (result.error) {
@@ -255,11 +256,7 @@ async function main(): Promise<void> {
   const skipped = results.filter((r) => r.status === 'skip').length
   const summary = `${passed} passed, ${failed} failed, ${skipped} skipped`
   console.log(
-    color(
-      process.stdout,
-      summary,
-      failed > 0 ? ANSI.red : passed > 0 ? ANSI.green : ANSI.yellow,
-    ),
+    color(process.stdout, summary, failed > 0 ? ANSI.red : passed > 0 ? ANSI.green : ANSI.yellow),
   )
 
   process.exit(failed > 0 ? 1 : 0)

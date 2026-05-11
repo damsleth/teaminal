@@ -123,7 +123,7 @@ export function userIdFromMri(mri: string | undefined): string | null {
 }
 
 export function skypeRowToDirectoryUser(row: SkypeSearchUser): DirectoryUser | null {
-  const id = userIdFromMri(row.mri) ?? (row.objectId ?? null)
+  const id = userIdFromMri(row.mri) ?? row.objectId ?? null
   if (!id) return null
   const mail = row.mail ?? row.email
   return {

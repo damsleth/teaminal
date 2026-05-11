@@ -110,7 +110,10 @@ export async function getChatsBatch(
         continue
       }
       const err = (entry.body as { error?: { message?: string } } | undefined)?.error
-      errors.set(chatId, { status: entry.status, message: err?.message ?? `status ${entry.status}` })
+      errors.set(chatId, {
+        status: entry.status,
+        message: err?.message ?? `status ${entry.status}`,
+      })
     }
   }
   return { hydrated, errors }

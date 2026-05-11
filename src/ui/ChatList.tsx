@@ -230,11 +230,7 @@ export function ChatList() {
     let consumed = heights[cur] ?? 1
     // Sticky scroll: prefer to keep `previousStart` if the cursor is
     // already inside it (and the cumulative budget still fits).
-    if (
-      previousStart >= 0 &&
-      previousStart <= cur &&
-      previousStart < rows.length
-    ) {
+    if (previousStart >= 0 && previousStart <= cur && previousStart < rows.length) {
       let trial = consumed
       let trialStart = cur
       while (trialStart > previousStart) {
@@ -293,13 +289,7 @@ export function ChatList() {
   }
 
   return (
-    <Box
-      flexDirection="column"
-      flexShrink={0}
-      overflow="hidden"
-      paddingLeft={0}
-      paddingRight={1}
-    >
+    <Box flexDirection="column" flexShrink={0} overflow="hidden" paddingLeft={0} paddingRight={1}>
       {filterBanner}
       {visible.map((row, i) => {
         if (row.kind === 'header') {

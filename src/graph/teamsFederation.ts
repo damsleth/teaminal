@@ -357,7 +357,10 @@ export async function fetchFederatedUsers(
     // peers. Either way there is nothing federated to resolve, so
     // signal the caller to bail out of the entire flow rather than
     // banging on the chatsvc endpoints with the wrong audience.
-    throw new TeamsInTenantLookupError(res.status, 'in-tenant user, federated lookup not applicable')
+    throw new TeamsInTenantLookupError(
+      res.status,
+      'in-tenant user, federated lookup not applicable',
+    )
   }
   if (res.status < 200 || res.status >= 300) {
     throw new TeamsFederationError(
