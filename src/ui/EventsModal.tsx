@@ -96,12 +96,17 @@ export function EventsModal() {
 
   if (!isOpen) return null
 
-  const filtered = filter
-    ? records.filter((r) => {
-        const f = filter.toLowerCase()
-        return r.source.includes(f) || r.level.includes(f) || r.message.toLowerCase().includes(f)
-      })
-    : records
+  // Hide debug-level events by default - the active-loop chatter
+  // drowns the things you actually want to see. Type "debug" in the
+  // filter to surface them, or set TEAMINAL_DEBUG=1.
+  const showDebug = filter.toLowerCase().includes('debug') || process.env.TEAMINAL_DEBUG === '1'
+  const filtered = records
+    .filter((r) => showDebug || r.level !== 'debug')
+    .filter((r) => {
+      if (!filter) return true
+      const f = filter.toLowerCase()
+      return r.source.includes(f) || r.level.includes(f) || r.message.toLowerCase().includes(f)
+    })
 
   const totalCount = filtered.length
   const tail = cursor === null

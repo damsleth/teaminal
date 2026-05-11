@@ -10,6 +10,7 @@
 // conversation's view with the previous one's messages.
 
 import { listMessagesPage } from '../../graph/chats'
+import { GraphError } from '../../graph/client'
 import { listChannelMessagesPage, listChannelRepliesPage } from '../../graph/teams'
 import { recordEvent } from '../../log'
 import type { ChatMessage } from '../../types'
@@ -53,6 +54,15 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
   const { store, sleeper, intervalMs, seen, setActiveAbort, isStopped, onMention, reportError } =
     deps
 
+  // Per-conv "this endpoint refuses us" latch. Meeting chats and other
+  // conversations the FOCI delegated token lacks scope for return 403
+  // on every /chats/{id}/messages call. Without a latch the active loop
+  // re-fires that 403 every interval and floods the event log. Once
+  // latched, we skip the fetch entirely until focus moves to a chat
+  // that isn't blocked - re-focusing the blocked chat will not retry
+  // automatically, since the scope state is sticky for the session.
+  const blocked = new Set<ConvKey>()
+
   return async function run(): Promise<void> {
     let consecutiveErrors = 0
     while (!isStopped()) {
@@ -62,14 +72,18 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
         await sleeper.sleep(jitter(intervalMs))
         continue
       }
+      if (blocked.has(conv)) {
+        await sleeper.sleep(jitter(intervalMs))
+        continue
+      }
       const ctrl = new AbortController()
       setActiveAbort(ctrl)
       try {
         const startedAt = Date.now()
-        recordEvent('poller', 'info', 'active refresh started', { conv })
+        recordEvent('poller', 'debug', 'active refresh started', { conv })
         const page = await fetchActiveMessages(focus, ctrl.signal)
         const messages = page.messages
-        recordEvent('poller', 'info', 'active refresh fetched', {
+        recordEvent('poller', 'debug', 'active refresh fetched', {
           conv,
           messages: messages.length,
           durationMs: Date.now() - startedAt,
@@ -113,10 +127,24 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
         if (!isAbortError(err)) {
           consecutiveErrors++
           reportError(err)
-          recordEvent('poller', 'warn', 'active refresh failed', {
-            conv,
-            error: err instanceof Error ? err.message : String(err),
-          })
+          const is403 = err instanceof GraphError && err.status === 403
+          if (is403) {
+            // Sticky scope failure (e.g. meeting chats under FOCI). Log
+            // once, latch, stop re-polling this conv. The chat stays in
+            // its loading state - we deliberately don't write an empty
+            // page because that would falsely claim "no messages" when
+            // the truth is "the tenant's policy hides them from us".
+            blocked.add(conv)
+            recordEvent('poller', 'warn', 'active refresh blocked (403, will not retry)', {
+              conv,
+              error: err instanceof Error ? err.message : String(err),
+            })
+          } else {
+            recordEvent('poller', 'warn', 'active refresh failed', {
+              conv,
+              error: err instanceof Error ? err.message : String(err),
+            })
+          }
         }
       } finally {
         setActiveAbort(null)

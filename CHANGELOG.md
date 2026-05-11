@@ -6,6 +6,35 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Chat list and message pane no longer bleed past their containers
+  on wide terminals.** The chat-list row body Box used `flexGrow=1`
+  with `wrap="wrap"` and no explicit width, so Ink's wrap kicked in
+  at the actual flex allocation rather than the
+  `labelContentWidth()` math the viewport relied on; long names
+  ("Nordic integration to NOCOS", "Crayon NC Team Sync") and chat
+  titles overflowed the 30-col pane. Row body Boxes now use
+  `width={labelContentWidth(...)}` + `flexShrink=0`, and the message
+  pane outer Box gets `overflow="hidden"` so any residual long URL
+  or unbroken token clips at the pane border instead of bleeding
+  into the right gutter.
+- **Meeting-chat 403s no longer flood the event log.** Active-loop
+  errors are now latched per-conv on 403 (Graph rejects
+  `/chats/{id}/messages` for chats the FOCI delegated token has no
+  scope for). The chat is logged once as `active refresh blocked
+  (403, will not retry)` and skipped on subsequent polls. Other
+  error classes still surface every interval as before.
+
+### Changed
+
+- **Routine `active refresh started` / `active refresh fetched`
+  events now log at `debug` level**, and the Events overlay hides
+  debug entries unless the filter contains `debug` or
+  `TEAMINAL_DEBUG=1` is set. Cuts the per-poll chatter that drowned
+  out the events you actually want to see. Warnings and errors are
+  unaffected.
+
 ### Added
 
 - **External-tenant user search via the Teams-web `searchV2` path.**
