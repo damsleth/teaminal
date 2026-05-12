@@ -18,9 +18,11 @@ teaminal is a lightweight terminal Microsoft Teams client written in TypeScript.
 
 ## Architecture Rules
 
-1. **Dependency direction:** `bin/` → `src/ui/` → `src/state/` → `src/graph/` → `src/auth/`. Lower layers never import upward. `src/auth/` has no dependencies on graph/state/ui.
-2. **Polling, not pushing:** All data freshness comes from `src/state/poller.ts`. UI components never call `src/graph/*` directly; they read from the store.
-3. **Auth boundary:** Only `src/auth/owaPiggy.ts` spawns subprocesses. Only `src/graph/client.ts` injects `Authorization` headers.
+1. **Dependency direction:** `bin/` → `src/ui/` → `src/state/` → `src/graph/` → `src/auth/`. Lower layers never import upward. `src/auth/` has no dependencies on graph/state/ui. Boundary-tested in `src/architecture.test.ts`.
+2. **Polling for freshness:** All background data freshness comes from `src/state/poller.ts`. UI components read freshness from the store, never by calling Graph.
+3. **Imperative actions through state:** One-shot user actions (create chat, send message, directory search, hydrate-by-id) live in `src/state/chatActions.ts` (or a sibling actions module). UI calls the action; the action wraps the Graph call. UI may still import `import type` from `src/graph/*` for shared shapes, and may import error classes (`GraphError`, `RateLimitError`) and `getActiveProfile` from `src/graph/client.ts` for `instanceof` checks and status reporting.
+4. **Auth boundary:** Only `src/auth/owaPiggy.ts` spawns subprocesses. Only `src/graph/client.ts` injects `Authorization` headers.
+5. **HTML utilities are layer-neutral:** Teams-HTML → plain text lives in `src/text/html.ts` (pure, no Ink dependency). Both UI and `src/notify` consume it.
 
 ## Release Hygiene
 
@@ -119,7 +121,7 @@ bun run build            # compiled binary at dist/teaminal
 
 ## When Modifying
 
-1. **Adding a Graph call:** add to the relevant `src/graph/*.ts`, route through `graph<T>()` so it inherits 401 retry, 429 backoff, and pagination.
+1. **Adding a Graph call:** add to the relevant `src/graph/*.ts`, route through `graph<T>()` so it inherits 401 retry, 429 backoff, and pagination. If the UI needs to invoke it directly (one-shot action), expose a wrapper from `src/state/chatActions.ts` and call the wrapper from UI - not the raw Graph function. The boundary test in `src/architecture.test.ts` will fail on direct UI -> graph operation imports.
 2. **Adding a keybind:** edit `src/ui/App.tsx` (`useInput` handler) and update the keybinds table in README.
 3. **Adding a config key:** edit `src/config/index.ts`, append to the recognized-keys list, document it in README.
 4. **Adding a poll loop:** edit `src/state/poller.ts`. Honor jitter, AbortController, and the seen-set conventions.

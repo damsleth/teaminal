@@ -7,8 +7,7 @@
 
 import { Box, Text, useApp, useInput } from 'ink'
 import { useEffect, useState } from 'react'
-import { searchChatUsers } from '../graph/chats'
-import { searchExternalUsers } from '../graph/teamsExternalSearch'
+import { searchChatUsers, searchExternalUsers } from '../state/chatActions'
 import { clampCursor } from '../state/selectables'
 import type { DirectoryUser } from '../types'
 import { isNewChatQueryCandidate } from './ChatList'

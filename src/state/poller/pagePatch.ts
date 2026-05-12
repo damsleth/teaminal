@@ -29,7 +29,17 @@ export function mergeActivePagePatch(
 ): Partial<AppState> {
   const cache = state.messageCacheByConvo[conv]
   const legacyMessages = state.messagesByConvo[conv] ?? []
-  const existing = cache?.messages ?? legacyMessages
+  // When a cache exists, prefer it, but pick up any optimistic
+  // _sending/_sendError rows from the legacy mirror that the cache
+  // has not yet seen. Composer writes optimistic rows only to
+  // messagesByConvo, so without this rescue a poll that lands while
+  // a send is in flight would drop the pending row.
+  const cachedMessages = cache?.messages ?? []
+  const cachedIds = new Set(cachedMessages.map((m) => m.id))
+  const orphanOptimistic = cache
+    ? legacyMessages.filter((m) => (m._sending || m._sendError) && !cachedIds.has(m.id))
+    : []
+  const existing = cache ? [...cachedMessages, ...orphanOptimistic] : legacyMessages
   const merged = mergeWithOptimistic(existing, page.messages)
 
   const incomingIds = new Set(page.messages.map((m) => m.id))

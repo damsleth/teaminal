@@ -23,9 +23,7 @@
 
 import { Box, useApp, useInput, useStdin } from 'ink'
 import { useEffect, useRef, useState } from 'react'
-import { createOneOnOneChat, getChat } from '../graph/chats'
-import { resolveFederatedEquivalentConversationId } from '../graph/teamsFederation'
-import { recordEvent } from '../log'
+import { createOneOnOneChat, materializeChat, resolveFederatedChatId } from '../state/chatActions'
 import { clampCursor } from '../state/selectables'
 import {
   focusKey,
@@ -124,7 +122,7 @@ export function App() {
     void (async () => {
       const federatedChatId = await resolveFederatedChatId(me.id, otherUserId)
       if (!federatedChatId || federatedChatId === focus.chatId || cancelled) return
-      const canonical = await materializeChat(federatedChatId)
+      const canonical = await materializeChat(store, federatedChatId)
       if (cancelled) return
       store.set((s) => ({
         chats: [canonical, ...s.chats.filter((c) => c.id !== canonical.id)],
@@ -217,7 +215,7 @@ export function App() {
     }
     const federatedChatId = await resolveFederatedChatId(selfId, user.id)
     if (federatedChatId) {
-      const chat = await materializeChat(federatedChatId)
+      const chat = await materializeChat(store, federatedChatId)
       setNewChatPrompt(null)
       store.set((s) => ({
         chats: [chat, ...s.chats.filter((c) => c.id !== chat.id)],
@@ -237,39 +235,6 @@ export function App() {
       filter: '',
     }))
     pollerRef.current?.refresh()
-  }
-
-  async function resolveFederatedChatId(
-    selfId: string,
-    otherUserId: string,
-  ): Promise<string | null> {
-    try {
-      return await resolveFederatedEquivalentConversationId(selfId, otherUserId)
-    } catch (err) {
-      recordEvent(
-        'graph',
-        'warn',
-        `federated equivalent lookup failed: ${err instanceof Error ? err.message : String(err)}`,
-      )
-      return null
-    }
-  }
-
-  async function materializeChat(chatId: string): Promise<Chat> {
-    const local = store.get().chats.find((c) => c.id === chatId)
-    if (local) return local
-    return getChat(chatId, { members: true }).catch((err) => {
-      recordEvent(
-        'graph',
-        'warn',
-        `federated canonical chat hydrate failed: ${err instanceof Error ? err.message : String(err)}`,
-      )
-      return {
-        id: chatId,
-        chatType: 'oneOnOne' as const,
-        createdDateTime: new Date().toISOString(),
-      }
-    })
   }
 
   const refresh = (): void => {

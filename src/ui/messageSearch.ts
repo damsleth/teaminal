@@ -11,7 +11,7 @@
 // cost low even for long histories.
 
 import type { ChatMessage } from '../types'
-import { htmlToText } from './html'
+import { htmlToText } from '../text/html'
 
 export type SearchHit = {
   /** Index into the original messages array. */

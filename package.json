@@ -1,6 +1,6 @@
 {
   "name": "teaminal",
-  "version": "0.12.15",
+  "version": "0.12.16",
   "license": "MIT",
   "description": "Lightweight terminal Microsoft Teams client",
   "type": "module",
@@ -17,7 +17,7 @@
     "test": "bun test",
     "test:coverage": "bun test --coverage",
     "e2e": "bun run e2e/runner.ts",
-    "typecheck": "bunx tsc --noEmit",
+    "typecheck": "bun x tsc --noEmit",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\""
   },
   "dependencies": {

@@ -1,6 +1,6 @@
 import type { ChatMessage } from '../types'
 import type { ReactionDisplayMode } from '../state/store'
-import { htmlToText } from './html'
+import { htmlToText } from '../text/html'
 import { reactionsSummary } from './reactions'
 
 export type LoadMoreState = 'idle' | 'loading' | 'error' | 'unavailable'

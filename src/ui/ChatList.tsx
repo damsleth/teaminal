@@ -21,7 +21,7 @@ import {
 } from '../state/selectables'
 import type { ChatListDensity } from '../state/store'
 import type { Presence } from '../types'
-import { htmlToText } from './html'
+import { htmlToText } from '../text/html'
 import { useTerminalRows } from './hooks/useTerminalRows'
 import { useAppState, useTheme } from './StoreContext'
 import type { PresenceColorKey, Theme } from './theme'
