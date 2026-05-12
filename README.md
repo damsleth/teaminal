@@ -69,69 +69,6 @@ scopes such as `Group.ReadWrite.All` do not satisfy those endpoints.
 | Linux arm64         | `linux-arm64.tar.gz`    |
 | Windows x64         | `windows-x64.zip`       |
 
-## Develop
-
-```bash
-bun install
-bun run dev              # run from source with debug log
-bun run dev:watch        # auto-reload on file changes
-```
-
-Useful commands:
-
-```bash
-bun test                 # unit tests (no network)
-bun run test:coverage    # unit tests + coverage report
-bun run typecheck        # tsc --noEmit
-bun run format           # prettier
-bun run e2e              # integration suite against a real owa-piggy profile
-bun run build            # single-file binary at dist/teaminal
-```
-
-The unit tests use only synthetic JWTs and HTTP fixtures - no real
-tokens, no real account IDs - so they are safe to run in CI on every
-push. The e2e suite hits Microsoft Graph through your active
-owa-piggy profile; see [`e2e/README.md`](./e2e/README.md).
-
-## Architecture
-
-```
-bin/teaminal.tsx   -> src/ui/   -> src/state/ -> src/graph/ -> src/auth/
-```
-
-Lower layers never import upward. Only `src/auth/owaPiggy.ts` spawns
-subprocesses. Only `src/graph/client.ts` injects `Authorization`
-headers. All data freshness comes from `src/state/poller.ts`; UI
-components never call `src/graph/*` directly.
-
-See [`AGENTS.md`](./AGENTS.md) for the full module map, code patterns,
-and known pitfalls (`/chats` ordering, `$expand=members` limits,
-self-mention matching, seed-on-startup, etc.).
-
-## Build
-
-Build for the current host:
-
-```bash
-bun run build
-```
-
-Cross-build any supported target:
-
-```bash
-TARGET=bun-darwin-arm64 ./scripts/build.sh
-TARGET=bun-darwin-x64 ./scripts/build.sh
-TARGET=bun-linux-x64-modern ./scripts/build.sh
-TARGET=bun-linux-arm64 ./scripts/build.sh
-TARGET=bun-windows-x64 OUT=dist/teaminal.exe ./scripts/build.sh
-```
-
-The binary is written to `dist/teaminal`. The build script runs
-`dist/teaminal --version` as a smoke test after compilation.
-
-For tag-driven release builds and the Homebrew tap, see
-[`RELEASING.md`](./RELEASING.md).
-
 ## Configuration
 
 teaminal reads JSON settings once at startup from:
