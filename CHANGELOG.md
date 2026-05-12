@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.15] - 2026-05-12
+
+### Changed
+
+- **Prettier sweep across 19 files** (chatsvc / federation / external
+  search modules and their tests, ChatList, MessagePane, TailPanels,
+  systemEvent, CHANGELOG, RELEASING, docs/external-user-search). No
+  behavior change. Clears the prettier check that was failing in CI
+  on the v0.12.14 tag.
+
 ## [0.12.14] - 2026-05-11
 
 ### Fixed
@@ -691,7 +701,8 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.12.14...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.12.15...HEAD
+[0.12.15]: https://github.com/damsleth/teaminal/compare/v0.12.14...v0.12.15
 [0.12.14]: https://github.com/damsleth/teaminal/compare/v0.12.13...v0.12.14
 [0.12.13]: https://github.com/damsleth/teaminal/compare/v0.12.12...v0.12.13
 [0.12.12]: https://github.com/damsleth/teaminal/compare/v0.12.11...v0.12.12
