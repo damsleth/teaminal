@@ -31,6 +31,11 @@ export type ListLoopDeps = {
   // Hot-stop signal for the background member hydration; the loop
   // module does not own this so stop() can abort it independently.
   hydrateSignal: AbortSignal
+  // Session-wide stop signal owned by the parent poller. Combined with
+  // the per-iteration AbortController so stop() can abort in-flight
+  // list fetches; without this, account switching can hang on a slow
+  // /chats call.
+  stopSignal: AbortSignal
   isStopped: () => boolean
   onMention?: (event: MentionEvent) => void
   reportError: (err: unknown) => void
@@ -48,6 +53,7 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
     intervalMs,
     seen,
     hydrateSignal,
+    stopSignal,
     isStopped,
     onMention,
     reportError,
@@ -62,12 +68,15 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
     let consecutiveErrors = 0
     while (!isStopped()) {
       const listAbort = new AbortController()
+      // Compose the per-iteration abort with the session-wide stop
+      // signal so stop() / account-switch tears the fetch down too.
+      const signal = AbortSignal.any([listAbort.signal, stopSignal])
       try {
         const startedAt = Date.now()
         recordEvent('poller', 'info', 'list refresh started')
         const [chats, teamsAndChannels] = await Promise.all([
-          listChats({ signal: listAbort.signal }),
-          fetchTeamsAndChannels(listAbort.signal, reportError),
+          listChats({ signal }),
+          fetchTeamsAndChannels(signal, reportError),
         ])
         const channelCount = Object.values(teamsAndChannels.channelsByTeam).reduce(
           (sum, channels) => sum + channels.length,
@@ -110,7 +119,7 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
             { store, seen, prevPreviewIds, onMention, reportError },
             chats,
             myId,
-            listAbort.signal,
+            signal,
           )
         } else {
           // Seed prevPreviewIds without firing anything.

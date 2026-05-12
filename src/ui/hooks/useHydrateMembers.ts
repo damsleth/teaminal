@@ -9,8 +9,8 @@
 
 import { useEffect, useState } from 'react'
 import { GraphError } from '../../graph/client'
-import { getChat } from '../../graph/chats'
 import { warn } from '../../log'
+import { hydrateChat } from '../../state/chatActions'
 import type { Focus, Store, AppState } from '../../state/store'
 
 export function useHydrateMembers(focus: Focus, store: Store<AppState>): void {
@@ -30,7 +30,7 @@ export function useHydrateMembers(focus: Focus, store: Store<AppState>): void {
     let cancelled = false
     ;(async () => {
       try {
-        const full = await getChat(chatId, { members: true })
+        const full = await hydrateChat(chatId)
         if (cancelled) return
         store.set((s) => ({
           chats: s.chats.map((c) => (c.id === chatId ? { ...c, members: full.members } : c)),

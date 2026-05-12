@@ -8,9 +8,7 @@
 
 import { createContext, useContext } from 'react'
 import type { ReactNode } from 'react'
-import type { PollerHandle } from '../state/poller'
-
-export type PollerHandleRef = { current: PollerHandle | null }
+import type { PollerHandleRef } from '../state/poller'
 
 const PollerContext = createContext<PollerHandleRef | null>(null)
 

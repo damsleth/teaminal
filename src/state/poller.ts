@@ -71,6 +71,12 @@ export type PollerOpts = {
   onError?: (loop: PollerLoopName, err: Error) => void
 }
 
+// Mutable ref to the active poller handle. The handle is not available
+// at first render because bootstrap is async; consumers (the UI tree
+// and bootstrap itself) share a `{ current }` box rather than passing
+// a handle through props/context that does not exist yet.
+export type PollerHandleRef = { current: PollerHandle | null }
+
 export type PollerHandle = {
   // Returns once the loops have observed the stop flag and exited their
   // current iteration. In-flight fetches are aborted via AbortController.
@@ -119,6 +125,13 @@ export function startPoller(opts: PollerOpts): PollerHandle {
   // the per-iteration listAbort.
   const hydrateAbort = new AbortController()
 
+  // Session-wide stop signal. Each loop combines this with its per-
+  // iteration AbortController via AbortSignal.any so stop() can abort
+  // in-flight list/presence fetches the same way it aborts active.
+  // Without this, account switching and shutdown can hang on slow
+  // network calls in those loops.
+  const sessionAbort = new AbortController()
+
   // Set of chat IDs already hydrated via $batch. Owned here so
   // hardRefresh can clear it (otherwise unresolved chat names would
   // stay stale across the explicit refresh the user just asked for).
@@ -166,6 +179,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
     intervalMs: listMs,
     seen,
     hydrateSignal: hydrateAbort.signal,
+    stopSignal: sessionAbort.signal,
     isStopped,
     onMention,
     reportError: (err) => reportError('list', err),
@@ -176,6 +190,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
     store,
     sleeper: presenceSleeper,
     intervalMs: presenceMs,
+    stopSignal: sessionAbort.signal,
     isStopped,
     reportError: (err) => reportError('presence', err),
   })
@@ -192,6 +207,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
       unsubscribe()
       activeAbort?.abort()
       hydrateAbort.abort()
+      sessionAbort.abort()
       // close() (not just wake()) latches each sleeper so any in-flight
       // sleep resolves AND any future sleep() inside the loop is a
       // no-op. Without the latch, a loop whose previous sleep just

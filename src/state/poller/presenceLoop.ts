@@ -23,12 +23,17 @@ export type PresenceLoopDeps = {
   store: Store<AppState>
   sleeper: Sleeper
   intervalMs: number
+  // Session-wide stop signal owned by the parent poller. Combined with
+  // the per-iteration AbortController so stop() can abort in-flight
+  // presence fetches; without this, account switching can hang on a
+  // slow /me/presence call.
+  stopSignal: AbortSignal
   isStopped: () => boolean
   reportError: (err: unknown) => void
 }
 
 export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
-  const { store, sleeper, intervalMs, isStopped, reportError } = deps
+  const { store, sleeper, intervalMs, stopSignal, isStopped, reportError } = deps
 
   return async function run(): Promise<void> {
     let consecutiveErrors = 0
@@ -48,13 +53,16 @@ export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
       }
 
       const presenceAbort = new AbortController()
+      // Compose with the session stop signal so stop() / account-switch
+      // can abort the in-flight presence fetches.
+      const signal = AbortSignal.any([presenceAbort.signal, stopSignal])
       let updated = false
       try {
         if (useTeams) {
           try {
             const teams = await getMyTeamsPresence({
               profile: getActiveProfile(),
-              signal: presenceAbort.signal,
+              signal,
             })
             if (isStopped()) return
             if (teams) {
@@ -85,7 +93,7 @@ export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
           }
         }
         if (!updated && useGraph) {
-          const myPresence = await getMyPresence({ signal: presenceAbort.signal })
+          const myPresence = await getMyPresence({ signal })
           if (isStopped()) return
           store.set({ myPresence })
         }
@@ -93,7 +101,7 @@ export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
         // --- Other-user presence for the chat-list dot ---
         const stateAfterSelf = store.get()
         const wantsMembers = stateAfterSelf.settings.showPresenceInList !== false
-        if (wantsMembers && !presenceAbort.signal.aborted) {
+        if (wantsMembers && !signal.aborted) {
           const meId = stateAfterSelf.me?.id
           const oids: string[] = []
           const seen = new Set<string>()
@@ -111,7 +119,7 @@ export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
               const fetched = await fetchMemberPresence(oids, {
                 useTeams,
                 useGraph,
-                signal: presenceAbort.signal,
+                signal,
               })
               if (isStopped()) return
               if (fetched.size > 0) {

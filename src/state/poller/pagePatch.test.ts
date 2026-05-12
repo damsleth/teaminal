@@ -62,6 +62,66 @@ describe('mergeActivePagePatch', () => {
     expect(patch.messageCacheByConvo?.[conv]?.fullyLoaded).toBe(false)
   })
 
+  test('rescues optimistic _sending messages that live only in messagesByConvo', () => {
+    // Simulates the Composer path: optimistic row is written to
+    // messagesByConvo but not yet mirrored into messageCacheByConvo.
+    const state = appStateWith({
+      messageCacheByConvo: {
+        [conv]: {
+          messages: [message('m1', '2026-01-01T00:00:00Z')],
+          loadingOlder: false,
+          fullyLoaded: true,
+        },
+      },
+      messagesByConvo: {
+        [conv]: [
+          message('m1', '2026-01-01T00:00:00Z'),
+          message('temp-ui', '2026-01-01T00:00:02Z', {
+            _sending: true,
+            _tempId: 'temp-ui',
+          }),
+        ],
+      },
+    })
+    const page: MessagesPage = {
+      messages: [message('m1', '2026-01-01T00:00:00Z')],
+    }
+    const patch = mergeActivePagePatch(state, conv, page, focus)
+    const cacheMerged = patch.messageCacheByConvo?.[conv]?.messages ?? []
+    expect(cacheMerged.map((m) => m.id)).toEqual(['m1', 'temp-ui'])
+    expect(cacheMerged[1]?._sending).toBe(true)
+    const legacyMerged = patch.messagesByConvo?.[conv] ?? []
+    expect(legacyMerged.map((m) => m.id)).toEqual(['m1', 'temp-ui'])
+  })
+
+  test('rescues optimistic _sendError messages that live only in messagesByConvo', () => {
+    const state = appStateWith({
+      messageCacheByConvo: {
+        [conv]: {
+          messages: [message('m1', '2026-01-01T00:00:00Z')],
+          loadingOlder: false,
+          fullyLoaded: true,
+        },
+      },
+      messagesByConvo: {
+        [conv]: [
+          message('m1', '2026-01-01T00:00:00Z'),
+          message('temp-err', '2026-01-01T00:00:02Z', {
+            _sendError: 'boom',
+            _tempId: 'temp-err',
+          }),
+        ],
+      },
+    })
+    const page: MessagesPage = {
+      messages: [message('m1', '2026-01-01T00:00:00Z')],
+    }
+    const patch = mergeActivePagePatch(state, conv, page, focus)
+    const merged = patch.messageCacheByConvo?.[conv]?.messages ?? []
+    expect(merged.map((m) => m.id)).toEqual(['m1', 'temp-err'])
+    expect(merged[1]?._sendError).toBe('boom')
+  })
+
   test('preserves optimistic _sending messages across the merge', () => {
     const state = appStateWith({
       messageCacheByConvo: {

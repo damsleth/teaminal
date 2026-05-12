@@ -37,8 +37,7 @@
 
 import { Box, Text, useInput, useStdin, useStdout } from 'ink'
 import { useEffect, useRef, useState } from 'react'
-import { sendMessage } from '../graph/chats'
-import { postChannelReply, sendChannelMessage } from '../graph/teams'
+import { postChannelReply, sendChannelMessage, sendChatMessage } from '../state/chatActions'
 import { focusKey } from '../state/store'
 import type { ChatMessage } from '../types'
 import {
@@ -56,7 +55,7 @@ import {
   type ComposerAction,
   type ComposerBuffer,
 } from './composerReducer'
-import { htmlToText } from './html'
+import { htmlToText } from '../text/html'
 import { shortName } from '../state/selectables'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
@@ -242,7 +241,7 @@ export function Composer() {
     try {
       const sent =
         focus.kind === 'chat'
-          ? await sendMessage(focus.chatId, trimmed)
+          ? await sendChatMessage(focus.chatId, trimmed)
           : focus.kind === 'channel'
             ? await sendChannelMessage(focus.teamId, focus.channelId, trimmed)
             : await postChannelReply(focus.teamId, focus.channelId, focus.rootId, trimmed)

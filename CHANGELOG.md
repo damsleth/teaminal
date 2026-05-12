@@ -6,6 +6,38 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.16] - 2026-05-12
+
+### Fixed
+
+- **Optimistic-send rows no longer disappear during normal polling.**
+  `Composer.tsx` writes `_sending` / `_sendError` rows to
+  `messagesByConvo`, but the active-poll merge in
+  `src/state/poller/pagePatch.ts` preferred `messageCacheByConvo` when
+  a cache existed and dropped the legacy mirror's optimistic rows. The
+  merge now rescues orphan optimistic rows from `messagesByConvo` into
+  the merged cache so a poll landing mid-send cannot hide your own
+  pending message.
+- **`stop()` now aborts in-flight list and presence fetches.** The list
+  and presence loops created local `AbortController`s that the parent
+  poller could not reach, so `currentSession.stop()` could hang on a
+  slow `/chats` or `/me/presence` request during account switch /
+  shutdown. Both loops now combine their per-iteration controller with
+  a shared session-stop signal via `AbortSignal.any`.
+
+### Changed
+
+- **Architecture contract refined and boundary-tested.** UI no longer
+  imports Graph operation modules directly; one-shot user actions
+  (create chat, send message, directory search, hydrate-by-id) now
+  flow through `src/state/chatActions.ts`. The pure HTML-to-text
+  utility moved from `src/ui/html.ts` to `src/text/html.ts` so
+  `src/state/bootstrap.ts` no longer reaches up into the UI layer.
+  A new `src/architecture.test.ts` enforces the layer rules
+  (auth/graph/state/ui) on every test run.
+- **`bun run typecheck` works without `bunx` on PATH.** Script now uses
+  `bun x` so the canonical `bun` install is enough.
+
 ## [0.12.15] - 2026-05-12
 
 ### Changed
@@ -701,7 +733,8 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.12.15...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.12.16...HEAD
+[0.12.16]: https://github.com/damsleth/teaminal/compare/v0.12.15...v0.12.16
 [0.12.15]: https://github.com/damsleth/teaminal/compare/v0.12.14...v0.12.15
 [0.12.14]: https://github.com/damsleth/teaminal/compare/v0.12.13...v0.12.14
 [0.12.13]: https://github.com/damsleth/teaminal/compare/v0.12.12...v0.12.13
