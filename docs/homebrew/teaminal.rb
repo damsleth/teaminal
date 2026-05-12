@@ -14,12 +14,16 @@ class Teaminal < Formula
   # If it isn't installed, we fail with a one-line install hint rather than
   # silently failing on the first `system "bun"` call.
   def find_bun
+    xdg_data = ENV["XDG_DATA_HOME"] || "#{Dir.home}/.local/share"
     candidates = [
+      ENV["BUN_INSTALL"] ? "#{ENV["BUN_INSTALL"]}/bin/bun" : nil,
       "#{Dir.home}/.bun/bin/bun",
+      "#{xdg_data}/bun/bin/bun",
+      "#{Dir.home}/.local/share/bun/bin/bun",
       "/opt/homebrew/bin/bun",
       "/usr/local/bin/bun",
       "/usr/bin/bun",
-    ]
+    ].compact
     candidates.find { |p| File.executable?(p) }
   end
 
