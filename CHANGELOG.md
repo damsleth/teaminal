@@ -6,6 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.12.17] - 2026-05-12
+
+### Fixed
+
+- **Homebrew install no longer fails with "Bun runtime not found"** when
+  bun is installed under `~/.local/share/bun` (the default XDG location
+  used by `bun.com/install`). Brew sets `HOME` to a sandbox path during
+  install, so `Dir.home` resolved to the fake brew home and every
+  `~/...` candidate evaluated to a non-existent path. The formula now
+  resolves the real user's home via `Dir.home(ENV.fetch("USER"))`
+  (passwd lookup) before probing the bun candidates.
+
 ## [0.12.16] - 2026-05-12
 
 ### Fixed

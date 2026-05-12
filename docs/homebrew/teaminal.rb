@@ -2,7 +2,7 @@ class Teaminal < Formula
   desc "Lightweight terminal Microsoft Teams client"
   homepage "https://github.com/damsleth/teaminal"
   url "https://github.com/damsleth/teaminal.git", branch: "main"
-  version "0.12.16"
+  version "0.12.17"
   license "MIT"
   head "https://github.com/damsleth/teaminal.git", branch: "main"
 
@@ -13,13 +13,17 @@ class Teaminal < Formula
   # so we look for it on disk and add its directory to PATH for this build.
   # If it isn't installed, we fail with a one-line install hint rather than
   # silently failing on the first `system "bun"` call.
+  #
+  # Brew sets HOME to a sandbox dir during install, so Dir.home returns the
+  # fake home. Resolve the real user's home via passwd (USER is preserved).
   def find_bun
-    xdg_data = ENV["XDG_DATA_HOME"] || "#{Dir.home}/.local/share"
+    real_home = Dir.home(ENV.fetch("USER"))
+    xdg_data = ENV["XDG_DATA_HOME"] || "#{real_home}/.local/share"
     candidates = [
       ENV["BUN_INSTALL"] ? "#{ENV["BUN_INSTALL"]}/bin/bun" : nil,
-      "#{Dir.home}/.bun/bin/bun",
+      "#{real_home}/.bun/bin/bun",
       "#{xdg_data}/bun/bin/bun",
-      "#{Dir.home}/.local/share/bun/bin/bun",
+      "#{real_home}/.local/share/bun/bin/bun",
       "/opt/homebrew/bin/bun",
       "/usr/local/bin/bun",
       "/usr/bin/bun",
