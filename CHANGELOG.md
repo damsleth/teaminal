@@ -22,6 +22,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 - **Teams render as non-selectable section headers in the chat list.** Up/down navigation skips team rows, jumping straight between channels and chats. Team display names render bold and flush-left; channels indent two spaces under their team with the `#` prefix. The generic "Teams" section label is removed (each team is now its own header).
 - **Tighter timestamp column in the message pane.** The timestamp box now hosts `HH:MM` only (5 cols), and the send-status glyph (`✗` / `…`) moved to the indicator column where it shares a slot with the focus arrow (focus wins when both apply). Net effect: two columns shaved off every row, reactions/receipts/attachments/send-error rows now align under the slimmer column.
 
+### Added
+
+- **Reply indicator in the chat pane.** When a chat message quotes another (Teams' "reply" feature), a muted `↳ replying to <name>: "<preview>"` row renders above the new message body. The preview is `htmlToText`-cleaned, single-lined, and truncated to 60 columns. Channel thread replies are unchanged — the existing thread tree already represents that flavor.
+
 ## [0.13.0] - 2026-05-13
 
 ### Added

@@ -16,7 +16,7 @@ import { extractInlineImages, type InlineImageRef } from '../text/inlineImages'
 import { reactionsSummary } from './reactions'
 import { describeSystemEvent } from './systemEvent'
 import { searchMessages } from './messageSearch'
-import { effectiveSenderName, isRenderableMessage } from './renderableMessage'
+import { effectiveSenderName, getQuotedReply, isRenderableMessage } from './renderableMessage'
 import {
   buildMessageRows,
   chooseMessageRowsWindowStart,
@@ -454,8 +454,27 @@ function MessageRow(props: {
 
   const rowDir = flipRow ? 'row-reverse' : 'row'
 
+  // Quoted-reply preview (chat-pane only). Channel threads represent
+  // replies via the existing thread tree; double-decorating both
+  // would be visual noise.
+  const quotedReply = !isSystem ? getQuotedReply(m) : null
+
   return (
     <>
+      {quotedReply && (
+        <Box flexDirection={rowDir}>
+          <Box width={1} flexShrink={0} />
+          {props.showTimestamp && <Box width={statusWidth} flexShrink={0} />}
+          <Box width={senderColWidth + 1} flexShrink={0} />
+          <Box flexGrow={1} flexShrink={1} minWidth={0}>
+            <Text color={theme.mutedText} wrap="truncate-end">
+              {`↳ replying to ${quotedReply.senderName}${
+                quotedReply.preview ? `: "${quotedReply.preview}"` : ''
+              }`}
+            </Text>
+          </Box>
+        </Box>
+      )}
       <Box flexDirection={rowDir}>
         <Box width={1} flexShrink={0}>
           <Text
@@ -565,7 +584,11 @@ function previewBody(m: ChatMessage): string {
   if (m.body.contentType === 'text') {
     return raw.replace(/\s+/g, ' ').trim()
   }
-  return htmlToText(raw)
+  // Graph inserts an opaque <attachment id="..."></attachment> tag at
+  // the top of body.content for quoted replies. htmlToText drops it
+  // (unknown tag) but leaves the preceding whitespace; trim again so
+  // the new message body starts at column 0.
+  return htmlToText(raw).trim()
 }
 
 // Sender column auto-sizes to the longest first name in the visible

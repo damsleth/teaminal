@@ -65,6 +65,26 @@ describe('message row viewport budgeting', () => {
     ).toBe(2)
   })
 
+  test('adds +1 row for chat-pane quoted replies', () => {
+    const replyMsg = {
+      ...msg('reply'),
+      attachments: [
+        {
+          id: 'att-1',
+          contentType: 'messageReference',
+          content: JSON.stringify({
+            messageId: 'orig',
+            messageSender: { user: { id: 'u1', displayName: 'Anna' } },
+            messagePreview: 'lunch at noon?',
+          }),
+        },
+      ],
+    }
+    expect(
+      messageRenderRowHeight({ kind: 'message', key: 'reply', message: replyMsg }),
+    ).toBe(2)
+  })
+
   test('counts wrapped body text when estimating the viewport budget', () => {
     expect(
       messageRenderRowHeight(
