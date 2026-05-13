@@ -3,14 +3,16 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  configToSettings,
   getConfigPath,
   loadConfig,
   loadSettings,
   mergeSettings,
   saveConfig,
+  settingsToConfig,
   updateConfig,
 } from './index'
-import { defaultSettings } from '../state/store'
+import { defaultSettings, type Settings } from '../state/store'
 
 let tmpDir: string
 let cfgPath: string
@@ -276,5 +278,57 @@ describe('saveConfig/updateConfig', () => {
     expect(next.themeOverrides?.borders?.modal).toBe('double')
     expect(next.themeOverrides?.emphasis?.selectedBold).toBe(true)
     expect(next.themeOverrides?.emphasis?.unreadBold).toBe(false)
+  })
+})
+
+describe('Settings ↔ config.json parity', () => {
+  test('settingsToConfig covers every key in defaultSettings', () => {
+    const written = settingsToConfig(defaultSettings)
+    for (const key of Object.keys(defaultSettings) as Array<keyof Settings>) {
+      expect(written).toHaveProperty(key)
+    }
+  })
+
+  test('every setting round-trips through config without loss', () => {
+    // Pick a non-default value for every scalar / enum so accidental
+    // stripping in either direction shows up as a diff.
+    const mutated: Settings = {
+      ...defaultSettings,
+      theme: 'comfortable',
+      themeOverrides: {
+        selected: 'cyan',
+        layout: { modalPaddingX: 3 },
+      },
+      accounts: ['profile-a', 'profile-b'],
+      activeAccount: 'profile-a',
+      chatListDensity: 'compact',
+      chatListShortNames: !defaultSettings.chatListShortNames,
+      messagePaneShortNames: !defaultSettings.messagePaneShortNames,
+      showPresenceInList: !defaultSettings.showPresenceInList,
+      showTimestampsInPane: !defaultSettings.showTimestampsInPane,
+      showReactions: 'all',
+      messageFocusIndicatorEnabled: !defaultSettings.messageFocusIndicatorEnabled,
+      messageFocusIndicatorChar: '|',
+      messageFocusIndicatorColor: 'magenta',
+      messageFocusBackgroundColor: 'gray',
+      useTeamsPresence: !defaultSettings.useTeamsPresence,
+      forceAvailableWhenFocused: !defaultSettings.forceAvailableWhenFocused,
+      realtimeEnabled: !defaultSettings.realtimeEnabled,
+      notifyMuted: !defaultSettings.notifyMuted,
+      notifyActiveBanner: !defaultSettings.notifyActiveBanner,
+      quietHoursStart: '22:00',
+      quietHoursEnd: '07:00',
+      logFile: '/tmp/teaminal.log',
+      tailEvents: !defaultSettings.tailEvents,
+      tailNetwork: !defaultSettings.tailNetwork,
+      tailDiagnostics: !defaultSettings.tailDiagnostics,
+      selfMessagesOnRight: !defaultSettings.selfMessagesOnRight,
+      inlineImages: 'off',
+      inlineImageMaxRows: 7,
+      statusBarPosition: 'hidden',
+    }
+    const config = settingsToConfig(mutated)
+    const roundtripped = configToSettings(config as Record<string, unknown>, [])
+    expect(roundtripped).toEqual(mutated)
   })
 })
