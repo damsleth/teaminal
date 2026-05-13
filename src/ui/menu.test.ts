@@ -182,6 +182,7 @@ describe('ROOT_MENU shape', () => {
       'tailEvents',
       'tailNetwork',
       'tailDiagnostics',
+      'statusBarPosition',
     ])
   })
 

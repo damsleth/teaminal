@@ -11,6 +11,11 @@
 //   3. Handle the new action in MenuModal.activate (and add a value
 //      formatter in valueForToggle below if it's a new toggle key)
 //
+// Invariant: every Settings key surfaced through the Menu modal must
+// also appear in src/config/index.ts settingsToConfig + validateAndAssign.
+// If you add a row here, update both ends and the test in
+// src/config/index.test.ts (settingsToConfig coverage test).
+//
 // Disabled items render dim and the cursor skips them. Use `disabled: true`
 // for "coming soon" placeholders so the structure is visible without
 // implying the feature works yet.
@@ -37,6 +42,7 @@ export type ToggleKey =
   | 'tailEvents'
   | 'tailNetwork'
   | 'tailDiagnostics'
+  | 'statusBarPosition'
 
 export type MenuAction =
   | { kind: 'resume' }
@@ -185,6 +191,11 @@ export const ROOT_MENU: MenuItem[] = [
         label: 'Tail diagnostics',
         action: { kind: 'toggle-setting', key: 'tailDiagnostics' },
       },
+      {
+        id: 'statusBarPosition',
+        label: 'Status bar',
+        action: { kind: 'toggle-setting', key: 'statusBarPosition' },
+      },
     ],
   },
   {
@@ -280,6 +291,8 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     }
     case 'chatListDensity':
       return (current === 'cozy' ? 'compact' : 'cozy') as Settings[K]
+    case 'statusBarPosition':
+      return (current === 'bottom' ? 'hidden' : 'bottom') as Settings[K]
     case 'showReactions':
       return cycleReactionDisplayMode(current as Settings['showReactions']) as Settings[K]
     case 'chatListShortNames':
@@ -322,6 +335,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'theme':
     case 'chatListDensity':
     case 'showReactions':
+    case 'statusBarPosition':
       return String(value)
     case 'chatListShortNames':
     case 'messagePaneShortNames':

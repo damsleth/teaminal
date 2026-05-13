@@ -82,6 +82,7 @@ export function MessagePane(props: {
   const threadMetaByRoot = useAppState((s) => s.threadMetaByRoot)
   const inlineImages = useAppState((s) => s.settings.inlineImages)
   const inlineImageMaxRows = useAppState((s) => s.settings.inlineImageMaxRows)
+  const statusBarHidden = useAppState((s) => s.settings.statusBarPosition === 'hidden')
   const theme = useTheme()
 
   const [, setImageRevision] = useState(0)
@@ -141,9 +142,10 @@ export function MessagePane(props: {
   const cozyRows = density === 'cozy' ? COZY_HEADER_ROWS : 0
   const typingActive = (typingByConvo[conv] ?? []).length > 0
   const reservedDynamic = (isLoadingOlder ? 1 : 0) + (typingActive ? 1 : 0)
+  const chromeRows = CHROME_RESERVED_ROWS - (statusBarHidden ? 1 : 0)
   const rowBudget = Math.max(
     MIN_VISIBLE_ROWS,
-    terminalSize.rows - CHROME_RESERVED_ROWS - cozyRows - reservedDynamic,
+    terminalSize.rows - chromeRows - cozyRows - reservedDynamic,
   )
   const messageTextColumns = Math.max(12, terminalSize.columns - 60)
   const allRows = buildMessageRows(messages, {
@@ -231,8 +233,10 @@ export function MessagePane(props: {
         reactionDisplayMode,
       })
     }
-    // BOTTOM_CHROME: composer (2) + status bar (1) + safety pad (1)
-    const BOTTOM_CHROME = 4
+    // BOTTOM_CHROME: composer (2) + status bar (1) + safety pad (1).
+    // Subtracts 1 when the status bar is hidden so the inline image
+    // anchors one row lower (recovering the row gained by the user).
+    const BOTTOM_CHROME = 4 - (statusBarHidden ? 1 : 0)
     const rowsFromBottom = rowsBelowFocused + BOTTOM_CHROME + 1
 
     writeKittyImageAtOffset(stdout, apc, rowsFromBottom, inlineImageMaxRows)
