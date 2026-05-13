@@ -68,12 +68,17 @@ function writeCachedImage(key: string, data: Buffer, meta: ImageMeta, profile?: 
 export type FetchImageOpts = {
   profile?: string
   signal?: AbortSignal
+  // When true, fetch directly with plain fetch() and no Authorization
+  // header. Used for giphy/tenor URLs returned by the Teams gif picker;
+  // sending a Bearer token to those hosts produces a rejection.
+  isExternal?: boolean
 }
 
 // Fetch an image blob from Graph and cache it on disk. Returns null on
 // oversized or failed downloads; the caller falls back to text display.
-// The path must already be a Graph-relative path or absolute Graph URL -
-// never a raw signed URL with embedded credentials.
+// The path must already be a Graph-relative path, absolute Graph URL, or
+// (when opts.isExternal is true) an absolute https URL for a third-party
+// host. Never a raw signed URL with embedded credentials.
 export async function fetchAndCacheImage(
   path: string,
   key: string,
@@ -85,7 +90,11 @@ export async function fetchAndCacheImage(
 
   let bytes: Uint8Array
   try {
-    bytes = await graphBinary({ method: 'GET', path, signal: opts?.signal })
+    if (opts?.isExternal) {
+      bytes = await fetchExternalImage(path, opts?.signal)
+    } else {
+      bytes = await graphBinary({ method: 'GET', path, signal: opts?.signal })
+    }
   } catch (err) {
     recordEvent(
       'graph',
@@ -118,6 +127,19 @@ export function getImageStatus(key: string): FetchStatus {
 
 export function getImageData(key: string): Buffer | undefined {
   return imageDataCache.get(key)
+}
+
+// Fetch an arbitrary image URL without auth headers. Applies the same
+// size cap as the Graph path. Used by the gif-picker shape, where
+// contentUrl is an external CDN URL (giphy/tenor) that rejects Bearer
+// tokens.
+async function fetchExternalImage(url: string, signal?: AbortSignal): Promise<Uint8Array> {
+  const res = await fetch(url, { signal })
+  if (!res.ok) {
+    throw new Error(`external image fetch ${res.status} ${res.statusText}`)
+  }
+  const ab = await res.arrayBuffer()
+  return new Uint8Array(ab)
 }
 
 // Trigger an async fetch for a key. Calls onChange when the status
