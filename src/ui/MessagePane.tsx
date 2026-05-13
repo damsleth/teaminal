@@ -11,8 +11,8 @@ import { useEffect, useRef, useState } from 'react'
 import { chatLabel, shortName } from '../state/selectables'
 import { focusKey, type ReadReceipt, type ThreadMeta, type TypingIndicator } from '../state/store'
 import type { Chat, ChatMessage, Channel, Team } from '../types'
-import { isImageAttachment, attachmentGraphPath } from '../types'
 import { htmlToText } from '../text/html'
+import { extractInlineImages, type InlineImageRef } from '../text/inlineImages'
 import { reactionsSummary } from './reactions'
 import { describeSystemEvent } from './systemEvent'
 import { searchMessages } from './messageSearch'
@@ -30,7 +30,7 @@ import {
 import type { Theme } from './theme'
 import { useAppState, useTheme } from './StoreContext'
 import { isKittyCapable, buildKittyAPC, writeKittyImageAtOffset } from './kittyGraphics'
-import { ensureImageFetched, getImageData, imageCacheKey } from '../state/imageCache'
+import { ensureImageFetched, getImageData } from '../state/imageCache'
 import { getActiveProfile } from '../graph/client'
 
 export { effectiveSenderName, isRenderableMessage } from './renderableMessage'
@@ -188,15 +188,18 @@ export function MessagePane(props: {
     for (const row of rows) {
       if (row.kind !== 'message') continue
       const m = row.message
-      const chatId = m.chatId ?? conv
-      const imgAtts = (m.attachments ?? []).filter(isImageAttachment)
-      for (const att of imgAtts) {
-        const key = imageCacheKey(m.id, att.id)
-        const path = attachmentGraphPath(att, chatId, m.id)
-        ensureImageFetched(path, key, { contentType: att.contentType, name: att.name ?? '' }, {
-          profile,
-          onChange: () => setImageRevision((r) => r + 1),
-        })
+      const refs = extractInlineImages(m)
+      for (const ref of refs) {
+        ensureImageFetched(
+          ref.sourcePath,
+          ref.cacheKey,
+          { contentType: ref.contentType, name: ref.name },
+          {
+            profile,
+            isExternal: ref.isExternal,
+            onChange: () => setImageRevision((r) => r + 1),
+          },
+        )
       }
     }
 
@@ -208,12 +211,11 @@ export function MessagePane(props: {
     if (!focusedRow || focusedRow.kind !== 'message') return
 
     const m = focusedRow.message
-    const imgAtts = (m.attachments ?? []).filter(isImageAttachment)
-    if (imgAtts.length === 0) return
+    const refs = extractInlineImages(m)
+    if (refs.length === 0) return
 
-    const att = imgAtts[0]!
-    const key = imageCacheKey(m.id, att.id)
-    const imgData = getImageData(key)
+    const ref = refs[0]!
+    const imgData = getImageData(ref.cacheKey)
     if (!imgData) return
 
     const imgCols = Math.max(12, terminalSize.columns - 60)
@@ -526,14 +528,14 @@ function MessageRow(props: {
         </Box>
       )}
       {!isDeleted &&
-        (m.attachments ?? []).filter(isImageAttachment).map((att) => (
-          <Box key={att.id} flexDirection="row">
+        extractInlineImages(m).map((ref: InlineImageRef) => (
+          <Box key={ref.cacheKey} flexDirection="row">
             <Box width={1} flexShrink={0} />
             {props.showTimestamp && <Box width={statusWidth} flexShrink={0} />}
             <Box width={senderColWidth + 1} flexShrink={0} />
             <Box flexGrow={1} flexShrink={1} minWidth={0}>
               <Text color={theme.mutedText} wrap="truncate-end">
-                {`[img] ${att.name ?? 'image'}`}
+                {`[img] ${ref.name}`}
               </Text>
             </Box>
           </Box>

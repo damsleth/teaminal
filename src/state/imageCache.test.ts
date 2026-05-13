@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it, mock } from 'bun:test'
 import { isImageAttachment, attachmentGraphPath } from '../types'
 import type { MessageAttachment } from '../types'
-import { imageCacheKey as cacheKey } from './imageCache'
+import { fetchAndCacheImage, imageCacheKey as cacheKey } from './imageCache'
 
 describe('imageCacheKey', () => {
   it('combines messageId and attachmentId with ::', () => {
@@ -79,5 +79,36 @@ describe('attachmentGraphPath', () => {
     const path = attachmentGraphPath(att, 'chat/id', 'msg/id')
     expect(path).not.toContain(' ')
     expect(path).toContain('att%20with%20spaces')
+  })
+})
+
+describe('fetchAndCacheImage isExternal branch', () => {
+  const realFetch = globalThis.fetch
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
+  it('does not send Authorization when isExternal is true', async () => {
+    let capturedHeaders: Headers | null = null
+    const bytes = new Uint8Array([1, 2, 3, 4])
+    const fakeFetch = mock(async (_url: string, init?: RequestInit) => {
+      capturedHeaders = new Headers(init?.headers ?? {})
+      return new Response(bytes, { status: 200 })
+    })
+    globalThis.fetch = fakeFetch as unknown as typeof fetch
+
+    const key = `external-test-${Date.now()}`
+    const buf = await fetchAndCacheImage(
+      'https://media.giphy.com/test.gif',
+      key,
+      { contentType: 'image/gif', name: 'test.gif' },
+      { isExternal: true, profile: '__external_test__' },
+    )
+
+    expect(buf).not.toBeNull()
+    expect(capturedHeaders).not.toBeNull()
+    expect(capturedHeaders!.get('authorization')).toBeNull()
+    expect(capturedHeaders!.get('Authorization')).toBeNull()
+    expect(fakeFetch).toHaveBeenCalledTimes(1)
   })
 })

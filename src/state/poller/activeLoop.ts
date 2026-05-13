@@ -12,7 +12,8 @@
 import { listMessagesPage } from '../../graph/chats'
 import { GraphError } from '../../graph/client'
 import { listChannelMessagesPage, listChannelRepliesPage } from '../../graph/teams'
-import { recordEvent } from '../../log'
+import { recordEvent, isDebugEnabled } from '../../log'
+import { logMessageImageShape } from './imageDebug'
 import type { ChatMessage } from '../../types'
 import { focusKey, type AppState, type ConvKey, type Focus, type Store } from '../store'
 import type { MentionEvent } from '../poller'
@@ -99,6 +100,7 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
           for (const msg of messages) {
             if (seenSet.has(msg.id)) continue
             seenSet.add(msg.id)
+            if (isDebugEnabled()) logMessageImageShape(msg)
             if (!isFirst && myId && shouldNotifyMention(msg, myId)) {
               newMentions.push(msg)
             }
