@@ -104,6 +104,43 @@ export type MessageAttachment = {
   teamsAppId?: string | null
 }
 
+// Parsed view of an attachment whose contentType is "messageReference".
+// Graph stores the quoted message metadata as JSON in `attachment.content`;
+// the body of the new message contains an `<attachment id="...">` tag
+// referencing this attachment by id.
+export type MessageReferenceContent = {
+  messageId: string
+  messageSender?: IdentitySet
+  messageType?: string
+  messagePreview?: string
+  createdDateTime?: string
+}
+
+export function parseMessageReference(
+  a: MessageAttachment,
+): MessageReferenceContent | null {
+  if (a.contentType !== 'messageReference') return null
+  if (!a.content) return null
+  try {
+    const parsed = JSON.parse(a.content) as unknown
+    if (!parsed || typeof parsed !== 'object') return null
+    const obj = parsed as Record<string, unknown>
+    const messageId = obj.messageId
+    if (typeof messageId !== 'string') return null
+    return {
+      messageId,
+      messageSender: obj.messageSender as IdentitySet | undefined,
+      messageType: typeof obj.messageType === 'string' ? obj.messageType : undefined,
+      messagePreview:
+        typeof obj.messagePreview === 'string' ? obj.messagePreview : undefined,
+      createdDateTime:
+        typeof obj.createdDateTime === 'string' ? obj.createdDateTime : undefined,
+    }
+  } catch {
+    return null
+  }
+}
+
 // Image attachments come in two shapes:
 //   1. contentType starts with 'image/' - direct file attachment
 //   2. common image extension in the name - Teams hosted content (contentType

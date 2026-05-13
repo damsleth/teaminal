@@ -2,6 +2,7 @@ import type { ChatMessage } from '../types'
 import type { ReactionDisplayMode } from '../state/store'
 import { htmlToText } from '../text/html'
 import { reactionsSummary } from './reactions'
+import { getQuotedReply } from './renderableMessage'
 
 export type LoadMoreState = 'idle' | 'loading' | 'error' | 'unavailable'
 
@@ -102,6 +103,8 @@ export function messageRenderRowHeight(row: MessageRenderRow, opts?: MessageRowH
   if (row.kind !== 'message') return 1
   let height = estimateWrappedRows(messageTextForHeight(row, opts), opts?.messageTextColumns)
   if (row.message._sendError) height++
+  // Reply preview row (only present for chat-pane quoted replies).
+  if (getQuotedReply(row.message)) height++
   return height
 }
 
