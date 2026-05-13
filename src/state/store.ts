@@ -300,6 +300,14 @@ export type Settings = {
   // Maximum terminal rows a single inline image may occupy. Images taller
   // than this are scaled down by the terminal to fit. Default 10.
   inlineImageMaxRows: number
+  // Where the status bar renders.
+  //   'bottom' (default) - below the composer; current behavior.
+  //   'hidden' - suppress the status bar entirely, gaining one row of
+  //              vertical space in the message pane. The terminal title
+  //              and the diagnostics modal remain available for the
+  //              information the status bar would have shown.
+  // A 'top' option is plausible but deferred until asked for.
+  statusBarPosition: 'bottom' | 'hidden'
 }
 
 export const defaultSettings: Settings = {
@@ -331,6 +339,7 @@ export const defaultSettings: Settings = {
   selfMessagesOnRight: false,
   inlineImages: 'auto',
   inlineImageMaxRows: 10,
+  statusBarPosition: 'bottom',
 }
 
 export type MessageCache = {

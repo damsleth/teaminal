@@ -25,6 +25,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - **Reply indicator in the chat pane.** When a chat message quotes another (Teams' "reply" feature), a muted `↳ replying to <name>: "<preview>"` row renders above the new message body. The preview is `htmlToText`-cleaned, single-lined, and truncated to 60 columns. Channel thread replies are unchanged — the existing thread tree already represents that flavor.
+- **`statusBarPosition` setting.** `"bottom"` (default) keeps the existing behavior; `"hidden"` suppresses the status bar entirely, freeing one row of vertical space in the message pane. Cyclable from Settings → Status bar. Kitty inline-image positioning math is adjusted when hidden so images still anchor correctly.
 
 ## [0.13.0] - 2026-05-13
 

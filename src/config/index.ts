@@ -237,6 +237,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     selfMessagesOnRight: settings.selfMessagesOnRight,
     inlineImages: settings.inlineImages,
     inlineImageMaxRows: settings.inlineImageMaxRows,
+    statusBarPosition: settings.statusBarPosition,
   }
 }
 
@@ -461,6 +462,13 @@ function validateAndAssign(
         return true
       }
       warnings.push('config: "inlineImageMaxRows" must be an integer between 1 and 50')
+      return false
+    case 'statusBarPosition':
+      if (value === 'bottom' || value === 'hidden') {
+        out.statusBarPosition = value
+        return true
+      }
+      warnings.push('config: "statusBarPosition" must be "bottom" or "hidden"')
       return false
   }
 }

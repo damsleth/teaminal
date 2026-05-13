@@ -103,6 +103,7 @@ export function App() {
   const messagesByConvo = useAppState((s) => s.messagesByConvo)
   const messageCacheByConvo = useAppState((s) => s.messageCacheByConvo)
   const messageCursorByConvo = useAppState((s) => s.messageCursorByConvo)
+  const statusBarPosition = useAppState((s) => s.settings.statusBarPosition)
 
   const [newChatPrompt, setNewChatPrompt] = useState<string | null>(null)
   const federatedFocusCheckedRef = useRef<Set<string>>(new Set())
@@ -427,7 +428,7 @@ export function App() {
       <Box borderStyle={theme.borders.panel} borderColor={theme.border}>
         <Composer />
       </Box>
-      <StatusBar />
+      {statusBarPosition !== 'hidden' && <StatusBar />}
     </Box>
   )
 }
