@@ -25,7 +25,7 @@ describe('findRootQuote', () => {
   test('returns sender short name and trimmed body for plain text', () => {
     const out = findRootQuote(ROOT_FOCUS, { 'channel:T1:C1': [ROOT] })
     expect(out).toEqual({
-      sender: 'Carl',
+      sender: 'Carl Joakim',
       preview: 'Hello, this is the root post.',
     })
   })

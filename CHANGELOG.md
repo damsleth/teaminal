@@ -16,6 +16,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 - **Pasted inline images, uploaded images, and gif-picker GIFs all render now.** A new `extractInlineImages()` walks both the HTML body (`<img itemid="...">` and hostedContents `$value` URLs) and `attachments[]` (covering the `application/vnd.microsoft.card.animation` and external-CDN GIF shape). External CDNs (giphy / tenor) are fetched without a Graph Authorization header. Animated GIFs render as still images (first frame) - acceptable v1 behavior.
 - **`forceAvailableWhenFocused` no longer gets stuck Away on terminals that drop DEC 1004 focus reporting (some Ghostty builds, certain multiplexers).** A 5-second fallback timer marks the focus reporter unhealthy if no focus events have arrived, re-affirms `terminalFocused=true`, and stops trusting subsequent DEC 1004 sequences so a spurious focus-out cannot latch the override off. Health surfaces in the Diagnostics modal.
 
+### Changed
+
+- **`shortName()` now drops only the last surname token.** `"Ole Kristian Mørch-Storstein"` renders as `"Ole Kristian"` instead of just `"Ole"`. Multi-given-name forms (`"Anna Bjørg Maria Vatne"` → `"Anna Bjørg Maria"`) are preserved; hyphenated surnames stay intact because they have no whitespace. AD comma form (`"Surname, First Middle"`) still drops the rightmost token after the comma, so `"Damsleth, Carl Joakim"` → `"Carl"`.
+
 ## [0.13.0] - 2026-05-13
 
 ### Added

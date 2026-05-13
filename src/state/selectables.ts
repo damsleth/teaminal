@@ -73,18 +73,27 @@ export function clampCursor(cursor: number, listLength: number): number {
 // Short, message-row-friendly form of a display name. Strategy:
 //   1. If formatted "Surname, Firstname [Middle...]" (common in corporate
 //      AD), take the part after the comma. Otherwise use the name as-is.
-//   2. Take the first whitespace-separated token from that.
-// "Nordling, Finn Saethre" -> "Finn"; "Carl Damsleth" -> "Carl".
-// Used in MessagePane so message rows show "Finn" / "Carl" instead of
-// truncated "Nordling, Finn ..." / "Damsleth, Carl ..." columns.
+//   2. Drop the rightmost whitespace-separated token (the surname in
+//      natural order); preserves multi-given-name forms like
+//      "Ole Kristian Mørch-Storstein" -> "Ole Kristian". Hyphenated
+//      surnames have no whitespace inside so they count as one token.
+// "Nordling, Finn Saethre" -> "Finn Saethre" -> "Finn";
+// "Carl Damsleth" -> "Carl";
+// "Ole Kristian Mørch-Storstein" -> "Ole Kristian".
+// Used in MessagePane so message rows show first/given names instead of
+// the full "Nordling, Finn Saethre" / "Damsleth, Carl Joakim" columns.
 export function shortName(displayName: string | null | undefined): string {
   if (!displayName) return '?'
   const trimmed = displayName.trim()
   if (!trimmed) return '?'
   const commaIdx = trimmed.indexOf(',')
-  const afterSurname = commaIdx >= 0 ? trimmed.slice(commaIdx + 1).trim() : trimmed
-  const first = afterSurname.split(/\s+/)[0]
-  return first || trimmed
+  // AD form "Surname, First Middle" — keep everything after the comma.
+  // Natural form "First Middle Surname" — drop the rightmost token.
+  const naturalOrder = commaIdx >= 0 ? trimmed.slice(commaIdx + 1).trim() : trimmed
+  const tokens = naturalOrder.split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return trimmed
+  if (tokens.length === 1) return tokens[0]!
+  return tokens.slice(0, -1).join(' ')
 }
 
 // Case-insensitive substring match against the displayed label (chat

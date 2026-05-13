@@ -180,18 +180,25 @@ describe('itemMatchesFilter', () => {
 })
 
 describe('shortName', () => {
-  test('takes the part after the comma in "Surname, First Last"', () => {
+  test('comma-form: drops surname before comma, then drops trailing token', () => {
+    // After comma we have "Finn Saethre"; drop the trailing "Saethre".
     expect(shortName('Nordling, Finn Saethre')).toBe('Finn')
     expect(shortName('Damsleth, Carl Joakim')).toBe('Carl')
   })
 
-  test('returns the first word when not comma-formatted', () => {
+  test('comma-form with single given name returns that name', () => {
+    expect(shortName('Nordling, Finn')).toBe('Finn')
+  })
+
+  test('natural form: drops only the rightmost token', () => {
     expect(shortName('Carl Damsleth')).toBe('Carl')
-    expect(shortName('Maria de la Cruz')).toBe('Maria')
+    expect(shortName('Ole Kristian Mørch-Storstein')).toBe('Ole Kristian')
+    expect(shortName('Anna Bjørg Maria Vatne')).toBe('Anna Bjørg Maria')
   })
 
   test('returns the whole name when single-word', () => {
     expect(shortName('Mononym')).toBe('Mononym')
+    expect(shortName('Madonna')).toBe('Madonna')
   })
 
   test('handles missing or empty input', () => {
