@@ -234,6 +234,9 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     tailEvents: settings.tailEvents,
     tailNetwork: settings.tailNetwork,
     tailDiagnostics: settings.tailDiagnostics,
+    selfMessagesOnRight: settings.selfMessagesOnRight,
+    inlineImages: settings.inlineImages,
+    inlineImageMaxRows: settings.inlineImageMaxRows,
   }
 }
 
@@ -388,6 +391,7 @@ function validateAndAssign(
     case 'tailEvents':
     case 'tailNetwork':
     case 'tailDiagnostics':
+    case 'selfMessagesOnRight':
       if (typeof value === 'boolean') {
         out[key] = value
         return true
@@ -443,6 +447,20 @@ function validateAndAssign(
         return true
       }
       warnings.push('config: "logFile" must be null or a path string')
+      return false
+    case 'inlineImages':
+      if (value === 'auto' || value === 'off') {
+        out.inlineImages = value
+        return true
+      }
+      warnings.push('config: "inlineImages" must be "auto" or "off"')
+      return false
+    case 'inlineImageMaxRows':
+      if (typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 50) {
+        out.inlineImageMaxRows = value
+        return true
+      }
+      warnings.push('config: "inlineImageMaxRows" must be an integer between 1 and 50')
       return false
   }
 }
