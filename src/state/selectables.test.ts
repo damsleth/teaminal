@@ -4,8 +4,11 @@ import {
   buildSelectableList,
   chatLabel,
   clampCursor,
+  firstSelectableIndex,
   itemMatchesFilter,
+  nextSelectableIndex,
   shortName,
+  type SelectableItem,
 } from './selectables'
 import { initialAppState } from './store'
 
@@ -210,5 +213,53 @@ describe('shortName', () => {
 
   test('preserves diacritics', () => {
     expect(shortName('Mørch, Gustav Meyer')).toBe('Gustav')
+  })
+})
+
+describe('nextSelectableIndex', () => {
+  // Synthetic lists - only kinds matter for navigation skipping.
+  const c = (id: string): SelectableItem => ({
+    kind: 'chat',
+    chat: chat(id),
+    label: id,
+  })
+  const t = (id: string): SelectableItem => ({ kind: 'team', team: team(id, id) })
+  const ch = (id: string): SelectableItem => ({
+    kind: 'channel',
+    team: team('T', 'T'),
+    channel: channel(id, id),
+    label: id,
+  })
+
+  test('jumps forward over a single team header', () => {
+    const items = [c('a'), t('T'), ch('g'), t('T2'), ch('r')]
+    expect(nextSelectableIndex(items, 0, +1)).toBe(2)
+  })
+
+  test('jumps backward over a single team header', () => {
+    const items = [c('a'), t('T'), ch('g'), t('T2'), ch('r')]
+    expect(nextSelectableIndex(items, 3, +1)).toBe(4)
+    expect(nextSelectableIndex(items, 4, -1)).toBe(2)
+  })
+
+  test('stays put when no movable target exists in direction', () => {
+    const items = [c('a'), t('T1'), t('T2')]
+    expect(nextSelectableIndex(items, 0, +1)).toBe(0)
+    expect(nextSelectableIndex(items, 0, -1)).toBe(0)
+  })
+
+  test('walks past consecutive team headers', () => {
+    const items = [ch('g'), t('T1'), t('T2'), ch('h')]
+    expect(nextSelectableIndex(items, 0, +1)).toBe(3)
+  })
+
+  test('firstSelectableIndex skips leading teams', () => {
+    const items = [t('T1'), ch('g'), c('a')]
+    expect(firstSelectableIndex(items)).toBe(1)
+  })
+
+  test('firstSelectableIndex returns 0 when first item is selectable', () => {
+    const items = [c('a'), t('T1'), ch('g')]
+    expect(firstSelectableIndex(items)).toBe(0)
   })
 })

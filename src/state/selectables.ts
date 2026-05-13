@@ -70,6 +70,32 @@ export function clampCursor(cursor: number, listLength: number): number {
   return cursor
 }
 
+// Teams render as non-selectable section headers; the cursor jumps over
+// them. Walks `items` from `from + dir` in steps of `dir` looking for
+// the next item that is not a team. Returns the original index when no
+// movable target exists in that direction so the cursor stays put.
+export function nextSelectableIndex(
+  items: SelectableItem[],
+  from: number,
+  dir: 1 | -1,
+): number {
+  let i = from + dir
+  while (i >= 0 && i < items.length) {
+    if (items[i]!.kind !== 'team') return i
+    i += dir
+  }
+  return from
+}
+
+// First non-team index, scanning forward from 0. Returns 0 when no item
+// (or only team items) exists - clampCursor handles the empty case.
+export function firstSelectableIndex(items: SelectableItem[]): number {
+  for (let i = 0; i < items.length; i++) {
+    if (items[i]!.kind !== 'team') return i
+  }
+  return 0
+}
+
 // Short, message-row-friendly form of a display name. Strategy:
 //   1. If formatted "Surname, Firstname [Middle...]" (common in corporate
 //      AD), take the part after the comma. Otherwise use the name as-is.

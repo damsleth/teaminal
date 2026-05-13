@@ -66,6 +66,7 @@ function buildRows(
 ): Row[] {
   const rows: Row[] = []
   let firstChatEmitted = false
+  let firstTeamEmitted = false
   let lastTeamId: string | null = null
   for (let i = 0; i < items.length; i++) {
     const it = items[i]!
@@ -74,10 +75,14 @@ function buildRows(
       firstChatEmitted = true
     }
     if (it.kind === 'team') {
-      // 'cozy' density: blank row between Chats and Teams sections.
+      // 'cozy' density: blank row between Chats and the team list.
       // 'compact': skip the spacer so more rows fit in the viewport.
-      if (rows.length > 0 && density === 'cozy') rows.push({ kind: 'spacer' })
-      rows.push({ kind: 'header', label: 'Teams' })
+      // The team item itself renders as its own bold header below, so
+      // no generic "Teams" section label is emitted.
+      if (rows.length > 0 && density === 'cozy' && !firstTeamEmitted) {
+        rows.push({ kind: 'spacer' })
+      }
+      firstTeamEmitted = true
       lastTeamId = it.team.id
     }
     if (it.kind === 'channel' && it.team.id !== lastTeamId) {
@@ -107,13 +112,13 @@ function rowLabel(item: SelectableItem, myUserId?: string, shortNames = false): 
   return `# ${item.label}`
 }
 
-// Cozy-density indent before the row label. Chats sit flush against
-// the selector gutter so the focus indicator (`>`) is one column
-// away from the name; teams + channels keep their indent to preserve
-// the visual hierarchy under the "Teams" header.
+// Cozy-density indent before the row label. Teams render flush-left
+// as bold headers; channels indent two spaces under their team; chats
+// stay flush-left so the focus indicator (`>`) is one column away
+// from the name.
 function rowIndent(item: SelectableItem): string {
-  if (item.kind === 'channel') return '    '
-  if (item.kind === 'team') return '  '
+  if (item.kind === 'channel') return '  '
+  if (item.kind === 'team') return ''
   return ''
 }
 
@@ -303,6 +308,23 @@ export function ChatList() {
                   {`Create chat with "${row.query}"`}
                 </Text>
               </Box>
+            </Box>
+          )
+        }
+
+        // Teams render as non-selectable bold headers (no presence dot,
+        // no selector gutter, no `#` prefix, no unread badge). Navigation
+        // skips them via nextSelectableIndex in listKeys.ts.
+        if (row.item.kind === 'team') {
+          return (
+            <Box key={`team-${row.index}`} flexDirection="row" flexShrink={0}>
+              <Text
+                bold={theme.emphasis.sectionHeadingBold}
+                color={theme.mutedText}
+                wrap="truncate-end"
+              >
+                {row.item.team.displayName}
+              </Text>
             </Box>
           )
         }

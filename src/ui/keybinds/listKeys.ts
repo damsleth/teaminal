@@ -13,7 +13,13 @@ import {
   type Focus,
   type Store,
 } from '../../state/store'
-import { buildSelectableList, clampCursor, itemMatchesFilter } from '../../state/selectables'
+import {
+  buildSelectableList,
+  clampCursor,
+  firstSelectableIndex,
+  itemMatchesFilter,
+  nextSelectableIndex,
+} from '../../state/selectables'
 import { isNewChatQueryCandidate } from '../ChatList'
 import { openKeybinds } from '../KeybindsModal'
 import { openMenu } from '../MenuModal'
@@ -109,21 +115,48 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       }
       return 'pass'
     }
-    const safe = clampCursor(ctx.cursor, selectableCount)
+    // Teams render as non-selectable headers; cursor must skip them.
+    // If the stored cursor happens to land on a team (e.g. just after a
+    // filter change reordered the list), advance forward to the next
+    // selectable item first.
+    let safe = clampCursor(ctx.cursor, selectableCount)
+    if (safe < visible.length && visible[safe]!.kind === 'team') {
+      safe = nextSelectableIndex(visible, safe, +1)
+      if (safe < visible.length && visible[safe]!.kind === 'team') {
+        safe = firstSelectableIndex(visible)
+      }
+    }
     if (ch === 'j' || key.downArrow) {
-      store.set({ cursor: clampCursor(safe + 1, selectableCount) })
+      const next = nextSelectableIndex(visible, safe, +1)
+      const max = selectableCount - 1
+      store.set({ cursor: clampCursor(Math.min(next, max), selectableCount) })
       return 'handled'
     }
     if (ch === 'k' || key.upArrow) {
-      store.set({ cursor: clampCursor(safe - 1, selectableCount) })
+      const next = nextSelectableIndex(visible, safe, -1)
+      store.set({ cursor: clampCursor(next, selectableCount) })
       return 'handled'
     }
     if (ch === 'u' || (key as typeof key & { pageUp?: boolean }).pageUp) {
-      store.set({ cursor: clampCursor(safe - HALF_PAGE, selectableCount) })
+      let target = clampCursor(safe - HALF_PAGE, selectableCount)
+      if (target < visible.length && visible[target]!.kind === 'team') {
+        target = nextSelectableIndex(visible, target, -1)
+        if (visible[target]?.kind === 'team') target = firstSelectableIndex(visible)
+      }
+      store.set({ cursor: clampCursor(target, selectableCount) })
       return 'handled'
     }
     if (ch === 'd' || (key as typeof key & { pageDown?: boolean }).pageDown) {
-      store.set({ cursor: clampCursor(safe + HALF_PAGE, selectableCount) })
+      let target = clampCursor(safe + HALF_PAGE, selectableCount)
+      if (target < visible.length && visible[target]!.kind === 'team') {
+        target = nextSelectableIndex(visible, target, +1)
+        if (target < visible.length && visible[target]!.kind === 'team') {
+          // No non-team rows after the original target — fall back to last
+          // selectable.
+          target = nextSelectableIndex(visible, target, -1)
+        }
+      }
+      store.set({ cursor: clampCursor(target, selectableCount) })
       return 'handled'
     }
     if (ch === 'h' || key.leftArrow) {
