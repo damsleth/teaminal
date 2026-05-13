@@ -161,10 +161,13 @@ describe('handleChatKeys', () => {
     expect(a.bottomCalls).toBe(0)
   })
 
-  test('Esc returns to list focus', () => {
+  test('Esc opens the menu overlay (does not return to list)', () => {
     const { ctx, store } = makeCtx(CHAT_FOCUS)
+    store.set({ focus: CHAT_FOCUS })
     expect(handleChatKeys({ input: '', key: makeKey({ escape: true }) }, ctx)).toBe('handled')
-    expect(store.get().focus.kind).toBe('list')
+    expect(store.get().focus).toEqual(CHAT_FOCUS)
+    expect(store.get().modal?.kind).toBe('menu')
+    expect(store.get().inputZone).toBe('menu')
   })
 
   test('unhandled keys pass through', () => {
@@ -208,14 +211,17 @@ describe('handleChatKeys', () => {
     })
   })
 
-  test('Esc in thread returns to parent channel', () => {
-    const { ctx, store } = makeCtx({
+  test('Esc in thread opens the menu (does not return to parent channel)', () => {
+    const focus: Focus = {
       kind: 'thread',
       teamId: 't1',
       channelId: 'ch1',
       rootId: 'r1',
-    })
+    }
+    const { ctx, store } = makeCtx(focus)
+    store.set({ focus })
     handleChatKeys({ input: '', key: makeKey({ escape: true }) }, ctx)
-    expect(store.get().focus.kind).toBe('channel')
+    expect(store.get().focus).toEqual(focus)
+    expect(store.get().modal?.kind).toBe('menu')
   })
 })

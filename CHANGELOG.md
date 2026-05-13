@@ -6,6 +6,75 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-05-13
+
+### Added
+
+- **Themeable layout, borders, and emphasis.** The theme model now
+  carries `layout` (paddings/margins for panes, modals, headers, the
+  chat-list gutter, and the tail-panel gap), `borders` (border styles
+  for panels and modals — Ink's `single` / `double` / `round` / `bold`
+  / `classic` / `singleDouble` / `doubleSingle` / `arrow`), and
+  `emphasis` (per-role bold flags: modal title, section heading,
+  selected row, unread previews, sender column, inline hint glyphs).
+  All of these are settable via `themeOverrides` in `config.json`.
+- **Two new built-in themes: `compact` and `comfortable`.** They
+  inherit the `dark` color palette but tighten or loosen paddings
+  across panes and modals. The Settings → Theme cycler now rotates
+  through `dark → light → compact → comfortable`.
+- **User theme files at `~/.config/teaminal/themes/<name>.json`.** Set
+  `"theme": "<name>"` in `config.json` to load a partial theme JSON
+  layered on top of the `dark` base. The file accepts any subset of
+  color tokens plus `presence`, `layout`, `borders`, and `emphasis`
+  sub-objects. `themeOverrides` still wins over the loaded file. Bad
+  values are dropped with a warning; a missing file falls back to
+  `dark`.
+- **"Short names in chats" setting.** Toggles the message pane sender
+  column between first-name only ("Finn") and the full display name
+  ("Nordling, Finn Saethre"). Independent of the existing
+  `chatListShortNames` toggle and defaults to on, preserving previous
+  behavior. Available under Settings → "Short names in chats".
+
+### Changed
+
+- **Modal padding normalized.** The Events and Network modals used
+  `paddingX={2}` while every other modal used `paddingX={3}`. Both now
+  use the shared `theme.layout.modalPaddingX` (default 3). Override in
+  `config.json` if you preferred the tighter look.
+- **App-pane border colors now follow the theme.** The header,
+  chat-list, message-pane, composer, and tail-panel frames previously
+  hardcoded `gray`. They now use `theme.border` (still gray by default,
+  themeable everywhere). The new-chat prompt border previously
+  hardcoded `cyan`; it now uses `theme.borderActive`.
+
+- **Tighter message pane layout.** The conversation header now has
+  breathing room (extra left padding and a blank row below), while the
+  date dividers and timestamps sit one column further left so the
+  message body reclaims that horizontal space. When timestamps are
+  hidden, the date row hugs the left edge and the sender column moves
+  one extra column inward.
+- **Esc always toggles the menu overlay**, including from an active
+  chat or thread. To step back a pane, use `h` or Left arrow (chat /
+  channel → list, thread → channel) as before.
+- **Modal overlays keep the active chat visible behind them.** The
+  menu, accounts, keybindings, diagnostics, event log, and network
+  panels now render as absolute-positioned overlays on top of the
+  message pane (with an opaque background of their own) instead of
+  replacing it. Only the auth-expired modal still takes over the pane,
+  since the chat isn't usable until auth is repaired.
+
+### Fixed
+
+- **Chat list now scrolls so the selected chat stays visible** when the
+  tail panels (events / network / diagnostics) are enabled. The chat
+  list's height budget was a hardcoded estimate that didn't subtract
+  the tail-panel band, so the viewport thought it had ~16 rows when it
+  really had ~6. The selected row could end up rendered below the
+  bordered list and clipped. Chrome rows are now computed from the
+  actual layout (header + chat-list border + tails + composer + status
+  - filter banner), and the viewport math is exercised by a regression
+    test (`src/ui/chatListViewport.test.ts`).
+
 ## [0.12.17] - 2026-05-12
 
 ### Fixed
@@ -745,7 +814,9 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.12.16...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/damsleth/teaminal/compare/v0.12.17...v0.13.0
+[0.12.17]: https://github.com/damsleth/teaminal/compare/v0.12.16...v0.12.17
 [0.12.16]: https://github.com/damsleth/teaminal/compare/v0.12.15...v0.12.16
 [0.12.15]: https://github.com/damsleth/teaminal/compare/v0.12.14...v0.12.15
 [0.12.14]: https://github.com/damsleth/teaminal/compare/v0.12.13...v0.12.14

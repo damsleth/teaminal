@@ -9,6 +9,7 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import {
   defaultSettings,
+  type BorderStyleName,
   type Settings,
   type ThemeOverrides,
   type ThemePresenceKey,
@@ -47,6 +48,41 @@ const THEME_KEYS = new Set<keyof ThemeOverrides>([
   'messageFocusIndicator',
   'messageFocusBackground',
   'presence',
+  'layout',
+  'borders',
+  'emphasis',
+])
+
+const LAYOUT_KEYS = new Set<keyof NonNullable<ThemeOverrides['layout']>>([
+  'panePaddingX',
+  'modalPaddingX',
+  'modalPaddingY',
+  'paneHeaderPaddingLeft',
+  'paneHeaderMarginBottom',
+  'tailGap',
+  'chatListPaddingRight',
+])
+
+const BORDERS_KEYS = new Set<keyof NonNullable<ThemeOverrides['borders']>>(['panel', 'modal'])
+
+const EMPHASIS_KEYS = new Set<keyof NonNullable<ThemeOverrides['emphasis']>>([
+  'modalTitleBold',
+  'sectionHeadingBold',
+  'selectedBold',
+  'unreadBold',
+  'senderBold',
+  'inlineKeyBold',
+])
+
+const BORDER_STYLES = new Set<BorderStyleName>([
+  'single',
+  'double',
+  'round',
+  'bold',
+  'classic',
+  'singleDouble',
+  'doubleSingle',
+  'arrow',
 ])
 
 const PRESENCE_KEYS = new Set<ThemePresenceKey>([
@@ -179,6 +215,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     activeAccount: settings.activeAccount,
     chatListDensity: settings.chatListDensity,
     chatListShortNames: settings.chatListShortNames,
+    messagePaneShortNames: settings.messagePaneShortNames,
     showPresenceInList: settings.showPresenceInList,
     showTimestampsInPane: settings.showTimestampsInPane,
     showReactions: settings.showReactions,
@@ -235,15 +272,28 @@ function mergeConfigPatch(current: TeaminalConfig, patch: TeaminalConfig): Teami
     next.themeOverrides = {
       ...(current.themeOverrides ?? {}),
       ...patch.themeOverrides,
-      presence: patch.themeOverrides.presence
-        ? {
-            ...(current.themeOverrides?.presence ?? {}),
-            ...patch.themeOverrides.presence,
-          }
-        : current.themeOverrides?.presence,
+      ...mergeNestedThemeOverride(current.themeOverrides, patch.themeOverrides, 'presence'),
+      ...mergeNestedThemeOverride(current.themeOverrides, patch.themeOverrides, 'layout'),
+      ...mergeNestedThemeOverride(current.themeOverrides, patch.themeOverrides, 'borders'),
+      ...mergeNestedThemeOverride(current.themeOverrides, patch.themeOverrides, 'emphasis'),
     }
   }
   return next
+}
+
+function mergeNestedThemeOverride<K extends 'presence' | 'layout' | 'borders' | 'emphasis'>(
+  current: ThemeOverrides | undefined,
+  patch: ThemeOverrides,
+  key: K,
+): Pick<ThemeOverrides, K> {
+  return {
+    [key]: patch[key]
+      ? {
+          ...(current?.[key] ?? {}),
+          ...patch[key],
+        }
+      : current?.[key],
+  } as Pick<ThemeOverrides, K>
 }
 
 function defaultsWithWarning(path: string, warning: string): LoadResult {
@@ -269,6 +319,9 @@ function cloneThemeOverrides(overrides: ThemeOverrides): ThemeOverrides {
   return {
     ...overrides,
     presence: overrides.presence ? { ...overrides.presence } : undefined,
+    layout: overrides.layout ? { ...overrides.layout } : undefined,
+    borders: overrides.borders ? { ...overrides.borders } : undefined,
+    emphasis: overrides.emphasis ? { ...overrides.emphasis } : undefined,
   }
 }
 
@@ -284,11 +337,11 @@ function validateAndAssign(
 ): boolean {
   switch (key) {
     case 'theme':
-      if (value === 'dark' || value === 'light') {
-        out.theme = value
+      if (typeof value === 'string' && value.trim().length > 0) {
+        out.theme = value.trim()
         return true
       }
-      warnings.push('config: "theme" must be "dark" or "light"')
+      warnings.push('config: "theme" must be a non-empty string')
       return false
     case 'themeOverrides': {
       const overrides = validateThemeOverrides(value, warnings)
@@ -323,6 +376,7 @@ function validateAndAssign(
       warnings.push('config: "chatListDensity" must be "cozy" or "compact"')
       return false
     case 'chatListShortNames':
+    case 'messagePaneShortNames':
     case 'showPresenceInList':
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
@@ -413,6 +467,24 @@ function validateThemeOverrides(value: unknown, warnings: string[]): ThemeOverri
       continue
     }
 
+    if (key === 'layout') {
+      const layout = validateLayoutOverrides(rawValue, warnings)
+      if (layout) out.layout = layout
+      continue
+    }
+
+    if (key === 'borders') {
+      const borders = validateBordersOverrides(rawValue, warnings)
+      if (borders) out.borders = borders
+      continue
+    }
+
+    if (key === 'emphasis') {
+      const emphasis = validateEmphasisOverrides(rawValue, warnings)
+      if (emphasis) out.emphasis = emphasis
+      continue
+    }
+
     if (key === 'messageFocusBackground' && rawValue === null) {
       out.messageFocusBackground = null
       continue
@@ -424,6 +496,80 @@ function validateThemeOverrides(value: unknown, warnings: string[]): ThemeOverri
     }
 
     warnings.push(`config: "themeOverrides.${rawKey}" must be a named color or hex color`)
+  }
+  return out
+}
+
+export function validateLayoutOverrides(
+  value: unknown,
+  warnings: string[],
+  scope = 'themeOverrides.layout',
+): NonNullable<ThemeOverrides['layout']> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    warnings.push(`config: "${scope}" must be a JSON object`)
+    return null
+  }
+  const out: NonNullable<ThemeOverrides['layout']> = {}
+  for (const [rawKey, rawValue] of Object.entries(value)) {
+    if (!LAYOUT_KEYS.has(rawKey as keyof NonNullable<ThemeOverrides['layout']>)) {
+      warnings.push(`config: unknown ${scope} key "${rawKey}" ignored`)
+      continue
+    }
+    if (typeof rawValue !== 'number' || !Number.isInteger(rawValue) || rawValue < 0) {
+      warnings.push(`config: "${scope}.${rawKey}" must be a non-negative integer`)
+      continue
+    }
+    ;(out as Record<string, number>)[rawKey] = rawValue
+  }
+  return out
+}
+
+export function validateBordersOverrides(
+  value: unknown,
+  warnings: string[],
+  scope = 'themeOverrides.borders',
+): NonNullable<ThemeOverrides['borders']> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    warnings.push(`config: "${scope}" must be a JSON object`)
+    return null
+  }
+  const out: NonNullable<ThemeOverrides['borders']> = {}
+  for (const [rawKey, rawValue] of Object.entries(value)) {
+    if (!BORDERS_KEYS.has(rawKey as keyof NonNullable<ThemeOverrides['borders']>)) {
+      warnings.push(`config: unknown ${scope} key "${rawKey}" ignored`)
+      continue
+    }
+    if (typeof rawValue !== 'string' || !BORDER_STYLES.has(rawValue as BorderStyleName)) {
+      warnings.push(
+        `config: "${scope}.${rawKey}" must be one of ${Array.from(BORDER_STYLES).join(', ')}`,
+      )
+      continue
+    }
+    ;(out as Record<string, BorderStyleName>)[rawKey] = rawValue as BorderStyleName
+  }
+  return out
+}
+
+export function validateEmphasisOverrides(
+  value: unknown,
+  warnings: string[],
+  scope = 'themeOverrides.emphasis',
+): NonNullable<ThemeOverrides['emphasis']> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    warnings.push(`config: "${scope}" must be a JSON object`)
+    return null
+  }
+  const out: NonNullable<ThemeOverrides['emphasis']> = {}
+  for (const [rawKey, rawValue] of Object.entries(value)) {
+    if (!EMPHASIS_KEYS.has(rawKey as keyof NonNullable<ThemeOverrides['emphasis']>)) {
+      warnings.push(`config: unknown ${scope} key "${rawKey}" ignored`)
+      continue
+    }
+    if (typeof rawValue !== 'boolean') {
+      warnings.push(`config: "${scope}.${rawKey}" must be a boolean`)
+      continue
+    }
+    ;(out as Record<string, boolean>)[rawKey] = rawValue
   }
   return out
 }

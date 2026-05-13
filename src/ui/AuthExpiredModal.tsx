@@ -88,18 +88,18 @@ export function AuthExpiredModal() {
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
       <Box
         flexDirection="column"
-        borderStyle="round"
+        borderStyle={theme.borders.modal}
         borderColor={theme.borderActive}
-        paddingX={3}
-        paddingY={1}
+        paddingX={theme.layout.modalPaddingX}
+        paddingY={theme.layout.modalPaddingY}
       >
-        <Text bold color={theme.errorText}>
+        <Text bold={theme.emphasis.modalTitleBold} color={theme.errorText}>
           Authentication expired
         </Text>
         <Box height={1} />
         <Text>
           {'Profile '}
-          <Text bold>{label}</Text>
+          <Text bold={theme.emphasis.inlineKeyBold}>{label}</Text>
           {' needs to be re-authenticated.'}
         </Text>
         <Text color={theme.mutedText} wrap="wrap">
@@ -113,15 +113,15 @@ export function AuthExpiredModal() {
         ) : (
           <>
             <Text>
-              <Text bold>r</Text>
+              <Text bold={theme.emphasis.inlineKeyBold}>r</Text>
               {'  reseed this profile (runs `owa-piggy reseed`)'}
             </Text>
             <Text>
-              <Text bold>s</Text>
+              <Text bold={theme.emphasis.inlineKeyBold}>s</Text>
               {'  switch to a different profile'}
             </Text>
             <Text>
-              <Text bold>q</Text>
+              <Text bold={theme.emphasis.inlineKeyBold}>q</Text>
               {'  quit teaminal'}
             </Text>
           </>

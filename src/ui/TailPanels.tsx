@@ -61,8 +61,8 @@ function EventsTail({ theme }: { theme: Theme }) {
   }, [])
   const tail = records.slice(-TAIL_ROWS)
   return (
-    <Box flexDirection="column" paddingX={1}>
-      <Text bold color={theme.mutedText}>
+    <Box flexDirection="column" paddingX={theme.layout.panePaddingX}>
+      <Text bold={theme.emphasis.sectionHeadingBold} color={theme.mutedText}>
         events ({records.length})
       </Text>
       {tail.length === 0 ? (
@@ -92,8 +92,8 @@ function NetworkTail({ theme }: { theme: Theme }) {
   }, [])
   const tail = records.slice(-TAIL_ROWS)
   return (
-    <Box flexDirection="column" paddingX={1}>
-      <Text bold color={theme.mutedText}>
+    <Box flexDirection="column" paddingX={theme.layout.panePaddingX}>
+      <Text bold={theme.emphasis.sectionHeadingBold} color={theme.mutedText}>
         network ({records.length})
       </Text>
       {tail.length === 0 ? (
@@ -121,8 +121,8 @@ function DiagnosticsTail({ theme }: { theme: Theme }) {
   const lastListPollAt = useAppState((s) => s.lastListPollAt)
   const chats = useAppState((s) => s.chats)
   return (
-    <Box flexDirection="column" paddingX={1}>
-      <Text bold color={theme.mutedText}>
+    <Box flexDirection="column" paddingX={theme.layout.panePaddingX}>
+      <Text bold={theme.emphasis.sectionHeadingBold} color={theme.mutedText}>
         diagnostics
       </Text>
       <Text wrap="truncate-end">
@@ -176,7 +176,12 @@ export function TailPanels() {
   if (enabled.length === 0) return null
 
   return (
-    <Box flexDirection="row" borderStyle="round" borderColor="gray" flexShrink={0}>
+    <Box
+      flexDirection="row"
+      borderStyle={theme.borders.panel}
+      borderColor={theme.border}
+      flexShrink={0}
+    >
       {enabled.map((kind, i) => (
         <Box
           key={kind}
@@ -185,7 +190,7 @@ export function TailPanels() {
           flexShrink={1}
           minWidth={0}
           flexDirection="column"
-          marginLeft={i === 0 ? 0 : 1}
+          marginLeft={i === 0 ? 0 : theme.layout.tailGap}
         >
           {kind === 'events' ? (
             <EventsTail theme={theme} />

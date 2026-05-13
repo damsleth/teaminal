@@ -22,11 +22,11 @@ import {
 import type { ChatListDensity } from '../state/store'
 import type { Presence } from '../types'
 import { htmlToText } from '../text/html'
+import { chromeRowsForChatList, computeChatListViewport } from './chatListViewport'
 import { useTerminalRows } from './hooks/useTerminalRows'
 import { useAppState, useTheme } from './StoreContext'
 import type { PresenceColorKey, Theme } from './theme'
 
-const CHROME_ROWS_ESTIMATE = 8
 // Mirrors LIST_PANE_WIDTH in App.tsx. Re-declared here so the chat-list
 // row-height math (visual lines per wrapped label) doesn't need to
 // thread the width through props.
@@ -169,9 +169,17 @@ export function ChatList() {
   const showPresence = useAppState((s) => s.settings.showPresenceInList)
   const memberPresence = useAppState((s) => s.memberPresence)
   const unreadByChatId = useAppState((s) => s.unreadByChatId)
+  const tailEvents = useAppState((s) => s.settings.tailEvents)
+  const tailNetwork = useAppState((s) => s.settings.tailNetwork)
+  const tailDiagnostics = useAppState((s) => s.settings.tailDiagnostics)
   const theme = useTheme()
   const terminalRows = useTerminalRows()
-  const rowsVisible = Math.max(3, terminalRows - CHROME_ROWS_ESTIMATE)
+  const hasFilterBanner = inputZone === 'filter' || !!filter
+  const anyTailEnabled = tailEvents || tailNetwork || tailDiagnostics
+  const rowsVisible = Math.max(
+    3,
+    terminalRows - chromeRowsForChatList({ hasFilterBanner, anyTailEnabled }),
+  )
 
   // Build selectables from individual slices so the hook only re-runs on
   // the data we actually depend on. (useAppState's selectors guarantee
@@ -221,46 +229,13 @@ export function ChatList() {
   // that was navigable but not painted.
   const cursorRowIdx = rows.findIndex((r) => r.kind === 'item' && r.index === safeCursor)
   const viewportRef = useRef(0)
-  const { viewStart, visibleEnd } = (() => {
-    if (rows.length === 0) return { viewStart: 0, visibleEnd: 0 }
-    const cur = cursorRowIdx === -1 ? 0 : cursorRowIdx
-    const previousStart = viewportRef.current
-    let start = cur
-    let end = cur + 1
-    let consumed = heights[cur] ?? 1
-    // Sticky scroll: prefer to keep `previousStart` if the cursor is
-    // already inside it (and the cumulative budget still fits).
-    if (previousStart >= 0 && previousStart <= cur && previousStart < rows.length) {
-      let trial = consumed
-      let trialStart = cur
-      while (trialStart > previousStart) {
-        const h = heights[trialStart - 1] ?? 1
-        if (trial + h > rowsVisible) break
-        trialStart--
-        trial += h
-      }
-      if (trialStart === previousStart) {
-        start = previousStart
-        consumed = trial
-      }
-    }
-    // Backward fill: include older rows until budget is exhausted.
-    while (start > 0) {
-      const h = heights[start - 1] ?? 1
-      if (consumed + h > rowsVisible) break
-      start--
-      consumed += h
-    }
-    // Forward fill: top off the budget with newer rows.
-    while (end < rows.length) {
-      const h = heights[end] ?? 1
-      if (consumed + h > rowsVisible) break
-      consumed += h
-      end++
-    }
-    viewportRef.current = start
-    return { viewStart: start, visibleEnd: end }
-  })()
+  const { viewStart, visibleEnd } = computeChatListViewport(
+    heights,
+    cursorRowIdx,
+    rowsVisible,
+    viewportRef.current,
+  )
+  viewportRef.current = viewStart
   const visible = rows.slice(viewStart, visibleEnd)
 
   // Filter banner: shown while typing a filter, and when a filter is
@@ -278,10 +253,10 @@ export function ChatList() {
 
   if (selectableCount === 0) {
     return (
-      <Box flexDirection="column" paddingLeft={0} paddingRight={1}>
+      <Box flexDirection="column" paddingLeft={0} paddingRight={theme.layout.chatListPaddingRight}>
         {filterBanner}
-        {density === 'cozy' && <Text bold>Chats</Text>}
-        <Text color="gray">
+        {density === 'cozy' && <Text bold={theme.emphasis.sectionHeadingBold}>Chats</Text>}
+        <Text color={theme.mutedText}>
           {filter ? '  no matches' : conn === 'connecting' ? '  loading...' : '  (none)'}
         </Text>
       </Box>
@@ -289,13 +264,19 @@ export function ChatList() {
   }
 
   return (
-    <Box flexDirection="column" flexShrink={0} overflow="hidden" paddingLeft={0} paddingRight={1}>
+    <Box
+      flexDirection="column"
+      flexShrink={0}
+      overflow="hidden"
+      paddingLeft={0}
+      paddingRight={theme.layout.chatListPaddingRight}
+    >
       {filterBanner}
       {visible.map((row, i) => {
         if (row.kind === 'header') {
           return (
             <Box key={`h-${row.label}-${i}`} flexShrink={0}>
-              <Text bold>{row.label}</Text>
+              <Text bold={theme.emphasis.sectionHeadingBold}>{row.label}</Text>
             </Box>
           )
         }
@@ -314,7 +295,11 @@ export function ChatList() {
                 </Box>
               )}
               <Box width={labelContentWidth(density, showPresence, '')} flexShrink={0}>
-                <Text color={isSelected ? theme.selected : 'gray'} bold={isSelected} wrap="wrap">
+                <Text
+                  color={isSelected ? theme.selected : theme.mutedText}
+                  bold={isSelected && theme.emphasis.selectedBold}
+                  wrap="wrap"
+                >
                   {`Create chat with "${row.query}"`}
                 </Text>
               </Box>
@@ -369,14 +354,17 @@ export function ChatList() {
             <Box width={labelContentWidth(density, showPresence, indent)} flexShrink={0}>
               <Text
                 color={isSelected ? theme.selected : hasUnread ? theme.unread : undefined}
-                bold={isSelected || hasUnread}
+                bold={
+                  (isSelected && theme.emphasis.selectedBold) ||
+                  (hasUnread && theme.emphasis.unreadBold)
+                }
                 wrap="wrap"
               >
                 {label}
                 {unreadBadge}
               </Text>
               {density === 'cozy' && hasUnread && row.item.kind === 'chat' && (
-                <Text color={theme.unread} bold wrap="wrap">
+                <Text color={theme.unread} bold={theme.emphasis.unreadBold} wrap="wrap">
                   {unread?.lastSenderName
                     ? `${shortName(unread.lastSenderName)} ${previewChat(row.item.chat)}`
                     : previewChat(row.item.chat)}

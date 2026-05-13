@@ -150,8 +150,21 @@ export type AccountManagerModalState =
       error?: string
     }
 
-export type ThemeMode = 'dark' | 'light'
+// Theme name. Built-in values are 'dark' | 'light' | 'compact' |
+// 'comfortable'; any other string is treated as a user theme file under
+// ~/.config/teaminal/themes/<name>.json. Kept as plain string here so
+// the config validator stays the single source of truth.
+export type ThemeMode = string
 export type ChatListDensity = 'cozy' | 'compact'
+export type BorderStyleName =
+  | 'single'
+  | 'double'
+  | 'round'
+  | 'bold'
+  | 'classic'
+  | 'singleDouble'
+  | 'doubleSingle'
+  | 'arrow'
 export type ReactionDisplayMode = 'off' | 'current' | 'all'
 export type ThemePresenceKey =
   | 'Available'
@@ -185,6 +198,27 @@ export type ThemeOverrides = {
   messageFocusIndicator?: string
   messageFocusBackground?: string | null
   presence?: Partial<Record<ThemePresenceKey, string>>
+  layout?: Partial<{
+    panePaddingX: number
+    modalPaddingX: number
+    modalPaddingY: number
+    paneHeaderPaddingLeft: number
+    paneHeaderMarginBottom: number
+    tailGap: number
+    chatListPaddingRight: number
+  }>
+  borders?: Partial<{
+    panel: BorderStyleName
+    modal: BorderStyleName
+  }>
+  emphasis?: Partial<{
+    modalTitleBold: boolean
+    sectionHeadingBold: boolean
+    selectedBold: boolean
+    unreadBold: boolean
+    senderBold: boolean
+    inlineKeyBold: boolean
+  }>
 }
 
 export type Settings = {
@@ -200,6 +234,11 @@ export type Settings = {
   // is preserved out of the box; users with mostly-internal contacts
   // can flip this on.
   chatListShortNames: boolean
+  // When true (default), the message pane renders the sender column as
+  // first-name only ("Finn") instead of the full display name
+  // ("Nordling, Finn Saethre"). Independent of `chatListShortNames` so
+  // users can short-name one place and not the other.
+  messagePaneShortNames: boolean
   showPresenceInList: boolean
   showTimestampsInPane: boolean
   showReactions: ReactionDisplayMode
@@ -256,6 +295,7 @@ export const defaultSettings: Settings = {
   activeAccount: null,
   chatListDensity: 'cozy',
   chatListShortNames: false,
+  messagePaneShortNames: true,
   showPresenceInList: true,
   showTimestampsInPane: true,
   showReactions: 'current',
@@ -570,6 +610,14 @@ export type AppState = {
   threadMetaByRoot: Record<string, ThreadMeta>
   // Active modal overlay (e.g. pause menu). null = no modal.
   modal: ModalState | null
+  // Custom theme loaded from ~/.config/teaminal/themes/<name>.json when
+  // settings.theme is not a built-in name. Layered between the built-in
+  // base ('dark') and settings.themeOverrides during theme resolution.
+  // Loaded once at startup by bin/teaminal.tsx; null when the startup
+  // theme is a built-in or when the file is missing/invalid. The name
+  // is stored with the data so cycling away from a custom theme cannot
+  // accidentally keep applying its tokens to built-in themes.
+  customTheme: { name: string; data: Record<string, unknown> } | null
   // User-tunable display preferences. Persisted to disk via
   // src/config/index.ts (loadSettings/saveSettings/updateSettings).
   settings: Settings
@@ -603,6 +651,7 @@ export function initialAppState(): AppState {
     readReceiptsByConvo: {},
     threadMetaByRoot: {},
     modal: null,
+    customTheme: null,
     settings: { ...defaultSettings },
   }
 }

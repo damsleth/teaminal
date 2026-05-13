@@ -108,11 +108,18 @@ describe('mergeSettings', () => {
 
   test('rejects wrong-shape values for enums', () => {
     const w: string[] = []
-    const out = mergeSettings({ theme: 'neon', showReactions: 'selected' }, w)
+    const out = mergeSettings({ theme: 123, showReactions: 'selected' }, w)
     expect(out.theme).toBe(defaultSettings.theme)
     expect(out.showReactions).toBe(defaultSettings.showReactions)
     expect(w.some((m) => /"theme" must be/.test(m))).toBe(true)
     expect(w.some((m) => /"showReactions" must be/.test(m))).toBe(true)
+  })
+
+  test('accepts any non-empty string as a theme name (custom themes)', () => {
+    const w: string[] = []
+    const out = mergeSettings({ theme: 'my-neon' }, w)
+    expect(out.theme).toBe('my-neon')
+    expect(w.some((m) => /theme/.test(m))).toBe(false)
   })
 
   test('rejects non-boolean for boolean keys', () => {
@@ -239,12 +246,23 @@ describe('saveConfig/updateConfig', () => {
         themeOverrides: {
           selected: 'cyan',
           presence: { Available: 'green' },
+          layout: { modalPaddingX: 3 },
+          borders: { panel: 'round' },
+          emphasis: { selectedBold: true },
         },
       }),
     )
 
     const next = await updateConfig(
-      { themeOverrides: { timestamp: 'gray', presence: { Busy: 'red' } } },
+      {
+        themeOverrides: {
+          timestamp: 'gray',
+          presence: { Busy: 'red' },
+          layout: { modalPaddingY: 2 },
+          borders: { modal: 'double' },
+          emphasis: { unreadBold: false },
+        },
+      },
       cfgPath,
     )
 
@@ -252,5 +270,11 @@ describe('saveConfig/updateConfig', () => {
     expect(next.themeOverrides?.timestamp).toBe('gray')
     expect(next.themeOverrides?.presence?.Available).toBe('green')
     expect(next.themeOverrides?.presence?.Busy).toBe('red')
+    expect(next.themeOverrides?.layout?.modalPaddingX).toBe(3)
+    expect(next.themeOverrides?.layout?.modalPaddingY).toBe(2)
+    expect(next.themeOverrides?.borders?.panel).toBe('round')
+    expect(next.themeOverrides?.borders?.modal).toBe('double')
+    expect(next.themeOverrides?.emphasis?.selectedBold).toBe(true)
+    expect(next.themeOverrides?.emphasis?.unreadBold).toBe(false)
   })
 })

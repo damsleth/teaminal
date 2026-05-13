@@ -112,8 +112,8 @@ export function HeaderBar() {
   const unreadText = formatUnread(unreadByChatId, chats, me?.id)
 
   return (
-    <Box paddingX={1}>
-      <Text bold>teaminal</Text>
+    <Box paddingX={theme.layout.panePaddingX}>
+      <Text bold={theme.emphasis.sectionHeadingBold}>teaminal</Text>
       <Text color="gray">{' · '}</Text>
       <Text color="gray">{userDisplay}</Text>
       <Text color="gray">{' · '}</Text>

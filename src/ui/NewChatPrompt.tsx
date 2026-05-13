@@ -11,6 +11,7 @@ import { searchChatUsers, searchExternalUsers } from '../state/chatActions'
 import { clampCursor } from '../state/selectables'
 import type { DirectoryUser } from '../types'
 import { isNewChatQueryCandidate } from './ChatList'
+import { useTheme } from './StoreContext'
 
 const DEBOUNCE_MS = 250
 const RESULT_LIMIT = 5
@@ -51,6 +52,7 @@ export function NewChatPrompt(props: {
   const [error, setError] = useState<string | null>(null)
   const [zone, setZone] = useState<PromptZone>('input')
   const [externalLookup, setExternalLookup] = useState<'idle' | 'in-flight' | 'no-hit'>('idle')
+  const theme = useTheme()
 
   useEffect(() => {
     const q = query.trim()
@@ -179,8 +181,14 @@ export function NewChatPrompt(props: {
 
   return (
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
-      <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={3} paddingY={1}>
-        <Text bold>New chat</Text>
+      <Box
+        flexDirection="column"
+        borderStyle={theme.borders.modal}
+        borderColor={theme.borderActive}
+        paddingX={theme.layout.modalPaddingX}
+        paddingY={theme.layout.modalPaddingY}
+      >
+        <Text bold={theme.emphasis.modalTitleBold}>New chat</Text>
         <Box height={1} />
         <Text>
           <Text color="gray">To: </Text>
@@ -209,7 +217,11 @@ export function NewChatPrompt(props: {
           const selected = zone === 'results' && i === clampCursor(cursor, results.length)
           const detail = user.mail ?? user.userPrincipalName ?? user.id
           return (
-            <Text key={user.id} color={selected ? 'cyan' : undefined} bold={selected}>
+            <Text
+              key={user.id}
+              color={selected ? theme.selected : undefined}
+              bold={selected && theme.emphasis.selectedBold}
+            >
               {selected ? '> ' : '  '}
               {user.displayName ?? detail}
               <Text color="gray">{`  ${detail}`}</Text>

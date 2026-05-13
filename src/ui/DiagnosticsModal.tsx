@@ -107,12 +107,14 @@ export function DiagnosticsModal() {
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
       <Box
         flexDirection="column"
-        borderStyle="round"
+        borderStyle={theme.borders.modal}
         borderColor={theme.borderActive}
-        paddingX={3}
-        paddingY={1}
+        backgroundColor={theme.background}
+        paddingX={theme.layout.modalPaddingX}
+        paddingY={theme.layout.modalPaddingY}
+        width={80}
       >
-        <Text bold>Diagnostics</Text>
+        <Text bold={theme.emphasis.modalTitleBold}>Diagnostics</Text>
         <Box height={1} />
 
         <Text>
@@ -142,7 +144,7 @@ export function DiagnosticsModal() {
         </Text>
 
         <Box height={1} />
-        <Text bold>Capabilities</Text>
+        <Text bold={theme.emphasis.sectionHeadingBold}>Capabilities</Text>
         {capabilities ? (
           <>
             <CapabilityRow label="me" cap={capabilities.me} theme={theme} />
@@ -155,7 +157,7 @@ export function DiagnosticsModal() {
         )}
 
         <Box height={1} />
-        <Text bold>Token</Text>
+        <Text bold={theme.emphasis.sectionHeadingBold}>Token</Text>
         {load.status === 'loading' && <Text color="gray">loading...</Text>}
         {load.status === 'error' && <Text color={theme.errorText}>{load.message}</Text>}
         {load.status === 'ready' && (
@@ -189,7 +191,7 @@ export function DiagnosticsModal() {
               <Text>{formatExp(load.claims.exp)}</Text>
             </Text>
             <Box height={1} />
-            <Text bold>Scopes (scp)</Text>
+            <Text bold={theme.emphasis.sectionHeadingBold}>Scopes (scp)</Text>
             {asScopeList(load.claims.scp).length > 0 ? (
               asScopeList(load.claims.scp).map((s) => (
                 <Text key={s}>
@@ -203,7 +205,7 @@ export function DiagnosticsModal() {
             {Array.isArray(load.claims.roles) && load.claims.roles.length > 0 && (
               <>
                 <Box height={1} />
-                <Text bold>Roles (app permissions)</Text>
+                <Text bold={theme.emphasis.sectionHeadingBold}>Roles (app permissions)</Text>
                 {(load.claims.roles as unknown[]).map((r, i) => (
                   <Text key={i}>
                     <Text color={theme.selected}>{'  · '}</Text>

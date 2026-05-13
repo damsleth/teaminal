@@ -56,7 +56,7 @@ import { readMessagePageState, type LoadMoreState } from './messageRows'
 import { messagesForTimelineNavigation } from './renderableMessage'
 import { usePollerHandleRef } from './PollerContext'
 import { StatusBar } from './StatusBar'
-import { useAppState, useAppStore } from './StoreContext'
+import { useAppState, useAppStore, useTheme } from './StoreContext'
 import type { Chat, DirectoryUser } from '../types'
 
 const LIST_PANE_WIDTH = 30
@@ -330,53 +330,101 @@ export function App() {
     { isActive: isRawModeSupported && inputZone === 'message-search' },
   )
 
-  // Modal rendering: header / composer / status bar stay visible; the
-  // central row (ChatList + MessagePane) is replaced by the modal box.
-  // Ink has no z-index so this is the closest "overlay" we can do.
+  // Modal rendering: header / composer / status bar stay visible. The
+  // menu / accounts / keybinds / diagnostics / events / network modals
+  // render as absolute-positioned overlays on top of the message pane,
+  // so the active chat stays visible behind them. Only the
+  // auth-expired modal still replaces the pane (the chat isn't
+  // actionable when auth is broken).
   //
+  const overlayModalKind:
+    | 'menu'
+    | 'accounts'
+    | 'keybinds'
+    | 'diagnostics'
+    | 'events'
+    | 'network'
+    | null = modal && modal.kind !== 'auth-expired' ? modal.kind : null
+  const replaceModal = modal?.kind === 'auth-expired' ? modal : null
+  const theme = useTheme()
   return (
     <Box flexDirection="column" height={terminalRows}>
-      <Box borderStyle="round" borderColor="gray" paddingX={1}>
+      <Box
+        borderStyle={theme.borders.panel}
+        borderColor={theme.border}
+        paddingX={theme.layout.panePaddingX}
+      >
         <HeaderBar />
       </Box>
       <Box flexDirection="row" flexGrow={1}>
-        <Box width={LIST_PANE_WIDTH} flexShrink={0} borderStyle="round" borderColor="gray">
+        <Box
+          width={LIST_PANE_WIDTH}
+          flexShrink={0}
+          borderStyle={theme.borders.panel}
+          borderColor={theme.border}
+        >
           <ChatList />
         </Box>
-        <Box flexGrow={1} flexShrink={1} minWidth={0} borderStyle="round" borderColor="gray">
+        <Box
+          flexGrow={1}
+          flexShrink={1}
+          minWidth={0}
+          borderStyle={theme.borders.panel}
+          borderColor={theme.border}
+        >
           {newChatPrompt !== null ? (
             <NewChatPrompt
               initialQuery={newChatPrompt}
               onClose={closeNewChatPrompt}
               onSelectUser={createOrFocusChat}
             />
-          ) : modal ? (
-            modal.kind === 'menu' ? (
-              <MenuModal />
-            ) : modal.kind === 'keybinds' ? (
-              <KeybindsModal />
-            ) : modal.kind === 'accounts' ? (
-              <AccountsModal />
-            ) : modal.kind === 'auth-expired' ? (
-              <AuthExpiredModal />
-            ) : modal.kind === 'events' ? (
-              <EventsModal />
-            ) : modal.kind === 'network' ? (
-              <NetworkModal />
-            ) : (
-              <DiagnosticsModal />
-            )
+          ) : replaceModal ? (
+            <AuthExpiredModal />
           ) : (
-            <MessagePane
-              focusedMessageId={focusedMessageId}
-              focusIndicatorActive={focus.kind !== 'list' && inputZone === 'list'}
-              loadOlderState={loadOlderState}
-            />
+            <Box
+              flexDirection="column"
+              flexGrow={1}
+              flexShrink={1}
+              minWidth={0}
+              position="relative"
+            >
+              <MessagePane
+                focusedMessageId={focusedMessageId}
+                focusIndicatorActive={focus.kind !== 'list' && inputZone === 'list'}
+                loadOlderState={loadOlderState}
+              />
+              {overlayModalKind && (
+                <Box
+                  position="absolute"
+                  top={0}
+                  left={0}
+                  right={0}
+                  bottom={0}
+                  flexDirection="column"
+                  alignItems="center"
+                  justifyContent="center"
+                >
+                  {overlayModalKind === 'menu' ? (
+                    <MenuModal />
+                  ) : overlayModalKind === 'accounts' ? (
+                    <AccountsModal />
+                  ) : overlayModalKind === 'keybinds' ? (
+                    <KeybindsModal />
+                  ) : overlayModalKind === 'diagnostics' ? (
+                    <DiagnosticsModal />
+                  ) : overlayModalKind === 'events' ? (
+                    <EventsModal />
+                  ) : (
+                    <NetworkModal />
+                  )}
+                </Box>
+              )}
+            </Box>
           )}
         </Box>
       </Box>
       <TailPanels />
-      <Box borderStyle="round" borderColor="gray">
+      <Box borderStyle={theme.borders.panel} borderColor={theme.border}>
         <Composer />
       </Box>
       <StatusBar />

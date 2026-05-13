@@ -104,7 +104,7 @@ warnings and fall back to defaults.
 
 | Key                            | Values               | Default | Description                                                                              |
 | ------------------------------ | -------------------- | ------: | ---------------------------------------------------------------------------------------- |
-| `theme`                        | `dark`, `light`      |  `dark` | Terminal color palette.                                                                  |
+| `theme`                        | `dark`, `light`, `compact`, `comfortable`, or a custom name | `dark` | Terminal palette + layout preset. Custom names load `~/.config/teaminal/themes/<name>.json` (see [Themes](#themes) below). |
 | `accounts`                     | string array         |    `[]` | owa-piggy profile aliases managed by Accounts.                                           |
 | `activeAccount`                | string or null       |  `null` | Default profile alias used at startup when `--profile` is not passed.                    |
 | `chatListDensity`              | `cozy`, `compact`    |  `cozy` | Row spacing in the chat list.                                                            |
@@ -116,12 +116,61 @@ warnings and fall back to defaults.
 | `messageFocusIndicatorChar`    | single character     |     `>` | Marker shown beside the focused message.                                                 |
 | `messageFocusIndicatorColor`   | color or null        |  `null` | Override focused-message marker color.                                                   |
 | `messageFocusBackgroundColor`  | color or null        |  `null` | Optional focused-message background color.                                               |
-| `themeOverrides`               | object               |    `{}` | Override color roles such as `text`, `mutedText`, `unread`, `timestamp`, and `presence`. |
+| `themeOverrides`               | object               |    `{}` | Override color roles such as `text`, `mutedText`, `unread`, `timestamp`, `presence`, plus `layout` (paddings), `borders` (border styles for `panel` and `modal`), and `emphasis` (per-role bold flags). |
 | `useTeamsPresence`             | boolean              |  `true` | Use the Teams unified presence endpoint (`presence.teams.microsoft.com`) for own presence. Falls back to Graph `/me/presence` automatically on 401/403/404. Set to `false` to force Graph-only in tenants that block public-client access to that host. |
 | `forceAvailableWhenFocused`    | boolean              |  `true` | While the terminal window has focus (DEC focus reporting; CSI ?1004), PUT `forceavailability=Available` to `presence.teams.microsoft.com` so Teams shows you Available, like the desktop client does for an active window. The override expires server-side after ~5 min and is refreshed inside that window. Set to `false` to leave presence to Teams' own desktop client / inactivity timer. |
 | `realtimeEnabled`              | boolean              | `false` | Enables the experimental Teams trouter push transport for typing, read-receipt, presence, and immediate refresh signals. Polling remains the source of truth and fallback. |
 
 <!-- prettier-ignore-end -->
+
+### Themes
+
+The four built-in themes (`dark`, `light`, `compact`, `comfortable`)
+live inside teaminal. `compact` and `comfortable` inherit the `dark`
+color palette but tighten or loosen paddings.
+
+Drop a JSON file at `~/.config/teaminal/themes/<name>.json` and set
+`"theme": "<name>"` in `config.json` to load it. The file is a partial
+theme layered on top of `dark`; any subset of these keys is accepted:
+
+```jsonc
+{
+  // Color roles (named color or `#rrggbb`):
+  "background": "#001100",
+  "text": "white",
+  "border": "#444",
+  "borderActive": "magentaBright",
+  "selected": "magenta",
+  "unread": "yellow",
+  // Per-presence colors:
+  "presence": { "Available": "greenBright", "DoNotDisturb": "red" },
+  // Paddings / margins (non-negative integers):
+  "layout": {
+    "panePaddingX": 1,
+    "modalPaddingX": 3,
+    "modalPaddingY": 1,
+    "paneHeaderPaddingLeft": 1,
+    "paneHeaderMarginBottom": 1,
+    "tailGap": 1,
+    "chatListPaddingRight": 1,
+  },
+  // Border styles (single | double | round | bold | classic | singleDouble | doubleSingle | arrow):
+  "borders": { "panel": "single", "modal": "double" },
+  // Per-role bold (true/false):
+  "emphasis": {
+    "modalTitleBold": true,
+    "sectionHeadingBold": true,
+    "selectedBold": true,
+    "unreadBold": true,
+    "senderBold": true,
+    "inlineKeyBold": true,
+  },
+}
+```
+
+`themeOverrides` in `config.json` still wins over the theme file, so
+you can ship a base theme and tweak per-machine. Unknown keys, bad
+colors, and out-of-range values are dropped with a warning at startup.
 
 The in-app Settings menu persists changes back to `config.json`.
 
@@ -137,8 +186,7 @@ The in-app Settings menu persists changes back to `config.json`.
 | Tab            | chat / channel    | Toggle between message navigation and composer.                |
 | Tab            | composer          | Return to message navigation.                                  |
 | Esc            | composer / filter | Leave mode.                                                    |
-| Esc            | chat / channel    | Return to chat list.                                           |
-| Esc            | chat list         | Open menu.                                                     |
+| Esc            | anywhere else     | Toggle the menu overlay. Use `h` / Left to step back a pane.   |
 | Enter          | composer          | Send message.                                                  |
 | Ctrl+J         | composer          | Insert newline.                                                |
 | `/`            | list              | Filter chats.                                                  |

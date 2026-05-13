@@ -120,13 +120,14 @@ export function EventsModal() {
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
       <Box
         flexDirection="column"
-        borderStyle="round"
+        borderStyle={theme.borders.modal}
         borderColor={theme.borderActive}
-        paddingX={2}
-        paddingY={1}
+        backgroundColor={theme.background}
+        paddingX={theme.layout.modalPaddingX}
+        paddingY={theme.layout.modalPaddingY}
         width={100}
       >
-        <Text bold>Events ({totalCount})</Text>
+        <Text bold={theme.emphasis.modalTitleBold}>Events ({totalCount})</Text>
         <Box height={1} />
         {slice.length === 0 ? (
           <Text color={theme.mutedText}>No events.</Text>

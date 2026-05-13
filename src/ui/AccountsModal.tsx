@@ -184,12 +184,14 @@ export function AccountsModal() {
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
       <Box
         flexDirection="column"
-        borderStyle="round"
+        borderStyle={theme.borders.modal}
         borderColor={theme.borderActive}
-        paddingX={3}
-        paddingY={1}
+        backgroundColor={theme.background}
+        paddingX={theme.layout.modalPaddingX}
+        paddingY={theme.layout.modalPaddingY}
+        width={70}
       >
-        <Text bold>Accounts</Text>
+        <Text bold={theme.emphasis.modalTitleBold}>Accounts</Text>
         <Box height={1} />
         {mode.kind === 'loading' ? (
           <Text color={theme.mutedText}>Checking owa-piggy profiles...</Text>
@@ -200,7 +202,7 @@ export function AccountsModal() {
               <Text
                 key={profile.profile}
                 color={i === mode.cursor ? theme.selected : undefined}
-                bold={i === mode.cursor}
+                bold={i === mode.cursor && theme.emphasis.selectedBold}
               >
                 {i === mode.cursor ? '> ' : '  '}
                 {profile.profile}
@@ -224,7 +226,7 @@ export function AccountsModal() {
                 <Text
                   key={profile}
                   color={i === mode.cursor ? theme.selected : undefined}
-                  bold={i === mode.cursor}
+                  bold={i === mode.cursor && theme.emphasis.selectedBold}
                 >
                   {i === mode.cursor ? '> ' : '  '}
                   {profile}
