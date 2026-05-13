@@ -437,13 +437,20 @@ function MessageRow(props: {
   else if (isSystem) color = theme.systemEvent
   else if (isSelf) color = theme.selfMessage
 
-  const statusMarker = sendError ? '✗' : isSending ? '…' : ' '
-  const timeCol = props.showTimestamp ? `${time} ` : ''
-  const indicator = props.focused ? props.focusIndicatorChar.slice(0, 1) || '>' : ' '
-  // When timestamps are off the status column collapses entirely so the
-  // sender column hugs the indicator gutter. Error / sending state is
-  // still conveyed by row color in that mode.
-  const statusWidth = props.showTimestamp ? 7 : 0
+  // The indicator column carries the focus arrow when this row is
+  // focused; otherwise it carries any send-status glyph (failed / sending).
+  // Focus wins over send-state because focus is user-driven and errors
+  // are server-driven — they rarely coincide, and when they do, seeing
+  // the cursor matters more.
+  const sendStatusGlyph = sendError ? '✗' : isSending ? '…' : ' '
+  const indicator = props.focused
+    ? props.focusIndicatorChar.slice(0, 1) || '>'
+    : sendStatusGlyph
+  // Timestamp column hosts HH:MM only - the trailing space and the
+  // status glyph have been pulled into the indicator column above.
+  // When timestamps are off the column collapses entirely.
+  const TIMESTAMP_WIDTH = 5
+  const statusWidth = props.showTimestamp ? TIMESTAMP_WIDTH : 0
 
   const rowDir = flipRow ? 'row-reverse' : 'row'
 
@@ -463,7 +470,7 @@ function MessageRow(props: {
         {props.showTimestamp && (
           <Box width={statusWidth} flexShrink={0}>
             <Text color={color} wrap="truncate-end">
-              {`${statusMarker}${timeCol}`}
+              {time}
             </Text>
           </Box>
         )}

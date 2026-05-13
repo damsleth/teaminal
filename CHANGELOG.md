@@ -20,6 +20,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 - **`shortName()` now drops only the last surname token.** `"Ole Kristian Mørch-Storstein"` renders as `"Ole Kristian"` instead of just `"Ole"`. Multi-given-name forms (`"Anna Bjørg Maria Vatne"` → `"Anna Bjørg Maria"`) are preserved; hyphenated surnames stay intact because they have no whitespace. AD comma form (`"Surname, First Middle"`) still drops the rightmost token after the comma, so `"Damsleth, Carl Joakim"` → `"Carl"`.
 - **Teams render as non-selectable section headers in the chat list.** Up/down navigation skips team rows, jumping straight between channels and chats. Team display names render bold and flush-left; channels indent two spaces under their team with the `#` prefix. The generic "Teams" section label is removed (each team is now its own header).
+- **Tighter timestamp column in the message pane.** The timestamp box now hosts `HH:MM` only (5 cols), and the send-status glyph (`✗` / `…`) moved to the indicator column where it shares a slot with the focus arrow (focus wins when both apply). Net effect: two columns shaved off every row, reactions/receipts/attachments/send-error rows now align under the slimmer column.
 
 ## [0.13.0] - 2026-05-13
 
