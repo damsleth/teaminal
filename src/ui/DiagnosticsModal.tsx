@@ -61,6 +61,8 @@ export function DiagnosticsModal() {
   const teams = useAppState((s) => s.teams)
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
   const messagesByConvo = useAppState((s) => s.messagesByConvo)
+  const terminalFocused = useAppState((s) => s.terminalFocused)
+  const focusReportingHealthy = useAppState((s) => s.focusReportingHealthy)
   const theme = useTheme()
   const isOpen = modal?.kind === 'diagnostics'
 
@@ -141,6 +143,14 @@ export function DiagnosticsModal() {
         <Text>
           <Text color="gray">loaded: </Text>
           <Text>{`${chats.length} chats, ${teams.length} teams, ${countChannels(channelsByTeam)} channels, ${countMessages(messagesByConvo)} messages`}</Text>
+        </Text>
+        <Text>
+          <Text color="gray">focus: </Text>
+          <Text>{terminalFocused ? 'focused' : 'blurred'}</Text>
+          <Text color="gray">
+            {' · DEC 1004: '}
+            {focusReportingHealthy ? 'healthy' : 'unhealthy (fallback)'}
+          </Text>
         </Text>
 
         <Box height={1} />

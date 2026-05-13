@@ -614,6 +614,14 @@ export type AppState = {
   // Defaults to true (process startup implies focus); set to false
   // when the terminal sends ESC[O and back to true on ESC[I.
   terminalFocused: boolean
+  // True when at least one DEC 1004 focus event has been observed
+  // (or DEC reporting is presumed healthy by the fallback timer).
+  // Surfaces in the Diagnostics modal so users on terminals that
+  // drop DEC 1004 (some Ghostty versions, certain multiplexers)
+  // can see why force-availability behavior may differ. While
+  // false, the force-availability driver still treats the terminal
+  // as focused so the override does not silently disable.
+  focusReportingHealthy: boolean
   // Active typing indicators per conversation, keyed by ConvKey.
   // Entries expire after ~8s of inactivity (cleaned by a timer).
   typingByConvo: Record<ConvKey, TypingIndicator[]>
@@ -664,6 +672,7 @@ export function initialAppState(): AppState {
     conn: 'connecting',
     realtimeState: 'off',
     terminalFocused: true,
+    focusReportingHealthy: false,
     typingByConvo: {},
     readReceiptsByConvo: {},
     threadMetaByRoot: {},
@@ -693,5 +702,6 @@ export function resetAccountScopedState(store: Store<AppState>): void {
   // Preserve UI preferences and hardware-level state.
   fresh.settings = prev.settings
   fresh.terminalFocused = prev.terminalFocused
+  fresh.focusReportingHealthy = prev.focusReportingHealthy
   store.replace(fresh)
 }
