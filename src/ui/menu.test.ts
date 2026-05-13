@@ -90,9 +90,11 @@ describe('nextSelectable', () => {
 })
 
 describe('cycleSetting', () => {
-  test('flips theme between dark and light', () => {
+  test('cycles theme through built-in presets', () => {
     expect(cycleSetting('theme', 'dark')).toBe('light')
-    expect(cycleSetting('theme', 'light')).toBe('dark')
+    expect(cycleSetting('theme', 'light')).toBe('compact')
+    expect(cycleSetting('theme', 'compact')).toBe('comfortable')
+    expect(cycleSetting('theme', 'comfortable')).toBe('dark')
   })
 
   test('flips chat list density between cozy and compact', () => {
@@ -167,6 +169,7 @@ describe('ROOT_MENU shape', () => {
       'theme',
       'chatListDensity',
       'chatListShortNames',
+      'messagePaneShortNames',
       'showPresenceInList',
       'forceAvailableWhenFocused',
       'realtimeEnabled',

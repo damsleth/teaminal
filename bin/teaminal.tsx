@@ -3,6 +3,7 @@
 import { render } from 'ink'
 import { isRefreshExpiredError } from '../src/auth/owaPiggy'
 import { loadSettings } from '../src/config'
+import { loadThemeFile } from '../src/config/themes'
 import { runSession, type SessionHandle } from '../src/state/bootstrap'
 import { startForceAvailabilityDriver } from '../src/state/forceAvailability'
 import { createAppStore, messagesFromCaches, resetAccountScopedState } from '../src/state/store'
@@ -127,6 +128,13 @@ const store = createAppStore()
 // to owa-piggy's default profile.
 const configResult = loadSettings()
 store.set({ settings: configResult.settings })
+// Load custom theme JSON if settings.theme isn't a built-in name.
+const themeResult = loadThemeFile(configResult.settings.theme)
+if (themeResult.source === 'file') {
+  store.set({ customTheme: { name: themeResult.name, data: themeResult.data ?? {} } })
+  debug(`theme: loaded "${themeResult.name}" from ${themeResult.path}`)
+}
+for (const w of themeResult.warnings) warn(w)
 let activeProfile: string | null = cliProfile ?? configResult.settings.activeAccount ?? null
 const resolvedLogFile = cliLogFile ?? configResult.settings.logFile ?? null
 if (resolvedLogFile) setLogFile(resolvedLogFile)

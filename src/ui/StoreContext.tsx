@@ -7,7 +7,7 @@
 import { createContext, useContext, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import type { AppState, Store } from '../state/store'
-import { resolveTheme, type Theme } from './theme'
+import { resolveTheme, type PartialTheme, type Theme } from './theme'
 
 const StoreContext = createContext<Store<AppState> | null>(null)
 
@@ -30,9 +30,18 @@ export function useAppState<T>(selector: (s: AppState) => T): T {
   )
 }
 
-// Active palette derived from settings. This includes theme overrides and
-// message-focus color settings loaded from config.json.
+// Active palette derived from settings + any loaded custom theme.
+// Custom theme JSON is loaded once at startup by bin/teaminal.tsx and
+// stored on AppState.customTheme; settings.themeOverrides still wins.
 export function useTheme(): Theme {
   const settings = useAppState((s) => s.settings)
-  return resolveTheme(settings)
+  const customTheme = useAppState((s) => s.customTheme)
+  return resolveTheme(settings, activeCustomThemeData(settings.theme, customTheme))
+}
+
+export function activeCustomThemeData(
+  themeName: string,
+  customTheme: AppState['customTheme'],
+): PartialTheme | null {
+  return customTheme && customTheme.name === themeName ? (customTheme.data as PartialTheme) : null
 }

@@ -46,6 +46,20 @@ const LOGO = [
   '   ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝',
 ]
 
+// Width of the rendered menu rows (LOGO length). Used to pad every
+// row so each Text node writes a uniform-width run with the menu's
+// background color — Ink's Box backgroundColor fill paints the box's
+// rectangle, but when the menu sits behind cells the underlying chat
+// has already written to we get more reliable opacity by also setting
+// backgroundColor on each Text and padding so every cell of the row
+// is covered.
+const MENU_CONTENT_WIDTH = LOGO[0]!.length
+
+function pad(text: string): string {
+  if (text.length >= MENU_CONTENT_WIDTH) return text
+  return text + ' '.repeat(MENU_CONTENT_WIDTH - text.length)
+}
+
 export function openMenu(store: ReturnType<typeof useAppStore>, path: string[] = []): void {
   const items = resolveMenuPath(ROOT_MENU, path) ?? ROOT_MENU
   const idx = firstSelectable(items)
@@ -180,25 +194,33 @@ export function MenuModal() {
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
       <Box
         flexDirection="column"
-        borderStyle="round"
+        borderStyle={theme.borders.modal}
         borderColor={theme.borderActive}
-        paddingX={3}
-        paddingY={1}
+        backgroundColor={theme.background}
+        paddingX={theme.layout.modalPaddingX}
+        paddingY={theme.layout.modalPaddingY}
       >
         <Box flexDirection="column">
           {LOGO.map((line, i) => (
-            <Text key={i} color="cyan">
-              {line}
+            <Text key={i} color="cyan" backgroundColor={theme.background}>
+              {pad(line)}
             </Text>
           ))}
         </Box>
-        <Text color="gray">{`teaminal ${VERSION}`}</Text>
-        <Text color="gray">{REPOSITORY_URL}</Text>
-        <Box height={1} />
+        <Text color="gray" backgroundColor={theme.background}>
+          {pad(`teaminal ${VERSION}`)}
+        </Text>
+        <Text color="gray" backgroundColor={theme.background}>
+          {pad(REPOSITORY_URL)}
+        </Text>
+        <Text backgroundColor={theme.background}>{pad('')}</Text>
         {breadcrumb && (
-          <Box marginBottom={1}>
-            <Text color="gray">{breadcrumb}</Text>
-          </Box>
+          <>
+            <Text color="gray" backgroundColor={theme.background}>
+              {pad(breadcrumb)}
+            </Text>
+            <Text backgroundColor={theme.background}>{pad('')}</Text>
+          </>
         )}
         <Box flexDirection="column">
           {items.map((item, idx) => {
@@ -208,17 +230,21 @@ export function MenuModal() {
             const valueSuffix = formatValueSuffix(item, settings)
             const hint = item.hint ? `  (${item.hint})` : ''
             return (
-              <Text key={item.id} color={color} bold={selected && !item.disabled}>
-                {marker}
-                {item.label}
-                {valueSuffix}
-                {hint}
+              <Text
+                key={item.id}
+                color={color}
+                backgroundColor={theme.background}
+                bold={selected && !item.disabled && theme.emphasis.selectedBold}
+              >
+                {pad(`${marker}${item.label}${valueSuffix}${hint}`)}
               </Text>
             )
           })}
         </Box>
-        <Box height={1} />
-        <Text color="gray">{'↑/↓ navigate · enter select · esc back'}</Text>
+        <Text backgroundColor={theme.background}>{pad('')}</Text>
+        <Text color="gray" backgroundColor={theme.background}>
+          {pad('↑/↓ navigate · enter select · esc back')}
+        </Text>
       </Box>
     </Box>
   )

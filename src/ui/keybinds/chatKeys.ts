@@ -7,6 +7,7 @@
 // shared App-level dispatcher because it is identical across zones.
 
 import type { AppState, Focus, Store } from '../../state/store'
+import { openMenu } from '../MenuModal'
 import type { KeyResult, RawKey } from './types'
 
 export type ChatKeysCtx = {
@@ -30,10 +31,10 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
   const ch = input.toLowerCase()
   if (ctx.focus.kind === 'list') return 'pass'
 
-  // Thread-specific routing: h / Left / Esc must return to the parent
-  // channel, not the list. Has to come before the generic 'h → list'
-  // rule below.
-  if (ctx.focus.kind === 'thread' && (ch === 'h' || key.leftArrow || key.escape)) {
+  // Thread-specific routing: h / Left return to the parent channel.
+  // Has to come before the generic 'h → list' rule below. Esc is
+  // handled later — it always opens the menu, regardless of focus.
+  if (ctx.focus.kind === 'thread' && (ch === 'h' || key.leftArrow)) {
     store.set({
       focus: { kind: 'channel', teamId: ctx.focus.teamId, channelId: ctx.focus.channelId },
     })
@@ -82,10 +83,11 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
     })
     return 'handled'
   }
-  // From a thread, h / Esc returns to its parent channel — handled
-  // earlier, before the generic 'h → list' rule.
+  // Esc always opens the menu overlay, regardless of focus. The menu
+  // itself toggles closed on Esc, so the binding behaves as a toggle.
+  // Use h / Left / l-Tab to move between panes instead.
   if (key.escape) {
-    store.set({ focus: { kind: 'list' }, inputZone: 'list' })
+    openMenu(store)
     return 'handled'
   }
   // '/' opens in-pane message search.

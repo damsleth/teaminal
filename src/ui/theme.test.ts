@@ -59,4 +59,47 @@ describe('resolveTheme', () => {
     expect(theme.messageFocusIndicator).toBe('yellow')
     expect(theme.messageFocusBackground).toBeNull()
   })
+
+  test('compact and comfortable presets differ in layout but inherit dark colors', () => {
+    expect(builtinThemes.compact.layout.modalPaddingX).toBe(2)
+    expect(builtinThemes.comfortable.layout.modalPaddingX).toBe(4)
+    expect(builtinThemes.compact.background).toBe(builtinThemes.dark.background)
+    expect(builtinThemes.comfortable.borders.panel).toBe('round')
+  })
+
+  test('layered partial theme is applied between built-in base and overrides', () => {
+    const theme = resolveTheme(
+      {
+        ...defaultSettings,
+        theme: 'dark',
+        themeOverrides: {
+          layout: { modalPaddingY: 3 },
+        },
+      },
+      {
+        layout: { modalPaddingX: 7, modalPaddingY: 5 },
+        borders: { modal: 'double' },
+        emphasis: { selectedBold: false },
+        selected: '#abcdef',
+      },
+    )
+
+    // Custom theme wins over built-in base
+    expect(theme.layout.modalPaddingX).toBe(7)
+    expect(theme.borders.modal).toBe('double')
+    expect(theme.emphasis.selectedBold).toBe(false)
+    expect(theme.selected).toBe('#abcdef')
+    // themeOverrides wins over the custom theme
+    expect(theme.layout.modalPaddingY).toBe(3)
+    // Untouched keys fall back to the built-in base
+    expect(theme.layout.panePaddingX).toBe(builtinThemes.dark.layout.panePaddingX)
+    expect(theme.borders.panel).toBe('round')
+    expect(theme.emphasis.modalTitleBold).toBe(true)
+  })
+
+  test('unknown theme name falls back to dark base', () => {
+    const theme = resolveTheme({ ...defaultSettings, theme: 'does-not-exist' })
+    expect(theme.background).toBe(builtinThemes.dark.background)
+    expect(theme.layout).toEqual(builtinThemes.dark.layout)
+  })
 })

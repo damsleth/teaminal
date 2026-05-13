@@ -82,12 +82,14 @@ export function KeybindsModal() {
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
       <Box
         flexDirection="column"
-        borderStyle="round"
+        borderStyle={theme.borders.modal}
         borderColor={theme.borderActive}
-        paddingX={3}
-        paddingY={1}
+        backgroundColor={theme.background}
+        paddingX={theme.layout.modalPaddingX}
+        paddingY={theme.layout.modalPaddingY}
+        width={80}
       >
-        <Text bold>Keybindings</Text>
+        <Text bold={theme.emphasis.modalTitleBold}>Keybindings</Text>
         <Box height={1} />
         {BINDINGS.map((b, i) => (
           <Text key={i}>

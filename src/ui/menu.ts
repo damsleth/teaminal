@@ -24,6 +24,7 @@ export type ToggleKey =
   | 'theme'
   | 'chatListDensity'
   | 'chatListShortNames'
+  | 'messagePaneShortNames'
   | 'showPresenceInList'
   | 'showTimestampsInPane'
   | 'showReactions'
@@ -112,6 +113,11 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'chatListShortNames',
         label: 'Short names in chat list',
         action: { kind: 'toggle-setting', key: 'chatListShortNames' },
+      },
+      {
+        id: 'messagePaneShortNames',
+        label: 'Short names in chats',
+        action: { kind: 'toggle-setting', key: 'messagePaneShortNames' },
       },
       {
         id: 'showPresenceInList',
@@ -266,13 +272,18 @@ function cycleReactionDisplayMode(current: Settings['showReactions']): Settings[
 // negate. Add new keys here when the Settings type grows.
 export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]): Settings[K] {
   switch (key) {
-    case 'theme':
-      return (current === 'dark' ? 'light' : 'dark') as Settings[K]
+    case 'theme': {
+      const order = ['dark', 'light', 'compact', 'comfortable']
+      const idx = order.indexOf(current as string)
+      const next = order[(idx === -1 ? -1 : idx) + 1] ?? order[0]!
+      return next as Settings[K]
+    }
     case 'chatListDensity':
       return (current === 'cozy' ? 'compact' : 'cozy') as Settings[K]
     case 'showReactions':
       return cycleReactionDisplayMode(current as Settings['showReactions']) as Settings[K]
     case 'chatListShortNames':
+    case 'messagePaneShortNames':
     case 'showPresenceInList':
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
@@ -313,6 +324,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'showReactions':
       return String(value)
     case 'chatListShortNames':
+    case 'messagePaneShortNames':
     case 'showPresenceInList':
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
