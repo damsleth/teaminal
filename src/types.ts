@@ -89,6 +89,50 @@ export type SystemEventDetail = {
   [key: string]: unknown
 }
 
+// Graph chat message attachment. contentType is the MIME type for file
+// and image attachments, or a Teams-specific string (e.g.
+// "application/vnd.microsoft.teams.file.download.info") for hosted
+// content references. Only the fields teaminal reads are declared; Graph
+// may include additional vendor fields.
+export type MessageAttachment = {
+  id: string
+  contentType: string
+  contentUrl?: string | null
+  content?: string | null
+  name?: string | null
+  thumbnailUrl?: string | null
+  teamsAppId?: string | null
+}
+
+// Image attachments come in two shapes:
+//   1. contentType starts with 'image/' - direct file attachment
+//   2. common image extension in the name - Teams hosted content (contentType
+//      is often a Teams-specific string, not the image MIME type itself)
+export function isImageAttachment(a: MessageAttachment): boolean {
+  if (a.contentType.startsWith('image/')) return true
+  const name = a.name ?? ''
+  return /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i.test(name)
+}
+
+function hostedContentPath(chatId: string, messageId: string, attachmentId: string): string {
+  return `/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}/hostedContents/${encodeURIComponent(attachmentId)}/$value`
+}
+
+const GRAPH_V1_BASE = 'https://graph.microsoft.com/v1.0'
+
+// Return the Graph-relative path to download an image attachment.
+// Prefers a contentUrl that already points into Graph; falls back to the
+// hostedContents endpoint for inline-pasted images.
+export function attachmentGraphPath(
+  attachment: MessageAttachment,
+  chatId: string,
+  messageId: string,
+): string {
+  const url = attachment.contentUrl ?? ''
+  if (url.startsWith(`${GRAPH_V1_BASE}/`)) return url.slice(GRAPH_V1_BASE.length)
+  return hostedContentPath(chatId, messageId, attachment.id)
+}
+
 export type ChatMessage = {
   id: string
   createdDateTime: string
@@ -102,7 +146,7 @@ export type ChatMessage = {
   body: MessageBody
   mentions?: Mention[]
   importance?: 'normal' | 'high' | 'urgent'
-  attachments?: unknown[]
+  attachments?: MessageAttachment[]
   reactions?: Reaction[]
   replyToId?: string | null
   subject?: string | null

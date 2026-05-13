@@ -6,6 +6,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`selfMessagesOnRight` setting.** When enabled, your own messages are right-aligned in the message pane (body pushed to the right, sender/timestamp on the left of the body). Other users' messages remain left-aligned. Default `false` (uniform IRC-style left alignment).
+- **Inline image rendering via Kitty graphics protocol.** Messages with image attachments now show a `[img] filename` text row in all terminals. In Kitty-capable terminals (`KITTY_WINDOW_ID` / `TERM=xterm-kitty` / `TERM_PROGRAM=kitty`), the focused message's first image is also rendered inline using the Kitty graphics APC protocol after each frame. Two new config keys: `inlineImages` (`"auto"` | `"off"`, default `"auto"`) and `inlineImageMaxRows` (integer 1-50, default `10`). Image blobs are cached on disk under `~/.cache/teaminal/<profile>/images/` keyed by SHA-1 of `messageId::attachmentId` - no signed URLs are stored or logged.
+
 ## [0.13.0] - 2026-05-13
 
 ### Added

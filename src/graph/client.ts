@@ -248,6 +248,82 @@ export async function graph<T>(opts: GraphOpts): Promise<T> {
   return executeRequest<T>(url, opts)
 }
 
+// Binary variant of `graph()` for endpoints that return raw bytes
+// (e.g. /hostedContents/{id}/$value). Applies the same 401/429 retry
+// logic as graph<T> but returns the response body as a Uint8Array.
+export async function graphBinary(opts: GraphOpts): Promise<Uint8Array> {
+  const url = buildUrl(opts)
+  return executeBinaryRequest(url, opts)
+}
+
+async function executeBinaryRequest(
+  url: string,
+  opts: GraphOpts,
+  retried401 = false,
+  retried429Count = 0,
+): Promise<Uint8Array> {
+  const token = await getToken({ profile: activeProfile, scope: opts.scope })
+  const headers = new Headers({ Accept: '*/*' })
+  for (const [k, v] of Object.entries(opts.headers ?? {})) {
+    if (v === undefined) continue
+    if (k.toLowerCase() === 'authorization') continue
+    headers.set(k, v)
+  }
+  headers.set('Authorization', `Bearer ${token}`)
+
+  const init: RequestInit = { method: opts.method, headers }
+  if (opts.signal) init.signal = opts.signal
+
+  const startedAt = Date.now()
+  let res: Response
+  try {
+    res = await transport(url, init)
+  } catch (err) {
+    recordRequest({
+      ts: startedAt,
+      method: opts.method,
+      path: opts.path,
+      status: null,
+      durationMs: Date.now() - startedAt,
+      retried401: retried401 || undefined,
+      retried429: retried429Count > 0 || undefined,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+  recordRequest({
+    ts: startedAt,
+    method: opts.method,
+    path: opts.path,
+    status: res.status,
+    durationMs: Date.now() - startedAt,
+    retried401: retried401 || undefined,
+    retried429: retried429Count > 0 || undefined,
+  })
+
+  if (res.status === 401 && !retried401) {
+    invalidate({ profile: activeProfile, scope: opts.scope })
+    return executeBinaryRequest(url, opts, true, retried429Count)
+  }
+
+  if (res.status === 429) {
+    if (retried429Count >= MAX_429_RETRIES) {
+      const retryMs = parseRetryAfter(res.headers.get('Retry-After'), Date.now())
+      throw new RateLimitError(429, opts.path, retryMs, 'rate limited (max retries exhausted)')
+    }
+    const retryRaw = parseRetryAfter(res.headers.get('Retry-After'), Date.now())
+    const waitMs = jitter(retryRaw > 0 ? retryRaw : DEFAULT_429_BACKOFF_MS)
+    await sleep(waitMs)
+    return executeBinaryRequest(url, opts, retried401, retried429Count + 1)
+  }
+
+  if (!res.ok) {
+    throw new GraphError(res.status, opts.path, res.statusText || `HTTP ${res.status}`)
+  }
+
+  return new Uint8Array(await res.arrayBuffer())
+}
+
 type PagedResponse<T> = { value: T[]; '@odata.nextLink'?: string }
 
 // Yields successive pages of `value` from a Graph collection endpoint,

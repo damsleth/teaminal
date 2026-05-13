@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 import { chatLabel, shortName } from '../state/selectables'
 import { focusKey, type ReadReceipt, type ThreadMeta, type TypingIndicator } from '../state/store'
 import type { Chat, ChatMessage, Channel, Team } from '../types'
+import { isImageAttachment, attachmentGraphPath } from '../types'
 import { htmlToText } from '../text/html'
 import { reactionsSummary } from './reactions'
 import { describeSystemEvent } from './systemEvent'
@@ -19,6 +20,7 @@ import { effectiveSenderName, isRenderableMessage } from './renderableMessage'
 import {
   buildMessageRows,
   chooseMessageRowsWindowStart,
+  messageRenderRowHeight,
   messageRowsWindowEnd,
   readMessagePageState,
   shouldShowReactionRow,
@@ -27,6 +29,9 @@ import {
 } from './messageRows'
 import type { Theme } from './theme'
 import { useAppState, useTheme } from './StoreContext'
+import { isKittyCapable, buildKittyAPC, writeKittyImageAtOffset } from './kittyGraphics'
+import { ensureImageFetched, getImageData, imageCacheKey } from '../state/imageCache'
+import { getActiveProfile } from '../graph/client'
 
 export { effectiveSenderName, isRenderableMessage } from './renderableMessage'
 
@@ -71,10 +76,16 @@ export function MessagePane(props: {
   const searchQuery = useAppState((s) => s.messageSearchQuery)
   const focusIndicatorVisible = useAppState((s) => s.settings.messageFocusIndicatorEnabled)
   const focusIndicatorChar = useAppState((s) => s.settings.messageFocusIndicatorChar)
+  const selfMessagesOnRight = useAppState((s) => s.settings.selfMessagesOnRight)
   const typingByConvo = useAppState((s) => s.typingByConvo)
   const readReceiptsByConvo = useAppState((s) => s.readReceiptsByConvo)
   const threadMetaByRoot = useAppState((s) => s.threadMetaByRoot)
+  const inlineImages = useAppState((s) => s.settings.inlineImages)
+  const inlineImageMaxRows = useAppState((s) => s.settings.inlineImageMaxRows)
   const theme = useTheme()
+
+  const [, setImageRevision] = useState(0)
+  const kittyEnabled = inlineImages === 'auto' && isKittyCapable()
 
   // Track terminal height live so the message slice fills the available
   // space. Without this we capped at 20 rows even on tall terminals.
@@ -94,15 +105,8 @@ export function MessagePane(props: {
   }, [stdout])
   const windowStartRef = useRef(0)
 
-  if (focus.kind === 'list') {
-    return (
-      <Box flexDirection="column" flexGrow={1} paddingX={0}>
-        <Text color="gray">Select a chat or channel · Enter to open · q to quit</Text>
-      </Box>
-    )
-  }
-
-  const conv = focusKey(focus)!
+  const isListFocus = focus.kind === 'list'
+  const conv = focusKey(focus) ?? ''
   const rawMessages = messagesByConvo[conv] ?? []
   // Drop system-event rows we can't render usefully. This covers two
   // shapes Graph returns:
@@ -114,7 +118,15 @@ export function MessagePane(props: {
   const messages = rawMessages.filter((m) => isRenderableMessage(m))
   const senderColWidth = computeSenderColWidth(messages, shortNames)
   const cache = messageCacheByConvo[conv]
-  const headerLabel = headerForFocus(focus, chats, teams, channelsByTeam, me?.id)
+  const headerLabel = isListFocus
+    ? ''
+    : headerForFocus(
+        focus as Exclude<typeof focus, { kind: 'list' }>,
+        chats,
+        teams,
+        channelsByTeam,
+        me?.id,
+      )
   const pageState = readMessagePageState(cache ?? messages)
   const loadMoreState =
     props.loadOlderState ??
@@ -164,6 +176,73 @@ export function MessagePane(props: {
   // on Enter / n), so the search bar itself is just an input echo.
   const searchActive = inputZone === 'message-search'
   const hits = searchActive ? searchMessages(messages, searchQuery) : []
+
+  // Trigger image fetches for visible messages and write Kitty sequences
+  // for the focused message after each render. The imageRevision counter
+  // is bumped by ensureImageFetched's onChange callback so the component
+  // re-renders once an image transitions from loading → ready.
+  useEffect(() => {
+    const profile = getActiveProfile()
+    const focusedMsgId = props.focusedMessageId
+
+    for (const row of rows) {
+      if (row.kind !== 'message') continue
+      const m = row.message
+      const chatId = m.chatId ?? conv
+      const imgAtts = (m.attachments ?? []).filter(isImageAttachment)
+      for (const att of imgAtts) {
+        const key = imageCacheKey(m.id, att.id)
+        const path = attachmentGraphPath(att, chatId, m.id)
+        ensureImageFetched(path, key, { contentType: att.contentType, name: att.name ?? '' }, {
+          profile,
+          onChange: () => setImageRevision((r) => r + 1),
+        })
+      }
+    }
+
+    if (!kittyEnabled || !stdout || !focusedMsgId) return
+
+    const focusedRow = rows.find(
+      (r) => r.kind === 'message' && r.message.id === focusedMsgId,
+    )
+    if (!focusedRow || focusedRow.kind !== 'message') return
+
+    const m = focusedRow.message
+    const imgAtts = (m.attachments ?? []).filter(isImageAttachment)
+    if (imgAtts.length === 0) return
+
+    const att = imgAtts[0]!
+    const key = imageCacheKey(m.id, att.id)
+    const imgData = getImageData(key)
+    if (!imgData) return
+
+    const imgCols = Math.max(12, terminalSize.columns - 60)
+    const apc = buildKittyAPC(imgData, imgCols, inlineImageMaxRows)
+
+    // Count rows below the focused message (in the visible window) plus
+    // the bottom chrome so we can position the cursor correctly.
+    const focusedIdx = rows.indexOf(focusedRow)
+    let rowsBelowFocused = 0
+    for (let i = focusedIdx + 1; i < rows.length; i++) {
+      rowsBelowFocused += messageRenderRowHeight(rows[i]!, {
+        messageTextColumns,
+        reactionDisplayMode,
+      })
+    }
+    // BOTTOM_CHROME: composer (2) + status bar (1) + safety pad (1)
+    const BOTTOM_CHROME = 4
+    const rowsFromBottom = rowsBelowFocused + BOTTOM_CHROME + 1
+
+    writeKittyImageAtOffset(stdout, apc, rowsFromBottom, inlineImageMaxRows)
+  })
+
+  if (isListFocus) {
+    return (
+      <Box flexDirection="column" flexGrow={1} paddingX={0}>
+        <Text color="gray">Select a chat or channel · Enter to open · q to quit</Text>
+      </Box>
+    )
+  }
 
   return (
     <Box
@@ -224,6 +303,7 @@ export function MessagePane(props: {
                 myUserId={me?.id}
                 reactionDisplayMode={reactionDisplayMode}
                 readReceipts={readReceiptsByConvo[conv]}
+                selfMessagesOnRight={selfMessagesOnRight}
                 senderColWidth={senderColWidth}
                 shortNames={shortNames}
                 showTimestamp={showTimestamps}
@@ -251,6 +331,7 @@ function TimelineRow(props: {
   myUserId?: string
   reactionDisplayMode: 'off' | 'current' | 'all'
   readReceipts?: Record<string, ReadReceipt>
+  selfMessagesOnRight: boolean
   senderColWidth: number
   shortNames: boolean
   showTimestamp: boolean
@@ -288,6 +369,7 @@ function TimelineRow(props: {
       myUserId={props.myUserId}
       reactionDisplayMode={props.reactionDisplayMode}
       readReceipts={props.readReceipts}
+      selfMessagesOnRight={props.selfMessagesOnRight}
       senderColWidth={props.senderColWidth}
       shortNames={props.shortNames}
       showTimestamp={props.showTimestamp}
@@ -305,6 +387,7 @@ function MessageRow(props: {
   myUserId?: string
   reactionDisplayMode: 'off' | 'current' | 'all'
   readReceipts?: Record<string, ReadReceipt>
+  selfMessagesOnRight: boolean
   senderColWidth: number
   shortNames: boolean
   showTimestamp: boolean
@@ -313,6 +396,8 @@ function MessageRow(props: {
 }) {
   const { theme, senderColWidth } = props
   const m = props.message
+  const isSelf = !!props.myUserId && m.from?.user?.id === props.myUserId
+  const flipRow = props.selfMessagesOnRight && isSelf
   const time = m.createdDateTime.slice(11, 16)
   const isSystem = m.messageType === 'systemEventMessage'
   // Sender label resolution: system rows leave the sender column blank
@@ -325,7 +410,6 @@ function MessageRow(props: {
     senderDisplay.length > senderColWidth
       ? senderDisplay.slice(0, senderColWidth - 1) + '…'
       : senderDisplay
-  const isSelf = !!props.myUserId && m.from?.user?.id === props.myUserId
   const isSending = m._sending === true
   const sendError = m._sendError
   const readReceiptLine =
@@ -359,9 +443,11 @@ function MessageRow(props: {
   // still conveyed by row color in that mode.
   const statusWidth = props.showTimestamp ? 7 : 0
 
+  const rowDir = flipRow ? 'row-reverse' : 'row'
+
   return (
     <>
-      <Box flexDirection="row">
+      <Box flexDirection={rowDir}>
         <Box width={1} flexShrink={0}>
           <Text
             color={props.focused ? theme.messageFocusIndicator : undefined}
@@ -404,7 +490,7 @@ function MessageRow(props: {
         </Box>
       </Box>
       {props.threadMeta && props.threadMeta.count > 0 && (
-        <Box flexDirection="row">
+        <Box flexDirection={rowDir}>
           <Box width={1} flexShrink={0} />
           {props.showTimestamp && <Box width={statusWidth} flexShrink={0} />}
           <Box width={senderColWidth + 1} flexShrink={0} />
@@ -416,7 +502,7 @@ function MessageRow(props: {
         </Box>
       )}
       {readReceiptLine && (
-        <Box flexDirection="row">
+        <Box flexDirection={rowDir}>
           <Box width={1} flexShrink={0} />
           {props.showTimestamp && <Box width={statusWidth} flexShrink={0} />}
           <Box width={senderColWidth + 1} flexShrink={0} />
@@ -428,7 +514,7 @@ function MessageRow(props: {
         </Box>
       )}
       {sendError && (
-        <Box flexDirection="row">
+        <Box flexDirection={rowDir}>
           <Box width={1} flexShrink={0} />
           {props.showTimestamp && <Box width={statusWidth} flexShrink={0} />}
           <Box width={senderColWidth + 1} flexShrink={0} />
@@ -439,6 +525,19 @@ function MessageRow(props: {
           </Box>
         </Box>
       )}
+      {!isDeleted &&
+        (m.attachments ?? []).filter(isImageAttachment).map((att) => (
+          <Box key={att.id} flexDirection="row">
+            <Box width={1} flexShrink={0} />
+            {props.showTimestamp && <Box width={statusWidth} flexShrink={0} />}
+            <Box width={senderColWidth + 1} flexShrink={0} />
+            <Box flexGrow={1} flexShrink={1} minWidth={0}>
+              <Text color={theme.mutedText} wrap="truncate-end">
+                {`[img] ${att.name ?? 'image'}`}
+              </Text>
+            </Box>
+          </Box>
+        ))}
     </>
   )
 }
