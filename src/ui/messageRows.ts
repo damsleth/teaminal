@@ -1,6 +1,7 @@
 import type { ChatMessage } from '../types'
 import type { ReactionDisplayMode } from '../state/store'
 import { htmlToText } from '../text/html'
+import { extractInlineImages } from '../text/inlineImages'
 import { reactionsSummary } from './reactions'
 import { getQuotedReply } from './renderableMessage'
 
@@ -105,6 +106,7 @@ export function messageRenderRowHeight(row: MessageRenderRow, opts?: MessageRowH
   if (row.message._sendError) height++
   // Reply preview row (only present for chat-pane quoted replies).
   if (getQuotedReply(row.message)) height++
+  if (!row.message.deletedDateTime) height += extractInlineImages(row.message).length
   return height
 }
 

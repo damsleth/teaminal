@@ -35,8 +35,7 @@ describe('extractInlineImages', () => {
         {
           id: 'att-1',
           contentType: 'reference',
-          contentUrl:
-            'https://graph.microsoft.com/v1.0/sites/x/drives/y/items/z',
+          contentUrl: 'https://graph.microsoft.com/v1.0/sites/x/drives/y/items/z',
           name: 'screenshot.png',
         },
       ],

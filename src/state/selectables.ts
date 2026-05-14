@@ -74,11 +74,7 @@ export function clampCursor(cursor: number, listLength: number): number {
 // them. Walks `items` from `from + dir` in steps of `dir` looking for
 // the next item that is not a team. Returns the original index when no
 // movable target exists in that direction so the cursor stays put.
-export function nextSelectableIndex(
-  items: SelectableItem[],
-  from: number,
-  dir: 1 | -1,
-): number {
+export function nextSelectableIndex(items: SelectableItem[], from: number, dir: 1 | -1): number {
   let i = from + dir
   while (i >= 0 && i < items.length) {
     if (items[i]!.kind !== 'team') return i

@@ -2,6 +2,7 @@ import type { ChatMessage } from '../types'
 import { parseMessageReference } from '../types'
 import { describeSystemEvent } from './systemEvent'
 import { htmlToText } from '../text/html'
+import { extractInlineImages } from '../text/inlineImages'
 import { shortName } from '../state/selectables'
 
 const QUOTED_REPLY_PREVIEW_MAX = 60
@@ -21,6 +22,7 @@ export function isRenderableMessage(m: ChatMessage): boolean {
     return describeSystemEvent(m) !== null
   }
   if (effectiveSenderName(m) === null) return false
+  if (extractInlineImages(m).length > 0) return true
   const hasBody =
     typeof m.body?.content === 'string' && m.body.content.replace(/<[^>]+>/g, '').trim().length > 0
   return hasBody
@@ -58,9 +60,7 @@ export function effectiveSenderName(m: ChatMessage): string | null {
 // attachment with valid contentType but unparsable content) so callers
 // can render the body unchanged. Channel thread replies are not
 // considered here — the existing thread tree already represents them.
-export function getQuotedReply(
-  m: ChatMessage,
-): { senderName: string; preview: string } | null {
+export function getQuotedReply(m: ChatMessage): { senderName: string; preview: string } | null {
   const attachments = m.attachments ?? []
   for (const a of attachments) {
     const ref = parseMessageReference(a)

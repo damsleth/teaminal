@@ -116,9 +116,7 @@ export type MessageReferenceContent = {
   createdDateTime?: string
 }
 
-export function parseMessageReference(
-  a: MessageAttachment,
-): MessageReferenceContent | null {
+export function parseMessageReference(a: MessageAttachment): MessageReferenceContent | null {
   if (a.contentType !== 'messageReference') return null
   if (!a.content) return null
   try {
@@ -131,10 +129,8 @@ export function parseMessageReference(
       messageId,
       messageSender: obj.messageSender as IdentitySet | undefined,
       messageType: typeof obj.messageType === 'string' ? obj.messageType : undefined,
-      messagePreview:
-        typeof obj.messagePreview === 'string' ? obj.messagePreview : undefined,
-      createdDateTime:
-        typeof obj.createdDateTime === 'string' ? obj.createdDateTime : undefined,
+      messagePreview: typeof obj.messagePreview === 'string' ? obj.messagePreview : undefined,
+      createdDateTime: typeof obj.createdDateTime === 'string' ? obj.createdDateTime : undefined,
     }
   } catch {
     return null
