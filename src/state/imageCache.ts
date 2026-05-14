@@ -1,6 +1,6 @@
 // Disk-backed cache for image blobs from Teams message attachments.
 //
-// Cache directory: ${XDG_CACHE_HOME:-~/.cache}/teaminal/<profile>/images/
+// Cache directory: ${XDG_CACHE_HOME:-~/.cache}/teaminal/<safe-profile>/images/
 // Each entry is two files: <sha1-of-key>.bin (blob) + <sha1-of-key>.meta.json
 // The cache key is messageId::attachmentId - never contains signed URLs or
 // other credentials. Blobs are rejected above MAX_IMAGE_BYTES to bound disk use.
@@ -32,7 +32,13 @@ export function imageCacheKey(messageId: string, attachmentId: string): string {
 function getCacheDir(profile?: string): string {
   const xdg = process.env.XDG_CACHE_HOME
   const base = xdg && xdg.length > 0 ? xdg : join(homedir(), '.cache')
-  return join(base, 'teaminal', profile ?? 'default', 'images')
+  return join(base, 'teaminal', safeProfileSegment(profile), 'images')
+}
+
+function safeProfileSegment(profile?: string): string {
+  const raw = profile && profile.length > 0 ? profile : 'default'
+  const safe = raw.replace(/[^A-Za-z0-9._-]/g, '_')
+  return safe.length > 0 ? safe : 'default'
 }
 
 function blobPath(key: string, profile?: string): string {
@@ -105,7 +111,11 @@ export async function fetchAndCacheImage(
   }
 
   if (bytes.byteLength > MAX_IMAGE_BYTES) {
-    recordEvent('graph', 'warn', `image too large (${bytes.byteLength} bytes), skipping: ${meta.name}`)
+    recordEvent(
+      'graph',
+      'warn',
+      `image too large (${bytes.byteLength} bytes), skipping: ${meta.name}`,
+    )
     return null
   }
 

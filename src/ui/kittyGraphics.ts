@@ -70,7 +70,5 @@ export function writeKittyImageAtOffset(
   if (!apc) return
   // \x1b7 = save cursor, \x1b8 = restore cursor
   // \x1b[{n}A = cursor up n rows, \x1b[1G = cursor to column 1
-  stdout.write(
-    `\x1b7\x1b[${rowsFromBottom}A\x1b[1G${apc}\x1b[${imageRows}B\x1b8`,
-  )
+  stdout.write(`\x1b7\x1b[${rowsFromBottom}A\x1b[1G${apc}\x1b[${imageRows}B\x1b8`)
 }

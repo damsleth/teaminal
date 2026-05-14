@@ -102,7 +102,11 @@ function parseBodyImages(html: string): BodyImageRef[] {
   return out
 }
 
-function attachmentSourcePath(a: MessageAttachment, chatId: string, messageId: string): {
+function attachmentSourcePath(
+  a: MessageAttachment,
+  chatId: string,
+  messageId: string,
+): {
   path: string
   isExternal: boolean
 } {
@@ -134,11 +138,7 @@ export function extractInlineImages(message: ChatMessage): InlineImageRef[] {
     if (seen.has(cacheKey)) continue
     seen.add(cacheKey)
     const name =
-      att.name && att.name.length > 0
-        ? att.name
-        : isExternal
-          ? inferNameFromUrl(path)
-          : 'image'
+      att.name && att.name.length > 0 ? att.name : isExternal ? inferNameFromUrl(path) : 'image'
     out.push({
       cacheKey,
       sourcePath: path,

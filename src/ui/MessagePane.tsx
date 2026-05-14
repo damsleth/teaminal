@@ -184,6 +184,7 @@ export function MessagePane(props: {
   // is bumped by ensureImageFetched's onChange callback so the component
   // re-renders once an image transitions from loading → ready.
   useEffect(() => {
+    if (!kittyEnabled) return
     const profile = getActiveProfile()
     const focusedMsgId = props.focusedMessageId
 
@@ -205,11 +206,9 @@ export function MessagePane(props: {
       }
     }
 
-    if (!kittyEnabled || !stdout || !focusedMsgId) return
+    if (!stdout || !focusedMsgId) return
 
-    const focusedRow = rows.find(
-      (r) => r.kind === 'message' && r.message.id === focusedMsgId,
-    )
+    const focusedRow = rows.find((r) => r.kind === 'message' && r.message.id === focusedMsgId)
     if (!focusedRow || focusedRow.kind !== 'message') return
 
     const m = focusedRow.message
@@ -447,9 +446,7 @@ function MessageRow(props: {
   // are server-driven — they rarely coincide, and when they do, seeing
   // the cursor matters more.
   const sendStatusGlyph = sendError ? '✗' : isSending ? '…' : ' '
-  const indicator = props.focused
-    ? props.focusIndicatorChar.slice(0, 1) || '>'
-    : sendStatusGlyph
+  const indicator = props.focused ? props.focusIndicatorChar.slice(0, 1) || '>' : sendStatusGlyph
   // Timestamp column hosts HH:MM only - the trailing space and the
   // status glyph have been pulled into the indicator column above.
   // When timestamps are off the column collapses entirely.

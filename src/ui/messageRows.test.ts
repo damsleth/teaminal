@@ -80,9 +80,23 @@ describe('message row viewport budgeting', () => {
         },
       ],
     }
-    expect(
-      messageRenderRowHeight({ kind: 'message', key: 'reply', message: replyMsg }),
-    ).toBe(2)
+    expect(messageRenderRowHeight({ kind: 'message', key: 'reply', message: replyMsg })).toBe(2)
+  })
+
+  test('counts inline image fallback rows', () => {
+    const row: MessageRenderRow = {
+      kind: 'message',
+      key: 'm1',
+      message: {
+        id: 'm1',
+        chatId: 'chat-1',
+        createdDateTime: '2026-05-05T10:00:00Z',
+        body: { contentType: 'html', content: '<p><img itemid="img-1"></p>' },
+        from: { user: { id: 'u1', displayName: 'User' } },
+      },
+    }
+
+    expect(messageRenderRowHeight(row)).toBe(2)
   })
 
   test('counts wrapped body text when estimating the viewport budget', () => {

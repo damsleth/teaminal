@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, mock } from 'bun:test'
+import { existsSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { isImageAttachment, attachmentGraphPath } from '../types'
 import type { MessageAttachment } from '../types'
-import { fetchAndCacheImage, imageCacheKey as cacheKey } from './imageCache'
+import { fetchAndCacheImage, imageCacheKey as cacheKey, readCachedImage } from './imageCache'
 
 describe('imageCacheKey', () => {
   it('combines messageId and attachmentId with ::', () => {
@@ -30,7 +33,9 @@ describe('isImageAttachment', () => {
   })
 
   it('matches by filename extension for Teams hosted content', () => {
-    expect(isImageAttachment(att('application/vnd.microsoft.teams.file.download.info', 'photo.png'))).toBe(true)
+    expect(
+      isImageAttachment(att('application/vnd.microsoft.teams.file.download.info', 'photo.png')),
+    ).toBe(true)
     expect(isImageAttachment(att('reference', 'screenshot.jpeg'))).toBe(true)
     expect(isImageAttachment(att('reference', 'diagram.svg'))).toBe(true)
   })
@@ -50,7 +55,8 @@ describe('attachmentGraphPath', () => {
     const att: MessageAttachment = {
       id: 'att-1',
       contentType: 'image/png',
-      contentUrl: 'https://graph.microsoft.com/v1.0/chats/chat-abc/messages/msg-def/hostedContents/att-1/$value',
+      contentUrl:
+        'https://graph.microsoft.com/v1.0/chats/chat-abc/messages/msg-def/hostedContents/att-1/$value',
     }
     const path = attachmentGraphPath(att, chatId, msgId)
     expect(path).toBe('/chats/chat-abc/messages/msg-def/hostedContents/att-1/$value')
@@ -84,8 +90,11 @@ describe('attachmentGraphPath', () => {
 
 describe('fetchAndCacheImage isExternal branch', () => {
   const realFetch = globalThis.fetch
+  const realXdg = process.env.XDG_CACHE_HOME
   afterEach(() => {
     globalThis.fetch = realFetch
+    if (realXdg === undefined) delete process.env.XDG_CACHE_HOME
+    else process.env.XDG_CACHE_HOME = realXdg
   })
 
   it('does not send Authorization when isExternal is true', async () => {
@@ -110,5 +119,24 @@ describe('fetchAndCacheImage isExternal branch', () => {
     expect(capturedHeaders!.get('authorization')).toBeNull()
     expect(capturedHeaders!.get('Authorization')).toBeNull()
     expect(fakeFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('sanitizes profile names before using them in cache paths', async () => {
+    const cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    globalThis.fetch = mock(
+      async () => new Response(new Uint8Array([1]), { status: 200 }),
+    ) as unknown as typeof fetch
+
+    const key = `profile-path-test-${Date.now()}`
+    await fetchAndCacheImage(
+      'https://media.giphy.com/test.gif',
+      key,
+      { contentType: 'image/gif', name: 'test.gif' },
+      { isExternal: true, profile: '../escape/profile' },
+    )
+
+    expect(readCachedImage(key, '../escape/profile')).not.toBeNull()
+    expect(existsSync(join(cacheRoot, 'escape'))).toBe(false)
   })
 })

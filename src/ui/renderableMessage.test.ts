@@ -32,14 +32,41 @@ describe('messagesForTimelineNavigation', () => {
       'current-day-visible',
     ])
   })
+
+  test('keeps image-only messages so attachment rows can render', () => {
+    const messages: ChatMessage[] = [
+      {
+        id: 'image-only',
+        chatId: 'chat-1',
+        createdDateTime: '2026-05-05T10:00:00Z',
+        body: { contentType: 'html', content: '<p><img itemid="img-1"></p>' },
+        from: { user: { id: 'u1', displayName: 'User' } },
+      },
+      {
+        id: 'attachment-only',
+        chatId: 'chat-1',
+        createdDateTime: '2026-05-05T10:01:00Z',
+        body: { contentType: 'html', content: '' },
+        from: { user: { id: 'u1', displayName: 'User' } },
+        attachments: [
+          {
+            id: 'att-1',
+            contentType: 'image/png',
+            name: 'photo.png',
+          },
+        ],
+      },
+    ]
+
+    expect(messagesForTimelineNavigation(messages).map((m) => m.id)).toEqual([
+      'image-only',
+      'attachment-only',
+    ])
+  })
 })
 
 describe('getQuotedReply', () => {
-  function reply(opts: {
-    sender: string
-    preview: string
-    replyText: string
-  }): ChatMessage {
+  function reply(opts: { sender: string; preview: string; replyText: string }): ChatMessage {
     return {
       id: 'reply',
       createdDateTime: '2026-05-05T11:00:00Z',
@@ -89,9 +116,7 @@ describe('getQuotedReply', () => {
       id: 'reply',
       createdDateTime: '2026-05-05T11:00:00Z',
       body: { contentType: 'html', content: '<p>hi</p>' },
-      attachments: [
-        { id: 'a1', contentType: 'messageReference', content: '{not-json' },
-      ],
+      attachments: [{ id: 'a1', contentType: 'messageReference', content: '{not-json' }],
     }
     expect(getQuotedReply(m)).toBeNull()
   })
@@ -101,9 +126,7 @@ describe('getQuotedReply', () => {
       id: 'plain',
       createdDateTime: '2026-05-05T11:00:00Z',
       body: { contentType: 'text', content: 'hello' },
-      attachments: [
-        { id: 'f1', contentType: 'application/pdf', name: 'report.pdf' },
-      ],
+      attachments: [{ id: 'f1', contentType: 'application/pdf', name: 'report.pdf' }],
     }
     expect(getQuotedReply(m)).toBeNull()
   })

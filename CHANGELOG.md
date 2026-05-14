@@ -6,10 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-05-14
+
 ### Added
 
 - **`selfMessagesOnRight` setting.** When enabled, your own messages are right-aligned in the message pane (body pushed to the right, sender/timestamp on the left of the body). Other users' messages remain left-aligned. Default `false` (uniform IRC-style left alignment).
 - **Inline image rendering via Kitty graphics protocol.** Messages with image attachments now show a `[img] filename` text row in all terminals. In Kitty-capable terminals (`KITTY_WINDOW_ID` / `TERM=xterm-kitty` / `TERM_PROGRAM=kitty`), the focused message's first image is also rendered inline using the Kitty graphics APC protocol after each frame. Two new config keys: `inlineImages` (`"auto"` | `"off"`, default `"auto"`) and `inlineImageMaxRows` (integer 1-50, default `10`). Image blobs are cached on disk under `~/.cache/teaminal/<profile>/images/` keyed by SHA-1 of `messageId::attachmentId` - no signed URLs are stored or logged.
+- **Reply indicator in the chat pane.** When a chat message quotes another (Teams' "reply" feature), a muted `↳ replying to <name>: "<preview>"` row renders above the new message body. The preview is `htmlToText`-cleaned, single-lined, and truncated to 60 columns. Channel thread replies are unchanged — the existing thread tree already represents that flavor.
+- **`statusBarPosition` setting.** `"bottom"` (default) keeps the existing behavior; `"hidden"` suppresses the status bar entirely, freeing one row of vertical space in the message pane. Cyclable from Settings → Status bar. Kitty inline-image positioning math is adjusted when hidden so images still anchor correctly.
 
 ### Fixed
 
@@ -21,11 +25,6 @@ adheres to [Semantic Versioning](https://semver.org/).
 - **`shortName()` now drops only the last surname token.** `"Ole Kristian Mørch-Storstein"` renders as `"Ole Kristian"` instead of just `"Ole"`. Multi-given-name forms (`"Anna Bjørg Maria Vatne"` → `"Anna Bjørg Maria"`) are preserved; hyphenated surnames stay intact because they have no whitespace. AD comma form (`"Surname, First Middle"`) still drops the rightmost token after the comma, so `"Damsleth, Carl Joakim"` → `"Carl"`.
 - **Teams render as non-selectable section headers in the chat list.** Up/down navigation skips team rows, jumping straight between channels and chats. Team display names render bold and flush-left; channels indent two spaces under their team with the `#` prefix. The generic "Teams" section label is removed (each team is now its own header).
 - **Tighter timestamp column in the message pane.** The timestamp box now hosts `HH:MM` only (5 cols), and the send-status glyph (`✗` / `…`) moved to the indicator column where it shares a slot with the focus arrow (focus wins when both apply). Net effect: two columns shaved off every row, reactions/receipts/attachments/send-error rows now align under the slimmer column.
-
-### Added
-
-- **Reply indicator in the chat pane.** When a chat message quotes another (Teams' "reply" feature), a muted `↳ replying to <name>: "<preview>"` row renders above the new message body. The preview is `htmlToText`-cleaned, single-lined, and truncated to 60 columns. Channel thread replies are unchanged — the existing thread tree already represents that flavor.
-- **`statusBarPosition` setting.** `"bottom"` (default) keeps the existing behavior; `"hidden"` suppresses the status bar entirely, freeing one row of vertical space in the message pane. Cyclable from Settings → Status bar. Kitty inline-image positioning math is adjusted when hidden so images still anchor correctly.
 
 ## [0.13.0] - 2026-05-13
 
@@ -835,7 +834,8 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/damsleth/teaminal/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/damsleth/teaminal/compare/v0.12.17...v0.13.0
 [0.12.17]: https://github.com/damsleth/teaminal/compare/v0.12.16...v0.12.17
 [0.12.16]: https://github.com/damsleth/teaminal/compare/v0.12.15...v0.12.16
