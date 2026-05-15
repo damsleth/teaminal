@@ -58,7 +58,7 @@ describe('buildKittyAPC', () => {
 
   it('single-chunk: wraps data in one APC sequence with m=0', () => {
     const apc = buildKittyAPC(smallPng, 40, 8)
-    expect(apc).toMatch(/^\x1b_Ga=T,f=100,c=40,r=8,m=0;/)
+    expect(apc).toMatch(/^\x1b_Ga=T,f=100,c=40,r=8,C=1,m=0;/)
     expect(apc).toEndWith('\x1b\\')
     expect(apc.split('\x1b_G').length).toBe(2)
   })
@@ -80,5 +80,10 @@ describe('buildKittyAPC', () => {
   it('embeds correct cols and rows params', () => {
     const apc = buildKittyAPC(smallPng, 60, 5)
     expect(apc).toContain('c=60,r=5')
+  })
+
+  it('disables terminal-side cursor movement for placements', () => {
+    const apc = buildKittyAPC(smallPng, 60, 5)
+    expect(apc).toContain('C=1')
   })
 })

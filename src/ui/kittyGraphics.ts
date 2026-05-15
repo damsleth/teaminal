@@ -45,11 +45,11 @@ export function buildKittyAPC(png: Buffer, cols: number, rows: number): string {
   }
 
   if (chunks.length === 1) {
-    return `\x1b_Ga=T,f=100,c=${cols},r=${rows},m=0;${chunks[0]}\x1b\\`
+    return `\x1b_Ga=T,f=100,c=${cols},r=${rows},C=1,m=0;${chunks[0]}\x1b\\`
   }
 
   const parts: string[] = []
-  parts.push(`\x1b_Ga=T,f=100,c=${cols},r=${rows},m=1;${chunks[0]}\x1b\\`)
+  parts.push(`\x1b_Ga=T,f=100,c=${cols},r=${rows},C=1,m=1;${chunks[0]}\x1b\\`)
   for (let i = 1; i < chunks.length - 1; i++) {
     parts.push(`\x1b_Gm=1;${chunks[i]}\x1b\\`)
   }

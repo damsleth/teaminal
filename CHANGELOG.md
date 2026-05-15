@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-05-15
+
+### Fixed
+
+- **Inline images now paint for every visible message in Kitty-compatible terminals, including Ghostty.** The renderer now reserves rows under image fallback labels and places ready Kitty graphics into those rows instead of only drawing the focused message's first image. Kitty graphics placements also set `C=1` so the terminal does not move the cursor outside Ink's render model.
+
 ## [0.14.0] - 2026-05-14
 
 ### Added
@@ -834,7 +840,8 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/damsleth/teaminal/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/damsleth/teaminal/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/damsleth/teaminal/compare/v0.12.17...v0.13.0
 [0.12.17]: https://github.com/damsleth/teaminal/compare/v0.12.16...v0.12.17

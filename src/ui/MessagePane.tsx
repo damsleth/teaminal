@@ -87,6 +87,7 @@ export function MessagePane(props: {
 
   const [, setImageRevision] = useState(0)
   const kittyEnabled = inlineImages === 'auto' && isKittyCapable()
+  const inlineImageRows = kittyEnabled ? inlineImageMaxRows : 0
 
   // Track terminal height live so the message slice fills the available
   // space. Without this we capped at 20 rows even on tall terminals.
@@ -155,6 +156,7 @@ export function MessagePane(props: {
   const windowStart = chooseMessageRowsWindowStart(allRows, {
     focusedMessageId: props.focusedMessageId,
     focusActive: props.focusIndicatorActive === true,
+    inlineImageRows,
     messageTextColumns,
     reactionDisplayMode,
     rowBudget,
@@ -163,6 +165,7 @@ export function MessagePane(props: {
   windowStartRef.current = windowStart
   const windowEnd = messageRowsWindowEnd(allRows, windowStart, {
     focusedMessageId: props.focusedMessageId,
+    inlineImageRows,
     messageTextColumns,
     reactionDisplayMode,
     rowBudget,
@@ -186,7 +189,6 @@ export function MessagePane(props: {
   useEffect(() => {
     if (!kittyEnabled) return
     const profile = getActiveProfile()
-    const focusedMsgId = props.focusedMessageId
 
     for (const row of rows) {
       if (row.kind !== 'message') continue
@@ -206,39 +208,38 @@ export function MessagePane(props: {
       }
     }
 
-    if (!stdout || !focusedMsgId) return
+    if (!stdout) return
 
-    const focusedRow = rows.find((r) => r.kind === 'message' && r.message.id === focusedMsgId)
-    if (!focusedRow || focusedRow.kind !== 'message') return
-
-    const m = focusedRow.message
-    const refs = extractInlineImages(m)
-    if (refs.length === 0) return
-
-    const ref = refs[0]!
-    const imgData = getImageData(ref.cacheKey)
-    if (!imgData) return
-
-    const imgCols = Math.max(12, terminalSize.columns - 60)
-    const apc = buildKittyAPC(imgData, imgCols, inlineImageMaxRows)
-
-    // Count rows below the focused message (in the visible window) plus
-    // the bottom chrome so we can position the cursor correctly.
-    const focusedIdx = rows.indexOf(focusedRow)
-    let rowsBelowFocused = 0
-    for (let i = focusedIdx + 1; i < rows.length; i++) {
-      rowsBelowFocused += messageRenderRowHeight(rows[i]!, {
+    const rowsAfter = new Array(rows.length).fill(0) as number[]
+    let below = 0
+    for (let i = rows.length - 1; i >= 0; i--) {
+      rowsAfter[i] = below
+      below += messageRenderRowHeight(rows[i]!, {
+        inlineImageRows,
         messageTextColumns,
         reactionDisplayMode,
       })
     }
-    // BOTTOM_CHROME: composer (2) + status bar (1) + safety pad (1).
-    // Subtracts 1 when the status bar is hidden so the inline image
-    // anchors one row lower (recovering the row gained by the user).
-    const BOTTOM_CHROME = 4 - (statusBarHidden ? 1 : 0)
-    const rowsFromBottom = rowsBelowFocused + BOTTOM_CHROME + 1
 
-    writeKittyImageAtOffset(stdout, apc, rowsFromBottom, inlineImageMaxRows)
+    const imgCols = Math.max(12, terminalSize.columns - 60)
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+      const row = rows[rowIndex]!
+      if (row.kind !== 'message') continue
+      const refs = extractInlineImages(row.message)
+      for (let imageIndex = 0; imageIndex < refs.length; imageIndex++) {
+        const ref = refs[imageIndex]!
+        const imgData = getImageData(ref.cacheKey)
+        if (!imgData) continue
+        const apc = buildKittyAPC(imgData, imgCols, inlineImageRows)
+        const rowsBelowImage =
+          rowsAfter[rowIndex]! +
+          rowsBelowImageWithinMessage(row.message, imageIndex, {
+            inlineImageRows,
+          })
+        const rowsFromBottom = rowsBelowImage + bottomChromeRows(statusBarHidden) + 1
+        writeKittyImageAtOffset(stdout, apc, rowsFromBottom, inlineImageRows)
+      }
+    }
   })
 
   if (isListFocus) {
@@ -308,6 +309,7 @@ export function MessagePane(props: {
                 myUserId={me?.id}
                 reactionDisplayMode={reactionDisplayMode}
                 readReceipts={readReceiptsByConvo[conv]}
+                inlineImageRows={inlineImageRows}
                 selfMessagesOnRight={selfMessagesOnRight}
                 senderColWidth={senderColWidth}
                 shortNames={shortNames}
@@ -336,6 +338,7 @@ function TimelineRow(props: {
   myUserId?: string
   reactionDisplayMode: 'off' | 'current' | 'all'
   readReceipts?: Record<string, ReadReceipt>
+  inlineImageRows: number
   selfMessagesOnRight: boolean
   senderColWidth: number
   shortNames: boolean
@@ -374,6 +377,7 @@ function TimelineRow(props: {
       myUserId={props.myUserId}
       reactionDisplayMode={props.reactionDisplayMode}
       readReceipts={props.readReceipts}
+      inlineImageRows={props.inlineImageRows}
       selfMessagesOnRight={props.selfMessagesOnRight}
       senderColWidth={props.senderColWidth}
       shortNames={props.shortNames}
@@ -392,6 +396,7 @@ function MessageRow(props: {
   myUserId?: string
   reactionDisplayMode: 'off' | 'current' | 'all'
   readReceipts?: Record<string, ReadReceipt>
+  inlineImageRows: number
   selfMessagesOnRight: boolean
   senderColWidth: number
   shortNames: boolean
@@ -556,19 +561,69 @@ function MessageRow(props: {
       )}
       {!isDeleted &&
         extractInlineImages(m).map((ref: InlineImageRef) => (
-          <Box key={ref.cacheKey} flexDirection="row">
-            <Box width={1} flexShrink={0} />
-            {props.showTimestamp && <Box width={statusWidth} flexShrink={0} />}
-            <Box width={senderColWidth + 1} flexShrink={0} />
-            <Box flexGrow={1} flexShrink={1} minWidth={0}>
-              <Text color={theme.mutedText} wrap="truncate-end">
-                {`[img] ${ref.name}`}
-              </Text>
-            </Box>
-          </Box>
+          <ImageRows
+            key={ref.cacheKey}
+            imageRows={props.inlineImageRows}
+            label={ref.name}
+            senderColWidth={senderColWidth}
+            showTimestamp={props.showTimestamp}
+            statusWidth={statusWidth}
+            theme={theme}
+          />
         ))}
     </>
   )
+}
+
+function ImageRows(props: {
+  imageRows: number
+  label: string
+  senderColWidth: number
+  showTimestamp: boolean
+  statusWidth: number
+  theme: Theme
+}) {
+  return (
+    <>
+      <Box flexDirection="row">
+        <Box width={1} flexShrink={0} />
+        {props.showTimestamp && <Box width={props.statusWidth} flexShrink={0} />}
+        <Box width={props.senderColWidth + 1} flexShrink={0} />
+        <Box flexGrow={1} flexShrink={1} minWidth={0}>
+          <Text color={props.theme.mutedText} wrap="truncate-end">
+            {`[img] ${props.label}`}
+          </Text>
+        </Box>
+      </Box>
+      {Array.from({ length: props.imageRows }, (_, i) => (
+        <Box key={`img-space-${i}`} flexDirection="row">
+          <Box width={1} flexShrink={0} />
+          {props.showTimestamp && <Box width={props.statusWidth} flexShrink={0} />}
+          <Box width={props.senderColWidth + 1} flexShrink={0} />
+          <Box flexGrow={1} flexShrink={1} minWidth={0}>
+            <Text> </Text>
+          </Box>
+        </Box>
+      ))}
+    </>
+  )
+}
+
+function bottomChromeRows(statusBarHidden: boolean): number {
+  // Composer (2) + status bar (1) + safety pad (1). Subtracts 1 when
+  // the status bar is hidden so images anchor one row lower.
+  return 4 - (statusBarHidden ? 1 : 0)
+}
+
+function rowsBelowImageWithinMessage(
+  message: ChatMessage,
+  imageIndex: number,
+  opts: { inlineImageRows: number },
+): number {
+  const imageCount = extractInlineImages(message).length
+  const imageRows = Math.max(0, opts.inlineImageRows)
+  const remainingImages = Math.max(0, imageCount - imageIndex - 1)
+  return imageRows - 1 + remainingImages * (1 + imageRows)
 }
 
 function previewBody(m: ChatMessage): string {

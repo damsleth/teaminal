@@ -21,6 +21,7 @@ export type MessageRenderRow =
 
 export type MessageRowHeightOpts = {
   focusedMessageId?: string | null
+  inlineImageRows?: number
   reactionDisplayMode?: ReactionDisplayMode
   messageTextColumns?: number
 }
@@ -106,7 +107,10 @@ export function messageRenderRowHeight(row: MessageRenderRow, opts?: MessageRowH
   if (row.message._sendError) height++
   // Reply preview row (only present for chat-pane quoted replies).
   if (getQuotedReply(row.message)) height++
-  if (!row.message.deletedDateTime) height += extractInlineImages(row.message).length
+  if (!row.message.deletedDateTime) {
+    const imageRows = Math.max(0, opts?.inlineImageRows ?? 0)
+    height += extractInlineImages(row.message).length * (1 + imageRows)
+  }
   return height
 }
 
