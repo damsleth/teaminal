@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.14.2] - 2026-05-15
+
+### Fixed
+
+- **Ghostty inline images no longer stretch, cover the chat list, or linger after scrolling.** Kitty graphics now preserve aspect ratio by constraining only one dimension, render at the message-body column instead of terminal column 1, and clear Teaminal-owned image placements before each repaint.
+
 ## [0.14.1] - 2026-05-15
 
 ### Fixed
@@ -840,7 +846,8 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.14.2...HEAD
+[0.14.2]: https://github.com/damsleth/teaminal/compare/v0.14.1...v0.14.2
 [0.14.1]: https://github.com/damsleth/teaminal/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/damsleth/teaminal/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/damsleth/teaminal/compare/v0.12.17...v0.13.0

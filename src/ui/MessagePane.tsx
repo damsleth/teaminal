@@ -29,7 +29,13 @@ import {
 } from './messageRows'
 import type { Theme } from './theme'
 import { useAppState, useTheme } from './StoreContext'
-import { isKittyCapable, buildKittyAPC, writeKittyImageAtOffset } from './kittyGraphics'
+import {
+  isKittyCapable,
+  buildKittyAPC,
+  clearKittyImages,
+  fitKittyPlacement,
+  writeKittyImageAtOffset,
+} from './kittyGraphics'
 import { ensureImageFetched, getImageData } from '../state/imageCache'
 import { getActiveProfile } from '../graph/client'
 
@@ -55,6 +61,10 @@ const MIN_VISIBLE_ROWS = 5
 //     external bot account) from pushing every body row absurdly right.
 const SENDER_COL_MIN = 4
 const SENDER_COL_MAX = 16
+// Mirrors LIST_PANE_WIDTH in App.tsx. Kitty image placement is done
+// outside Ink, so it needs the absolute terminal column where the
+// message pane content starts.
+const LIST_PANE_WIDTH = 30
 
 export function MessagePane(props: {
   focusedMessageId?: string | null
@@ -221,7 +231,12 @@ export function MessagePane(props: {
       })
     }
 
-    const imgCols = Math.max(12, terminalSize.columns - 60)
+    clearKittyImages(stdout)
+    const imgCols = Math.max(12, terminalSize.columns - LIST_PANE_WIDTH - 20)
+    const imageColumn = messageBodyTerminalColumn({
+      senderColWidth,
+      showTimestamps,
+    })
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
       const row = rows[rowIndex]!
       if (row.kind !== 'message') continue
@@ -230,15 +245,20 @@ export function MessagePane(props: {
         const ref = refs[imageIndex]!
         const imgData = getImageData(ref.cacheKey)
         if (!imgData) continue
-        const apc = buildKittyAPC(imgData, imgCols, inlineImageRows)
+        const placement = fitKittyPlacement(imgData, imgCols, inlineImageRows)
+        const apc = buildKittyAPC(imgData, placement)
         const rowsBelowImage =
           rowsAfter[rowIndex]! +
           rowsBelowImageWithinMessage(row.message, imageIndex, {
             inlineImageRows,
           })
         const rowsFromBottom = rowsBelowImage + bottomChromeRows(statusBarHidden) + 1
-        writeKittyImageAtOffset(stdout, apc, rowsFromBottom, inlineImageRows)
+        writeKittyImageAtOffset(stdout, apc, rowsFromBottom, placement.reservedRows, imageColumn)
       }
+    }
+
+    return () => {
+      clearKittyImages(stdout)
     }
   })
 
@@ -613,6 +633,14 @@ function bottomChromeRows(statusBarHidden: boolean): number {
   // Composer (2) + status bar (1) + safety pad (1). Subtracts 1 when
   // the status bar is hidden so images anchor one row lower.
   return 4 - (statusBarHidden ? 1 : 0)
+}
+
+function messageBodyTerminalColumn(opts: { senderColWidth: number; showTimestamps: boolean }) {
+  const messagePaneContentStart = LIST_PANE_WIDTH + 2
+  const indicatorWidth = 1
+  const timestampWidth = opts.showTimestamps ? 5 : 0
+  const senderWidth = opts.senderColWidth + 1
+  return messagePaneContentStart + indicatorWidth + timestampWidth + senderWidth
 }
 
 function rowsBelowImageWithinMessage(

@@ -2,7 +2,7 @@ class Teaminal < Formula
   desc "Lightweight terminal Microsoft Teams client"
   homepage "https://github.com/damsleth/teaminal"
   url "https://github.com/damsleth/teaminal.git", branch: "main"
-  version "0.14.1"
+  version "0.14.2"
   license "MIT"
   head "https://github.com/damsleth/teaminal.git", branch: "main"
 
