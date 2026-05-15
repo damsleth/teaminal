@@ -97,6 +97,7 @@ describe('message row viewport budgeting', () => {
     }
 
     expect(messageRenderRowHeight(row)).toBe(2)
+    expect(messageRenderRowHeight(row, { inlineImageRows: 4 })).toBe(6)
   })
 
   test('counts wrapped body text when estimating the viewport budget', () => {
