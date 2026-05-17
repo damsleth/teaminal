@@ -22,7 +22,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         bun: [1.x]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Bun ${{ matrix.bun }}
         uses: oven-sh/setup-bun@v2
