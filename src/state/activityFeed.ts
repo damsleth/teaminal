@@ -42,12 +42,23 @@ export function countUnreadMentions(items: ActivityItem[]): number {
 // this to trigger an on-demand refresh (e.g. when the activity modal
 // opens) without violating the ui → graph layering rule. Always
 // best-effort: a failure is logged and the cached feed remains.
-export async function refreshActivityFeed(store: Store<AppState>): Promise<void> {
+//
+// `isStale` lets callers cancel the store write if the session was torn
+// down (profile switch) while the fetch was in flight — otherwise the
+// resolved page would repopulate the new account's wiped feed with the
+// old account's items.
+export async function refreshActivityFeed(
+  store: Store<AppState>,
+  isStale?: () => boolean,
+): Promise<void> {
+  const requestProfile = getActiveProfile()
   try {
     const page = await listActivityFeed({
-      profile: getActiveProfile(),
+      profile: requestProfile,
       syncState: store.get().activitySyncState,
     })
+    // Drop the result if the session/profile changed under us.
+    if (isStale?.() || getActiveProfile() !== requestProfile) return
     if (page.items.length === 0 && !page.syncState) return
     store.set((s) => {
       const merged = mergeActivityItems(s.activityFeed, page.items)

@@ -48,15 +48,20 @@ export type RunSessionOpts = {
 async function hydrateActivityFeed(
   store: Store<AppState>,
   profile: string | undefined,
+  isStale: () => boolean,
 ): Promise<void> {
   try {
     const page = await listActivityFeed({ profile, isPrefetch: true })
+    // Drop the result if the session was torn down (profile switch)
+    // while this detached fetch was in flight — otherwise we'd
+    // repopulate the next account's wiped feed with this account's items.
+    if (isStale()) return
     store.set((s) => {
       const merged = mergeActivityItems(s.activityFeed, page.items)
       return {
         activityFeed: merged,
         unreadMentionCount: countUnreadMentions(merged),
-        activitySyncState: page.syncState,
+        activitySyncState: page.syncState ?? s.activitySyncState,
       }
     })
     recordEvent('app', 'info', `activity feed hydrated: ${page.items.length} items`)
@@ -79,6 +84,12 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
   let bridge: ReturnType<typeof startRealtimeBridge> | null = null
   let transport: TrouterTransport | null = null
   let notifyDrainTimer: ReturnType<typeof setInterval> | null = null
+  // Flipped by stop(). Detached async work (e.g. the activity-feed
+  // hydrate) consults this before writing to the store so a fetch that
+  // resolves after a profile switch can't repopulate the next account's
+  // wiped state.
+  let stopped = false
+  const isStale = (): boolean => stopped
 
   try {
     recordEvent('app', 'info', `session starting profile=${profile ?? '(default)'}`)
@@ -133,6 +144,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
       bus,
       store,
       getPoller: () => pollerHandleRef.current,
+      isStale,
     })
 
     if (store.get().settings.realtimeEnabled) {
@@ -183,7 +195,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
     // Initial CSA activity feed hydrate. Best-effort: if the endpoint
     // 404s on a tenant or auth shape we haven't seen, log and continue —
     // the rest of the app doesn't depend on it.
-    void hydrateActivityFeed(store, profile ?? undefined)
+    void hydrateActivityFeed(store, profile ?? undefined, isStale)
   } catch (err) {
     // Roll back partial bootstrap so the caller can retry / switch.
     try {
@@ -205,6 +217,9 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
     profile,
     async stop() {
       recordEvent('app', 'info', `session stopping profile=${profile ?? '(default)'}`)
+      // Signal detached async work (activity hydrate / bridge refresh) to
+      // drop any store write that resolves after this point.
+      stopped = true
       // Reverse-order teardown. Push side stops first so a final realtime
       // event cannot enqueue work onto a torn-down poller.
       try {

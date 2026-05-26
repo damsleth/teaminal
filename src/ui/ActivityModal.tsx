@@ -110,22 +110,26 @@ export function ActivityModal() {
       }
       if (key.return && items[cursor]) {
         const item = items[cursor]
-        if (item.chatId) {
+        const chatId = item.chatId
+        if (chatId) {
           // Open the source chat. Channel ids start with 19:...@thread.tacv2;
           // chat ids look like 19:meeting_... or 19:..._@unq.gbl.spaces.
           // Without a channel/team mapping at hand, dispatch to a chat focus
           // — the existing list/realtime reconcile will surface unknown
           // chats. (Channel jump is left as a follow-up.)
-          if (item.chatId.includes('@thread.tacv2')) {
+          if (chatId.includes('@thread.tacv2')) {
             // Channel — we don't have teamId here, fall through and just close.
             // A future iteration can index channelsByTeam to resolve.
           } else {
-            store.set({
-              focus: { kind: 'chat', chatId: item.chatId },
-              modal: null,
-              inputZone: 'list',
-              activityFeed: markActivityRead(items, [item.id]),
-              unreadMentionCount: countUnreadMentions(markActivityRead(items, [item.id])),
+            store.set((s) => {
+              const next = markActivityRead(s.activityFeed, [item.id])
+              return {
+                focus: { kind: 'chat', chatId },
+                modal: null,
+                inputZone: 'list',
+                activityFeed: next,
+                unreadMentionCount: countUnreadMentions(next),
+              }
             })
             return
           }
