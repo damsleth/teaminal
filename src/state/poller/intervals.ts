@@ -4,12 +4,41 @@
 // applies an exponential backoff capped at 60s. The next interval gets
 // ±20% jitter so multiple teaminal instances do not align perfectly.
 
-export const ACTIVE_DEFAULT_MS = 5_000
+// Base interval used when realtime push is NOT connected and the
+// terminal is focused. Trouter-degraded operation drops the active
+// loop to ~10s so message latency stays in the same range as the
+// previous fixed 5s default without the steady-state cost when push
+// is healthy.
+export const ACTIVE_DEFAULT_MS = 10_000
 export const LIST_DEFAULT_MS = 30_000
 export const PRESENCE_DEFAULT_MS = 60_000
 
+// When realtime push (trouter) is connected, every loop's role flips
+// from "main source of freshness" to "belt-and-suspenders sanity
+// check". 60s on all three is plenty.
+export const REALTIME_CONNECTED_MS = 60_000
+
+// When the terminal is blurred (background tab / minimized window),
+// no user is watching. Stretch every loop to a 5-min heartbeat so we
+// don't pay for invisible work.
+export const BLURRED_MS = 5 * 60_000
+
 export const BACKOFF_BASE = 1.5
 export const BACKOFF_CAP_MS = 60_000
+
+export type IntervalSource = {
+  realtimeState?: string | undefined
+  terminalFocused?: boolean | undefined
+}
+
+// Per-loop adaptive interval. Each loop falls back to its own base
+// when neither stretch nor compression applies. `baseMs` is the
+// "trouter-degraded but focused" rate the loop should run at.
+export function adaptiveIntervalMs(baseMs: number, source: IntervalSource): number {
+  if (source.terminalFocused === false) return BLURRED_MS
+  if (source.realtimeState === 'connected') return REALTIME_CONNECTED_MS
+  return baseMs
+}
 
 // Cap the per-tick member-presence fan-out. Graph and the Teams unified-
 // presence endpoint both accept much larger batches, but we only render

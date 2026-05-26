@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetFederation,
   __setTransportForTests as setFederationTransport,
@@ -14,6 +14,7 @@ import {
   __resetForTests as resetAuth,
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
+import { __setRegionForTests } from './teamsRegion'
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -39,6 +40,10 @@ function primeAuth(): void {
     jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }),
   )
 }
+
+beforeEach(() => {
+  __setRegionForTests(undefined, 'emea')
+})
 
 afterEach(() => {
   __resetForTests()

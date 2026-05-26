@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetFederation,
   __setTransportForTests as setFederationTransport,
@@ -16,6 +16,7 @@ import {
   __resetForTests as resetAuth,
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
+import { __setRegionForTests } from './teamsRegion'
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -50,6 +51,11 @@ function primeAuth(): void {
       ),
   )
 }
+
+beforeEach(() => {
+  // Prime the region cache so test URLs continue to assert `/emea/`.
+  __setRegionForTests(undefined, 'emea')
+})
 
 afterEach(() => {
   __resetForTests()
@@ -204,6 +210,42 @@ describe('listChannelMessagesViaChatsvc', () => {
     )
     const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2')
     expect(page.messages.map((m) => m.id)).toEqual(['1'])
+  })
+
+  test('on 401 invalidates the Skype token and retries the request once', async () => {
+    // First authsvc → token A. After 401, federation transport returns
+    // token B; we assert the retry uses the fresh token.
+    let authzCalls = 0
+    setFederationTransport(async () => {
+      authzCalls += 1
+      return jsonResponse({
+        tokens: {
+          skypeToken: authzCalls === 1 ? 'token-A' : 'token-B',
+          expiresIn: 3600,
+        },
+      })
+    })
+    setAuthRunner(async () => ({ stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }))
+
+    const tokensSeen: string[] = []
+    let chatsvcCalls = 0
+    __setTransportForTests(async (_url, init) => {
+      chatsvcCalls += 1
+      const headers = new Headers(init.headers as Record<string, string>)
+      tokensSeen.push(headers.get('x-skypetoken') ?? '')
+      if (chatsvcCalls === 1) {
+        return new Response('expired', { status: 401 })
+      }
+      return jsonResponse({
+        messages: [{ id: '7', messagetype: 'Text', content: 'recovered' }],
+      })
+    })
+
+    const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2')
+    expect(page.messages.map((m) => m.id)).toEqual(['7'])
+    expect(chatsvcCalls).toBe(2)
+    expect(tokensSeen).toEqual(['token-A', 'token-B'])
+    expect(authzCalls).toBe(2)
   })
 })
 

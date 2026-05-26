@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'bun:test'
-import { backoff, isAbortError, jitter } from './intervals'
+import {
+  adaptiveIntervalMs,
+  backoff,
+  BLURRED_MS,
+  isAbortError,
+  jitter,
+  REALTIME_CONNECTED_MS,
+} from './intervals'
 
 describe('jitter', () => {
   test('returns a value within ±20% of the input', () => {
@@ -37,6 +44,34 @@ describe('backoff', () => {
     expect(backoff(5_000, 100)).toBe(60_000)
     expect(backoff(60_001, 0)).toBe(60_001) // base higher than cap, no error: pass-through
     expect(backoff(60_001, 1)).toBe(60_000) // any error caps it
+  })
+})
+
+describe('adaptiveIntervalMs', () => {
+  const base = 10_000
+
+  test('returns the base interval when focused and realtime is degraded', () => {
+    expect(adaptiveIntervalMs(base, { realtimeState: 'error', terminalFocused: true })).toBe(base)
+    expect(adaptiveIntervalMs(base, { realtimeState: 'reconnecting', terminalFocused: true })).toBe(
+      base,
+    )
+    // Missing terminalFocused is treated as focused (we don't stretch).
+    expect(adaptiveIntervalMs(base, { realtimeState: 'off' })).toBe(base)
+  })
+
+  test('uses the connected-realtime cadence when push is healthy', () => {
+    expect(adaptiveIntervalMs(base, { realtimeState: 'connected', terminalFocused: true })).toBe(
+      REALTIME_CONNECTED_MS,
+    )
+  })
+
+  test('stretches to BLURRED_MS when the terminal is blurred regardless of realtime', () => {
+    expect(adaptiveIntervalMs(base, { realtimeState: 'connected', terminalFocused: false })).toBe(
+      BLURRED_MS,
+    )
+    expect(adaptiveIntervalMs(base, { realtimeState: 'error', terminalFocused: false })).toBe(
+      BLURRED_MS,
+    )
   })
 })
 

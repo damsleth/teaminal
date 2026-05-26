@@ -13,13 +13,17 @@
 import { getToken } from '../auth/owaPiggy'
 import { recordEvent, recordRequest } from '../log'
 import { getActiveProfile } from './client'
+import {
+  __resetForTests as resetRegionCacheForTests,
+  ingestAuthzData,
+  resolveRegion,
+} from './teamsRegion'
 
 export const TEAMS_SPACES_SCOPE = 'https://api.spaces.skype.com/.default'
 export const TEAMS_IC3_SCOPE = 'https://ic3.teams.office.com/.default'
 
 const TEAMS_ORIGIN = 'https://teams.microsoft.com'
 const TEAMS_AUTHZ_URL = `${TEAMS_ORIGIN}/api/authsvc/v1.0/authz`
-const DEFAULT_REGION = 'emea'
 const SKYPE_TOKEN_REFRESH_MARGIN_S = 60
 
 export class TeamsFederationError extends Error {
@@ -51,8 +55,9 @@ type SkypeTokenEntry = { token: string; exp: number }
 const skypeTokenCache = new Map<string, SkypeTokenEntry>()
 const skypeTokenInFlight = new Map<string, Promise<string>>()
 
-function region(opts?: TeamsFederationOpts): string {
-  return opts?.region ?? DEFAULT_REGION
+async function region(opts?: TeamsFederationOpts): Promise<string> {
+  if (opts?.region) return opts.region
+  return resolveRegion({ profile: opts?.profile, signal: opts?.signal })
 }
 
 function profile(opts?: TeamsFederationOpts): string | undefined {
@@ -205,6 +210,37 @@ async function postAuthz(bearerToken: string, signal?: AbortSignal): Promise<Res
   return res
 }
 
+// Drop the cached Skype token for this profile so the next call mints a
+// fresh one via authsvc. Used by withSkypeAuth() when a chatsvc/federation
+// call fails with 401 (token expired between cache lookup and request).
+export function invalidateSkypeToken(opts?: TeamsFederationOpts): void {
+  skypeTokenCache.delete(skypeCacheKey(opts))
+}
+
+// Runs fn() with a fresh Skype token. If the call surfaces a 401 (via a
+// TeamsFederationError / TeamsChatsvcError-shaped status field), the
+// token cache is invalidated and fn() is retried exactly once. This
+// closes the rare race where the cached token expires between getSkypeToken
+// returning it and the underlying request being sent (suspended laptop,
+// slow DNS, network blip).
+export async function withSkypeAuth<T>(
+  fn: () => Promise<T>,
+  opts?: TeamsFederationOpts,
+): Promise<T> {
+  try {
+    return await fn()
+  } catch (err) {
+    const status =
+      err && typeof err === 'object' && 'status' in err
+        ? (err as { status: unknown }).status
+        : undefined
+    if (status !== 401) throw err
+    recordEvent('graph', 'warn', 'skype-auth 401, invalidating token cache and retrying once')
+    invalidateSkypeToken(opts)
+    return await fn()
+  }
+}
+
 export async function getSkypeToken(opts?: TeamsFederationOpts): Promise<string> {
   const key = skypeCacheKey(opts)
   const now = Date.now() / 1000
@@ -262,6 +298,10 @@ export async function getSkypeToken(opts?: TeamsFederationOpts): Promise<string>
     if (!skype) {
       throw new TeamsFederationError(res.status, 'teams authz: skype token missing from response')
     }
+    // Side-effect: surface regionGtms into the region cache so chatsvc /
+    // federation / external-search calls can use the tenant's actual
+    // region instead of the hardcoded emea default.
+    ingestAuthzData(profile(opts), raw)
     skypeTokenCache.set(key, {
       token: skype.token,
       exp: Date.now() / 1000 + (skype.expiresIn ?? 3600),
@@ -347,7 +387,8 @@ export async function fetchFederatedUsers(
   opts?: TeamsFederationOpts,
 ): Promise<unknown[]> {
   if (userOids.length === 0) return []
-  const url = `${TEAMS_ORIGIN}/api/mt/part/${region(opts)}/beta/users/fetchFederated?edEnabled=false&includeDisabledAccounts=true`
+  const r = await region(opts)
+  const url = `${TEAMS_ORIGIN}/api/mt/part/${r}/beta/users/fetchFederated?edEnabled=false&includeDisabledAccounts=true`
   const mris = userOids.map(userMriFromOid)
   const res = await requestTeams<unknown[]>('POST', url, mris, opts)
   if (res.status === 404) {
@@ -402,7 +443,8 @@ export async function createOneOnOneThreadViaChatsvc(
   otherOid: string,
   opts?: TeamsFederationOpts,
 ): Promise<string> {
-  const url = `${TEAMS_ORIGIN}/api/chatsvc/${region(opts)}/v1/threads`
+  const r = await region(opts)
+  const url = `${TEAMS_ORIGIN}/api/chatsvc/${r}/v1/threads`
   const body = {
     members: [
       { id: `8:orgid:${selfOid}`, role: 'Admin' },
@@ -476,7 +518,8 @@ export async function getMsnp24EquivalentConversationId(
   conversationId: string,
   opts?: TeamsFederationOpts,
 ): Promise<string | null> {
-  const url = `${TEAMS_ORIGIN}/api/chatsvc/${region(opts)}/v1/users/ME/conversations/${encodeURIComponent(
+  const r = await region(opts)
+  const url = `${TEAMS_ORIGIN}/api/chatsvc/${r}/v1/users/ME/conversations/${encodeURIComponent(
     conversationId,
   )}?view=msnp24Equivalent`
   const res = await requestChatsvcMe<unknown>('GET', url, undefined, opts)
@@ -494,7 +537,8 @@ export async function conversationExistsInTeams(
   conversationId: string,
   opts?: TeamsFederationOpts,
 ): Promise<boolean> {
-  const url = `${TEAMS_ORIGIN}/api/chatsvc/${region(opts)}/v1/threads/${encodeURIComponent(
+  const r = await region(opts)
+  const url = `${TEAMS_ORIGIN}/api/chatsvc/${r}/v1/threads/${encodeURIComponent(
     conversationId,
   )}/consumptionhorizons`
   const res = await requestTeams<unknown>('GET', url, undefined, {
@@ -555,4 +599,5 @@ export function __resetForTests(): void {
   transport = realTransport
   skypeTokenCache.clear()
   skypeTokenInFlight.clear()
+  resetRegionCacheForTests()
 }

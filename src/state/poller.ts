@@ -32,6 +32,7 @@ import {
   ACTIVE_DEFAULT_MS,
   LIST_DEFAULT_MS,
   PRESENCE_DEFAULT_MS,
+  adaptiveIntervalMs,
   isAbortError,
 } from './poller/intervals'
 import { makeSleeper } from './poller/sleeper'
@@ -95,9 +96,18 @@ export type PollerHandle = {
 
 export function startPoller(opts: PollerOpts): PollerHandle {
   const { store, onMention, onError } = opts
-  const activeMs = opts.intervals?.activeMs ?? ACTIVE_DEFAULT_MS
-  const listMs = opts.intervals?.listMs ?? LIST_DEFAULT_MS
-  const presenceMs = opts.intervals?.presenceMs ?? PRESENCE_DEFAULT_MS
+  // When the caller passes explicit interval overrides (tests do this
+  // to drive the loops at sub-second cadence), we honor them verbatim.
+  // Otherwise each loop reads its current interval from the store on
+  // every iteration: trouter-connected → 60s, trouter-degraded → the
+  // per-loop default, terminal blurred → 5min. This keeps the degraded
+  // state usable without paying for fast polls when push is healthy.
+  const activeMs: number | (() => number) =
+    opts.intervals?.activeMs ?? (() => adaptiveIntervalMs(ACTIVE_DEFAULT_MS, store.get()))
+  const listMs: number | (() => number) =
+    opts.intervals?.listMs ?? (() => adaptiveIntervalMs(LIST_DEFAULT_MS, store.get()))
+  const presenceMs: number | (() => number) =
+    opts.intervals?.presenceMs ?? (() => adaptiveIntervalMs(PRESENCE_DEFAULT_MS, store.get()))
 
   // --- Shared state ---
 
