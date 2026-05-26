@@ -20,7 +20,8 @@
 // 401 substatuscode 40102). Always go through the bulk getpresence POST,
 // even for self.
 
-import { decodeJwtClaims, getToken } from '../auth/owaPiggy'
+import { decodeJwtClaims, getToken, invalidate as invalidateOwaPiggy } from '../auth/owaPiggy'
+import { recordEvent } from '../log'
 
 const ENDPOINT = 'https://presence.teams.microsoft.com/v1/presence/getpresence/'
 export const TEAMS_PRESENCE_SCOPE = 'https://presence.teams.microsoft.com/.default'
@@ -74,6 +75,29 @@ type RawEntry = {
   status?: number
 }
 
+// Runs fn() and, if it surfaces a 401 with an `.status` field (the shape
+// TeamsPresenceError uses), invalidates the owa-piggy token cache for
+// the given scope/profile and retries fn() exactly once. Closes the
+// race where the cached AAD token expires between cache read and HTTP
+// send (suspended laptop, slow DNS).
+async function withAadAuth<T>(
+  fn: () => Promise<T>,
+  tokenOpts: { profile?: string; scope: string },
+): Promise<T> {
+  try {
+    return await fn()
+  } catch (err) {
+    const status =
+      err && typeof err === 'object' && 'status' in err
+        ? (err as { status: unknown }).status
+        : undefined
+    if (status !== 401) throw err
+    recordEvent('graph', 'warn', 'presence 401, invalidating token cache and retrying once')
+    invalidateOwaPiggy(tokenOpts)
+    return await fn()
+  }
+}
+
 async function safeText(res: Response): Promise<string> {
   try {
     const body = await res.text()
@@ -89,39 +113,42 @@ export async function getTeamsPresenceByOid(
 ): Promise<Map<string, TeamsPresenceEntry>> {
   const out = new Map<string, TeamsPresenceEntry>()
   if (oids.length === 0) return out
-  const token = await getToken({ profile: opts?.profile, scope: TEAMS_PRESENCE_SCOPE })
-  const body = oids.map((oid) => ({ mri: mriFromOid(oid) }))
-  const res = await transport(ENDPOINT, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-    signal: opts?.signal,
-  })
-  if (!res.ok) {
-    throw new TeamsPresenceError(
-      res.status,
-      `presence.teams.microsoft.com ${res.status}: ${await safeText(res)}`,
-    )
-  }
-  const list = (await res.json()) as RawEntry[]
-  if (!Array.isArray(list)) {
-    throw new TeamsPresenceError(0, 'presence.teams.microsoft.com: response was not an array')
-  }
-  for (const entry of list) {
-    if (!entry.presence) continue
-    const oid = oidFromMri(entry.mri)
-    out.set(oid, {
-      oid,
-      availability: entry.presence.availability ?? 'PresenceUnknown',
-      activity: entry.presence.activity ?? 'PresenceUnknown',
-      deviceType: entry.presence.deviceType,
-      outOfOffice: entry.presence.calendarData?.isOutOfOffice,
+  const tokenOpts = { profile: opts?.profile, scope: TEAMS_PRESENCE_SCOPE }
+  return withAadAuth(async () => {
+    const token = await getToken(tokenOpts)
+    const body = oids.map((oid) => ({ mri: mriFromOid(oid) }))
+    const res = await transport(ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: opts?.signal,
     })
-  }
-  return out
+    if (!res.ok) {
+      throw new TeamsPresenceError(
+        res.status,
+        `presence.teams.microsoft.com ${res.status}: ${await safeText(res)}`,
+      )
+    }
+    const list = (await res.json()) as RawEntry[]
+    if (!Array.isArray(list)) {
+      throw new TeamsPresenceError(0, 'presence.teams.microsoft.com: response was not an array')
+    }
+    for (const entry of list) {
+      if (!entry.presence) continue
+      const oid = oidFromMri(entry.mri)
+      out.set(oid, {
+        oid,
+        availability: entry.presence.availability ?? 'PresenceUnknown',
+        activity: entry.presence.activity ?? 'PresenceUnknown',
+        deviceType: entry.presence.deviceType,
+        outOfOffice: entry.presence.calendarData?.isOutOfOffice,
+      })
+    }
+    return out
+  }, tokenOpts)
 }
 
 export async function getMyTeamsPresence(
@@ -154,23 +181,26 @@ export async function forceMyAvailability(
   availability: ForceAvailabilityValue,
   opts?: TeamsPresenceOpts,
 ): Promise<void> {
-  const token = await getToken({ profile: opts?.profile, scope: TEAMS_PRESENCE_SCOPE })
-  const url = 'https://presence.teams.microsoft.com/v1/me/forceavailability/'
-  const res = await transport(url, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ availability }),
-    signal: opts?.signal,
-  })
-  if (!res.ok) {
-    throw new TeamsPresenceError(
-      res.status,
-      `presence.teams.microsoft.com/forceavailability ${res.status}: ${await safeText(res)}`,
-    )
-  }
+  const tokenOpts = { profile: opts?.profile, scope: TEAMS_PRESENCE_SCOPE }
+  await withAadAuth(async () => {
+    const token = await getToken(tokenOpts)
+    const url = 'https://presence.teams.microsoft.com/v1/me/forceavailability/'
+    const res = await transport(url, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ availability }),
+      signal: opts?.signal,
+    })
+    if (!res.ok) {
+      throw new TeamsPresenceError(
+        res.status,
+        `presence.teams.microsoft.com/forceavailability ${res.status}: ${await safeText(res)}`,
+      )
+    }
+  }, tokenOpts)
 }
 
 // Test-only helpers. Underscore prefix marks them as not part of the public API.

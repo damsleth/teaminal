@@ -20,9 +20,9 @@ import { recordEvent, recordRequest } from '../log'
 import type { DirectoryUser } from '../types'
 import { getActiveProfile } from './client'
 import { TEAMS_SPACES_SCOPE } from './teamsFederation'
+import { resolveRegion } from './teamsRegion'
 
 const TEAMS_ORIGIN = 'https://teams.microsoft.com'
-const DEFAULT_REGION = 'emea'
 
 export class TeamsExternalSearchError extends Error {
   constructor(
@@ -46,8 +46,9 @@ type Transport = (url: string, init: RequestInit) => Promise<Response>
 const realTransport: Transport = (url, init) => fetch(url, init)
 let transport: Transport = realTransport
 
-function region(opts?: ExternalSearchOpts): string {
-  return opts?.region ?? DEFAULT_REGION
+async function region(opts?: ExternalSearchOpts): Promise<string> {
+  if (opts?.region) return opts.region
+  return resolveRegion({ profile: opts?.profile, signal: opts?.signal })
 }
 
 function profile(opts?: ExternalSearchOpts): string | undefined {
@@ -175,8 +176,9 @@ export async function searchExternalUsers(
   // email/UPN as a JSON-string. Returns
   // { type, value: [{ mri, displayName, email, ... }] } - matches all
   // the fields we need to construct a DirectoryUser.
+  const r = await region(opts)
   const url =
-    `${TEAMS_ORIGIN}/api/mt/part/${region(opts)}/beta/users/searchV2` +
+    `${TEAMS_ORIGIN}/api/mt/part/${r}/beta/users/searchV2` +
     `?includeDLs=true&enableGuest=true&includeBots=true&includeMTOUsers=true` +
     `&includeChats=false&includeChannels=false&includeTeams=false` +
     `&skypeTeamsInfo=true&source=newChat`

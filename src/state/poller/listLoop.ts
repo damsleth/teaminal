@@ -26,7 +26,7 @@ import type { MentionEvent } from '../poller'
 export type ListLoopDeps = {
   store: Store<AppState>
   sleeper: Sleeper
-  intervalMs: number
+  intervalMs: number | (() => number)
   seen: Map<ConvKey, Set<string>>
   // Hot-stop signal for the background member hydration; the loop
   // module does not own this so stop() can abort it independently.
@@ -59,6 +59,7 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
     reportError,
     memberHydrated,
   } = deps
+  const getIntervalMs = typeof intervalMs === 'function' ? intervalMs : () => intervalMs
 
   // Per-chat snapshot of the last seen lastMessagePreview.id.
   const prevPreviewIds = new Map<string, string>()
@@ -148,7 +149,7 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
           })
         }
       }
-      await sleeper.sleep(jitter(backoff(intervalMs, consecutiveErrors)))
+      await sleeper.sleep(jitter(backoff(getIntervalMs(), consecutiveErrors)))
     }
   }
 }

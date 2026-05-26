@@ -26,7 +26,7 @@ import type { Sleeper } from './sleeper'
 export type ActiveLoopDeps = {
   store: Store<AppState>
   sleeper: Sleeper
-  intervalMs: number
+  intervalMs: number | (() => number)
   // seen-message-ID set, shared across loops (the cross-chat mention
   // pass also seeds it so a later active-loop open doesn't re-notify).
   seen: Map<ConvKey, Set<string>>
@@ -54,6 +54,7 @@ async function fetchActiveMessages(focus: Focus, signal: AbortSignal): Promise<M
 export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
   const { store, sleeper, intervalMs, seen, setActiveAbort, isStopped, onMention, reportError } =
     deps
+  const getIntervalMs = typeof intervalMs === 'function' ? intervalMs : () => intervalMs
 
   // Per-conv "this endpoint refuses us" latch. Meeting chats and other
   // conversations the FOCI delegated token lacks scope for return 403
@@ -70,11 +71,11 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
       const focus = store.get().focus
       const conv = focusKey(focus)
       if (!conv) {
-        await sleeper.sleep(jitter(intervalMs))
+        await sleeper.sleep(jitter(getIntervalMs()))
         continue
       }
       if (blocked.has(conv)) {
-        await sleeper.sleep(jitter(intervalMs))
+        await sleeper.sleep(jitter(getIntervalMs()))
         continue
       }
       const ctrl = new AbortController()
@@ -151,7 +152,7 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
       } finally {
         setActiveAbort(null)
       }
-      await sleeper.sleep(jitter(backoff(intervalMs, consecutiveErrors)))
+      await sleeper.sleep(jitter(backoff(getIntervalMs(), consecutiveErrors)))
     }
   }
 }

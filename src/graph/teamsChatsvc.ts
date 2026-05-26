@@ -18,10 +18,10 @@
 import { recordEvent, recordRequest } from '../log'
 import type { ChatMessage, Reaction } from '../types'
 import { getActiveProfile } from './client'
-import { getSkypeToken } from './teamsFederation'
+import { getSkypeToken, withSkypeAuth } from './teamsFederation'
+import { resolveRegion } from './teamsRegion'
 
 const TEAMS_ORIGIN = 'https://teams.microsoft.com'
-const DEFAULT_REGION = 'emea'
 const DEFAULT_PAGE_SIZE = 50
 
 export class TeamsChatsvcError extends Error {
@@ -50,8 +50,9 @@ type Transport = (url: string, init: RequestInit) => Promise<Response>
 const realTransport: Transport = (url, init) => fetch(url, init)
 let transport: Transport = realTransport
 
-function region(opts?: ChatsvcOpts): string {
-  return opts?.region ?? DEFAULT_REGION
+async function region(opts?: ChatsvcOpts): Promise<string> {
+  if (opts?.region) return opts.region
+  return resolveRegion({ profile: opts?.profile, signal: opts?.signal })
 }
 
 function profile(opts?: ChatsvcOpts): string | undefined {
@@ -321,30 +322,33 @@ export async function listChannelMessagesViaChatsvc(
   threadId: string,
   opts?: ChatsvcOpts & { pageSize?: number },
 ): Promise<ChatsvcChannelMessagesPage> {
-  const pageSize = opts?.pageSize ?? DEFAULT_PAGE_SIZE
-  const url = `${TEAMS_ORIGIN}/api/chatsvc/${region(opts)}/v1/users/ME/conversations/${encodeURIComponent(
-    threadId,
-  )}/messages?pageSize=${pageSize}&startTime=1&view=msnp24`
-  const res = await chatsvcGet<SkypeMessagesResponse>(url, opts)
-  if (res.status < 200 || res.status >= 300) {
-    throw new TeamsChatsvcError(
-      res.status,
-      `teams chatsvc messages ${res.status}: ${res.text || 'request failed'}`,
-    )
-  }
-  const raw = res.body?.messages ?? []
-  const mapped = raw
-    .filter((m) => !m.properties?.parentmessageid || m.properties.parentmessageid === m.id)
-    .map(skypeToChannelMessage)
-    .filter((m) => m.id.length > 0)
-    .reverse()
-  if (mapped.length === 0) {
-    diagnoseEmptyResponse(threadId, res.status, res.body, res.text)
-  }
-  return {
-    messages: mapped,
-    backwardLink: res.body?._metadata?.backwardLink,
-  }
+  return withSkypeAuth(async () => {
+    const pageSize = opts?.pageSize ?? DEFAULT_PAGE_SIZE
+    const r = await region(opts)
+    const url = `${TEAMS_ORIGIN}/api/chatsvc/${r}/v1/users/ME/conversations/${encodeURIComponent(
+      threadId,
+    )}/messages?pageSize=${pageSize}&startTime=1&view=msnp24`
+    const res = await chatsvcGet<SkypeMessagesResponse>(url, opts)
+    if (res.status < 200 || res.status >= 300) {
+      throw new TeamsChatsvcError(
+        res.status,
+        `teams chatsvc messages ${res.status}: ${res.text || 'request failed'}`,
+      )
+    }
+    const raw = res.body?.messages ?? []
+    const mapped = raw
+      .filter((m) => !m.properties?.parentmessageid || m.properties.parentmessageid === m.id)
+      .map(skypeToChannelMessage)
+      .filter((m) => m.id.length > 0)
+      .reverse()
+    if (mapped.length === 0) {
+      diagnoseEmptyResponse(threadId, res.status, res.body, res.text)
+    }
+    return {
+      messages: mapped,
+      backwardLink: res.body?._metadata?.backwardLink,
+    }
+  }, opts)
 }
 
 // Follow a chatsvc backward link returned from a previous page. The
@@ -353,23 +357,25 @@ export async function listChannelMessagesViaChatsvcNextPage(
   backwardLink: string,
   opts?: ChatsvcOpts,
 ): Promise<ChatsvcChannelMessagesPage> {
-  const res = await chatsvcGet<SkypeMessagesResponse>(backwardLink, opts)
-  if (res.status < 200 || res.status >= 300) {
-    throw new TeamsChatsvcError(
-      res.status,
-      `teams chatsvc messages ${res.status}: ${res.text || 'request failed'}`,
-    )
-  }
-  const raw = res.body?.messages ?? []
-  const mapped = raw
-    .filter((m) => !m.properties?.parentmessageid || m.properties.parentmessageid === m.id)
-    .map(skypeToChannelMessage)
-    .filter((m) => m.id.length > 0)
-    .reverse()
-  return {
-    messages: mapped,
-    backwardLink: res.body?._metadata?.backwardLink,
-  }
+  return withSkypeAuth(async () => {
+    const res = await chatsvcGet<SkypeMessagesResponse>(backwardLink, opts)
+    if (res.status < 200 || res.status >= 300) {
+      throw new TeamsChatsvcError(
+        res.status,
+        `teams chatsvc messages ${res.status}: ${res.text || 'request failed'}`,
+      )
+    }
+    const raw = res.body?.messages ?? []
+    const mapped = raw
+      .filter((m) => !m.properties?.parentmessageid || m.properties.parentmessageid === m.id)
+      .map(skypeToChannelMessage)
+      .filter((m) => m.id.length > 0)
+      .reverse()
+    return {
+      messages: mapped,
+      backwardLink: res.body?._metadata?.backwardLink,
+    }
+  }, opts)
 }
 
 export type SendChatsvcOpts = ChatsvcOpts & {
@@ -401,83 +407,89 @@ export async function sendChannelMessageViaChatsvc(
   content: string,
   opts?: SendChatsvcOpts,
 ): Promise<ChatMessage> {
-  const url = `${TEAMS_ORIGIN}/api/chatsvc/${region(opts)}/v1/users/ME/conversations/${encodeURIComponent(
-    threadId,
-  )}/messages`
+  // Generate the cmid outside the retry closure so a 401-retry preserves
+  // idempotency: Skype dedupes by clientmessageid, so re-sending with the
+  // same id is safe.
   const cmid = clientMessageId()
-  const body: Record<string, unknown> = {
-    content,
-    messagetype: 'Text',
-    contenttype: 'text',
-    clientmessageid: cmid,
-    ...(opts?.imdisplayname ? { imdisplayname: opts.imdisplayname } : {}),
-    ...(opts?.replyToId ? { properties: { parentmessageid: opts.replyToId } } : {}),
-  }
-  const skypeToken = await getSkypeToken({ profile: profile(opts), signal: opts?.signal })
-  const startedAt = Date.now()
-  const path = new URL(url).pathname
-  let res: Response
-  try {
-    res = await transport(url, {
-      method: 'POST',
-      headers: chatsvcHeaders(skypeToken),
-      body: JSON.stringify(body),
-      signal: opts?.signal,
-    })
-  } catch (err) {
-    recordRequest({
-      ts: startedAt,
-      method: 'POST',
-      path,
-      status: null,
-      durationMs: Date.now() - startedAt,
-      error: err instanceof Error ? err.message : String(err),
-    })
-    throw err
-  }
-  const durationMs = Date.now() - startedAt
-  recordRequest({ ts: startedAt, method: 'POST', path, status: res.status, durationMs })
-  const text = await safeFullText(res)
-  if (res.status < 200 || res.status >= 300) {
-    throw new TeamsChatsvcError(
-      res.status,
-      `teams chatsvc send ${res.status}: ${text.slice(0, 1024) || 'request failed'}`,
-    )
-  }
-  let parsed: { OriginalArrivalTime?: string; id?: string } | null = null
-  if (text) {
-    try {
-      parsed = JSON.parse(text) as { OriginalArrivalTime?: string; id?: string }
-    } catch {
-      parsed = null
+  return withSkypeAuth(async () => {
+    const r = await region(opts)
+    const url = `${TEAMS_ORIGIN}/api/chatsvc/${r}/v1/users/ME/conversations/${encodeURIComponent(
+      threadId,
+    )}/messages`
+    const body: Record<string, unknown> = {
+      content,
+      messagetype: 'Text',
+      contenttype: 'text',
+      clientmessageid: cmid,
+      ...(opts?.imdisplayname ? { imdisplayname: opts.imdisplayname } : {}),
+      ...(opts?.replyToId ? { properties: { parentmessageid: opts.replyToId } } : {}),
     }
-  }
-  // Skype responds 201 with `{ OriginalArrivalTime }` and a Location
-  // header containing the canonical message id. Some regions also
-  // return the id in the body. Prefer the body id when present.
-  const location = res.headers.get('Location') ?? res.headers.get('location') ?? ''
-  const locationMatch = location.match(/\/messages\/([^/?]+)/)
-  const messageId = parsed?.id ?? (locationMatch ? locationMatch[1]! : cmid)
-  const created = parsed?.OriginalArrivalTime
-    ? (toIsoFromAny(parsed.OriginalArrivalTime) ?? new Date().toISOString())
-    : new Date().toISOString()
-  return {
-    id: messageId,
-    createdDateTime: created,
-    messageType: 'message',
-    body: { contentType: 'text', content },
-    ...(opts?.replyToId ? { replyToId: opts.replyToId } : {}),
-    ...(opts?.fromUserId
-      ? {
-          from: {
-            user: {
-              id: opts.fromUserId,
-              ...(opts.imdisplayname ? { displayName: opts.imdisplayname } : {}),
+    const skypeToken = await getSkypeToken({ profile: profile(opts), signal: opts?.signal })
+    const startedAt = Date.now()
+    const path = new URL(url).pathname
+    let res: Response
+    try {
+      res = await transport(url, {
+        method: 'POST',
+        headers: chatsvcHeaders(skypeToken),
+        body: JSON.stringify(body),
+        signal: opts?.signal,
+      })
+    } catch (err) {
+      recordRequest({
+        ts: startedAt,
+        method: 'POST',
+        path,
+        status: null,
+        durationMs: Date.now() - startedAt,
+        error: err instanceof Error ? err.message : String(err),
+      })
+      throw err
+    }
+    const durationMs = Date.now() - startedAt
+    recordRequest({ ts: startedAt, method: 'POST', path, status: res.status, durationMs })
+    const text = await safeFullText(res)
+    if (res.status < 200 || res.status >= 300) {
+      throw new TeamsChatsvcError(
+        res.status,
+        `teams chatsvc send ${res.status}: ${text.slice(0, 1024) || 'request failed'}`,
+      )
+    }
+    let parsed: { OriginalArrivalTime?: string; id?: string } | null = null
+    if (text) {
+      try {
+        parsed = JSON.parse(text) as { OriginalArrivalTime?: string; id?: string }
+      } catch {
+        parsed = null
+      }
+    }
+    // Skype responds 201 with `{ OriginalArrivalTime }` and a Location
+    // header containing the canonical message id. Some regions also
+    // return the id in the body. Prefer the body id when present.
+    const location = res.headers.get('Location') ?? res.headers.get('location') ?? ''
+    const locationMatch = location.match(/\/messages\/([^/?]+)/)
+    const messageId = parsed?.id ?? (locationMatch ? locationMatch[1]! : cmid)
+    const created = parsed?.OriginalArrivalTime
+      ? (toIsoFromAny(parsed.OriginalArrivalTime) ?? new Date().toISOString())
+      : new Date().toISOString()
+    return {
+      id: messageId,
+      createdDateTime: created,
+      messageType: 'message',
+      body: { contentType: 'text', content },
+      ...(opts?.replyToId ? { replyToId: opts.replyToId } : {}),
+      ...(opts?.fromUserId
+        ? {
+            from: {
+              user: {
+                id: opts.fromUserId,
+                ...(opts.imdisplayname ? { displayName: opts.imdisplayname } : {}),
+              },
             },
-          },
-        }
-      : {}),
-  }
+          }
+        : {}),
+    }
+  }, opts)
 }
 
 export function __setTransportForTests(t: Transport): void {
