@@ -147,7 +147,9 @@ export function mapCsaMember(m: CsaMember): ChatMember {
     id,
     ...(m.displayName ? { displayName: m.displayName } : {}),
     ...(m.email ? { email: m.email } : {}),
-    ...(m.objectId ? { userId: m.objectId.toLowerCase() } : { userId: userIdFromMri(m.mri) ?? null }),
+    ...(m.objectId
+      ? { userId: m.objectId.toLowerCase() }
+      : { userId: userIdFromMri(m.mri) ?? null }),
     ...(m.role ? { roles: [m.role] } : {}),
   }
 }
