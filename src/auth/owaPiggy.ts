@@ -51,6 +51,12 @@ export type GetTokenOpts = {
   // graph token, so concurrent loops with different scopes don't fight
   // each other in the in-process cache.
   scope?: string
+  // Named owa-piggy audience (`--audience <name>`, e.g. 'graph', 'ic3',
+  // 'teams', 'presence'). Lower precedence than `scope`: if both are set,
+  // `scope` wins. When neither is set, owa-piggy is invoked with the
+  // default graph audience. Cached separately per audience so a graph and
+  // an ic3 token for the same profile don't evict each other.
+  audience?: string
 }
 
 function normalizeOpts(opts?: GetTokenOpts | string): GetTokenOpts {
@@ -59,12 +65,14 @@ function normalizeOpts(opts?: GetTokenOpts | string): GetTokenOpts {
   return opts
 }
 
+const DEFAULT_AUDIENCE_KEY = '<aud-default>'
+
 function fullCacheKey(opts: GetTokenOpts): string {
-  return `${opts.profile ?? DEFAULT_KEY}::${opts.scope ?? DEFAULT_SCOPE_KEY}`
+  return `${opts.profile ?? DEFAULT_KEY}::${opts.audience ?? DEFAULT_AUDIENCE_KEY}::${opts.scope ?? DEFAULT_SCOPE_KEY}`
 }
 
 function scopeFallbackCacheKey(opts: GetTokenOpts): string {
-  return `${opts.profile ?? DEFAULT_KEY}::${opts.scope ?? DEFAULT_SCOPE_KEY}`
+  return fullCacheKey(opts)
 }
 
 function isPreauthFailure(stderr: string): boolean {
@@ -168,9 +176,12 @@ export async function getToken(opts?: GetTokenOpts | string): Promise<string> {
     ): Promise<{ stdout: string; stderr: string; exitCode: number }> => {
       const args = ['token']
       if (withScope && normalized.scope) {
+        // Explicit scope wins over a named audience.
         args.push('--scope', normalized.scope)
       } else {
-        args.push('--audience', 'graph')
+        // Named audience (graph/ic3/teams/presence/...) or the graph
+        // default when neither scope nor audience was requested.
+        args.push('--audience', normalized.audience ?? 'graph')
       }
       if (normalized.profile) args.push('--profile', normalized.profile)
       return runner(args)
