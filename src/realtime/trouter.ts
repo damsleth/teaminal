@@ -274,8 +274,17 @@ export class TrouterTransport implements RealtimeTransport {
     this.disconnecting = true
     this.clearTimers()
     if (this.ws) {
+      // Detach handlers before closing. close() fires onclose
+      // asynchronously; if a manual retry() has already started a fresh
+      // connect() by then, the stale onclose would otherwise null the
+      // new socket (this.ws = null) and schedule a competing reconnect.
+      const ws = this.ws
+      ws.onopen = null
+      ws.onmessage = null
+      ws.onerror = null
+      ws.onclose = null
       try {
-        this.ws.close()
+        ws.close()
       } catch {
         // ignore
       }
