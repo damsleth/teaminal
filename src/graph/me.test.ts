@@ -87,4 +87,38 @@ describe('getMe', () => {
     await getMe(ctrl.signal)
     expect(seenSignal).toBe(ctrl.signal)
   })
+
+  test('falls back to token claims when graph /me 401s (Conditional Access)', async () => {
+    setAuthRunner(async () => ({
+      stdout: makeJwt({
+        exp: FAR_FUTURE,
+        oid: '11111111-1111-1111-1111-111111111111',
+        name: 'Nordmann, Kari Anne',
+        upn: 'kari.nordmann@contoso.com',
+        email: 'kari@contoso.com',
+      }),
+      stderr: '',
+      exitCode: 0,
+    }))
+    __setTransportForTests(async () =>
+      jsonResponse({ error: { code: 'Unauthorized', message: 'CA' } }, { status: 401 }),
+    )
+    const me = await getMe()
+    expect(me.id).toBe('11111111-1111-1111-1111-111111111111')
+    expect(me.displayName).toBe('Nordmann, Kari Anne')
+    expect(me.userPrincipalName).toBe('kari.nordmann@contoso.com')
+    expect(me.mail).toBe('kari@contoso.com')
+  })
+
+  test('rethrows the 401 when the token has no oid to fall back on', async () => {
+    setAuthRunner(async () => ({
+      stdout: makeJwt({ exp: FAR_FUTURE }), // no oid
+      stderr: '',
+      exitCode: 0,
+    }))
+    __setTransportForTests(async () =>
+      jsonResponse({ error: { code: 'Unauthorized', message: 'CA' } }, { status: 401 }),
+    )
+    await expect(getMe()).rejects.toMatchObject({ status: 401 })
+  })
 })
