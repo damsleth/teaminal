@@ -12,11 +12,8 @@
 // uses them as "something changed" signals that trigger authoritative
 // Graph fetches through the existing poller.
 
-import { getActiveProfile } from '../graph/client'
-import { listActivityFeed } from '../graph/teamsActivity'
-import { recordEvent } from '../log'
 import type { RealtimeEventBus } from '../realtime/events'
-import { countUnreadMentions, mergeActivityItems } from './activityFeed'
+import { refreshActivityFeed } from './activityFeed'
 import type { AppState, ConvKey, Store, TypingIndicator } from './store'
 import type { PollerHandle } from './poller'
 
@@ -28,6 +25,13 @@ export type RealtimeBridgeOpts = {
   store: Store<AppState>
   /** Set once the poller is started; the bridge tolerates null during bootstrap. */
   getPoller: () => PollerHandle | null
+  /**
+   * Returns true once the owning session has been torn down. Detached
+   * async work (the activity-feed refresh) checks this before writing to
+   * the store so a fetch resolving after a profile switch can't
+   * repopulate the next account's state. Optional for tests.
+   */
+  isStale?: () => boolean
 }
 
 export type RealtimeBridgeHandle = {
@@ -35,7 +39,7 @@ export type RealtimeBridgeHandle = {
 }
 
 export function startRealtimeBridge(opts: RealtimeBridgeOpts): RealtimeBridgeHandle {
-  const { bus, store, getPoller } = opts
+  const { bus, store, getPoller, isStale } = opts
   const unsubs: (() => void)[] = []
 
   // --- New-message acceleration ---
@@ -80,29 +84,7 @@ export function startRealtimeBridge(opts: RealtimeBridgeOpts): RealtimeBridgeHan
     pendingActivityTimer = setTimeout(() => {
       pendingActivityTimer = null
       lastActivityRefreshAt = Date.now()
-      void (async () => {
-        try {
-          const page = await listActivityFeed({
-            profile: getActiveProfile(),
-            syncState: store.get().activitySyncState,
-          })
-          if (page.items.length === 0) return
-          store.set((s) => {
-            const merged = mergeActivityItems(s.activityFeed, page.items)
-            return {
-              activityFeed: merged,
-              unreadMentionCount: countUnreadMentions(merged),
-              activitySyncState: page.syncState ?? s.activitySyncState,
-            }
-          })
-        } catch (err) {
-          recordEvent(
-            'graph',
-            'debug',
-            `activity refresh skipped: ${err instanceof Error ? err.message : String(err)}`,
-          )
-        }
-      })()
+      void refreshActivityFeed(store, isStale)
     }, wait)
   }
 

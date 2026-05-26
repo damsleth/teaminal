@@ -227,9 +227,24 @@ export function parseActivityItem(raw: unknown): ActivityItem | null {
     senderDisplayName,
     preview: stripHtml(previewSource),
     createdAt,
-    isRead: obj.isRead === true || obj.read === true,
+    isRead: parseReadFlag(obj),
   }
   return item
+}
+
+// CSA encodes read-state under a few keys and value types across regions:
+// boolean `isRead`/`read`, a numeric 1/0, or a string `readState:"read"`.
+// Treat any of those truthy forms as read so the unread badge doesn't
+// perpetually show mentions the user already cleared in the web client.
+function parseReadFlag(obj: Record<string, unknown>): boolean {
+  for (const key of ['isRead', 'read', 'isSeen', 'seen']) {
+    const v = obj[key]
+    if (v === true || v === 1) return true
+    if (typeof v === 'string' && /^(true|read|seen|1)$/i.test(v)) return true
+  }
+  const state = obj.readState ?? obj.activityState
+  if (typeof state === 'string' && /^(read|seen)$/i.test(state)) return true
+  return false
 }
 
 type CsaUpdatesResponse = {
