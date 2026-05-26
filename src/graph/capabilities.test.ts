@@ -105,7 +105,7 @@ describe('probeCapabilities', () => {
     }
   })
 
-  test('classifies 401 as unauthorized (after the client retry has already failed)', async () => {
+  test('classifies 401 as unauthorized; me degrades to ok via token claims', async () => {
     primeAuth()
     const handler = async () =>
       jsonResponse(
@@ -115,12 +115,15 @@ describe('probeCapabilities', () => {
     __setTransportForTests(handler)
     setTeamsPresenceTransport(handler)
     const caps = await probeCapabilities()
-    expect(caps.me.ok).toBe(false)
-    if (!caps.me.ok) {
-      expect(caps.me.reason).toBe('unauthorized')
-      expect(caps.me.status).toBe(401)
-    }
+    // /me 401s under Conditional Access, but getMe falls back to the
+    // token's oid/name/upn claims, so the me capability reports ok — this
+    // is what keeps bootstrap from fatally aborting a CA-gated session.
+    expect(caps.me.ok).toBe(true)
     expect(caps.chats.ok).toBe(false)
+    if (!caps.chats.ok) {
+      expect(caps.chats.reason).toBe('unauthorized')
+      expect(caps.chats.status).toBe(401)
+    }
     expect(caps.joinedTeams.ok).toBe(false)
     expect(caps.presence.ok).toBe(false)
   })
