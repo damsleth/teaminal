@@ -13,7 +13,9 @@
 
 import { listChats } from '../../graph/chats'
 import { GraphError, RateLimitError } from '../../graph/client'
+import { fetchChatsAndTeams } from '../../graph/teamsCsa'
 import { recordEvent } from '../../log'
+import type { Channel, Chat, Team } from '../../types'
 import { mergeChatMembers } from './chatList'
 import { runCrossChatMentionPass } from './crossChatMentions'
 import { fetchTeamsAndChannels } from './teamsAndChannels'
@@ -22,6 +24,8 @@ import { backoff, isAbortError, jitter } from './intervals'
 import type { Sleeper } from './sleeper'
 import { seedChatActivity, type AppState, type ConvKey, type Store } from '../store'
 import type { MentionEvent } from '../poller'
+
+type ChatsTeams = { chats: Chat[]; teams: Team[]; channelsByTeam: Record<string, Channel[]> }
 
 export type ListLoopDeps = {
   store: Store<AppState>
@@ -65,6 +69,35 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
   const prevPreviewIds = new Map<string, string>()
   let firstListPoll = true
 
+  // Once graph /chats or /me/joinedTeams 401s — typically a tenant
+  // Conditional Access policy on graph.microsoft.com that the FOCI token
+  // can't satisfy — switch to the Teams CSA endpoints (what the web
+  // client uses) for the rest of the session. Healthy tenants never 401,
+  // so they never switch and pay no CSA cost.
+  let useCsa = false
+
+  async function loadChatsTeams(signal: AbortSignal): Promise<ChatsTeams> {
+    if (useCsa) return fetchChatsAndTeams({ signal })
+    try {
+      const [chats, tc] = await Promise.all([
+        listChats({ signal }),
+        fetchTeamsAndChannels(signal, reportError),
+      ])
+      return { chats, teams: tc.teams, channelsByTeam: tc.channelsByTeam }
+    } catch (err) {
+      if (err instanceof GraphError && err.status === 401) {
+        useCsa = true
+        recordEvent(
+          'poller',
+          'warn',
+          'graph chat/teams list 401 (likely Conditional Access) — switching to Teams CSA',
+        )
+        return fetchChatsAndTeams({ signal })
+      }
+      throw err
+    }
+  }
+
   return async function run(): Promise<void> {
     let consecutiveErrors = 0
     while (!isStopped()) {
@@ -75,10 +108,8 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
       try {
         const startedAt = Date.now()
         recordEvent('poller', 'info', 'list refresh started')
-        const [chats, teamsAndChannels] = await Promise.all([
-          listChats({ signal }),
-          fetchTeamsAndChannels(signal, reportError),
-        ])
+        const teamsAndChannels = await loadChatsTeams(signal)
+        const chats = teamsAndChannels.chats
         const channelCount = Object.values(teamsAndChannels.channelsByTeam).reduce(
           (sum, channels) => sum + channels.length,
           0,
