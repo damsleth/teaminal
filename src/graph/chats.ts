@@ -9,7 +9,7 @@
 //     visible/active chats
 
 import { graph, GraphError } from './client'
-import { listChatMessagesViaChatsvc } from './teamsChatsvc'
+import { listChatMessagesViaChatsvc, sendChannelMessageViaChatsvc } from './teamsChatsvc'
 import { createOneOnOneThreadViaChatsvc } from './teamsFederation'
 import { recordEvent } from '../log'
 import type { Chat, ChatMessage, DirectoryUser, Person } from '../types'
@@ -229,12 +229,32 @@ export async function sendMessage(
   content: string,
   opts?: SendMessageOpts,
 ): Promise<ChatMessage> {
-  return graph<ChatMessage>({
-    method: 'POST',
-    path: `/chats/${encodeURIComponent(chatId)}/messages`,
-    body: { body: { contentType: 'text', content } },
-    signal: opts?.signal,
-  })
+  if (useChatsvcForMessages) {
+    return sendChannelMessageViaChatsvc(chatId, content, {
+      ...(opts?.signal ? { signal: opts.signal } : {}),
+    })
+  }
+  try {
+    return await graph<ChatMessage>({
+      method: 'POST',
+      path: `/chats/${encodeURIComponent(chatId)}/messages`,
+      body: { body: { contentType: 'text', content } },
+      signal: opts?.signal,
+    })
+  } catch (err) {
+    if (err instanceof GraphError && err.status === 401) {
+      useChatsvcForMessages = true
+      recordEvent(
+        'graph',
+        'warn',
+        'graph chat send 401 (likely Conditional Access) — switching to chatsvc',
+      )
+      return sendChannelMessageViaChatsvc(chatId, content, {
+        ...(opts?.signal ? { signal: opts.signal } : {}),
+      })
+    }
+    throw err
+  }
 }
 
 export async function editMessage(
