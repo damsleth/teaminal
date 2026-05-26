@@ -10,6 +10,7 @@
 // verify send permissions.
 
 import { getActiveProfile, graph, GraphError } from './client'
+import { getMe } from './me'
 import { getMyTeamsPresence, TeamsPresenceError } from './teamsPresence'
 
 export type CapabilityArea = 'me' | 'chats' | 'joinedTeams' | 'presence'
@@ -70,14 +71,11 @@ async function runProbe(fn: () => Promise<unknown>): Promise<CapabilityResult> {
 export async function probeCapabilities(opts?: ProbeOpts): Promise<Capabilities> {
   const signal = opts?.signal
   const [me, chats, joinedTeams, presence] = await Promise.all([
-    runProbe(() =>
-      graph({
-        method: 'GET',
-        path: '/me',
-        query: { $select: 'id,displayName' },
-        signal,
-      }),
-    ),
+    // Use getMe (not a raw graph /me) so the token-claims fallback under a
+    // Conditional Access gate counts as 'ok' — otherwise bootstrap's
+    // me-unauthorized check would fatally abort a session that the CSA
+    // migration can actually run.
+    runProbe(() => getMe(signal)),
     runProbe(() =>
       graph({
         method: 'GET',
