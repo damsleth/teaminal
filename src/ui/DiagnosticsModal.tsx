@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react'
 import { decodeJwtClaims, getToken } from '../auth/owaPiggy'
 import type { CapabilityResult } from '../graph/capabilities'
 import { getActiveProfile } from '../graph/client'
+import { getActiveTransport } from '../realtime/transport'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
 type LoadState =
@@ -97,6 +98,11 @@ export function DiagnosticsModal() {
         return
       }
       if (key.ctrl && ch === 'c') exit()
+      if (ch === 'r') {
+        // Manual realtime push retry — useful when the dot has been red
+        // for a while because trouter exhausted its automatic retries.
+        getActiveTransport()?.retry()
+      }
     },
     { isActive: isOpen },
   )
@@ -228,7 +234,7 @@ export function DiagnosticsModal() {
         )}
 
         <Box height={1} />
-        <Text color="gray">esc / enter to close</Text>
+        <Text color="gray">r: retry realtime · esc / enter to close</Text>
       </Box>
     </Box>
   )

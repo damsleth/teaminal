@@ -22,7 +22,7 @@ import type { Sleeper } from './sleeper'
 export type PresenceLoopDeps = {
   store: Store<AppState>
   sleeper: Sleeper
-  intervalMs: number
+  intervalMs: number | (() => number)
   // Session-wide stop signal owned by the parent poller. Combined with
   // the per-iteration AbortController so stop() can abort in-flight
   // presence fetches; without this, account switching can hang on a
@@ -34,6 +34,7 @@ export type PresenceLoopDeps = {
 
 export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
   const { store, sleeper, intervalMs, stopSignal, isStopped, reportError } = deps
+  const getIntervalMs = typeof intervalMs === 'function' ? intervalMs : () => intervalMs
 
   return async function run(): Promise<void> {
     let consecutiveErrors = 0
@@ -48,7 +49,7 @@ export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
       if (!useTeams && !useGraph) {
         // Both paths are off; presence stays whatever the realtime
         // bridge / store seeded.
-        await sleeper.sleep(jitter(intervalMs))
+        await sleeper.sleep(jitter(getIntervalMs()))
         continue
       }
 
@@ -147,7 +148,7 @@ export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
           reportError(err)
         }
       }
-      await sleeper.sleep(jitter(backoff(intervalMs, consecutiveErrors)))
+      await sleeper.sleep(jitter(backoff(getIntervalMs(), consecutiveErrors)))
     }
   }
 }

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests,
   __setTransportForTests,
@@ -15,6 +15,7 @@ import {
   __resetForTests as resetAuth,
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
+import { __setRegionForTests } from './teamsRegion'
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -39,6 +40,13 @@ function primeAuth(): string[][] {
   })
   return calls
 }
+
+beforeEach(() => {
+  // Prime the region cache so resolveRegion() doesn't trigger an extra
+  // authsvc round-trip and inflate the auth-runner call list. Tests that
+  // exercise region resolution itself live in teamsRegion.test.ts.
+  __setRegionForTests(undefined, 'emea')
+})
 
 afterEach(() => {
   __resetForTests()

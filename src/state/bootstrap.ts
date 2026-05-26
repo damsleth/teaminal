@@ -18,6 +18,7 @@ import { getMe } from '../graph/me'
 import { recordEvent, warn } from '../log'
 import { drainNotifications, notifyMention } from '../notify'
 import { RealtimeEventBus } from '../realtime/events'
+import { setActiveTransport } from '../realtime/transport'
 import { TrouterTransport } from '../realtime/trouter'
 import { htmlToText } from '../text/html'
 import { startPoller, type PollerHandleRef } from './poller'
@@ -147,6 +148,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
       transport.connect().catch((err) => {
         warn('trouter: initial connect failed:', err instanceof Error ? err.message : String(err))
       })
+      setActiveTransport(transport)
     } else {
       store.set({ realtimeState: 'off' })
       recordEvent('trouter', 'info', 'realtime disabled')
@@ -180,6 +182,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
       try {
         transport?.disconnect()
       } catch {}
+      setActiveTransport(null)
       try {
         bridge?.stop()
       } catch {}

@@ -18,6 +18,8 @@
 // cached in-process only, never logged, never written to disk.
 
 import { decodeJwtClaims } from '../auth/owaPiggy'
+import { getSkypeToken } from '../graph/teamsFederation'
+import { getCachedTrouterUrl } from '../graph/teamsRegion'
 import { debug, recordEvent, warn } from '../log'
 import type { RealtimeEventBus, RealtimeEvent } from './events'
 import type {
@@ -28,15 +30,17 @@ import type {
 } from './transport'
 
 const RECONNECT_BASE_MS = 2_000
-const RECONNECT_CAP_MS = 60_000
-// Keep reconnect bounded because trouter is undocumented and optional.
-// If Microsoft changes the protocol, polling still covers everything
-// user-visible and the push state settles to `error`.
-const MAX_RECONNECT_ATTEMPTS = 4
+const RECONNECT_CAP_MS = 5 * 60_000
+// Trouter is undocumented and optional, but legitimate transient drops
+// (Wi-Fi flap, laptop sleep, server-side restarts) are common enough
+// that the previous 4-attempt cap was too aggressive — the dot turned
+// red and stayed red even when a single extra retry would have
+// recovered. Allow 10 attempts with a 5-min cap; if real-time push is
+// gone after that, the user is likely on a flat-out broken network
+// and polling-only mode is the right fallback. The user can also
+// trigger a manual retry from the diagnostics modal.
+const MAX_RECONNECT_ATTEMPTS = 10
 const KEEPALIVE_INTERVAL_MS = 30_000
-
-// Teams auth service endpoint for Skype token exchange.
-const TEAMS_AUTHZ_URL = 'https://teams.microsoft.com/api/authsvc/v1.0/authz'
 
 // Regional trouter URL returned by authsvc in older experiments. The
 // successful Teams web trace uses the same host but connects to /v4/c,
@@ -164,37 +168,9 @@ export function parseSocketIoEvent(raw: string): SocketIoEventPacket | null {
   }
 }
 
-// Authsvc returns the Skype token in one of two shapes depending on
-// region / endpoint version:
-//   1. Top-level: `{ skypeToken: "...", expiresIn: 3600 }`
-//   2. Nested:    `{ tokens: { skypeToken: "...", expiresIn: 3600 } }`
-//      or         `{ tokens: { skypeToken: "...", skypeTokenExpiry: "<iso>" } }`
-// Try every known shape so we don't bail with "missing skypeToken" on
-// a 200 response that's just laid out differently.
-export function pickSkypeToken(
-  data: Record<string, unknown>,
-): { token: string; expiresIn: number } | null {
-  const candidates: Record<string, unknown>[] = [data]
-  const tokens = data.tokens as Record<string, unknown> | undefined
-  if (tokens && typeof tokens === 'object') candidates.push(tokens)
-
-  for (const c of candidates) {
-    const token = typeof c.skypeToken === 'string' ? c.skypeToken : null
-    if (!token) continue
-    const expiresIn =
-      typeof c.expiresIn === 'number'
-        ? c.expiresIn
-        : typeof c.skypeTokenExpiry === 'string'
-          ? Math.max(0, Math.floor((Date.parse(c.skypeTokenExpiry) - Date.now()) / 1000))
-          : 3600
-    return { token, expiresIn }
-  }
-  return null
-}
-
-// Decode the Graph token's audience and scope claims so the events log
-// can show *why* the authsvc endpoint refused us. Never logs the raw
-// token. Returns null if the token isn't decodable.
+// Decode the Graph/IC3 token's audience and scope claims so the events
+// log can show *why* an upstream endpoint refused us. Never logs the
+// raw token. Returns null if the token isn't decodable.
 export function summariseToken(token: string): string | null {
   try {
     const claims = decodeJwtClaims(token)
@@ -205,27 +181,6 @@ export function summariseToken(token: string): string | null {
   } catch {
     return null
   }
-}
-
-// Pull "AADSTS50012" or similar out of an AAD or Skype error body. The
-// AAD payload comes back as JSON `{ error: { code, message } }`; the
-// Skype service often returns the code in a `skype_error_code` field
-// or in plaintext "ESL_NOT_AUTHORIZED"-style strings.
-export function parseAadErrorCode(body: string): string | null {
-  if (!body) return null
-  const aadStsMatch = body.match(/AADSTS\d{4,}/)
-  if (aadStsMatch) return aadStsMatch[0]
-  try {
-    const parsed = JSON.parse(body)
-    const code =
-      parsed?.error?.code ?? parsed?.errorCode ?? parsed?.skype_error_code ?? parsed?.error
-    if (typeof code === 'string' && code.length > 0) return code
-  } catch {
-    // not JSON, fall through
-  }
-  const eslMatch = body.match(/ESL_[A-Z_]+/)
-  if (eslMatch) return eslMatch[0]
-  return null
 }
 
 export type TrouterFrame =
@@ -265,15 +220,14 @@ export class TrouterTransport implements RealtimeTransport {
   private _state: TransportState = 'disconnected'
   private stateListeners = new Set<TransportStateListener>()
   private bus: RealtimeEventBus
-  private getToken: () => Promise<string>
   private getIc3Token: () => Promise<string>
-  // Note: opts.profile is captured via the getToken closure in TransportOpts,
-  // so we don't need to retain it on the instance. Re-add when we surface
-  // per-profile diagnostics.
+  // Profile is needed so we can route Skype-token minting through the
+  // shared per-profile cache in teamsFederation (instead of holding our
+  // own copy).
+  private profile: string | undefined
 
   private ws: WebSocket | null = null
   private skypeToken: string | null = null
-  private skypeTokenExp = 0
   // Registration endpoint URL (POST target) returned by Teams authsvc
   // under regionGtms.trouter. Falls back to the global default when the
   // region payload is absent. Stays valid as long as the skype token
@@ -289,9 +243,8 @@ export class TrouterTransport implements RealtimeTransport {
 
   constructor(opts: TransportOpts) {
     this.bus = opts.bus
-    this.getToken = opts.getToken
     this.getIc3Token = opts.getIc3Token ?? opts.getToken
-    void opts.profile
+    this.profile = opts.profile
   }
 
   get state(): TransportState {
@@ -333,88 +286,29 @@ export class TrouterTransport implements RealtimeTransport {
 
   // --- Auth ---
 
+  // Delegates to the shared per-profile Skype token store in
+  // teamsFederation. The store handles the authsvc round-trip, response-
+  // shape variance, AAD/Skype error logging, and TTL-based caching. The
+  // regional trouter URL (also surfaced by authsvc under regionGtms.trouter)
+  // is read from teamsRegion's cache, which is populated as a side effect
+  // of the same authsvc call.
   private async ensureSkypeToken(): Promise<void> {
-    if (this.skypeToken && Date.now() / 1000 < this.skypeTokenExp - 60) return
-
-    const graphToken = await this.getToken()
-    const res = await fetch(TEAMS_AUTHZ_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${graphToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({}),
-    })
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      // Capture every diagnostic surface the endpoint exposes. The
-      // authsvc 401 frequently arrives with no body and no challenge
-      // header, so we *also* dump the Graph token's audience + scopes
-      // - that's typically the actual failure (token aud is for Graph,
-      // endpoint expects a Teams/Skype audience).
-      const aadCode = parseAadErrorCode(text)
-      const challenge = res.headers.get('www-authenticate') ?? ''
-      const correlation =
-        res.headers.get('x-ms-correlation-id') ?? res.headers.get('request-id') ?? ''
-      const tokenSummary = summariseToken(graphToken)
-      // Record the full payload as separate events so the truncated
-      // tail-panel still shows each piece on its own line. Order from
-      // most-actionable (status + token aud) down to raw body.
-      recordEvent('trouter', 'error', `trouter authz ${res.status} ${res.statusText || ''}`)
-      if (tokenSummary) {
-        recordEvent('trouter', 'error', `trouter token ${tokenSummary}`)
-      }
-      if (aadCode) recordEvent('trouter', 'error', `trouter aadcode ${aadCode}`)
-      if (challenge) {
-        recordEvent('trouter', 'error', `trouter challenge ${challenge.slice(0, 240)}`)
-      }
-      if (correlation) recordEvent('trouter', 'error', `trouter corr ${correlation}`)
-      if (text) {
-        recordEvent('trouter', 'error', `trouter body ${text.slice(0, 240).replace(/\s+/g, ' ')}`)
-      }
-      const detailParts = [
-        `${res.status} ${res.statusText || ''}`.trim(),
-        tokenSummary ? `token=${tokenSummary}` : null,
-        aadCode ? `aadcode=${aadCode}` : null,
-        challenge ? `challenge="${challenge.slice(0, 200)}"` : null,
-        correlation ? `corr=${correlation}` : null,
-        text ? `body=${text.slice(0, 400).replace(/\s+/g, ' ')}` : null,
-      ].filter(Boolean)
-      throw new Error(`Teams authz ${detailParts.join(' · ')}`)
-    }
-
-    const raw = await res.json().catch(() => ({}))
-    const data = (raw ?? {}) as Record<string, unknown>
-
-    // The authsvc endpoint sometimes nests the skype token under
-    // `tokens.skypeToken` rather than at the top level, and the
-    // duration can come back as either expiresIn (seconds) or as a
-    // `skypeTokenExpiry` ISO timestamp on the nested shape. Try every
-    // known layout before giving up.
-    const skype = pickSkypeToken(data)
-    if (!skype) {
-      const keys = Object.keys(data).slice(0, 10).join(',')
-      const nestedKeys = Object.keys(
-        (data.tokens as Record<string, unknown> | undefined) ?? {},
-      ).join(',')
+    try {
+      this.skypeToken = await getSkypeToken({ profile: this.profile })
+    } catch (err) {
+      // Mirror the per-source diagnostic event the local flow used to
+      // emit so the trouter section of the events panel still surfaces
+      // the failure even though the underlying request now logs under
+      // the 'graph' source.
       recordEvent(
         'trouter',
         'error',
-        `trouter authz ok-no-skype top=[${keys}] tokens=[${nestedKeys}]`,
+        `trouter authz delegated failure: ${err instanceof Error ? err.message : String(err)}`,
       )
-      throw new Error(
-        `Teams authz response missing skypeToken (top keys: ${keys}; tokens keys: ${nestedKeys})`,
-      )
+      throw err
     }
-
-    this.skypeToken = skype.token
-    this.skypeTokenExp = Date.now() / 1000 + (skype.expiresIn || 3600)
-    this.trouterUrl =
-      ((data.regionGtms as Record<string, unknown> | undefined)?.trouter as string | undefined) ??
-      TROUTER_REGISTER_URL
-
-    debug('trouter: obtained skype token, expires in', skype.expiresIn ?? '?', 's')
+    this.trouterUrl = getCachedTrouterUrl({ profile: this.profile }) ?? TROUTER_REGISTER_URL
+    debug('trouter: obtained skype token via shared store')
   }
 
   // --- WebSocket ---
@@ -800,10 +694,32 @@ export class TrouterTransport implements RealtimeTransport {
 
   // --- Reconnect ---
 
+  // Manual retry trigger: surface from the diagnostics modal so a user
+  // who sees the red push-state dot can recover without restarting the
+  // app. Idempotent — safe to call whether the transport is currently
+  // connected, error'd, or already retrying.
+  retry(): void {
+    recordEvent('trouter', 'info', 'trouter: manual retry requested')
+    this.reconnectAttempts = 0
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+    // disconnect() flips state to 'disconnected' but is idempotent if we
+    // already are; then we kick off a fresh connect cycle.
+    this.disconnect()
+    void this.connect()
+  }
+
   private scheduleReconnect(): void {
     if (this.disconnecting) return
     if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       warn('trouter: max reconnect attempts reached, giving up')
+      recordEvent(
+        'trouter',
+        'warn',
+        'realtime offline — falling back to polling. Trigger a retry from diagnostics.',
+      )
       this.setState('error')
       return
     }
