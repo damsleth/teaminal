@@ -326,9 +326,21 @@ describe('Settings ↔ config.json parity', () => {
       inlineImages: 'off',
       inlineImageMaxRows: 7,
       statusBarPosition: 'hidden',
+      audienceByAccount: { 'profile-a': 'ic3', 'profile-b': 'graph' },
     }
     const config = settingsToConfig(mutated)
     const roundtripped = configToSettings(config as Record<string, unknown>, [])
     expect(roundtripped).toEqual(mutated)
+  })
+
+  test('audienceByAccount drops invalid audiences with a warning', () => {
+    const warnings: string[] = []
+    const settings = configToSettings(
+      { audienceByAccount: { good: 'ic3', bad: 'outlook', alsoBad: 5 } } as Record<string, unknown>,
+      warnings,
+    )
+    expect(settings.audienceByAccount).toEqual({ good: 'ic3' })
+    expect(warnings.some((w) => w.includes('alsoBad'))).toBe(true)
+    expect(warnings.some((w) => w.includes('bad'))).toBe(true)
   })
 })

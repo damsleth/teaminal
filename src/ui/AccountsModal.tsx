@@ -2,7 +2,8 @@ import { Box, Text, useApp, useInput } from 'ink'
 import { useState } from 'react'
 import { listProfilesFromStatus, type OwaPiggyProfileStatus } from '../auth/owaPiggy'
 import { updateSettings } from '../config'
-import type { Settings } from '../state/store'
+import { setAudiencePreference } from '../graph/client'
+import { audienceForAccount, otherAudience, type Settings } from '../state/store'
 import { useSessionApi } from './SessionContext'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
@@ -151,6 +152,22 @@ export function AccountsModal() {
         if (profile) setMode({ kind: 'confirm-remove', profile })
         return
       }
+      // Toggle the focused account's preferred token audience (graph ↔ ic3).
+      if (ch === 't' && settings.accounts.length > 0) {
+        const profile = settings.accounts[clamp(mode.cursor, settings.accounts.length)]
+        if (!profile) return
+        const next = otherAudience(audienceForAccount(settings, profile))
+        const audienceByAccount = { ...settings.audienceByAccount, [profile]: next }
+        void persist({ audienceByAccount }).then(() => {
+          // If we just changed the active account's audience, apply it to
+          // the graph client immediately (fallback on, since this is now
+          // an explicit preference).
+          if (profile === settings.activeAccount) {
+            setAudiencePreference(next, { fallback: true })
+          }
+        })
+        return
+      }
       // Enter switches to the selected account.
       if (key.return && settings.accounts.length > 0) {
         const profile = settings.accounts[clamp(mode.cursor, settings.accounts.length)]
@@ -232,6 +249,7 @@ export function AccountsModal() {
                   {profile}
                   <Text color={theme.mutedText}>
                     {settings.activeAccount === profile ? '  active' : ''}
+                    {`  [${audienceForAccount(settings, profile)}]`}
                   </Text>
                 </Text>
               ))
@@ -239,7 +257,7 @@ export function AccountsModal() {
             {mode.error && <Text color={theme.errorText}>{mode.error.slice(0, 180)}</Text>}
             <Box height={1} />
             <Text color={theme.mutedText}>
-              Enter switch · a add account · d/Delete remove · Esc close
+              Enter switch · a add · d remove · t audience (graph/ic3) · Esc close
             </Text>
           </>
         )}

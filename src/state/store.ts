@@ -310,6 +310,33 @@ export type Settings = {
   //              information the status bar would have shown.
   // A 'top' option is plausible but deferred until asked for.
   statusBarPosition: 'bottom' | 'hidden'
+  // Per-account preferred owa-piggy token audience, keyed by profile/
+  // account name. 'graph' (default when an account is absent from the
+  // map) uses the Microsoft Graph audience; 'ic3' uses the Teams chatsvc
+  // (ic3.teams.office.com) audience. The graph client tries the preferred
+  // audience first and falls back to the other on a persistent 401 or
+  // when the preferred audience can't be minted. Toggled per account in
+  // the esc-menu Accounts list.
+  audienceByAccount: Record<string, TokenAudience>
+}
+
+export type TokenAudience = 'graph' | 'ic3'
+
+export const DEFAULT_TOKEN_AUDIENCE: TokenAudience = 'graph'
+
+// Resolve the preferred token audience for an account, defaulting to
+// graph when the account has no explicit preference.
+export function audienceForAccount(
+  settings: Pick<Settings, 'audienceByAccount'>,
+  account: string | null | undefined,
+): TokenAudience {
+  if (!account) return DEFAULT_TOKEN_AUDIENCE
+  return settings.audienceByAccount[account] ?? DEFAULT_TOKEN_AUDIENCE
+}
+
+// The "other" audience, used as the automatic fallback target.
+export function otherAudience(audience: TokenAudience): TokenAudience {
+  return audience === 'graph' ? 'ic3' : 'graph'
 }
 
 export const defaultSettings: Settings = {
@@ -342,6 +369,7 @@ export const defaultSettings: Settings = {
   inlineImages: 'auto',
   inlineImageMaxRows: 10,
   statusBarPosition: 'bottom',
+  audienceByAccount: {},
 }
 
 export type MessageCache = {

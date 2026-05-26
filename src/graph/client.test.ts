@@ -14,6 +14,7 @@ import {
   parseRetryAfter,
   RateLimitError,
   setActiveProfile,
+  setAudiencePreference,
 } from './client'
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
@@ -239,6 +240,79 @@ describe('401 handling', () => {
     expect((err as GraphError).status).toBe(401)
     expect((err as GraphError).message).toMatch(/still no good/)
     expect(httpCalls).toBe(2)
+  })
+})
+
+describe('audience preference + fallback', () => {
+  test('requests the preferred audience for default (no-scope) calls', async () => {
+    const seenArgs: string[][] = []
+    setAuthRunner(async (args) => {
+      seenArgs.push(args)
+      return { stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }
+    })
+    __setTransportForTests(async () => jsonResponse({ value: [] }))
+    setAudiencePreference('ic3', { fallback: true })
+
+    await graph({ method: 'GET', path: '/chats' })
+    expect(seenArgs[0]).toEqual(['token', '--audience', 'ic3'])
+  })
+
+  test('falls back to the other audience on a persistent 401 when enabled', async () => {
+    const seenArgs: string[][] = []
+    setAuthRunner(async (args) => {
+      seenArgs.push(args)
+      return { stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }
+    })
+    let httpCalls = 0
+    __setTransportForTests(async () => {
+      httpCalls++
+      // ic3 (attempt 1) + ic3-retry (attempt 2) 401; graph fallback (attempt 3) succeeds.
+      if (httpCalls < 3) {
+        return jsonResponse({ error: { code: 'x', message: 'no' } }, { status: 401 })
+      }
+      return jsonResponse({ value: [] })
+    })
+    setAudiencePreference('ic3', { fallback: true })
+
+    await graph({ method: 'GET', path: '/chats' })
+    expect(httpCalls).toBe(3)
+    const audiences = seenArgs.map((a) => a[a.indexOf('--audience') + 1])
+    expect(audiences).toEqual(['ic3', 'ic3', 'graph'])
+  })
+
+  test('does not fall back when fallback is disabled', async () => {
+    setAuthRunner(async () => ({ stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }))
+    let httpCalls = 0
+    __setTransportForTests(async () => {
+      httpCalls++
+      return jsonResponse({ error: { code: 'x', message: 'no' } }, { status: 401 })
+    })
+    setAudiencePreference('ic3', { fallback: false })
+
+    await graph({ method: 'GET', path: '/chats' }).catch(() => {})
+    // ic3 attempt + one same-audience retry only; no graph fallback.
+    expect(httpCalls).toBe(2)
+  })
+
+  test('explicit scope is never rewritten by the audience preference', async () => {
+    const seenArgs: string[][] = []
+    setAuthRunner(async (args) => {
+      seenArgs.push(args)
+      return { stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }
+    })
+    __setTransportForTests(async () => jsonResponse({ value: [] }))
+    setAudiencePreference('ic3', { fallback: true })
+
+    await graph({
+      method: 'GET',
+      path: '/chats',
+      scope: 'https://presence.teams.microsoft.com/.default',
+    })
+    expect(seenArgs[0]).toEqual([
+      'token',
+      '--scope',
+      'https://presence.teams.microsoft.com/.default',
+    ])
   })
 })
 

@@ -238,6 +238,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     inlineImages: settings.inlineImages,
     inlineImageMaxRows: settings.inlineImageMaxRows,
     statusBarPosition: settings.statusBarPosition,
+    audienceByAccount: { ...settings.audienceByAccount },
   }
 }
 
@@ -316,6 +317,7 @@ function cloneSettings(settings: Settings): Settings {
     ...settings,
     accounts: [...settings.accounts],
     themeOverrides: cloneThemeOverrides(settings.themeOverrides),
+    audienceByAccount: { ...settings.audienceByAccount },
   }
 }
 
@@ -470,7 +472,34 @@ function validateAndAssign(
       }
       warnings.push('config: "statusBarPosition" must be "bottom" or "hidden"')
       return false
+    case 'audienceByAccount': {
+      const parsed = validateAudienceByAccount(value, warnings)
+      if (parsed) {
+        out.audienceByAccount = parsed
+        return true
+      }
+      return false
+    }
   }
+}
+
+function validateAudienceByAccount(
+  value: unknown,
+  warnings: string[],
+): Record<string, 'graph' | 'ic3'> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    warnings.push('config: "audienceByAccount" must be a JSON object')
+    return null
+  }
+  const out: Record<string, 'graph' | 'ic3'> = {}
+  for (const [account, aud] of Object.entries(value)) {
+    if (aud === 'graph' || aud === 'ic3') {
+      out[account] = aud
+    } else {
+      warnings.push(`config: audienceByAccount["${account}"] must be "graph" or "ic3" — ignored`)
+    }
+  }
+  return out
 }
 
 function validateThemeOverrides(value: unknown, warnings: string[]): ThemeOverrides | null {
