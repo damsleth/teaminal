@@ -378,6 +378,44 @@ export async function listChannelMessagesViaChatsvcNextPage(
   }, opts)
 }
 
+// Read messages for a 1:1 / group CHAT thread via chatsvc. Same endpoint
+// as the channel reader, but chats are flat: there are no thread-root vs
+// reply distinctions, so we keep every message (channel reads filter
+// replies out because the UI fetches channel replies separately). Used as
+// the fallback when graph /chats/{id}/messages is Conditional-Access
+// gated. Auth is the skype token (default owa-piggy client mints it).
+export async function listChatMessagesViaChatsvc(
+  threadId: string,
+  opts?: ChatsvcOpts & { pageSize?: number },
+): Promise<ChatsvcChannelMessagesPage> {
+  return withSkypeAuth(async () => {
+    const pageSize = opts?.pageSize ?? DEFAULT_PAGE_SIZE
+    const r = await region(opts)
+    const url = `${TEAMS_ORIGIN}/api/chatsvc/${r}/v1/users/ME/conversations/${encodeURIComponent(
+      threadId,
+    )}/messages?pageSize=${pageSize}&startTime=1&view=msnp24`
+    const res = await chatsvcGet<SkypeMessagesResponse>(url, opts)
+    if (res.status < 200 || res.status >= 300) {
+      throw new TeamsChatsvcError(
+        res.status,
+        `teams chatsvc chat messages ${res.status}: ${res.text || 'request failed'}`,
+      )
+    }
+    const raw = res.body?.messages ?? []
+    const mapped = raw
+      .map(skypeToChannelMessage)
+      .filter((m) => m.id.length > 0)
+      .reverse()
+    if (mapped.length === 0) {
+      diagnoseEmptyResponse(threadId, res.status, res.body, res.text)
+    }
+    return {
+      messages: mapped,
+      backwardLink: res.body?._metadata?.backwardLink,
+    }
+  }, opts)
+}
+
 export type SendChatsvcOpts = ChatsvcOpts & {
   /** When set, the message is posted as a reply to this thread root. */
   replyToId?: string

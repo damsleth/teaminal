@@ -9,8 +9,20 @@
 //     visible/active chats
 
 import { graph, GraphError } from './client'
+import { listChatMessagesViaChatsvc } from './teamsChatsvc'
 import { createOneOnOneThreadViaChatsvc } from './teamsFederation'
+import { recordEvent } from '../log'
 import type { Chat, ChatMessage, DirectoryUser, Person } from '../types'
+
+// Once graph /chats/{id}/messages 401s (Conditional Access gate on
+// graph.microsoft.com), read chat messages through chatsvc for the rest
+// of the session — the same path channels already use, authenticated with
+// the skype token. Latched so we don't re-hit the graph 401 every poll.
+let useChatsvcForMessages = false
+
+export function __resetChatMessageFallbackForTests(): void {
+  useChatsvcForMessages = false
+}
 
 type CollectionResponse<T> = { value: T[]; '@odata.nextLink'?: string }
 
@@ -147,6 +159,9 @@ export async function listMessagesPage(
   chatId: string,
   opts?: ListMessagesOpts,
 ): Promise<MessagesPage> {
+  if (useChatsvcForMessages) {
+    return chatsvcMessagesPage(chatId, opts)
+  }
   const query: Record<string, string | number | undefined> = {
     $top: opts?.top ?? MESSAGES_TOP_DEFAULT,
     $orderby: 'createdDateTime desc',
@@ -154,16 +169,40 @@ export async function listMessagesPage(
   if (opts?.beforeCreatedDateTime) {
     query.$filter = `createdDateTime lt ${opts.beforeCreatedDateTime}`
   }
-  const res = await graph<CollectionResponse<ChatMessage>>({
-    method: 'GET',
-    path: `/chats/${encodeURIComponent(chatId)}/messages`,
-    query,
-    signal: opts?.signal,
-  })
-  return {
-    messages: res.value.slice().reverse(),
-    nextLink: res['@odata.nextLink'],
+  try {
+    const res = await graph<CollectionResponse<ChatMessage>>({
+      method: 'GET',
+      path: `/chats/${encodeURIComponent(chatId)}/messages`,
+      query,
+      signal: opts?.signal,
+    })
+    return {
+      messages: res.value.slice().reverse(),
+      nextLink: res['@odata.nextLink'],
+    }
+  } catch (err) {
+    if (err instanceof GraphError && err.status === 401) {
+      useChatsvcForMessages = true
+      recordEvent(
+        'graph',
+        'warn',
+        'graph chat messages 401 (likely Conditional Access) — switching to chatsvc',
+      )
+      return chatsvcMessagesPage(chatId, opts)
+    }
+    throw err
   }
+}
+
+// chatsvc returns the most-recent page; older-page paging via chatsvc's
+// backwardLink isn't wired through MessagesPage yet (nextLink is a Graph
+// URL). Returning no nextLink simply means "no older page" for now.
+async function chatsvcMessagesPage(chatId: string, opts?: ListMessagesOpts): Promise<MessagesPage> {
+  const page = await listChatMessagesViaChatsvc(chatId, {
+    ...(opts?.signal ? { signal: opts.signal } : {}),
+    ...(opts?.top ? { pageSize: opts.top } : {}),
+  })
+  return { messages: page.messages }
 }
 
 export async function listMessagesNextPage(

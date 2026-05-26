@@ -7,6 +7,7 @@ import {
   __resetForTests,
   __setTransportForTests,
   listChannelMessagesViaChatsvc,
+  listChatMessagesViaChatsvc,
   parseFrom,
   parseReactions,
   sendChannelMessageViaChatsvc,
@@ -210,6 +211,25 @@ describe('listChannelMessagesViaChatsvc', () => {
     )
     const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2')
     expect(page.messages.map((m) => m.id)).toEqual(['1'])
+  })
+
+  test('listChatMessagesViaChatsvc keeps all messages (chats are flat, no reply filter)', async () => {
+    primeAuth()
+    let seenUrl = ''
+    __setTransportForTests(async (url) => {
+      seenUrl = url
+      return jsonResponse({
+        messages: [
+          // a chat quoted-reply has parentmessageid set but is still a
+          // top-level chat message — must NOT be dropped.
+          { id: '2', messagetype: 'Text', properties: { parentmessageid: '1' } },
+          { id: '1', messagetype: 'Text' },
+        ],
+      })
+    })
+    const page = await listChatMessagesViaChatsvc('19:a_b@unq.gbl.spaces')
+    expect(page.messages.map((m) => m.id)).toEqual(['1', '2'])
+    expect(seenUrl).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
   })
 
   test('on 401 invalidates the Skype token and retries the request once', async () => {
