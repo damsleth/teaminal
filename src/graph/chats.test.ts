@@ -509,4 +509,30 @@ describe('sendMessage', () => {
     await sendMessage('19:abc@unq.gbl.spaces', 'hi', { signal: ctrl.signal })
     expect(seenSignal).toBe(ctrl.signal)
   })
+
+  test('falls back to chatsvc send when graph POST 401s', async () => {
+    primeAuth()
+    __setRegionForTests(undefined, 'emea')
+    __setTransportForTests(async () =>
+      jsonResponse({ error: { code: 'Unauthorized', message: 'CA' } }, { status: 401 }),
+    )
+    setFederationTransport(async () =>
+      jsonResponse({ tokens: { skypeToken: 'skype-test', expiresIn: 3600 } }),
+    )
+    let chatsvcPost = ''
+    setChatsvcTransport(async (url, init) => {
+      chatsvcPost = `${init.method} ${url}`
+      return new Response(
+        JSON.stringify({ id: 'srv-1', OriginalArrivalTime: '2026-04-29T09:00:00Z' }),
+        {
+          status: 201,
+          headers: { 'content-type': 'application/json' },
+        },
+      )
+    })
+    const created = await sendMessage('19:aaaa_bbbb@unq.gbl.spaces', 'hello')
+    expect(chatsvcPost).toContain('POST')
+    expect(chatsvcPost).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
+    expect(created.body.content).toBe('hello')
+  })
 })
