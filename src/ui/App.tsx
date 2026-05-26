@@ -35,6 +35,7 @@ import { AccountsModal } from './AccountsModal'
 import { AuthExpiredModal } from './AuthExpiredModal'
 import { ChatList } from './ChatList'
 import { Composer } from './Composer'
+import { ActivityModal, openActivity } from './ActivityModal'
 import { DiagnosticsModal } from './DiagnosticsModal'
 import { EventsModal } from './EventsModal'
 import { HeaderBar } from './HeaderBar'
@@ -255,6 +256,10 @@ export function App() {
         hardRefresh()
         return
       }
+      if (key.ctrl && input === 'a') {
+        openActivity(store)
+        return
+      }
       if (key.tab && focus.kind !== 'list') {
         store.set({ inputZone: 'composer' })
         return
@@ -345,6 +350,7 @@ export function App() {
     | 'diagnostics'
     | 'events'
     | 'network'
+    | 'activity'
     | null = modal && modal.kind !== 'auth-expired' ? modal.kind : null
   const replaceModal = modal?.kind === 'auth-expired' ? modal : null
   const theme = useTheme()
@@ -415,6 +421,8 @@ export function App() {
                     <DiagnosticsModal />
                   ) : overlayModalKind === 'events' ? (
                     <EventsModal />
+                  ) : overlayModalKind === 'activity' ? (
+                    <ActivityModal />
                   ) : (
                     <NetworkModal />
                   )}
