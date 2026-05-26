@@ -117,14 +117,21 @@ describe('parseActivityItem', () => {
 })
 
 describe('listActivityFeed', () => {
-  test('hits the regional CSA endpoint with the Skype token', async () => {
-    primeAuth()
+  test('hits the regional CSA endpoint with the csa-audience Bearer', async () => {
+    const csaToken = makeJwt({ exp: FAR_FUTURE, aud: 'https://chatsvcagg.teams.microsoft.com' })
+    const runnerArgs: string[][] = []
+    setAuthRunner(async (args) => {
+      runnerArgs.push(args)
+      return { stdout: csaToken, stderr: '', exitCode: 0 }
+    })
     let seenUrl = ''
     let seenAuth = ''
+    let seenSkype = ''
     __setTransportForTests(async (url, init) => {
       seenUrl = url
       const headers = new Headers(init.headers as Record<string, string>)
-      seenAuth = headers.get('x-skypetoken') ?? ''
+      seenAuth = headers.get('authorization') ?? ''
+      seenSkype = headers.get('x-skypetoken') ?? ''
       return jsonResponse({
         value: [
           {
@@ -140,9 +147,13 @@ describe('listActivityFeed', () => {
 
     const page = await listActivityFeed({ isPrefetch: true })
 
-    expect(seenUrl).toStartWith('https://teams.microsoft.com/api/csa/emea/api/v3/teams/users/me/updates')
+    expect(seenUrl).toStartWith(
+      'https://teams.microsoft.com/api/csa/emea/api/v3/teams/users/me/updates',
+    )
     expect(seenUrl).toContain('isPrefetch=true')
-    expect(seenAuth).toBe('skype-test-token')
+    expect(seenAuth).toBe(`Bearer ${csaToken}`)
+    expect(seenSkype).toBe('') // CSA uses the Bearer, not the skype token
+    expect(runnerArgs.some((a) => a.includes('--audience') && a.includes('csa'))).toBe(true)
     expect(page.items).toHaveLength(1)
     expect(page.items[0]!.id).toBe('a1')
     expect(page.syncState).toBe('cursor-1')
