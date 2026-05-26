@@ -23,13 +23,27 @@ import { getActiveProfile } from './client'
 import { getSkypeToken } from './teamsFederation'
 
 export const FALLBACK_REGION = 'emea'
+export const TEAMS_ORIGIN = 'https://teams.microsoft.com'
 
 export type RegionResolveOpts = {
   profile?: string
   signal?: AbortSignal
 }
 
+// Per-profile Teams service endpoints, derived from the authz response's
+// `region`/`partition` fields and the `regionGtms` map. teaminal builds
+// most URLs as `teams.microsoft.com/api/{svc}/{region}/...`, but the
+// middle-tier path uses the partition segment (e.g. `emea-02`), which we
+// pull from `regionGtms.middleTier`.
+export type TeamsEndpoints = {
+  // Short region for chatsvc / csa / ups path segments (e.g. 'emea').
+  region: string
+  // Partition path segment for /api/mt/part/{partition} (e.g. 'emea-02').
+  partition: string
+}
+
 const regionCache = new Map<string, string>()
+const partitionCache = new Map<string, string>()
 // Trouter registration URL is also derived from the authsvc response
 // (under `regionGtms.trouter`). Cache it alongside the region so the
 // trouter transport doesn't have to issue a parallel authsvc call.
@@ -82,13 +96,22 @@ export function pickRegionFromGtms(
   return null
 }
 
+// Pull the partition path segment from the middleTier URL, e.g.
+// `https://teams.microsoft.com/api/mt/part/emea-02` → `emea-02`. The
+// top-level `partition` field (`emea02`) lacks the dash the path needs,
+// so the URL is the reliable source.
+export function partitionFromMiddleTier(url: string | undefined | null): string | null {
+  if (!url || typeof url !== 'string') return null
+  const m = url.match(/\/api\/mt\/part\/([a-z0-9-]+)/i)
+  return m ? m[1]!.toLowerCase() : null
+}
+
 // Populate the cache from authsvc data. Called by getSkypeToken when
 // it sees a fresh authsvc response.
 export function ingestAuthzData(profile: string | undefined, data: unknown): void {
   if (!data || typeof data !== 'object') return
-  const regionGtms = (data as Record<string, unknown>).regionGtms as
-    | Record<string, unknown>
-    | undefined
+  const obj = data as Record<string, unknown>
+  const regionGtms = obj.regionGtms as Record<string, unknown> | undefined
   const key = profile ?? '<default>'
   const region = pickRegionFromGtms(regionGtms)
   if (region) {
@@ -98,6 +121,10 @@ export function ingestAuthzData(profile: string | undefined, data: unknown): voi
       recordEvent('graph', 'info', `teams region resolved to "${region}" for profile ${key}`)
     }
   }
+  const partition = partitionFromMiddleTier(
+    regionGtms && typeof regionGtms.middleTier === 'string' ? regionGtms.middleTier : undefined,
+  )
+  if (partition) partitionCache.set(key, partition)
   const trouterUrl =
     regionGtms && typeof regionGtms.trouter === 'string' ? regionGtms.trouter : undefined
   if (trouterUrl) trouterUrlCache.set(key, trouterUrl)
@@ -133,11 +160,46 @@ export async function resolveRegion(opts?: RegionResolveOpts): Promise<string> {
   return regionCache.get(key) ?? FALLBACK_REGION
 }
 
+// Default partition path when authz didn't surface a middleTier URL.
+// The mt path generally mirrors the region with a `-01` partition suffix;
+// `emea` → `emea-01`. This is only a last resort — the real value comes
+// from regionGtms.middleTier.
+function defaultPartition(region: string): string {
+  return `${region}-01`
+}
+
+export function getCachedEndpoints(opts?: RegionResolveOpts): TeamsEndpoints | undefined {
+  const key = cacheKey(opts)
+  const region = regionCache.get(key)
+  if (!region) return undefined
+  return {
+    region,
+    partition: partitionCache.get(key) ?? defaultPartition(region),
+  }
+}
+
+// Resolve the full Teams endpoint set for a profile, triggering an authsvc
+// round-trip (via getSkypeToken) if the cache is cold. Falls back to the
+// default region/partition on hard failure.
+export async function resolveEndpoints(opts?: RegionResolveOpts): Promise<TeamsEndpoints> {
+  const region = await resolveRegion(opts)
+  const key = cacheKey(opts)
+  return {
+    region,
+    partition: partitionCache.get(key) ?? defaultPartition(region),
+  }
+}
+
 export function __resetForTests(): void {
   regionCache.clear()
+  partitionCache.clear()
   trouterUrlCache.clear()
 }
 
 export function __setRegionForTests(profile: string | undefined, region: string): void {
   regionCache.set(profile ?? '<default>', region)
+}
+
+export function __setPartitionForTests(profile: string | undefined, partition: string): void {
+  partitionCache.set(profile ?? '<default>', partition)
 }

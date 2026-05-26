@@ -11,8 +11,10 @@ import {
   __resetForTests,
   __setRegionForTests,
   FALLBACK_REGION,
+  getCachedEndpoints,
   getCachedRegion,
   ingestAuthzData,
+  partitionFromMiddleTier,
   pickRegionFromGtms,
   regionFromHost,
   resolveRegion,
@@ -85,6 +87,22 @@ describe('pickRegionFromGtms', () => {
   })
 })
 
+describe('partitionFromMiddleTier', () => {
+  test('extracts the partition path segment from a middleTier URL', () => {
+    expect(
+      partitionFromMiddleTier('https://teams.microsoft.com/api/mt/part/emea-02'),
+    ).toBe('emea-02')
+    expect(
+      partitionFromMiddleTier('https://teams.microsoft.com/api/mt/part/amer-05/'),
+    ).toBe('amer-05')
+  })
+
+  test('returns null for non-matching input', () => {
+    expect(partitionFromMiddleTier('https://teams.microsoft.com')).toBeNull()
+    expect(partitionFromMiddleTier(undefined)).toBeNull()
+  })
+})
+
 describe('ingestAuthzData', () => {
   test('caches the resolved region per profile', () => {
     ingestAuthzData('demo', {
@@ -93,9 +111,35 @@ describe('ingestAuthzData', () => {
     expect(getCachedRegion({ profile: 'demo' })).toBe('amer')
   })
 
+  test('caches region + partition into the endpoints map', () => {
+    ingestAuthzData('demo', {
+      region: 'emea',
+      partition: 'emea02',
+      regionGtms: {
+        chatService: 'https://emea.ng.msg.teams.microsoft.com',
+        middleTier: 'https://teams.microsoft.com/api/mt/part/emea-02',
+      },
+    })
+    expect(getCachedEndpoints({ profile: 'demo' })).toEqual({
+      region: 'emea',
+      partition: 'emea-02',
+    })
+  })
+
+  test('falls back to {region}-01 partition when middleTier is absent', () => {
+    ingestAuthzData('demo', {
+      regionGtms: { chatService: 'https://apac.ng.msg.teams.microsoft.com' },
+    })
+    expect(getCachedEndpoints({ profile: 'demo' })).toEqual({
+      region: 'apac',
+      partition: 'apac-01',
+    })
+  })
+
   test('ignores payloads without a parseable region', () => {
     ingestAuthzData('demo', { regionGtms: { chatService: 'https://teams.microsoft.com' } })
     expect(getCachedRegion({ profile: 'demo' })).toBeUndefined()
+    expect(getCachedEndpoints({ profile: 'demo' })).toBeUndefined()
   })
 })
 
