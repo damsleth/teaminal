@@ -18,15 +18,10 @@
 // 401s flow through withSkypeAuth so a stale cache hit doesn't kill the
 // hydration.
 
-import { getToken, invalidate as invalidateOwaPiggy } from '../auth/owaPiggy'
 import { recordEvent, recordRequest } from '../log'
 import { getActiveProfile } from './client'
+import { csaHeaders, getCsaToken, withCsaAuth } from './csaAuth'
 import { resolveRegion, TEAMS_ORIGIN } from './teamsRegion'
-
-// CSA (chat-service aggregator) endpoints authenticate with a Bearer
-// token for aud=chatsvcagg.teams.microsoft.com — NOT the skype token and
-// NOT the ic3 token. owa-piggy mints it under the named `csa` audience.
-const CSA_AUDIENCE = 'csa'
 
 export class TeamsActivityError extends Error {
   constructor(
@@ -96,33 +91,6 @@ async function region(opts?: ActivityOpts): Promise<string> {
 
 function profile(opts?: ActivityOpts): string | undefined {
   return opts?.profile ?? getActiveProfile()
-}
-
-function activityHeaders(bearer: string): Record<string, string> {
-  return {
-    Accept: 'application/json',
-    Authorization: `Bearer ${bearer}`,
-    'x-ms-client-type': 'teaminal',
-    'x-ms-client-caller': 'teaminal-activity',
-    'x-client-ui-language': 'en-us',
-  }
-}
-
-// Run fn() with a fresh CSA Bearer; on a 401 invalidate the owa-piggy csa
-// token and retry once (covers a stale cache hit / token expiry).
-async function withCsaAuth<T>(fn: () => Promise<T>, profileName: string | undefined): Promise<T> {
-  try {
-    return await fn()
-  } catch (err) {
-    const status =
-      err && typeof err === 'object' && 'status' in err
-        ? (err as { status: unknown }).status
-        : undefined
-    if (status !== 401) throw err
-    recordEvent('graph', 'warn', 'csa 401, invalidating token and retrying once')
-    invalidateOwaPiggy({ profile: profileName, audience: CSA_AUDIENCE })
-    return await fn()
-  }
 }
 
 async function safeText(res: Response): Promise<string> {
@@ -295,13 +263,13 @@ export async function listActivityFeed(opts?: ActivityOpts): Promise<ActivityPag
     })
     if (opts?.syncState) params.set('syncState', opts.syncState)
     const url = `${TEAMS_ORIGIN}/api/csa/${r}/api/v3/teams/users/me/updates?${params.toString()}`
-    const token = await getToken({ profile: profile(opts), audience: CSA_AUDIENCE })
+    const token = await getCsaToken(profile(opts))
     const startedAt = Date.now()
     let res: Response
     try {
       res = await transport(url, {
         method: 'GET',
-        headers: activityHeaders(token),
+        headers: csaHeaders(token),
         signal: opts?.signal,
       })
     } catch (err) {
