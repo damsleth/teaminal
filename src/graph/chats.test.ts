@@ -5,6 +5,7 @@ import {
 } from '../auth/owaPiggy'
 import { __resetForTests, __setTransportForTests } from './client'
 import {
+  __resetChatMessageFallbackForTests,
   createGroupChat,
   createOneOnOneChat,
   getChat,
@@ -17,6 +18,15 @@ import {
   searchUsers,
   sendMessage,
 } from './chats'
+import {
+  __resetForTests as resetChatsvc,
+  __setTransportForTests as setChatsvcTransport,
+} from './teamsChatsvc'
+import {
+  __resetForTests as resetFederation,
+  __setTransportForTests as setFederationTransport,
+} from './teamsFederation'
+import { __resetForTests as resetRegion, __setRegionForTests } from './teamsRegion'
 import type { Chat, ChatMessage } from '../types'
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
@@ -45,6 +55,10 @@ function primeAuth(): void {
 afterEach(() => {
   __resetForTests()
   resetAuth()
+  resetChatsvc()
+  resetFederation()
+  resetRegion()
+  __resetChatMessageFallbackForTests()
 })
 
 const SAMPLE_CHAT: Chat = {
@@ -265,6 +279,50 @@ describe('listMessages', () => {
     const page = await listMessagesNextPage(nextLink)
     expect(seenUrl).toBe(nextLink)
     expect(page.messages.map((x) => x.id)).toEqual(['a', 'b'])
+  })
+
+  test('falls back to chatsvc when graph /chats/{id}/messages 401s', async () => {
+    primeAuth()
+    __setRegionForTests(undefined, 'emea')
+    // graph chat messages → 401 (Conditional Access).
+    __setTransportForTests(async () =>
+      jsonResponse({ error: { code: 'Unauthorized', message: 'CA' } }, { status: 401 }),
+    )
+    // federation transport serves the authsvc → skype token exchange.
+    setFederationTransport(async () =>
+      jsonResponse({ tokens: { skypeToken: 'skype-test', expiresIn: 3600 } }),
+    )
+    // chatsvc returns the chat's messages (skype-token authenticated).
+    let chatsvcUrl = ''
+    setChatsvcTransport(async (url) => {
+      chatsvcUrl = url
+      return jsonResponse({
+        messages: [
+          {
+            id: '2',
+            messagetype: 'Text',
+            originalarrivaltime: '2026-04-29T09:10:00Z',
+            content: 'b',
+          },
+          {
+            id: '1',
+            messagetype: 'Text',
+            originalarrivaltime: '2026-04-29T09:00:00Z',
+            content: 'a',
+          },
+        ],
+      })
+    })
+
+    const page = await listMessagesPage('19:aaaa_bbbb@unq.gbl.spaces')
+    // chronological (oldest first), all messages kept.
+    expect(page.messages.map((m) => m.id)).toEqual(['1', '2'])
+    expect(chatsvcUrl).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
+
+    // Latched: a second call goes straight to chatsvc (graph transport
+    // would still 401, but we never hit it).
+    const page2 = await listMessagesPage('19:aaaa_bbbb@unq.gbl.spaces')
+    expect(page2.messages.map((m) => m.id)).toEqual(['1', '2'])
   })
 })
 
