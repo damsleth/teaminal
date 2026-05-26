@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { graphBinary } from '../graph/client'
+import { fetchObjectByUrl, isAsyncGwUrl } from '../graph/teamsAsyncGw'
 import { recordEvent } from '../log'
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024
@@ -96,7 +97,16 @@ export async function fetchAndCacheImage(
 
   let bytes: Uint8Array
   try {
-    if (opts?.isExternal) {
+    if (opts?.isExternal && isAsyncGwUrl(path)) {
+      // AsyncGW URLs aren't really "external" — they need a session
+      // cookie obtained from aadtokenauth. Route them through the
+      // asyncgw client which mints/refreshes the cookie as needed.
+      const fetched = await fetchObjectByUrl(path, {
+        profile: opts.profile,
+        signal: opts.signal,
+      })
+      bytes = fetched.bytes
+    } else if (opts?.isExternal) {
       bytes = await fetchExternalImage(path, opts?.signal)
     } else {
       bytes = await graphBinary({ method: 'GET', path, signal: opts?.signal })

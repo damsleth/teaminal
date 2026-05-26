@@ -12,7 +12,11 @@
 // uses them as "something changed" signals that trigger authoritative
 // Graph fetches through the existing poller.
 
+import { getActiveProfile } from '../graph/client'
+import { listActivityFeed } from '../graph/teamsActivity'
+import { recordEvent } from '../log'
 import type { RealtimeEventBus } from '../realtime/events'
+import { countUnreadMentions, mergeActivityItems } from './activityFeed'
 import type { AppState, ConvKey, Store, TypingIndicator } from './store'
 import type { PollerHandle } from './poller'
 
@@ -59,6 +63,51 @@ export function startRealtimeBridge(opts: RealtimeBridgeOpts): RealtimeBridgeHan
         getPoller()?.refresh()
       }),
     )
+  }
+
+  // --- CSA activity feed reconcile ---
+  // Trouter push events tell us *something happened*, but the canonical
+  // shape we render in the activity modal comes from /api/csa/...updates.
+  // Throttle to one refresh every 15s so a flurry of reactions doesn't
+  // hammer the endpoint.
+  const ACTIVITY_REFRESH_THROTTLE_MS = 15_000
+  let lastActivityRefreshAt = 0
+  let pendingActivityTimer: ReturnType<typeof setTimeout> | null = null
+  const refreshActivity = (): void => {
+    const now = Date.now()
+    const wait = Math.max(0, ACTIVITY_REFRESH_THROTTLE_MS - (now - lastActivityRefreshAt))
+    if (pendingActivityTimer) return
+    pendingActivityTimer = setTimeout(() => {
+      pendingActivityTimer = null
+      lastActivityRefreshAt = Date.now()
+      void (async () => {
+        try {
+          const page = await listActivityFeed({
+            profile: getActiveProfile(),
+            syncState: store.get().activitySyncState,
+          })
+          if (page.items.length === 0) return
+          store.set((s) => {
+            const merged = mergeActivityItems(s.activityFeed, page.items)
+            return {
+              activityFeed: merged,
+              unreadMentionCount: countUnreadMentions(merged),
+              activitySyncState: page.syncState ?? s.activitySyncState,
+            }
+          })
+        } catch (err) {
+          recordEvent(
+            'graph',
+            'debug',
+            `activity refresh skipped: ${err instanceof Error ? err.message : String(err)}`,
+          )
+        }
+      })()
+    }, wait)
+  }
+
+  for (const kind of ['new-message', 'reaction-added', 'message-edited'] as const) {
+    unsubs.push(bus.onKind(kind, refreshActivity))
   }
 
   // --- Typing indicators ---
@@ -184,6 +233,10 @@ export function startRealtimeBridge(opts: RealtimeBridgeOpts): RealtimeBridgeHan
   return {
     stop() {
       clearInterval(cleanupTimer)
+      if (pendingActivityTimer) {
+        clearTimeout(pendingActivityTimer)
+        pendingActivityTimer = null
+      }
       for (const unsub of unsubs) unsub()
     },
   }

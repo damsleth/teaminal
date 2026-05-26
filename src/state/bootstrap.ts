@@ -15,12 +15,14 @@ import { getToken } from '../auth/owaPiggy'
 import { probeCapabilities } from '../graph/capabilities'
 import { setActiveProfile } from '../graph/client'
 import { getMe } from '../graph/me'
+import { listActivityFeed } from '../graph/teamsActivity'
 import { recordEvent, warn } from '../log'
 import { drainNotifications, notifyMention } from '../notify'
 import { RealtimeEventBus } from '../realtime/events'
 import { setActiveTransport } from '../realtime/transport'
 import { TrouterTransport } from '../realtime/trouter'
 import { htmlToText } from '../text/html'
+import { mergeActivityItems, countUnreadMentions } from './activityFeed'
 import { startPoller, type PollerHandleRef } from './poller'
 import { startRealtimeBridge } from './realtimeBridge'
 import type { AppState, Store } from './store'
@@ -41,6 +43,30 @@ export type RunSessionOpts = {
    * after this callback are not retried.
    */
   onFatal: (kind: 'unauthorized', message: string) => void
+}
+
+async function hydrateActivityFeed(
+  store: Store<AppState>,
+  profile: string | undefined,
+): Promise<void> {
+  try {
+    const page = await listActivityFeed({ profile, isPrefetch: true })
+    store.set((s) => {
+      const merged = mergeActivityItems(s.activityFeed, page.items)
+      return {
+        activityFeed: merged,
+        unreadMentionCount: countUnreadMentions(merged),
+        activitySyncState: page.syncState,
+      }
+    })
+    recordEvent('app', 'info', `activity feed hydrated: ${page.items.length} items`)
+  } catch (err) {
+    recordEvent(
+      'app',
+      'warn',
+      `activity feed hydrate skipped: ${err instanceof Error ? err.message : String(err)}`,
+    )
+  }
 }
 
 export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
@@ -153,6 +179,11 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
       store.set({ realtimeState: 'off' })
       recordEvent('trouter', 'info', 'realtime disabled')
     }
+
+    // Initial CSA activity feed hydrate. Best-effort: if the endpoint
+    // 404s on a tenant or auth shape we haven't seen, log and continue —
+    // the rest of the app doesn't depend on it.
+    void hydrateActivityFeed(store, profile ?? undefined)
   } catch (err) {
     // Roll back partial bootstrap so the caller can retry / switch.
     try {

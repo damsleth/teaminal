@@ -8,6 +8,7 @@
 
 import type { Capabilities } from '../graph/capabilities'
 import type { Me } from '../graph/me'
+import type { ActivityItem } from '../graph/teamsActivity'
 import type { Channel, Chat, ChatMessage, LastMessagePreview, Presence, Team } from '../types'
 
 export type Listener<S> = (state: S) => void
@@ -108,6 +109,7 @@ export type ModalState =
   | { kind: 'diagnostics' }
   | { kind: 'events' }
   | { kind: 'network' }
+  | { kind: 'activity'; cursor: number }
   | AccountManagerModalState
   | AuthExpiredModalState
 
@@ -659,6 +661,15 @@ export type AppState = {
   // "updated Ns ago" hint in the StatusBar; undefined while we have not
   // yet completed an initial poll.
   lastListPollAt?: Date
+  // CSA activity feed (bell-icon panel in Teams web). Hydrated once on
+  // launch and reconciled with trouter push events. Newest item first.
+  activityFeed: ActivityItem[]
+  // Server-derived count of unread @mentions across the whole tenant
+  // (includes channel mentions in teams the user hasn't opened yet,
+  // which unreadByChatId can't reach). Cleared as items are marked read.
+  unreadMentionCount: number
+  // Opaque CSA pagination cursor; sent on the next /updates call.
+  activitySyncState?: string | undefined
 }
 
 export function initialAppState(): AppState {
@@ -688,6 +699,8 @@ export function initialAppState(): AppState {
     modal: null,
     customTheme: null,
     settings: { ...defaultSettings },
+    activityFeed: [],
+    unreadMentionCount: 0,
   }
 }
 
