@@ -69,6 +69,36 @@ export function getActiveProfile(): string | undefined {
   return activeProfile
 }
 
+// Per-account audience preference for the default (no-explicit-scope)
+// Graph calls. 'graph' is the out-of-the-box behavior. When set to
+// 'ic3', default calls request the ic3-audience token first; on a
+// persistent 401 the client falls back to the other audience once (when
+// audienceFallback is on). Calls that pass an explicit `scope` are never
+// rewritten — those target a specific audience deliberately.
+type TokenAudience = 'graph' | 'ic3'
+let preferredAudience: TokenAudience = 'graph'
+// Off by default: a plain install with no per-account audience preference
+// behaves exactly as before (graph token, single same-audience 401 retry,
+// no cross-audience fallback request). bootstrap turns this on only for
+// accounts that explicitly opted into a non-default audience.
+let audienceFallback = false
+
+export function setAudiencePreference(
+  audience: TokenAudience,
+  opts?: { fallback?: boolean },
+): void {
+  preferredAudience = audience
+  if (opts?.fallback !== undefined) audienceFallback = opts.fallback
+}
+
+export function getAudiencePreference(): { audience: TokenAudience; fallback: boolean } {
+  return { audience: preferredAudience, fallback: audienceFallback }
+}
+
+function otherAudience(audience: TokenAudience): TokenAudience {
+  return audience === 'graph' ? 'ic3' : 'graph'
+}
+
 type Transport = (url: string, init: RequestInit) => Promise<Response>
 const realTransport: Transport = (url, init) => fetch(url, init)
 let transport: Transport = realTransport
@@ -142,13 +172,32 @@ function extractGraphErrorMessage(body: unknown, fallback: string): string {
   return fallback
 }
 
+type RetryState = {
+  retried401: boolean
+  retried429Count: number
+  // Audience actually in use for this attempt (undefined when an explicit
+  // scope is set — that path never applies the account preference).
+  audience?: TokenAudience
+  // Whether we've already swapped to the fallback audience.
+  triedFallback: boolean
+}
+
+function initialRetryState(opts: GraphOpts): RetryState {
+  return {
+    retried401: false,
+    retried429Count: 0,
+    audience: opts.scope ? undefined : preferredAudience,
+    triedFallback: false,
+  }
+}
+
 async function executeRequest<T>(
   url: string,
   opts: GraphOpts,
-  retried401 = false,
-  retried429Count = 0,
+  state: RetryState = initialRetryState(opts),
 ): Promise<T> {
-  const token = await getToken({ profile: activeProfile, scope: opts.scope })
+  const { retried401, retried429Count, audience } = state
+  const token = await getToken({ profile: activeProfile, scope: opts.scope, audience })
   const headers = new Headers({
     Accept: 'application/json',
   })
@@ -203,9 +252,28 @@ async function executeRequest<T>(
     retried429: retried429Count > 0 || undefined,
   })
 
-  if (res.status === 401 && !retried401) {
-    invalidate({ profile: activeProfile, scope: opts.scope })
-    return executeRequest<T>(url, opts, true, retried429Count)
+  if (res.status === 401) {
+    // First 401: token may have expired between cache validation and
+    // send. Invalidate and retry the same audience once.
+    if (!retried401) {
+      invalidate({ profile: activeProfile, scope: opts.scope, audience })
+      return executeRequest<T>(url, opts, { ...state, retried401: true })
+    }
+    // Persistent 401 on a default (no-explicit-scope) call: fall back to
+    // the other audience once, if enabled. Covers the case where the
+    // preferred audience is rejected outright (wrong audience / CA gate)
+    // but the other one is accepted by this endpoint.
+    if (!opts.scope && audienceFallback && !state.triedFallback) {
+      const fb = otherAudience(audience ?? preferredAudience)
+      invalidate({ profile: activeProfile, audience: fb })
+      return executeRequest<T>(url, opts, {
+        retried401: false,
+        retried429Count,
+        audience: fb,
+        triedFallback: true,
+      })
+    }
+    // else: fall through to the generic error throw below.
   }
 
   if (res.status === 429) {
@@ -223,7 +291,7 @@ async function executeRequest<T>(
     const retryRaw = parseRetryAfter(res.headers.get('Retry-After'), Date.now())
     const waitMs = jitter(retryRaw > 0 ? retryRaw : DEFAULT_429_BACKOFF_MS)
     await sleep(waitMs)
-    return executeRequest<T>(url, opts, retried401, retried429Count + 1)
+    return executeRequest<T>(url, opts, { ...state, retried429Count: retried429Count + 1 })
   }
 
   if (!res.ok) {
@@ -259,10 +327,10 @@ export async function graphBinary(opts: GraphOpts): Promise<Uint8Array> {
 async function executeBinaryRequest(
   url: string,
   opts: GraphOpts,
-  retried401 = false,
-  retried429Count = 0,
+  state: RetryState = initialRetryState(opts),
 ): Promise<Uint8Array> {
-  const token = await getToken({ profile: activeProfile, scope: opts.scope })
+  const { retried401, retried429Count, audience } = state
+  const token = await getToken({ profile: activeProfile, scope: opts.scope, audience })
   const headers = new Headers({ Accept: '*/*' })
   for (const [k, v] of Object.entries(opts.headers ?? {})) {
     if (v === undefined) continue
@@ -301,9 +369,21 @@ async function executeBinaryRequest(
     retried429: retried429Count > 0 || undefined,
   })
 
-  if (res.status === 401 && !retried401) {
-    invalidate({ profile: activeProfile, scope: opts.scope })
-    return executeBinaryRequest(url, opts, true, retried429Count)
+  if (res.status === 401) {
+    if (!retried401) {
+      invalidate({ profile: activeProfile, scope: opts.scope, audience })
+      return executeBinaryRequest(url, opts, { ...state, retried401: true })
+    }
+    if (!opts.scope && audienceFallback && !state.triedFallback) {
+      const fb = otherAudience(audience ?? preferredAudience)
+      invalidate({ profile: activeProfile, audience: fb })
+      return executeBinaryRequest(url, opts, {
+        retried401: false,
+        retried429Count,
+        audience: fb,
+        triedFallback: true,
+      })
+    }
   }
 
   if (res.status === 429) {
@@ -314,7 +394,7 @@ async function executeBinaryRequest(
     const retryRaw = parseRetryAfter(res.headers.get('Retry-After'), Date.now())
     const waitMs = jitter(retryRaw > 0 ? retryRaw : DEFAULT_429_BACKOFF_MS)
     await sleep(waitMs)
-    return executeBinaryRequest(url, opts, retried401, retried429Count + 1)
+    return executeBinaryRequest(url, opts, { ...state, retried429Count: retried429Count + 1 })
   }
 
   if (!res.ok) {
@@ -367,4 +447,6 @@ export function __resetForTests(): void {
   transport = realTransport
   sleep = realSleep
   activeProfile = undefined
+  preferredAudience = 'graph'
+  audienceFallback = false
 }
