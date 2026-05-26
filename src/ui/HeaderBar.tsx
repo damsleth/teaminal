@@ -79,6 +79,7 @@ export function HeaderBar() {
   const capabilities = useAppState((s) => s.capabilities)
   const lastListPollAt = useAppState((s) => s.lastListPollAt)
   const unreadByChatId = useAppState((s) => s.unreadByChatId)
+  const unreadMentionCount = useAppState((s) => s.unreadMentionCount)
   const realtimeState = useAppState((s) => s.realtimeState)
   const theme = useTheme()
 
@@ -132,6 +133,9 @@ export function HeaderBar() {
       <Text color="gray">{` ${conn}`}</Text>
       <Text color="gray">{` · ${chats.length} chats`}</Text>
       {unreadText && <Text color={theme.unread}>{` · ${unreadText.toLowerCase()}`}</Text>}
+      {unreadMentionCount > 0 && (
+        <Text color={theme.unread}>{` · @${unreadMentionCount}`}</Text>
+      )}
       {realtimeState !== 'off' && (
         <>
           <Text color="gray">{' · push '}</Text>

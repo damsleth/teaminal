@@ -12,6 +12,7 @@ import { chatLabel, shortName } from '../state/selectables'
 import { focusKey, type ReadReceipt, type ThreadMeta, type TypingIndicator } from '../state/store'
 import type { Chat, ChatMessage, Channel, Team } from '../types'
 import { htmlToText } from '../text/html'
+import { extractFileAttachments, formatBytes } from '../text/fileAttachments'
 import { extractInlineImages, type InlineImageRef } from '../text/inlineImages'
 import { reactionsSummary } from './reactions'
 import { describeSystemEvent } from './systemEvent'
@@ -591,7 +592,42 @@ function MessageRow(props: {
             theme={theme}
           />
         ))}
+      {!isDeleted &&
+        extractFileAttachments(m).map((file) => (
+          <FileAttachmentRow
+            key={`file-${file.id}`}
+            label={file.name}
+            sizeText={formatBytes(file.sizeBytes)}
+            senderColWidth={senderColWidth}
+            showTimestamp={props.showTimestamp}
+            statusWidth={statusWidth}
+            theme={theme}
+          />
+        ))}
     </>
+  )
+}
+
+function FileAttachmentRow(props: {
+  label: string
+  sizeText: string
+  senderColWidth: number
+  showTimestamp: boolean
+  statusWidth: number
+  theme: Theme
+}) {
+  const suffix = props.sizeText ? ` (${props.sizeText})` : ''
+  return (
+    <Box flexDirection="row">
+      <Box width={1} flexShrink={0} />
+      {props.showTimestamp && <Box width={props.statusWidth} flexShrink={0} />}
+      <Box width={props.senderColWidth + 1} flexShrink={0} />
+      <Box flexGrow={1} flexShrink={1} minWidth={0}>
+        <Text color={props.theme.mutedText} wrap="truncate-end">
+          {`📎 ${props.label}${suffix}`}
+        </Text>
+      </Box>
+    </Box>
   )
 }
 

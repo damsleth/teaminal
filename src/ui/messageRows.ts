@@ -1,5 +1,6 @@
 import type { ChatMessage } from '../types'
 import type { ReactionDisplayMode } from '../state/store'
+import { extractFileAttachments } from '../text/fileAttachments'
 import { htmlToText } from '../text/html'
 import { extractInlineImages } from '../text/inlineImages'
 import { reactionsSummary } from './reactions'
@@ -110,6 +111,8 @@ export function messageRenderRowHeight(row: MessageRenderRow, opts?: MessageRowH
   if (!row.message.deletedDateTime) {
     const imageRows = Math.max(0, opts?.inlineImageRows ?? 0)
     height += extractInlineImages(row.message).length * (1 + imageRows)
+    // File attachments render one row each below the body.
+    height += extractFileAttachments(row.message).length
   }
   return height
 }
