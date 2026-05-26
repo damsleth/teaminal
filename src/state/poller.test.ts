@@ -9,6 +9,11 @@ import {
   __resetForTests as resetTeamsPresence,
   __setTransportForTests as setTeamsPresenceTransport,
 } from '../graph/teamsPresence'
+import {
+  __resetForTests as resetCsa,
+  __setTransportForTests as setCsaTransport,
+} from '../graph/teamsCsa'
+import { __resetForTests as resetRegion, __setRegionForTests } from '../graph/teamsRegion'
 import type { Chat, ChatMessage, Mention } from '../types'
 import { createAppStore, focusKey } from './store'
 import {
@@ -150,6 +155,8 @@ afterEach(async () => {
   __resetForTests()
   resetAuth()
   resetTeamsPresence()
+  resetCsa()
+  resetRegion()
 })
 
 describe('active loop', () => {
@@ -497,6 +504,54 @@ describe('list loop', () => {
     })
     await waitFor(() => store.get().chats.length > 0)
     expect(store.get().chats[0]?.id).toBe('chat-1')
+    expect(store.get().conn).toBe('online')
+  })
+
+  test('falls back to Teams CSA when graph /chats 401s (Conditional Access)', async () => {
+    primeAuth()
+    __setRegionForTests(undefined, 'emea')
+    // graph /chats + /me/joinedTeams are CA-gated → 401.
+    installTransport(
+      makeHandlers({
+        '/chats': () =>
+          new Response(JSON.stringify({ error: { code: 'Unauthorized', message: 'CA' } }), {
+            status: 401,
+            headers: { 'content-type': 'application/json' },
+          }),
+        '/me/joinedTeams': () =>
+          new Response(JSON.stringify({ error: { code: 'Unauthorized', message: 'CA' } }), {
+            status: 401,
+            headers: { 'content-type': 'application/json' },
+          }),
+      }),
+    )
+    // CSA returns the chat + a team.
+    setCsaTransport(async (url) => {
+      if (url.includes('/api/v2/teams/users/me/chats')) {
+        return jsonResponse({
+          items: [
+            {
+              id: '19:csa-chat@unq.gbl.spaces',
+              isOneOnOne: true,
+              threadType: 'chat',
+              createdAt: '2026-04-29T08:00:00Z',
+              members: [{ mri: '8:orgid:other', objectId: 'other', displayName: 'Anna' }],
+            },
+          ],
+        })
+      }
+      return jsonResponse({
+        teams: [{ id: '19:t@thread.tacv2', displayName: 'ONE Team', channels: [] }],
+      })
+    })
+    const store = createAppStore()
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
+    })
+    await waitFor(() => store.get().chats.length > 0)
+    expect(store.get().chats[0]?.id).toBe('19:csa-chat@unq.gbl.spaces')
+    expect(store.get().teams[0]?.displayName).toBe('ONE Team')
     expect(store.get().conn).toBe('online')
   })
 
