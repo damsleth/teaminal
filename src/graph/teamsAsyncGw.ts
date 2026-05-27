@@ -2,11 +2,13 @@
 //
 // Two endpoints work together:
 //
-//   1. `POST https://{region}.asyncgw.teams.microsoft.com/v1/{oid}/aadtokenauth`
-//      exchanges a Graph/IC3 token for a session cookie. Done once per
-//      session, results cached in-process per profile.
+//   1. An auth exchange that mints a session cookie, done once per session and
+//      cached in-process per profile. We prefer `POST .../v1/skypetokenauth`
+//      (Skype token) because the default owa-piggy FOCI client can mint that,
+//      and fall back to `POST .../v1/{oid}/aadtokenauth` (ic3 Bearer) for
+//      clients carrying Teams.AccessAsUser.All (the 5e3ce6c0 Teams web client).
 //
-//   2. `GET .../v1/objects/{objectId}/views/{viewName}` returns the
+//   2. `GET .../v1/{oid}/objects/{objectId}/views/{viewName}` returns the
 //      object bytes — image, voice message, file. {viewName} is one of
 //      'original', 'imgo', 'imgpsh_fullsize', etc.; each is a resize/
 //      encoding variant. We always request 'imgpsh_fullsize' for images
@@ -19,7 +21,7 @@
 import { getToken } from '../auth/owaPiggy'
 import { recordEvent, recordRequest } from '../log'
 import { getActiveProfile } from './client'
-import { TEAMS_IC3_SCOPE } from './teamsFederation'
+import { getSkypeToken, TEAMS_IC3_SCOPE } from './teamsFederation'
 
 const ASYNCGW_HOST_BY_REGION: Record<string, string> = {
   emea: 'https://eu-prod.asyncgw.teams.microsoft.com',
@@ -105,10 +107,140 @@ export function asyncGwHostForUrl(url: string): string | null {
   return m ? m[1]! : null
 }
 
-// Bootstrap a session for the given profile. Issues a single
-// aadtokenauth POST and caches the resulting cookie in-process. Cookie
-// expiry isn't surfaced explicitly by the server; we assume a 1h TTL
-// (conservative — Teams web behaves the same way), and refresh on 401.
+// Pull the first `name=value` pair out of a Set-Cookie header, dropping the
+// attributes (Path, Expires, …) so it can be re-sent as a Cookie header.
+function cookiePairFromSetCookie(setCookie: string): string {
+  return setCookie.split(';')[0]?.trim() ?? ''
+}
+
+// Auth path 1 (preferred): exchange the Skype token for a session cookie via
+// `POST {host}/v1/skypetokenauth`. This works with the default owa-piggy FOCI
+// client, which can mint the Skype token (via authsvc) but NOT an ic3 Bearer
+// carrying Teams.AccessAsUser.All — the scope aadtokenauth/the object Bearer
+// require, available only to the 5e3ce6c0 Teams web client. Returns the cookie
+// pair, or null so the caller can fall back to aadtokenauth.
+async function authViaSkypeToken(host: string, opts?: AsyncGwOpts): Promise<string | null> {
+  let skypeToken: string
+  try {
+    skypeToken = await getSkypeToken({
+      profile: opts?.profile,
+      region: opts?.region,
+      signal: opts?.signal,
+    })
+  } catch (err) {
+    recordEvent(
+      'graph',
+      'debug',
+      `asyncgw skypetokenauth skipped: ${err instanceof Error ? err.message : String(err)}`,
+    )
+    return null
+  }
+  const url = `${host}/v1/skypetokenauth`
+  const startedAt = Date.now()
+  let res: Response
+  try {
+    res = await transport(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+      body: `skypetoken=${encodeURIComponent(skypeToken)}`,
+      signal: opts?.signal,
+    })
+  } catch (err) {
+    recordRequest({
+      ts: startedAt,
+      method: 'POST',
+      path: '/v1/skypetokenauth',
+      status: null,
+      durationMs: Date.now() - startedAt,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return null
+  }
+  recordRequest({
+    ts: startedAt,
+    method: 'POST',
+    path: '/v1/skypetokenauth',
+    status: res.status,
+    durationMs: Date.now() - startedAt,
+  })
+  if (!res.ok) {
+    recordEvent(
+      'graph',
+      'warn',
+      `asyncgw skypetokenauth ${res.status}; falling back to aadtokenauth`,
+    )
+    return null
+  }
+  return cookiePairFromSetCookie(res.headers.get('set-cookie') ?? '') || null
+}
+
+// Auth path 2 (fallback): the Teams web-client flow — exchange an ic3 Bearer
+// for a session cookie via `POST {host}/v1/{oid}/aadtokenauth`. Requires the
+// Bearer to carry Teams.AccessAsUser.All (5e3ce6c0); 403s otherwise. Throws on
+// failure since it's the last resort.
+async function authViaAadToken(host: string, oid: string, opts?: AsyncGwOpts): Promise<string> {
+  const token = await getToken({ profile: opts?.profile, scope: TEAMS_IC3_SCOPE })
+  const url = `${host}/v1/${encodeURIComponent(oid)}/aadtokenauth`
+  const startedAt = Date.now()
+  let res: Response
+  try {
+    res = await transport(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+      signal: opts?.signal,
+    })
+  } catch (err) {
+    recordRequest({
+      ts: startedAt,
+      method: 'POST',
+      path: '/v1/.../aadtokenauth',
+      status: null,
+      durationMs: Date.now() - startedAt,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+  recordRequest({
+    ts: startedAt,
+    method: 'POST',
+    path: '/v1/.../aadtokenauth',
+    status: res.status,
+    durationMs: Date.now() - startedAt,
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new TeamsAsyncGwError(
+      res.status,
+      `asyncgw aadtokenauth ${res.status}: ${text.slice(0, 240) || 'request failed'}`,
+    )
+  }
+  const setCookie = res.headers.get('set-cookie') ?? ''
+  let cookie = cookiePairFromSetCookie(setCookie)
+  if (!cookie) {
+    try {
+      const body = (await res.json()) as { token?: string; sessionToken?: string }
+      cookie = body.token ?? body.sessionToken ?? ''
+    } catch {
+      cookie = ''
+    }
+  }
+  if (!cookie) {
+    throw new TeamsAsyncGwError(res.status, 'asyncgw aadtokenauth: no session material in response')
+  }
+  return cookie
+}
+
+// Bootstrap a session for the given profile and cache the resulting cookie
+// in-process. Tries the Skype-token auth first (works with the default FOCI
+// client), falling back to aadtokenauth for clients that carry an ic3 Bearer
+// with Teams.AccessAsUser.All. Cookie expiry isn't surfaced explicitly; we
+// assume a 1h TTL (conservative — Teams web behaves the same way) and refresh
+// on 401.
 export async function bootstrap(opts?: AsyncGwOpts): Promise<AsyncGwSession> {
   const key = profileKey(opts)
   const now = Date.now()
@@ -117,68 +249,13 @@ export async function bootstrap(opts?: AsyncGwOpts): Promise<AsyncGwSession> {
   const existing = inFlight.get(key)
   if (existing) return existing
   const promise = (async (): Promise<AsyncGwSession> => {
-    const token = await getToken({ profile: opts?.profile, scope: TEAMS_IC3_SCOPE })
-    const oid = oidFromJwt(token)
-    if (!oid) throw new TeamsAsyncGwError(0, 'asyncgw bootstrap: ic3 token missing oid claim')
+    // The object URL is templated with the user's AAD oid; read it from any
+    // FOCI token's claims (works regardless of which auth path succeeds).
+    const idToken = await getToken({ profile: opts?.profile, scope: TEAMS_IC3_SCOPE })
+    const oid = oidFromJwt(idToken)
+    if (!oid) throw new TeamsAsyncGwError(0, 'asyncgw bootstrap: token missing oid claim')
     const host = hostForRegion(opts?.region)
-    const url = `${host}/v1/${encodeURIComponent(oid)}/aadtokenauth`
-    const startedAt = Date.now()
-    let res: Response
-    try {
-      res = await transport(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: '{}',
-        signal: opts?.signal,
-      })
-    } catch (err) {
-      recordRequest({
-        ts: startedAt,
-        method: 'POST',
-        path: '/v1/.../aadtokenauth',
-        status: null,
-        durationMs: Date.now() - startedAt,
-        error: err instanceof Error ? err.message : String(err),
-      })
-      throw err
-    }
-    recordRequest({
-      ts: startedAt,
-      method: 'POST',
-      path: '/v1/.../aadtokenauth',
-      status: res.status,
-      durationMs: Date.now() - startedAt,
-    })
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      throw new TeamsAsyncGwError(
-        res.status,
-        `asyncgw aadtokenauth ${res.status}: ${text.slice(0, 240) || 'request failed'}`,
-      )
-    }
-    // The session material is returned both as a Set-Cookie header and,
-    // on some regions, in the body. Prefer Set-Cookie; fall back to a
-    // JSON token shape.
-    const setCookie = res.headers.get('set-cookie') ?? ''
-    let cookie = setCookie
-    if (!cookie) {
-      try {
-        const body = (await res.json()) as { token?: string; sessionToken?: string }
-        cookie = body.token ?? body.sessionToken ?? ''
-      } catch {
-        cookie = ''
-      }
-    }
-    if (!cookie) {
-      throw new TeamsAsyncGwError(
-        res.status,
-        'asyncgw aadtokenauth: no session material in response',
-      )
-    }
+    const cookie = (await authViaSkypeToken(host, opts)) ?? (await authViaAadToken(host, oid, opts))
     const session: AsyncGwSession = {
       profile: opts?.profile,
       host,
