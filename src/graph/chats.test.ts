@@ -3,7 +3,7 @@ import {
   __resetForTests as resetAuth,
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
-import { __resetForTests, __setTransportForTests } from './client'
+import { __resetForTests, __setTransportForTests, setAudiencePreference } from './client'
 import {
   __resetChatMessageFallbackForTests,
   createGroupChat,
@@ -283,6 +283,8 @@ describe('listMessages', () => {
 
   test('falls back to chatsvc when graph /chats/{id}/messages 401s', async () => {
     primeAuth()
+    // graph+ic3 (default routing): graph-primary with cross-transport fallback.
+    setAudiencePreference('graph', { fallback: true })
     __setRegionForTests(undefined, 'emea')
     // graph chat messages → 401 (Conditional Access).
     __setTransportForTests(async () =>
@@ -512,6 +514,7 @@ describe('sendMessage', () => {
 
   test('falls back to chatsvc send when graph POST 401s', async () => {
     primeAuth()
+    setAudiencePreference('graph', { fallback: true })
     __setRegionForTests(undefined, 'emea')
     __setTransportForTests(async () =>
       jsonResponse({ error: { code: 'Unauthorized', message: 'CA' } }, { status: 401 }),
@@ -534,5 +537,57 @@ describe('sendMessage', () => {
     expect(chatsvcPost).toContain('POST')
     expect(chatsvcPost).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
     expect(created.body.content).toBe('hello')
+  })
+})
+
+describe('chat routing modes', () => {
+  test('ic3-only reads messages straight from chatsvc without touching graph', async () => {
+    primeAuth()
+    setAudiencePreference('ic3', { fallback: false })
+    __setRegionForTests(undefined, 'emea')
+    let graphCalled = false
+    __setTransportForTests(async () => {
+      graphCalled = true
+      return jsonResponse({ error: { code: 'Unauthorized', message: 'CA' } }, { status: 401 })
+    })
+    setFederationTransport(async () =>
+      jsonResponse({ tokens: { skypeToken: 'skype-test', expiresIn: 3600 } }),
+    )
+    let chatsvcUrl = ''
+    setChatsvcTransport(async (url) => {
+      chatsvcUrl = url
+      return jsonResponse({
+        messages: [
+          {
+            id: '1',
+            messagetype: 'Text',
+            originalarrivaltime: '2026-04-29T09:00:00Z',
+            content: 'a',
+          },
+        ],
+      })
+    })
+
+    const page = await listMessagesPage('19:aaaa_bbbb@unq.gbl.spaces')
+    expect(page.messages.map((m) => m.id)).toEqual(['1'])
+    expect(chatsvcUrl).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
+    expect(graphCalled).toBe(false)
+  })
+
+  test('graph-only surfaces the 401 instead of falling back to chatsvc', async () => {
+    primeAuth()
+    setAudiencePreference('graph', { fallback: false })
+    __setRegionForTests(undefined, 'emea')
+    __setTransportForTests(async () =>
+      jsonResponse({ error: { code: 'Unauthorized', message: 'CA' } }, { status: 401 }),
+    )
+    let chatsvcCalled = false
+    setChatsvcTransport(async () => {
+      chatsvcCalled = true
+      return jsonResponse({ messages: [] })
+    })
+
+    await expect(listMessagesPage('19:aaaa_bbbb@unq.gbl.spaces')).rejects.toThrow()
+    expect(chatsvcCalled).toBe(false)
   })
 })

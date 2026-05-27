@@ -14,6 +14,7 @@
 import { getToken } from '../auth/owaPiggy'
 import { probeCapabilities } from '../graph/capabilities'
 import { setActiveProfile, setAudiencePreference } from '../graph/client'
+import { resetChatMessageTransport } from '../graph/chats'
 import { getMe } from '../graph/me'
 import { listActivityFeed } from '../graph/teamsActivity'
 import { recordEvent, warn } from '../log'
@@ -25,7 +26,7 @@ import { htmlToText } from '../text/html'
 import { mergeActivityItems, countUnreadMentions } from './activityFeed'
 import { startPoller, type PollerHandleRef } from './poller'
 import { startRealtimeBridge } from './realtimeBridge'
-import { audienceForAccount, type AppState, type Store } from './store'
+import { audienceFromRouting, routingForAccount, type AppState, type Store } from './store'
 
 export type SessionHandle = {
   /** Profile passed to runSession; useful for logging / debugging. */
@@ -78,15 +79,18 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
   const { store, profile, pollerHandleRef, onFatal } = opts
 
   setActiveProfile(profile ?? undefined)
-  // Apply this account's preferred token audience to the graph client.
-  // Fallback to the other audience is enabled only when the account has
-  // an explicit preference, so plain installs keep the default
-  // graph-only behavior (no extra request on genuine 401s).
+  // Apply this account's chat routing mode. The mode resolves to the token
+  // audience the graph client mints for default calls plus whether it may
+  // fall back to the other transport. A plain install (no per-account
+  // preference => graph+ic3) keeps the default graph-first behavior. We also
+  // clear the chatsvc message latch so a previous account's Conditional
+  // Access fallback doesn't leak across a profile switch.
   {
     const settings = store.get().settings
     const account = profile ?? settings.activeAccount ?? null
-    const hasExplicit = account != null && account in settings.audienceByAccount
-    setAudiencePreference(audienceForAccount(settings, account), { fallback: hasExplicit })
+    const { audience, fallback } = audienceFromRouting(routingForAccount(settings, account))
+    setAudiencePreference(audience, { fallback })
+    resetChatMessageTransport()
   }
 
   let pollerHandle: Awaited<ReturnType<typeof startPoller>> | null = null
