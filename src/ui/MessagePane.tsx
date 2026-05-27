@@ -98,7 +98,6 @@ export function MessagePane(props: {
 
   const [, setImageRevision] = useState(0)
   const kittyEnabled = inlineImages === 'auto' && isKittyCapable()
-  const inlineImageRows = kittyEnabled ? inlineImageMaxRows : 0
 
   // Track terminal height live so the message slice fills the available
   // space. Without this we capped at 20 rows even on tall terminals.
@@ -160,6 +159,17 @@ export function MessagePane(props: {
     terminalSize.rows - chromeRows - cozyRows - reservedDynamic,
   )
   const messageTextColumns = Math.max(12, terminalSize.columns - 60)
+  // Cell budget for an inline image (message pane minus the gutter columns).
+  const imgCols = Math.max(12, terminalSize.columns - LIST_PANE_WIDTH - 20)
+  // Rows a message's inline images occupy: each loaded image takes its fitted
+  // height (no label), each still-loading image takes one `[img]` label row.
+  // Recomputed each render (imageRevision bumps on load) so layout, the
+  // reserved blank rows, and the Kitty placement all agree.
+  const imageRowsForMessage = (message: ChatMessage): number =>
+    extractInlineImages(message).reduce((sum, ref) => {
+      const reserved = inlineImageReservedRows(ref.cacheKey, imgCols, inlineImageMaxRows)
+      return sum + (reserved === null ? 1 : reserved)
+    }, 0)
   const allRows = buildMessageRows(messages, {
     showLoadMoreRow: messages.length > 0 && !pageState.fullyLoaded,
     loadMoreState,
@@ -167,7 +177,7 @@ export function MessagePane(props: {
   const windowStart = chooseMessageRowsWindowStart(allRows, {
     focusedMessageId: props.focusedMessageId,
     focusActive: props.focusIndicatorActive === true,
-    inlineImageRows,
+    imageRowsForMessage,
     messageTextColumns,
     reactionDisplayMode,
     rowBudget,
@@ -176,7 +186,7 @@ export function MessagePane(props: {
   windowStartRef.current = windowStart
   const windowEnd = messageRowsWindowEnd(allRows, windowStart, {
     focusedMessageId: props.focusedMessageId,
-    inlineImageRows,
+    imageRowsForMessage,
     messageTextColumns,
     reactionDisplayMode,
     rowBudget,
@@ -227,14 +237,13 @@ export function MessagePane(props: {
     for (let i = rows.length - 1; i >= 0; i--) {
       rowsAfter[i] = below
       below += messageRenderRowHeight(rows[i]!, {
-        inlineImageRows,
+        imageRowsForMessage,
         messageTextColumns,
         reactionDisplayMode,
       })
     }
 
     clearKittyImages(stdout)
-    const imgCols = Math.max(12, terminalSize.columns - LIST_PANE_WIDTH - 20)
     const imageColumn = messageBodyTerminalColumn({
       senderColWidth,
       showTimestamps,
@@ -243,19 +252,31 @@ export function MessagePane(props: {
       const row = rows[rowIndex]!
       if (row.kind !== 'message') continue
       const refs = extractInlineImages(row.message)
+      // Per-image fitted rows (null = not yet loaded → renders a label row).
+      const reserved = refs.map((ref) =>
+        inlineImageReservedRows(ref.cacheKey, imgCols, inlineImageMaxRows),
+      )
+      const fileRows = extractFileAttachments(row.message).length
       for (let imageIndex = 0; imageIndex < refs.length; imageIndex++) {
         const ref = refs[imageIndex]!
+        const reservedRows = reserved[imageIndex]
+        if (reservedRows === null || reservedRows === undefined) continue
         const imgData = getImageData(ref.cacheKey)
         if (!imgData) continue
-        const placement = fitKittyPlacement(imgData, imgCols, inlineImageRows)
+        const placement = fitKittyPlacement(imgData, imgCols, inlineImageMaxRows)
         const apc = buildKittyAPC(imgData, placement)
-        const rowsBelowImage =
-          rowsAfter[rowIndex]! +
-          rowsBelowImageWithinMessage(row.message, imageIndex, {
-            inlineImageRows,
-          })
-        const rowsFromBottom = rowsBelowImage + bottomChromeRows(statusBarHidden) + 1
-        writeKittyImageAtOffset(stdout, apc, rowsFromBottom, placement.reservedRows, imageColumn)
+        // Rows below this image's top, within its own message: the rest of
+        // this image, then later images' blocks (fitted rows or a label
+        // row each), then file-attachment rows.
+        let belowWithinMessage = reservedRows - 1
+        for (let j = imageIndex + 1; j < refs.length; j++) {
+          const r = reserved[j]
+          belowWithinMessage += r === null || r === undefined ? 1 : r
+        }
+        belowWithinMessage += fileRows
+        const rowsFromBottom =
+          rowsAfter[rowIndex]! + belowWithinMessage + bottomChromeRows(statusBarHidden) + 1
+        writeKittyImageAtOffset(stdout, apc, rowsFromBottom, reservedRows, imageColumn)
       }
     }
 
@@ -331,7 +352,8 @@ export function MessagePane(props: {
                 myUserId={me?.id}
                 reactionDisplayMode={reactionDisplayMode}
                 readReceipts={readReceiptsByConvo[conv]}
-                inlineImageRows={inlineImageRows}
+                imgCols={imgCols}
+                inlineImageMaxRows={inlineImageMaxRows}
                 selfMessagesOnRight={selfMessagesOnRight}
                 senderColWidth={senderColWidth}
                 shortNames={shortNames}
@@ -360,7 +382,8 @@ function TimelineRow(props: {
   myUserId?: string
   reactionDisplayMode: 'off' | 'current' | 'all'
   readReceipts?: Record<string, ReadReceipt>
-  inlineImageRows: number
+  imgCols: number
+  inlineImageMaxRows: number
   selfMessagesOnRight: boolean
   senderColWidth: number
   shortNames: boolean
@@ -399,7 +422,8 @@ function TimelineRow(props: {
       myUserId={props.myUserId}
       reactionDisplayMode={props.reactionDisplayMode}
       readReceipts={props.readReceipts}
-      inlineImageRows={props.inlineImageRows}
+      imgCols={props.imgCols}
+      inlineImageMaxRows={props.inlineImageMaxRows}
       selfMessagesOnRight={props.selfMessagesOnRight}
       senderColWidth={props.senderColWidth}
       shortNames={props.shortNames}
@@ -418,7 +442,8 @@ function MessageRow(props: {
   myUserId?: string
   reactionDisplayMode: 'off' | 'current' | 'all'
   readReceipts?: Record<string, ReadReceipt>
-  inlineImageRows: number
+  imgCols: number
+  inlineImageMaxRows: number
   selfMessagesOnRight: boolean
   senderColWidth: number
   shortNames: boolean
@@ -586,7 +611,9 @@ function MessageRow(props: {
         extractInlineImages(m).map((ref: InlineImageRef) => (
           <ImageRows
             key={ref.cacheKey}
-            imageRows={props.inlineImageRows}
+            cacheKey={ref.cacheKey}
+            imgCols={props.imgCols}
+            maxRows={props.inlineImageMaxRows}
             label={ref.name}
             senderColWidth={senderColWidth}
             showTimestamp={props.showTimestamp}
@@ -633,16 +660,24 @@ function FileAttachmentRow(props: {
   )
 }
 
+// Reserves vertical space for one inline image. Until the image loads it
+// shows a single `[img] name` label row; once loaded it reserves exactly the
+// image's fitted height (no label) and the Kitty layer paints the picture
+// into those rows. Keeping the reserved height equal to the fitted height is
+// what stops the old fixed-max padding and the overlay/offset.
 function ImageRows(props: {
-  imageRows: number
+  cacheKey: string
+  imgCols: number
+  maxRows: number
   label: string
   senderColWidth: number
   showTimestamp: boolean
   statusWidth: number
   theme: Theme
 }) {
-  return (
-    <>
+  const reservedRows = inlineImageReservedRows(props.cacheKey, props.imgCols, props.maxRows)
+  if (reservedRows === null) {
+    return (
       <Box flexDirection="row">
         <Box width={1} flexShrink={0} />
         {props.showTimestamp && <Box width={props.statusWidth} flexShrink={0} />}
@@ -653,7 +688,11 @@ function ImageRows(props: {
           </Text>
         </Box>
       </Box>
-      {Array.from({ length: props.imageRows }, (_, i) => (
+    )
+  }
+  return (
+    <>
+      {Array.from({ length: reservedRows }, (_, i) => (
         <Box key={`img-space-${i}`} flexDirection="row">
           <Box width={1} flexShrink={0} />
           {props.showTimestamp && <Box width={props.statusWidth} flexShrink={0} />}
@@ -676,20 +715,24 @@ function bottomChromeRows(statusBarHidden: boolean): number {
 function messageBodyTerminalColumn(opts: { senderColWidth: number; showTimestamps: boolean }) {
   const messagePaneContentStart = LIST_PANE_WIDTH + 2
   const indicatorWidth = 1
-  const timestampWidth = opts.showTimestamps ? 5 : 0
+  // Matches TIMESTAMP_WIDTH (HH:MM + trailing space).
+  const timestampWidth = opts.showTimestamps ? 6 : 0
   const senderWidth = opts.senderColWidth + 1
   return messagePaneContentStart + indicatorWidth + timestampWidth + senderWidth
 }
 
-function rowsBelowImageWithinMessage(
-  message: ChatMessage,
-  imageIndex: number,
-  opts: { inlineImageRows: number },
-): number {
-  const imageCount = extractInlineImages(message).length
-  const imageRows = Math.max(0, opts.inlineImageRows)
-  const remainingImages = Math.max(0, imageCount - imageIndex - 1)
-  return imageRows - 1 + remainingImages * (1 + imageRows)
+// Fitted picture rows for a loaded inline image, or null when it hasn't
+// loaded yet (the caller renders the [img] label instead). Shared by the
+// height math, the reserved blank rows, and the Kitty placement so all three
+// agree on how many rows each image occupies.
+function inlineImageReservedRows(
+  cacheKey: string,
+  imgCols: number,
+  maxRows: number,
+): number | null {
+  const data = getImageData(cacheKey)
+  if (!data) return null
+  return fitKittyPlacement(data, imgCols, maxRows).reservedRows
 }
 
 function previewBody(m: ChatMessage): string {

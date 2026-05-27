@@ -25,6 +25,11 @@ export type MessageRowHeightOpts = {
   inlineImageRows?: number
   reactionDisplayMode?: ReactionDisplayMode
   messageTextColumns?: number
+  // Total rows the message's inline images occupy, resolved dynamically from
+  // the loaded image's fitted height (loaded → fitted rows, no label;
+  // pending → one `[img]` label row). When omitted, falls back to the static
+  // `inlineImageRows` reservation (label + max rows per image).
+  imageRowsForMessage?: (message: ChatMessage) => number
 }
 
 type MessagePageMeta = Partial<{
@@ -109,8 +114,12 @@ export function messageRenderRowHeight(row: MessageRenderRow, opts?: MessageRowH
   // Reply preview row (only present for chat-pane quoted replies).
   if (getQuotedReply(row.message)) height++
   if (!row.message.deletedDateTime) {
-    const imageRows = Math.max(0, opts?.inlineImageRows ?? 0)
-    height += extractInlineImages(row.message).length * (1 + imageRows)
+    if (opts?.imageRowsForMessage) {
+      height += opts.imageRowsForMessage(row.message)
+    } else {
+      const imageRows = Math.max(0, opts?.inlineImageRows ?? 0)
+      height += extractInlineImages(row.message).length * (1 + imageRows)
+    }
     // File attachments render one row each below the body.
     height += extractFileAttachments(row.message).length
   }
