@@ -14,6 +14,11 @@ import {
   __setTransportForTests as setAsyncGwTransport,
 } from '../graph/teamsAsyncGw'
 import {
+  __resetForTests as resetFederation,
+  __setTransportForTests as setFederationTransport,
+} from '../graph/teamsFederation'
+import { __resetForTests as resetRegion, __setRegionForTests } from '../graph/teamsRegion'
+import {
   __resetForTests as resetAuth,
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
@@ -172,6 +177,8 @@ describe('fetchAndCacheImage hosted-content routing (ic3)', () => {
   afterEach(() => {
     resetClient()
     resetAsyncGw()
+    resetFederation()
+    resetRegion()
     resetAuth()
     if (realXdg === undefined) delete process.env.XDG_CACHE_HOME
     else process.env.XDG_CACHE_HOME = realXdg
@@ -187,13 +194,23 @@ describe('fetchAndCacheImage hosted-content routing (ic3)', () => {
       stderr: '',
       exitCode: 0,
     }))
+    // Deterministic skype-token exchange so asyncgw bootstrap uses
+    // skypetokenauth (the FOCI-client path) rather than the real network.
+    __setRegionForTests(undefined, 'emea')
+    setFederationTransport(
+      async () =>
+        new Response(JSON.stringify({ tokens: { skypeToken: 'skype-test', expiresIn: 3600 } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    )
     // Graph transport must never be hit on the ic3-only path.
     setClientTransport(async () => {
       throw new Error('graph transport should not be called for ic3-only image fetch')
     })
     let objectUrl = ''
     setAsyncGwTransport(async (url) => {
-      if (url.endsWith('/aadtokenauth')) {
+      if (url.endsWith('/skypetokenauth')) {
         return new Response(null, { status: 200, headers: { 'set-cookie': 'AGW=s1' } })
       }
       objectUrl = url
