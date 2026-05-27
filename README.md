@@ -87,6 +87,8 @@ warnings and fall back to defaults.
   "activeAccount": null,
   "chatListDensity": "cozy",
   "chatListShortNames": false,
+  "showMessagePreviews": true,
+  "messagePaneShortNames": true,
   "showPresenceInList": true,
   "showTimestampsInPane": true,
   "showReactions": "current",
@@ -96,7 +98,21 @@ warnings and fall back to defaults.
   "messageFocusBackgroundColor": null,
   "themeOverrides": {},
   "useTeamsPresence": true,
-  "forceAvailableWhenFocused": true
+  "forceAvailableWhenFocused": true,
+  "realtimeEnabled": false,
+  "notifyMuted": false,
+  "notifyActiveBanner": false,
+  "quietHoursStart": null,
+  "quietHoursEnd": null,
+  "logFile": null,
+  "tailEvents": false,
+  "tailNetwork": false,
+  "tailDiagnostics": false,
+  "selfMessagesOnRight": false,
+  "inlineImages": "auto",
+  "inlineImageMaxRows": 10,
+  "statusBarPosition": "bottom",
+  "chatRoutingByAccount": {}
 }
 ```
 
@@ -109,6 +125,8 @@ warnings and fall back to defaults.
 | `activeAccount`                | string or null       |  `null` | Default profile alias used at startup when `--profile` is not passed.                    |
 | `chatListDensity`              | `cozy`, `compact`    |  `cozy` | Row spacing in the chat list.                                                            |
 | `chatListShortNames`           | boolean              | `false` | Show first names in chat list rows.                                                      |
+| `showMessagePreviews`          | boolean              |  `true` | Show up to two last-message preview lines in chat list rows.                             |
+| `messagePaneShortNames`        | boolean              |  `true` | Show first names in the message-pane sender column.                                      |
 | `showPresenceInList`           | boolean              |  `true` | Show presence dots in the chat list when available.                                      |
 | `showTimestampsInPane`         | boolean              |  `true` | Show message timestamps in the message pane.                                             |
 | `showReactions`                | `off`, `current`, `all` | `current` | Show message reactions never, only on the focused message, or on every message.      |
@@ -120,8 +138,19 @@ warnings and fall back to defaults.
 | `useTeamsPresence`             | boolean              |  `true` | Use the Teams unified presence endpoint (`presence.teams.microsoft.com`) for own presence. Falls back to Graph `/me/presence` automatically on 401/403/404. Set to `false` to force Graph-only in tenants that block public-client access to that host. |
 | `forceAvailableWhenFocused`    | boolean              |  `true` | While the terminal window has focus (DEC focus reporting; CSI ?1004), PUT `forceavailability=Available` to `presence.teams.microsoft.com` so Teams shows you Available, like the desktop client does for an active window. The override expires server-side after ~5 min and is refreshed inside that window. Set to `false` to leave presence to Teams' own desktop client / inactivity timer. |
 | `realtimeEnabled`              | boolean              | `false` | Enables the experimental Teams trouter push transport for typing, read-receipt, presence, and immediate refresh signals. Polling remains the source of truth and fallback. |
+| `notifyMuted`                  | boolean              | `false` | Suppress desktop notification banners while keeping terminal bells.                      |
+| `notifyActiveBanner`           | boolean              | `false` | Show banners even for the conversation currently open in a focused terminal.             |
+| `quietHoursStart`              | `HH:MM` or null      |  `null` | Quiet-hours start time; disabled unless both start and end are set.                      |
+| `quietHoursEnd`                | `HH:MM` or null      |  `null` | Quiet-hours end time; windows can cross midnight.                                        |
+| `logFile`                      | string or null       |  `null` | Append a redacted event log mirror to this path. CLI `--log-file` overrides it.          |
+| `tailEvents`                   | boolean              | `false` | Show an always-on event-log tail panel above the composer.                               |
+| `tailNetwork`                  | boolean              | `false` | Show an always-on network-log tail panel above the composer.                             |
+| `tailDiagnostics`              | boolean              | `false` | Show an always-on diagnostics tail panel above the composer.                             |
 | `selfMessagesOnRight`          | boolean              | `false` | When `true`, your own messages are right-aligned in the message pane (body on the right, sender/timestamp on the left of the body). Other users' messages remain left-aligned. |
+| `inlineImages`                 | `auto`, `off`        |  `auto` | In Kitty-compatible terminals, render message images inline; otherwise show text rows.   |
+| `inlineImageMaxRows`           | integer 1-50         |    `10` | Maximum terminal rows reserved for a single inline image.                                |
 | `statusBarPosition`            | `bottom`, `hidden`   | `bottom` | Where the status bar renders. `hidden` suppresses it entirely, freeing one row of vertical space in the message pane. |
+| `chatRoutingByAccount`         | object               |    `{}` | Per-account chat transport mode: `graph+ic3`, `ic3+graph`, `ic3-only`, or `graph-only`. |
 
 <!-- prettier-ignore-end -->
 
@@ -193,14 +222,19 @@ The in-app Settings menu persists changes back to `config.json`.
 | Ctrl+J         | composer          | Insert newline.                                                |
 | `/`            | list              | Filter chats.                                                  |
 | `n`            | list              | Open the new-chat prompt.                                      |
+| `m`            | list              | Toggle the focused chat read/unread.                           |
 | `a`            | Accounts          | Find valid `owa-piggy status` profiles to add.                 |
 | `d` / Delete   | Accounts          | Remove the focused account from teaminal's list.               |
+| `t`            | Accounts          | Cycle the focused account's chat routing mode.                 |
 | `h` / Left     | chat / channel    | Return to chat list.                                           |
 | `j` / Down     | chat / channel    | Focus next message.                                            |
 | `k` / Up       | chat / channel    | Focus previous message, or load older when focused at the top. |
 | `l` / Right    | chat / channel    | Jump to latest message.                                        |
 | `u` / PageUp   | chat / channel    | Move up half a page, or load older if that reaches the top.    |
 | `d` / PageDown | chat / channel    | Move down half a page.                                         |
+| `t`            | channel           | Open the thread for the focused channel message.               |
+| `/`            | chat / channel    | Search messages in the open conversation.                      |
+| Ctrl+A         | any               | Open the activity feed.                                        |
 | `?`            | list              | Show keybindings.                                              |
 | `r`            | any               | Refresh now.                                                   |
 | `Shift+R`      | any               | Hard refresh: clear visible data and reload from Graph.        |

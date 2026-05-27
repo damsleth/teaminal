@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, mock } from 'bun:test'
-import { existsSync } from 'node:fs'
+import { existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { isImageAttachment, attachmentGraphPath } from '../types'
@@ -91,13 +91,17 @@ describe('attachmentGraphPath', () => {
 describe('fetchAndCacheImage isExternal branch', () => {
   const realFetch = globalThis.fetch
   const realXdg = process.env.XDG_CACHE_HOME
+  let cacheRoot: string
   afterEach(() => {
     globalThis.fetch = realFetch
     if (realXdg === undefined) delete process.env.XDG_CACHE_HOME
     else process.env.XDG_CACHE_HOME = realXdg
+    rmSync(cacheRoot, { recursive: true, force: true })
   })
 
   it('does not send Authorization when isExternal is true', async () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-external`)
+    process.env.XDG_CACHE_HOME = cacheRoot
     let capturedHeaders: Headers | null = null
     const bytes = new Uint8Array([1, 2, 3, 4])
     const fakeFetch = mock(async (_url: string, init?: RequestInit) => {
@@ -122,7 +126,7 @@ describe('fetchAndCacheImage isExternal branch', () => {
   })
 
   it('sanitizes profile names before using them in cache paths', async () => {
-    const cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}`)
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-profile`)
     process.env.XDG_CACHE_HOME = cacheRoot
     globalThis.fetch = mock(
       async () => new Response(new Uint8Array([1]), { status: 200 }),

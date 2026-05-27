@@ -31,6 +31,7 @@ export function AccountsModal() {
   const theme = useTheme()
   const isOpen = modal?.kind === 'accounts'
   const session = useSessionApi()
+  const activeProfile = session.getActiveProfile()
   const [mode, setMode] = useState<Mode>({ kind: 'list', cursor: 0 })
 
   async function persist(patch: Partial<Settings>): Promise<void> {
@@ -167,7 +168,7 @@ export function AccountsModal() {
         void persist({ chatRoutingByAccount }).then(() => {
           // If we just changed the active account's routing, apply the
           // derived audience/fallback to the graph client immediately.
-          if (profile === settings.activeAccount) {
+          if (profile === session.getActiveProfile()) {
             const { audience, fallback } = audienceFromRouting(next)
             setAudiencePreference(audience, { fallback })
           }
@@ -254,7 +255,7 @@ export function AccountsModal() {
                   {i === mode.cursor ? '> ' : '  '}
                   {profile}
                   <Text color={theme.mutedText}>
-                    {settings.activeAccount === profile ? '  active' : ''}
+                    {activeProfile === profile ? '  active' : ''}
                     {`  [${routingForAccount(settings, profile)}]`}
                   </Text>
                 </Text>
