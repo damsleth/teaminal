@@ -25,6 +25,7 @@ import {
   type ChatMessage,
   type MessageAttachment,
 } from '../types'
+import { isEmojiOnly } from './html'
 
 export type InlineImageRef = {
   // Stable cache key: msgId::contentId. Used by imageCache.
@@ -151,6 +152,11 @@ export function extractInlineImages(message: ChatMessage): InlineImageRef[] {
   // 2. body <img> tags - pasted inline images, frequently with empty attachments.
   const body = message.body?.content ?? ''
   for (const img of parseBodyImages(body)) {
+    // Teams chatsvc renders emoji as <img alt="😕"> rather than the Graph
+    // <emoji> element. Those aren't hosted-content images — htmlToText emits
+    // their alt as text — so never try to fetch them (it 400s/401s, and on
+    // chatsvc messages chatId is empty, producing /chats//messages/...).
+    if (isEmojiOnly(img.alt)) continue
     // Prefer itemid: it's the hostedContents id. If absent, mine the src.
     let contentId = img.itemid
     if (!contentId && img.src) {
@@ -173,6 +179,9 @@ export function extractInlineImages(message: ChatMessage): InlineImageRef[] {
       }
       continue
     }
+    // A hostedContents fetch needs the chat id. chatsvc-sourced messages
+    // don't carry one, so skip rather than build /chats//messages/... (400).
+    if (!chatId) continue
     const cacheKey = `${messageId}::${contentId}`
     if (seen.has(cacheKey)) continue
     seen.add(cacheKey)

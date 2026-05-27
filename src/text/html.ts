@@ -23,6 +23,25 @@
 
 import { Parser } from 'htmlparser2'
 
+// True when a string is composed only of emoji (pictographs plus their
+// component code points: skin-tone modifiers, ZWJ sequences, variation
+// selectors, keycap combiner) and whitespace, with at least one pictograph.
+// Teams' chatsvc HTML renders emoji as `<img alt="😕">` rather than the
+// Graph `<emoji>` element; this lets us treat such an <img> as text (its
+// alt) instead of a fetchable hosted-content image. Requiring a pictograph
+// keeps plain alt text ("bilde", "123", "Media") from matching, since
+// \p{Emoji_Component} alone includes ASCII digits.
+const EMOJI_ONLY_RE = /^[\p{Extended_Pictographic}\p{Emoji_Component}\u200d\ufe0f\u20e3\s]+$/u
+const HAS_PICTOGRAPH_RE = /\p{Extended_Pictographic}/u
+
+export function isEmojiOnly(value: string | null | undefined): boolean {
+  if (!value) return false
+  const trimmed = value.trim()
+  if (!trimmed) return false
+  if (!HAS_PICTOGRAPH_RE.test(trimmed)) return false
+  return EMOJI_ONLY_RE.test(trimmed)
+}
+
 const TEXT_KEEP_TAGS = new Set([
   'strong',
   'b',
@@ -131,6 +150,14 @@ export function htmlToText(html: string, opts?: HtmlToTextOpts): string {
           state.dropDepth++
           return
         }
+        if (lower === 'img') {
+          // Teams chatsvc renders emoji as <img alt="😕"> (Graph uses
+          // <emoji>). Surface the alt as text for emoji-only images; real
+          // images are dropped here and shown via the separate [img] row.
+          // <img> is void, so no dropDepth bookkeeping is needed.
+          if (isEmojiOnly(attrs.alt)) appendText(state, attrs.alt!)
+          return
+        }
         if (TEXT_KEEP_TAGS.has(lower)) {
           // pass through; inner text appended via ontext
           return
@@ -175,6 +202,11 @@ export function htmlToText(html: string, opts?: HtmlToTextOpts): string {
         }
         if (lower === 'emoji') {
           state.dropDepth = Math.max(0, state.dropDepth - 1)
+          return
+        }
+        if (lower === 'img') {
+          // Matched img in onopentag without touching dropDepth; the void
+          // element's auto-close must be a no-op too.
           return
         }
         if (TEXT_KEEP_TAGS.has(lower)) return

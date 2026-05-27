@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { htmlToText } from './html'
+import { htmlToText, isEmojiOnly } from './html'
 
 describe('htmlToText', () => {
   test('returns empty string for empty input', () => {
@@ -84,6 +84,15 @@ describe('htmlToText', () => {
     expect(htmlToText('photo: <img src="https://example.com/img.png" alt="cat"/>')).toBe('photo:')
   })
 
+  test('renders chatsvc emoji <img alt> as its alt text', () => {
+    // Teams chatsvc encodes emoji as <img alt="😕"> rather than <emoji>.
+    expect(htmlToText('<p>oops <img alt="😕" itemid="x"> done</p>')).toBe('oops 😕 done')
+  })
+
+  test('does not turn a real image with a word alt into text', () => {
+    expect(htmlToText('<img alt="bilde" itemid="x">')).toBe('')
+  })
+
   test('combines mentions, emoji, and anchors in one body', () => {
     const html =
       '<p><at id="0">Carl</at> see <a href="https://example.com">this</a> ' +
@@ -93,6 +102,27 @@ describe('htmlToText', () => {
 
   test('handles uppercase tag names', () => {
     expect(htmlToText('<P><STRONG>HI</STRONG></P>')).toBe('HI')
+  })
+
+  describe('isEmojiOnly', () => {
+    test('true for single and compound emoji', () => {
+      expect(isEmojiOnly('😕')).toBe(true)
+      expect(isEmojiOnly('🎉')).toBe(true)
+      expect(isEmojiOnly('👍🏽')).toBe(true) // skin-tone modifier
+      expect(isEmojiOnly('👩‍💻')).toBe(true) // ZWJ sequence
+      expect(isEmojiOnly('🏟️')).toBe(true) // variation selector
+      expect(isEmojiOnly(' 😀 😀 ')).toBe(true)
+    })
+
+    test('false for text, digits, filenames, or mixed content', () => {
+      expect(isEmojiOnly('bilde')).toBe(false)
+      expect(isEmojiOnly('123')).toBe(false)
+      expect(isEmojiOnly('photo.png')).toBe(false)
+      expect(isEmojiOnly('😀 hello')).toBe(false)
+      expect(isEmojiOnly('')).toBe(false)
+      expect(isEmojiOnly(null)).toBe(false)
+      expect(isEmojiOnly(undefined)).toBe(false)
+    })
   })
 
   test('handles nested formatting without leaking tags', () => {
