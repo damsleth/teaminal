@@ -139,4 +139,26 @@ describe('extractInlineImages', () => {
     expect(refs[0]!.cacheKey).toBe('msg-1::BBB')
     expect(refs[0]!.isExternal).toBe(false)
   })
+
+  it('ignores emoji rendered as <img alt> (chatsvc emoji), not a fetchable image', () => {
+    const m = msg({
+      body: {
+        contentType: 'html',
+        content: '<p>oops <img alt="😕" itemid="emoji-1"> done</p>',
+      },
+    })
+    expect(extractInlineImages(m)).toEqual([])
+  })
+
+  it('skips hostedContents images when chatId is empty (chatsvc-sourced)', () => {
+    const m = msg({
+      chatId: undefined,
+      body: {
+        contentType: 'html',
+        content: '<p><img alt="bilde" itemid="AAA"></p>',
+      },
+    })
+    // No chatId → cannot build /chats/{id}/.../hostedContents path, so skip.
+    expect(extractInlineImages(m)).toEqual([])
+  })
 })
