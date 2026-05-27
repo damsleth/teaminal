@@ -215,6 +215,14 @@ export function App() {
       pollerRef.current?.refresh()
       return
     }
+    // Picking your own directory entry (incl. a same-name guest identity that
+    // resolves to you) maps to the Teams notes-to-self chat. If it isn't in
+    // the local list yet there's nothing to open - federated resolution and
+    // Graph chat-create both require a distinct peer - so surface a clear
+    // message rather than a cryptic "requires exactly two user IDs" throw.
+    if (user.id === selfId) {
+      throw new Error('That is your own account; open your notes-to-self chat from the list')
+    }
     const federatedChatId = await resolveFederatedChatId(selfId, user.id)
     if (federatedChatId) {
       const chat = await materializeChat(store, federatedChatId)
@@ -382,6 +390,7 @@ export function App() {
           {newChatPrompt !== null ? (
             <NewChatPrompt
               initialQuery={newChatPrompt}
+              selfId={me?.id}
               onClose={closeNewChatPrompt}
               onSelectUser={createOrFocusChat}
             />
