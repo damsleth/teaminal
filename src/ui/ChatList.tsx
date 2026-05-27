@@ -160,6 +160,21 @@ function presenceForChatItem(
   return { dot: '●', color }
 }
 
+// Nerd-font glyphs distinguishing non-1:1 chats in the gutter where 1:1
+// chats show their presence dot.  (U+EAB0) marks meeting chats,
+//  (U+F0C0) marks group chats. 1:1 chats return null so the presence dot
+// shows instead.
+const CHAT_TYPE_GLYPH: Partial<Record<string, string>> = {
+  meeting: '',
+  group: '',
+}
+
+function chatTypeGlyph(item: SelectableItem, theme: Theme): { dot: string; color: string } | null {
+  if (item.kind !== 'chat') return null
+  const glyph = CHAT_TYPE_GLYPH[item.chat.chatType]
+  return glyph ? { dot: glyph, color: theme.mutedText } : null
+}
+
 export function ChatList() {
   const chats = useAppState((s) => s.chats)
   const teams = useAppState((s) => s.teams)
@@ -171,6 +186,7 @@ export function ChatList() {
   const inputZone = useAppState((s) => s.inputZone)
   const density = useAppState((s) => s.settings.chatListDensity)
   const shortNames = useAppState((s) => s.settings.chatListShortNames)
+  const showMessagePreviews = useAppState((s) => s.settings.showMessagePreviews)
   const showPresence = useAppState((s) => s.settings.showPresenceInList)
   const memberPresence = useAppState((s) => s.memberPresence)
   const unreadByChatId = useAppState((s) => s.unreadByChatId)
@@ -217,11 +233,9 @@ export function ChatList() {
     const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
     const unreadBadge = hasMention ? ' @' : hasUnread ? ' ●' : ''
     let h = visualLines(label + unreadBadge, cw)
-    if (density === 'cozy' && hasUnread && row.item.kind === 'chat') {
-      const preview = unread?.lastSenderName
-        ? `${shortName(unread.lastSenderName)} ${previewChat(row.item.chat)}`
-        : previewChat(row.item.chat)
-      h += visualLines(preview, cw)
+    if (showMessagePreviews && row.item.kind === 'chat') {
+      const preview = previewLineForChat(row.item.chat, PREVIEW_CONTENT_WIDTH)
+      if (preview) h += visualLines(preview, PREVIEW_CONTENT_WIDTH)
     }
     return h
   })
@@ -332,9 +346,13 @@ export function ChatList() {
         const isSelected = row.index === safeCursor
         const indent = density === 'cozy' ? rowIndent(row.item) : ''
         const label = rowLabel(row.item, me?.id, shortNames)
-        const presence = showPresence
-          ? presenceForChatItem(row.item, me?.id, memberPresence, theme)
-          : null
+        // Gutter glyph: 1:1 chats show a presence dot (when presence is
+        // enabled), while meeting / group chats show a chat-type glyph so
+        // they're distinguishable. Type glyphs need no fetched data, so they
+        // render whenever the gutter is visible, regardless of showPresence.
+        const presence =
+          (showPresence ? presenceForChatItem(row.item, me?.id, memberPresence, theme) : null) ??
+          chatTypeGlyph(row.item, theme)
         const unread = row.item.kind === 'chat' ? unreadByChatId[row.item.chat.id] : undefined
         const hasMention = !!unread && unread.mentionCount > 0
         const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
@@ -354,45 +372,57 @@ export function ChatList() {
         const showGutter = density === 'cozy' || showPresence
         const presenceText = presence ? presence.dot : ' '
         const presenceColor = presence?.color
+        // Non-indented last-message preview, independent of density. Read
+        // chats render in muted gray, unread chats in the unread color.
+        const preview =
+          showMessagePreviews && row.item.kind === 'chat'
+            ? previewLineForChat(row.item.chat, PREVIEW_CONTENT_WIDTH)
+            : ''
         return (
-          <Box key={`${row.item.kind}-${row.index}`} flexDirection="row" flexShrink={0}>
-            {showGutter && (
-              <Box width={2} flexShrink={0}>
-                <Text color={presenceColor}>{`${presenceText} `}</Text>
-              </Box>
-            )}
-            {density === 'cozy' && (
-              <Box width={2} flexShrink={0}>
-                <Text color={isSelected ? theme.selected : undefined}>
-                  {isSelected ? '> ' : '  '}
-                </Text>
-              </Box>
-            )}
-            {indent && (
-              <Box width={indent.length} flexShrink={0}>
-                <Text>{indent}</Text>
-              </Box>
-            )}
-            <Box width={labelContentWidth(density, showPresence, indent)} flexShrink={0}>
-              <Text
-                color={isSelected ? theme.selected : hasUnread ? theme.unread : undefined}
-                bold={
-                  (isSelected && theme.emphasis.selectedBold) ||
-                  (hasUnread && theme.emphasis.unreadBold)
-                }
-                wrap="wrap"
-              >
-                {label}
-                {unreadBadge}
-              </Text>
-              {density === 'cozy' && hasUnread && row.item.kind === 'chat' && (
-                <Text color={theme.unread} bold={theme.emphasis.unreadBold} wrap="wrap">
-                  {unread?.lastSenderName
-                    ? `${shortName(unread.lastSenderName)} ${previewChat(row.item.chat)}`
-                    : previewChat(row.item.chat)}
-                </Text>
+          <Box key={`${row.item.kind}-${row.index}`} flexDirection="column" flexShrink={0}>
+            <Box flexDirection="row">
+              {showGutter && (
+                <Box width={2} flexShrink={0}>
+                  <Text color={presenceColor}>{`${presenceText} `}</Text>
+                </Box>
               )}
+              {density === 'cozy' && (
+                <Box width={2} flexShrink={0}>
+                  <Text color={isSelected ? theme.selected : undefined}>
+                    {isSelected ? '> ' : '  '}
+                  </Text>
+                </Box>
+              )}
+              {indent && (
+                <Box width={indent.length} flexShrink={0}>
+                  <Text>{indent}</Text>
+                </Box>
+              )}
+              <Box width={labelContentWidth(density, showPresence, indent)} flexShrink={0}>
+                <Text
+                  color={isSelected ? theme.selected : hasUnread ? theme.unread : undefined}
+                  bold={
+                    (isSelected && theme.emphasis.selectedBold) ||
+                    (hasUnread && theme.emphasis.unreadBold)
+                  }
+                  wrap="wrap"
+                >
+                  {label}
+                  {unreadBadge}
+                </Text>
+              </Box>
             </Box>
+            {preview && (
+              <Box width={PREVIEW_CONTENT_WIDTH} flexShrink={0}>
+                <Text
+                  color={hasUnread ? theme.unread : theme.mutedText}
+                  bold={hasUnread && theme.emphasis.unreadBold}
+                  wrap="wrap"
+                >
+                  {preview}
+                </Text>
+              </Box>
+            )}
           </Box>
         )
       })}
@@ -408,4 +438,32 @@ function previewChat(chat: Extract<SelectableItem, { kind: 'chat' }>['chat']): s
       ? htmlToText(body.content)
       : body.content.replace(/\s+/g, ' ').trim()
   return text
+}
+
+// Width of the (non-indented) preview rows: the full list pane minus the
+// round border and the column container's paddingRight. No presence /
+// selector gutters or channel indent apply — previews start at the left
+// edge so they don't look ragged under the chat name.
+const PREVIEW_CONTENT_WIDTH = LIST_PANE_WIDTH - 2 - 1
+
+// Truncate to at most `maxLines` visual lines worth of characters, adding an
+// ellipsis when clipped. Keeps the rendered preview and the viewport height
+// math in agreement.
+function clampToLines(text: string, width: number, maxLines = 2): string {
+  const max = Math.max(1, width) * maxLines
+  if (text.length <= max) return text
+  return `${text.slice(0, Math.max(0, max - 1)).trimEnd()}…`
+}
+
+// "Sender: message" preview for a chat's last message, clamped to two lines.
+// Empty string when the chat has no last-message preview to show.
+function previewLineForChat(
+  chat: Extract<SelectableItem, { kind: 'chat' }>['chat'],
+  width: number,
+): string {
+  const text = previewChat(chat)
+  if (!text) return ''
+  const sender = chat.lastMessagePreview?.from?.user?.displayName
+  const line = sender ? `${shortName(sender)}: ${text}` : text
+  return clampToLines(line, width)
 }

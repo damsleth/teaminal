@@ -8,20 +8,32 @@
 //   - Member expansion is capped at 25 so we hydrate lazily, only on
 //     visible/active chats
 
-import { graph, GraphError } from './client'
+import { getAudiencePreference, graph, GraphError } from './client'
 import { listChatMessagesViaChatsvc, sendChannelMessageViaChatsvc } from './teamsChatsvc'
 import { createOneOnOneThreadViaChatsvc } from './teamsFederation'
 import { recordEvent } from '../log'
 import type { Chat, ChatMessage, DirectoryUser, Person } from '../types'
 
-// Once graph /chats/{id}/messages 401s (Conditional Access gate on
-// graph.microsoft.com), read chat messages through chatsvc for the rest
-// of the session — the same path channels already use, authenticated with
-// the skype token. Latched so we don't re-hit the graph 401 every poll.
-let useChatsvcForMessages = false
+// Chat message reads/sends route between graph.microsoft.com and the Teams
+// chatsvc (ic3) endpoints according to the active account's routing mode,
+// exposed via getAudiencePreference(): { audience, fallback }.
+//   - audience 'graph' → graph endpoints first
+//   - audience 'ic3'   → chatsvc endpoints first
+//   - fallback true    → try the other transport when the primary fails
+// Under a graph-primary, fallback-enabled mode (graph+ic3, the default) the
+// first graph 401 (Conditional Access gate) latches us onto chatsvc for the
+// rest of the session so we don't re-hit the 401 every poll. The latch is
+// cleared on profile switch via resetChatMessageTransport(). ic3-primary
+// modes never touch the graph chat endpoints, and graph-only / ic3-only
+// modes never fall back.
+let graphMessages401 = false
+
+export function resetChatMessageTransport(): void {
+  graphMessages401 = false
+}
 
 export function __resetChatMessageFallbackForTests(): void {
-  useChatsvcForMessages = false
+  graphMessages401 = false
 }
 
 type CollectionResponse<T> = { value: T[]; '@odata.nextLink'?: string }
@@ -155,13 +167,7 @@ export async function listMessages(
   return (await listMessagesPage(chatId, opts)).messages
 }
 
-export async function listMessagesPage(
-  chatId: string,
-  opts?: ListMessagesOpts,
-): Promise<MessagesPage> {
-  if (useChatsvcForMessages) {
-    return chatsvcMessagesPage(chatId, opts)
-  }
+async function graphMessagesPage(chatId: string, opts?: ListMessagesOpts): Promise<MessagesPage> {
   const query: Record<string, string | number | undefined> = {
     $top: opts?.top ?? MESSAGES_TOP_DEFAULT,
     $orderby: 'createdDateTime desc',
@@ -169,20 +175,47 @@ export async function listMessagesPage(
   if (opts?.beforeCreatedDateTime) {
     query.$filter = `createdDateTime lt ${opts.beforeCreatedDateTime}`
   }
-  try {
-    const res = await graph<CollectionResponse<ChatMessage>>({
-      method: 'GET',
-      path: `/chats/${encodeURIComponent(chatId)}/messages`,
-      query,
-      signal: opts?.signal,
-    })
-    return {
-      messages: res.value.slice().reverse(),
-      nextLink: res['@odata.nextLink'],
+  const res = await graph<CollectionResponse<ChatMessage>>({
+    method: 'GET',
+    path: `/chats/${encodeURIComponent(chatId)}/messages`,
+    query,
+    signal: opts?.signal,
+  })
+  return {
+    messages: res.value.slice().reverse(),
+    nextLink: res['@odata.nextLink'],
+  }
+}
+
+export async function listMessagesPage(
+  chatId: string,
+  opts?: ListMessagesOpts,
+): Promise<MessagesPage> {
+  const { audience, fallback } = getAudiencePreference()
+  // ic3-primary modes read straight from chatsvc; only ic3+graph falls back.
+  if (audience === 'ic3') {
+    if (!fallback) return chatsvcMessagesPage(chatId, opts)
+    try {
+      return await chatsvcMessagesPage(chatId, opts)
+    } catch (err) {
+      recordEvent(
+        'graph',
+        'warn',
+        `chatsvc chat messages failed (${err instanceof Error ? err.message : String(err)}) — trying graph`,
+      )
+      return graphMessagesPage(chatId, opts)
     }
+  }
+  // graph-primary modes. Once latched (fallback-enabled graph 401), stay on
+  // chatsvc rather than re-hitting the gated graph endpoint each poll.
+  if (graphMessages401 && fallback) {
+    return chatsvcMessagesPage(chatId, opts)
+  }
+  try {
+    return await graphMessagesPage(chatId, opts)
   } catch (err) {
-    if (err instanceof GraphError && err.status === 401) {
-      useChatsvcForMessages = true
+    if (err instanceof GraphError && err.status === 401 && fallback) {
+      graphMessages401 = true
       recordEvent(
         'graph',
         'warn',
@@ -224,34 +257,54 @@ export type SendMessageOpts = {
   signal?: AbortSignal
 }
 
+function graphSend(chatId: string, content: string, opts?: SendMessageOpts): Promise<ChatMessage> {
+  return graph<ChatMessage>({
+    method: 'POST',
+    path: `/chats/${encodeURIComponent(chatId)}/messages`,
+    body: { body: { contentType: 'text', content } },
+    signal: opts?.signal,
+  })
+}
+
 export async function sendMessage(
   chatId: string,
   content: string,
   opts?: SendMessageOpts,
 ): Promise<ChatMessage> {
-  if (useChatsvcForMessages) {
-    return sendChannelMessageViaChatsvc(chatId, content, {
+  const chatsvcSend = (): Promise<ChatMessage> =>
+    sendChannelMessageViaChatsvc(chatId, content, {
       ...(opts?.signal ? { signal: opts.signal } : {}),
     })
+  const { audience, fallback } = getAudiencePreference()
+  // ic3-primary modes send via chatsvc; only ic3+graph falls back to graph.
+  if (audience === 'ic3') {
+    if (!fallback) return chatsvcSend()
+    try {
+      return await chatsvcSend()
+    } catch (err) {
+      recordEvent(
+        'graph',
+        'warn',
+        `chatsvc chat send failed (${err instanceof Error ? err.message : String(err)}) — trying graph`,
+      )
+      return graphSend(chatId, content, opts)
+    }
+  }
+  // graph-primary modes, honoring the session latch from a prior 401.
+  if (graphMessages401 && fallback) {
+    return chatsvcSend()
   }
   try {
-    return await graph<ChatMessage>({
-      method: 'POST',
-      path: `/chats/${encodeURIComponent(chatId)}/messages`,
-      body: { body: { contentType: 'text', content } },
-      signal: opts?.signal,
-    })
+    return await graphSend(chatId, content, opts)
   } catch (err) {
-    if (err instanceof GraphError && err.status === 401) {
-      useChatsvcForMessages = true
+    if (err instanceof GraphError && err.status === 401 && fallback) {
+      graphMessages401 = true
       recordEvent(
         'graph',
         'warn',
         'graph chat send 401 (likely Conditional Access) — switching to chatsvc',
       )
-      return sendChannelMessageViaChatsvc(chatId, content, {
-        ...(opts?.signal ? { signal: opts.signal } : {}),
-      })
+      return chatsvcSend()
     }
     throw err
   }
