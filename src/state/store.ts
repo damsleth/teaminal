@@ -236,6 +236,11 @@ export type Settings = {
   // is preserved out of the box; users with mostly-internal contacts
   // can flip this on.
   chatListShortNames: boolean
+  // When true (default), each chat row in the sidebar renders up to two
+  // non-indented lines with the start of the last message — light gray for
+  // read chats, the unread color for chats with unread messages. Independent
+  // of chatListDensity. Turn off for a denser, single-line-per-chat list.
+  showMessagePreviews: boolean
   // When true (default), the message pane renders the sender column as
   // first-name only ("Finn") instead of the full display name
   // ("Nordling, Finn Saethre"). Independent of `chatListShortNames` so
@@ -310,33 +315,69 @@ export type Settings = {
   //              information the status bar would have shown.
   // A 'top' option is plausible but deferred until asked for.
   statusBarPosition: 'bottom' | 'hidden'
-  // Per-account preferred owa-piggy token audience, keyed by profile/
-  // account name. 'graph' (default when an account is absent from the
-  // map) uses the Microsoft Graph audience; 'ic3' uses the Teams chatsvc
-  // (ic3.teams.office.com) audience. The graph client tries the preferred
-  // audience first and falls back to the other on a persistent 401 or
-  // when the preferred audience can't be minted. Toggled per account in
-  // the esc-menu Accounts list.
-  audienceByAccount: Record<string, TokenAudience>
+  // Per-account chat routing mode, keyed by profile/account name. Controls
+  // both which owa-piggy token audience is minted for default Graph calls
+  // and whether chat message reads/sends use graph.microsoft.com or the
+  // Teams chatsvc (ic3) endpoints — plus whether a failure falls back to the
+  // other transport:
+  //   'graph+ic3' (default) — graph first, fall back to chatsvc on 401
+  //   'ic3+graph'           — chatsvc first, fall back to graph on failure
+  //   'ic3-only'            — chatsvc only, never touch graph chat endpoints
+  //   'graph-only'          — graph only, never fall back to chatsvc
+  // Accounts gated by Conditional Access on graph.microsoft.com should use
+  // 'ic3-only' to avoid hammering the same 401-returning endpoints. Toggled
+  // per account in the esc-menu Accounts list. Absent => graph+ic3.
+  chatRoutingByAccount: Record<string, ChatRoutingMode>
 }
 
 export type TokenAudience = 'graph' | 'ic3'
 
 export const DEFAULT_TOKEN_AUDIENCE: TokenAudience = 'graph'
 
-// Resolve the preferred token audience for an account, defaulting to
-// graph when the account has no explicit preference.
-export function audienceForAccount(
-  settings: Pick<Settings, 'audienceByAccount'>,
+export type ChatRoutingMode = 'graph+ic3' | 'ic3+graph' | 'ic3-only' | 'graph-only'
+
+export const DEFAULT_CHAT_ROUTING: ChatRoutingMode = 'graph+ic3'
+
+// The order the Accounts-list 't' key cycles through.
+export const CHAT_ROUTING_MODES: readonly ChatRoutingMode[] = [
+  'graph+ic3',
+  'ic3+graph',
+  'ic3-only',
+  'graph-only',
+]
+
+// Resolve the routing mode for an account, defaulting to graph+ic3 when the
+// account has no explicit preference.
+export function routingForAccount(
+  settings: Pick<Settings, 'chatRoutingByAccount'>,
   account: string | null | undefined,
-): TokenAudience {
-  if (!account) return DEFAULT_TOKEN_AUDIENCE
-  return settings.audienceByAccount[account] ?? DEFAULT_TOKEN_AUDIENCE
+): ChatRoutingMode {
+  if (!account) return DEFAULT_CHAT_ROUTING
+  return settings.chatRoutingByAccount[account] ?? DEFAULT_CHAT_ROUTING
 }
 
-// The "other" audience, used as the automatic fallback target.
-export function otherAudience(audience: TokenAudience): TokenAudience {
-  return audience === 'graph' ? 'ic3' : 'graph'
+// Next mode in the cycle, for the Accounts-list toggle.
+export function nextChatRouting(mode: ChatRoutingMode): ChatRoutingMode {
+  const i = CHAT_ROUTING_MODES.indexOf(mode)
+  return CHAT_ROUTING_MODES[(i + 1) % CHAT_ROUTING_MODES.length]!
+}
+
+// Resolve a routing mode into the token audience to mint and whether the
+// graph client / chat transport may fall back to the other transport.
+export function audienceFromRouting(mode: ChatRoutingMode): {
+  audience: TokenAudience
+  fallback: boolean
+} {
+  switch (mode) {
+    case 'graph+ic3':
+      return { audience: 'graph', fallback: true }
+    case 'graph-only':
+      return { audience: 'graph', fallback: false }
+    case 'ic3+graph':
+      return { audience: 'ic3', fallback: true }
+    case 'ic3-only':
+      return { audience: 'ic3', fallback: false }
+  }
 }
 
 export const defaultSettings: Settings = {
@@ -346,6 +387,7 @@ export const defaultSettings: Settings = {
   activeAccount: null,
   chatListDensity: 'cozy',
   chatListShortNames: false,
+  showMessagePreviews: true,
   messagePaneShortNames: true,
   showPresenceInList: true,
   showTimestampsInPane: true,
@@ -369,7 +411,7 @@ export const defaultSettings: Settings = {
   inlineImages: 'auto',
   inlineImageMaxRows: 10,
   statusBarPosition: 'bottom',
-  audienceByAccount: {},
+  chatRoutingByAccount: {},
 }
 
 export type MessageCache = {

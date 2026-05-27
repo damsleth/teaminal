@@ -29,6 +29,7 @@ export type ToggleKey =
   | 'theme'
   | 'chatListDensity'
   | 'chatListShortNames'
+  | 'showMessagePreviews'
   | 'messagePaneShortNames'
   | 'showPresenceInList'
   | 'showTimestampsInPane'
@@ -119,6 +120,11 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'chatListShortNames',
         label: 'Short names in chat list',
         action: { kind: 'toggle-setting', key: 'chatListShortNames' },
+      },
+      {
+        id: 'showMessagePreviews',
+        label: 'Show message previews in chat list',
+        action: { kind: 'toggle-setting', key: 'showMessagePreviews' },
       },
       {
         id: 'messagePaneShortNames',
@@ -296,6 +302,7 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'showReactions':
       return cycleReactionDisplayMode(current as Settings['showReactions']) as Settings[K]
     case 'chatListShortNames':
+    case 'showMessagePreviews':
     case 'messagePaneShortNames':
     case 'showPresenceInList':
     case 'showTimestampsInPane':
@@ -338,6 +345,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'statusBarPosition':
       return String(value)
     case 'chatListShortNames':
+    case 'showMessagePreviews':
     case 'messagePaneShortNames':
     case 'showPresenceInList':
     case 'showTimestampsInPane':

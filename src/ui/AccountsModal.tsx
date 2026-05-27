@@ -3,7 +3,12 @@ import { useState } from 'react'
 import { listProfilesFromStatus, type OwaPiggyProfileStatus } from '../auth/owaPiggy'
 import { updateSettings } from '../config'
 import { setAudiencePreference } from '../graph/client'
-import { audienceForAccount, otherAudience, type Settings } from '../state/store'
+import {
+  audienceFromRouting,
+  nextChatRouting,
+  routingForAccount,
+  type Settings,
+} from '../state/store'
 import { useSessionApi } from './SessionContext'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
@@ -152,18 +157,19 @@ export function AccountsModal() {
         if (profile) setMode({ kind: 'confirm-remove', profile })
         return
       }
-      // Toggle the focused account's preferred token audience (graph ↔ ic3).
+      // Cycle the focused account's chat routing mode
+      // (graph+ic3 → ic3+graph → ic3-only → graph-only).
       if (ch === 't' && settings.accounts.length > 0) {
         const profile = settings.accounts[clamp(mode.cursor, settings.accounts.length)]
         if (!profile) return
-        const next = otherAudience(audienceForAccount(settings, profile))
-        const audienceByAccount = { ...settings.audienceByAccount, [profile]: next }
-        void persist({ audienceByAccount }).then(() => {
-          // If we just changed the active account's audience, apply it to
-          // the graph client immediately (fallback on, since this is now
-          // an explicit preference).
+        const next = nextChatRouting(routingForAccount(settings, profile))
+        const chatRoutingByAccount = { ...settings.chatRoutingByAccount, [profile]: next }
+        void persist({ chatRoutingByAccount }).then(() => {
+          // If we just changed the active account's routing, apply the
+          // derived audience/fallback to the graph client immediately.
           if (profile === settings.activeAccount) {
-            setAudiencePreference(next, { fallback: true })
+            const { audience, fallback } = audienceFromRouting(next)
+            setAudiencePreference(audience, { fallback })
           }
         })
         return
@@ -249,7 +255,7 @@ export function AccountsModal() {
                   {profile}
                   <Text color={theme.mutedText}>
                     {settings.activeAccount === profile ? '  active' : ''}
-                    {`  [${audienceForAccount(settings, profile)}]`}
+                    {`  [${routingForAccount(settings, profile)}]`}
                   </Text>
                 </Text>
               ))
@@ -257,7 +263,8 @@ export function AccountsModal() {
             {mode.error && <Text color={theme.errorText}>{mode.error.slice(0, 180)}</Text>}
             <Box height={1} />
             <Text color={theme.mutedText}>
-              Enter switch · a add · d remove · t audience (graph/ic3) · Esc close
+              Enter switch · a add · d remove · t routing (graph+ic3/ic3+graph/ic3-only/graph-only)
+              · Esc close
             </Text>
           </>
         )}

@@ -8,8 +8,10 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import {
+  CHAT_ROUTING_MODES,
   defaultSettings,
   type BorderStyleName,
+  type ChatRoutingMode,
   type Settings,
   type ThemeOverrides,
   type ThemePresenceKey,
@@ -215,6 +217,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     activeAccount: settings.activeAccount,
     chatListDensity: settings.chatListDensity,
     chatListShortNames: settings.chatListShortNames,
+    showMessagePreviews: settings.showMessagePreviews,
     messagePaneShortNames: settings.messagePaneShortNames,
     showPresenceInList: settings.showPresenceInList,
     showTimestampsInPane: settings.showTimestampsInPane,
@@ -238,7 +241,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     inlineImages: settings.inlineImages,
     inlineImageMaxRows: settings.inlineImageMaxRows,
     statusBarPosition: settings.statusBarPosition,
-    audienceByAccount: { ...settings.audienceByAccount },
+    chatRoutingByAccount: { ...settings.chatRoutingByAccount },
   }
 }
 
@@ -246,6 +249,14 @@ export function mergeSettings(input: Record<string, unknown>, warnings: string[]
   const out: Settings = cloneSettings(defaultSettings)
   for (const [key, value] of Object.entries(input)) {
     if (key === 'windowHeight') {
+      continue
+    }
+    // Legacy key (pre chatRoutingByAccount): the binary audience preference.
+    // An explicit 'graph'/'ic3' meant "with cross-audience fallback", so map
+    // to the +fallback modes. Only fills accounts not already set by an
+    // explicit chatRoutingByAccount, which always wins.
+    if (key === 'audienceByAccount') {
+      migrateLegacyAudienceByAccount(value, out)
       continue
     }
     if (!(key in defaultSettings)) {
@@ -256,6 +267,15 @@ export function mergeSettings(input: Record<string, unknown>, warnings: string[]
     validateAndAssign(out, k, value, warnings)
   }
   return out
+}
+
+function migrateLegacyAudienceByAccount(value: unknown, out: Settings): void {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return
+  for (const [account, aud] of Object.entries(value)) {
+    if (account in out.chatRoutingByAccount) continue
+    if (aud === 'graph') out.chatRoutingByAccount[account] = 'graph+ic3'
+    else if (aud === 'ic3') out.chatRoutingByAccount[account] = 'ic3+graph'
+  }
 }
 
 function writeConfigAtomically(config: TeaminalConfig, path: string): void {
@@ -317,7 +337,7 @@ function cloneSettings(settings: Settings): Settings {
     ...settings,
     accounts: [...settings.accounts],
     themeOverrides: cloneThemeOverrides(settings.themeOverrides),
-    audienceByAccount: { ...settings.audienceByAccount },
+    chatRoutingByAccount: { ...settings.chatRoutingByAccount },
   }
 }
 
@@ -382,6 +402,7 @@ function validateAndAssign(
       warnings.push('config: "chatListDensity" must be "cozy" or "compact"')
       return false
     case 'chatListShortNames':
+    case 'showMessagePreviews':
     case 'messagePaneShortNames':
     case 'showPresenceInList':
     case 'showTimestampsInPane':
@@ -472,10 +493,12 @@ function validateAndAssign(
       }
       warnings.push('config: "statusBarPosition" must be "bottom" or "hidden"')
       return false
-    case 'audienceByAccount': {
-      const parsed = validateAudienceByAccount(value, warnings)
+    case 'chatRoutingByAccount': {
+      const parsed = validateChatRoutingByAccount(value, warnings)
       if (parsed) {
-        out.audienceByAccount = parsed
+        // Merge rather than replace so a legacy audienceByAccount migration
+        // (see mergeSettings) isn't clobbered regardless of key order.
+        out.chatRoutingByAccount = { ...out.chatRoutingByAccount, ...parsed }
         return true
       }
       return false
@@ -483,20 +506,22 @@ function validateAndAssign(
   }
 }
 
-function validateAudienceByAccount(
+function validateChatRoutingByAccount(
   value: unknown,
   warnings: string[],
-): Record<string, 'graph' | 'ic3'> | null {
+): Record<string, ChatRoutingMode> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    warnings.push('config: "audienceByAccount" must be a JSON object')
+    warnings.push('config: "chatRoutingByAccount" must be a JSON object')
     return null
   }
-  const out: Record<string, 'graph' | 'ic3'> = {}
-  for (const [account, aud] of Object.entries(value)) {
-    if (aud === 'graph' || aud === 'ic3') {
-      out[account] = aud
+  const out: Record<string, ChatRoutingMode> = {}
+  for (const [account, mode] of Object.entries(value)) {
+    if (CHAT_ROUTING_MODES.includes(mode as ChatRoutingMode)) {
+      out[account] = mode as ChatRoutingMode
     } else {
-      warnings.push(`config: audienceByAccount["${account}"] must be "graph" or "ic3" — ignored`)
+      warnings.push(
+        `config: chatRoutingByAccount["${account}"] must be one of ${CHAT_ROUTING_MODES.join('/')} — ignored`,
+      )
     }
   }
   return out

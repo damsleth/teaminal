@@ -326,21 +326,46 @@ describe('Settings ↔ config.json parity', () => {
       inlineImages: 'off',
       inlineImageMaxRows: 7,
       statusBarPosition: 'hidden',
-      audienceByAccount: { 'profile-a': 'ic3', 'profile-b': 'graph' },
+      chatRoutingByAccount: { 'profile-a': 'ic3-only', 'profile-b': 'graph+ic3' },
     }
     const config = settingsToConfig(mutated)
     const roundtripped = configToSettings(config as Record<string, unknown>, [])
     expect(roundtripped).toEqual(mutated)
   })
 
-  test('audienceByAccount drops invalid audiences with a warning', () => {
+  test('chatRoutingByAccount drops invalid modes with a warning', () => {
     const warnings: string[] = []
     const settings = configToSettings(
-      { audienceByAccount: { good: 'ic3', bad: 'outlook', alsoBad: 5 } } as Record<string, unknown>,
+      {
+        chatRoutingByAccount: { good: 'ic3-only', bad: 'outlook', alsoBad: 5 },
+      } as Record<string, unknown>,
       warnings,
     )
-    expect(settings.audienceByAccount).toEqual({ good: 'ic3' })
+    expect(settings.chatRoutingByAccount).toEqual({ good: 'ic3-only' })
     expect(warnings.some((w) => w.includes('alsoBad'))).toBe(true)
     expect(warnings.some((w) => w.includes('bad'))).toBe(true)
+  })
+
+  test('migrates legacy audienceByAccount to chatRoutingByAccount (+fallback modes)', () => {
+    const warnings: string[] = []
+    const settings = configToSettings(
+      { audienceByAccount: { a: 'graph', b: 'ic3', c: 'bogus' } } as Record<string, unknown>,
+      warnings,
+    )
+    expect(settings.chatRoutingByAccount).toEqual({ a: 'graph+ic3', b: 'ic3+graph' })
+    // No "unknown key" warning for the recognised legacy key.
+    expect(warnings.some((w) => w.includes('audienceByAccount'))).toBe(false)
+  })
+
+  test('explicit chatRoutingByAccount wins over legacy audienceByAccount', () => {
+    const warnings: string[] = []
+    const settings = configToSettings(
+      {
+        audienceByAccount: { a: 'graph' },
+        chatRoutingByAccount: { a: 'ic3-only' },
+      } as Record<string, unknown>,
+      warnings,
+    )
+    expect(settings.chatRoutingByAccount).toEqual({ a: 'ic3-only' })
   })
 })
