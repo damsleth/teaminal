@@ -11,6 +11,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 - **Per-account chat routing modes.** The esc-menu Accounts list now cycles each account through four modes with `t`: `graph+ic3` (default), `ic3+graph`, `ic3-only`, and `graph-only`. The mode picks which token audience is minted and whether chat message reads/sends may fall back to the other transport. `ic3-only` reads and sends straight through chatsvc and never calls `graph.microsoft.com`, so accounts gated by Conditional Access stop re-hitting the same 401-returning Graph endpoints; `graph-only` disables the chatsvc fallback entirely.
 - **"Show message previews" in the chat list.** A new setting (default on, independent of chat-list density) renders up to two non-indented lines of the last message under each chat — muted gray when read, the unread color when unread.
 - **Chat-type glyphs in the chat list.** Meeting chats () and group chats () now show a nerd-font glyph in the gutter where 1:1 chats show their presence dot.
+- **Inline images load on Conditional-Access-gated (ic3) accounts.** When the Graph hostedContents endpoint is gated, images are fetched from the Teams asyncgw object store instead, keyed by the message's asm object id (from `<img itemid>`, an `asm.skype.com` object URL, or a base64 hostedContents id). `ic3` accounts go straight to asyncgw; `graph` accounts fall back to it on a hostedContents 401.
 
 ### Changed
 

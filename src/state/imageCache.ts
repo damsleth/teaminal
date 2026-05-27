@@ -9,8 +9,8 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { graphBinary } from '../graph/client'
-import { fetchObjectByUrl, isAsyncGwUrl } from '../graph/teamsAsyncGw'
+import { getAudiencePreference, graphBinary, GraphError } from '../graph/client'
+import { fetchObjectById, fetchObjectByUrl, isAsyncGwUrl } from '../graph/teamsAsyncGw'
 import { recordEvent } from '../log'
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024
@@ -79,6 +79,60 @@ export type FetchImageOpts = {
   // header. Used for giphy/tenor URLs returned by the Teams gif picker;
   // sending a Bearer token to those hosts produces a rejection.
   isExternal?: boolean
+  // Raw asm/asyncgw object id, when known. Lets ic3 (Conditional-Access)
+  // accounts retrieve the image via asyncgw instead of the Graph
+  // hostedContents endpoint, which 401s under the CA gate.
+  objectId?: string
+}
+
+// Whether `path` is something graphBinary can actually fetch (a Graph-relative
+// path or absolute Graph URL) — as opposed to an asm object URL or the empty
+// path we leave on chatsvc-sourced messages.
+function isGraphFetchable(path: string): boolean {
+  return path.startsWith('/') || path.startsWith('https://graph.microsoft.com/')
+}
+
+// Fetch a hosted-content image, routing between the Graph hostedContents
+// endpoint and the asyncgw object store per the account's routing mode
+// (getAudiencePreference). ic3 accounts go to asyncgw (the Graph endpoint is
+// CA-gated); graph accounts use Graph and fall back to asyncgw on a 401 when
+// the object id is known and fallback is enabled.
+async function fetchHostedContent(path: string, opts?: FetchImageOpts): Promise<Uint8Array> {
+  const { audience, fallback } = getAudiencePreference()
+  const objectId = opts?.objectId
+  const viaGraph = (): Promise<Uint8Array> =>
+    graphBinary({ method: 'GET', path, signal: opts?.signal })
+  const viaAsyncGw = async (): Promise<Uint8Array> => {
+    const { bytes } = await fetchObjectById(objectId!, {
+      profile: opts?.profile,
+      signal: opts?.signal,
+    })
+    return bytes
+  }
+  const canGraph = isGraphFetchable(path)
+
+  if (audience === 'ic3' && objectId) {
+    if (!fallback || !canGraph) return viaAsyncGw()
+    try {
+      return await viaAsyncGw()
+    } catch {
+      return viaGraph()
+    }
+  }
+  if (canGraph) {
+    try {
+      return await viaGraph()
+    } catch (err) {
+      if (fallback && objectId && err instanceof GraphError && err.status === 401) {
+        return viaAsyncGw()
+      }
+      throw err
+    }
+  }
+  // No Graph path (e.g. an asm object URL, or a chatsvc message with no chat
+  // id) — asyncgw is the only route.
+  if (objectId) return viaAsyncGw()
+  throw new Error('image has no Graph path and no asyncgw object id')
 }
 
 // Fetch an image blob from Graph and cache it on disk. Returns null on
@@ -109,7 +163,7 @@ export async function fetchAndCacheImage(
     } else if (opts?.isExternal) {
       bytes = await fetchExternalImage(path, opts?.signal)
     } else {
-      bytes = await graphBinary({ method: 'GET', path, signal: opts?.signal })
+      bytes = await fetchHostedContent(path, opts)
     }
   } catch (err) {
     recordEvent(

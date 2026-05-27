@@ -8,6 +8,7 @@ import {
   __setTransportForTests,
   asyncGwHostForUrl,
   bootstrap,
+  fetchObjectById,
   fetchObjectByUrl,
   isAsyncGwUrl,
 } from './teamsAsyncGw'
@@ -145,6 +146,44 @@ describe('fetchObjectByUrl', () => {
   })
 
   test('throws when the URL is not an asyncgw URL', async () => {
-    await expect(fetchObjectByUrl('https://media.giphy.com/abc.gif')).rejects.toThrow(/not an asyncgw/)
+    await expect(fetchObjectByUrl('https://media.giphy.com/abc.gif')).rejects.toThrow(
+      /not an asyncgw/,
+    )
+  })
+})
+
+describe('fetchObjectById', () => {
+  test('builds {host}/v1/{oid}/objects/{id}/views/{view} and fetches the bytes', async () => {
+    primeAuth()
+    let objectUrl = ''
+    __setTransportForTests(async (url) => {
+      if (url.endsWith('/aadtokenauth')) {
+        return new Response(null, { status: 200, headers: { 'set-cookie': 'AGW=s1' } })
+      }
+      objectUrl = url
+      return new Response(new Uint8Array([1, 2, 3, 4]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      })
+    })
+    const out = await fetchObjectById('0-wch-d2-eb96')
+    expect(out.bytes.byteLength).toBe(4)
+    expect(objectUrl).toBe(
+      `https://eu-prod.asyncgw.teams.microsoft.com/v1/${OID}/objects/0-wch-d2-eb96/views/imgpsh_fullsize`,
+    )
+  })
+
+  test('honors a custom view name', async () => {
+    primeAuth()
+    let objectUrl = ''
+    __setTransportForTests(async (url) => {
+      if (url.endsWith('/aadtokenauth')) {
+        return new Response(null, { status: 200, headers: { 'set-cookie': 'AGW=s1' } })
+      }
+      objectUrl = url
+      return new Response(new Uint8Array([1]), { status: 200 })
+    })
+    await fetchObjectById('0-wch-d2-eb96', { view: 'imgo' })
+    expect(objectUrl).toContain('/views/imgo')
   })
 })
