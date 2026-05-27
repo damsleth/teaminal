@@ -3,7 +3,7 @@ import {
   __resetForTests as resetAuth,
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
-import { __resetForTests, __setTransportForTests } from './client'
+import { __resetForTests, __setTransportForTests, setAudiencePreference } from './client'
 import { getMe } from './me'
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
@@ -108,6 +108,29 @@ describe('getMe', () => {
     expect(me.displayName).toBe('Nordmann, Kari Anne')
     expect(me.userPrincipalName).toBe('kari.nordmann@contoso.com')
     expect(me.mail).toBe('kari@contoso.com')
+  })
+
+  test('ic3 audience derives identity from token claims without calling graph /me', async () => {
+    setAudiencePreference('ic3', { fallback: false })
+    setAuthRunner(async () => ({
+      stdout: makeJwt({
+        exp: FAR_FUTURE,
+        oid: '11111111-1111-1111-1111-111111111111',
+        name: 'Nordmann, Kari Anne',
+        upn: 'kari.nordmann@contoso.com',
+      }),
+      stderr: '',
+      exitCode: 0,
+    }))
+    let graphCalled = false
+    __setTransportForTests(async () => {
+      graphCalled = true
+      return jsonResponse({ error: { code: 'Unauthorized', message: 'CA' } }, { status: 401 })
+    })
+    const me = await getMe()
+    expect(me.id).toBe('11111111-1111-1111-1111-111111111111')
+    expect(me.displayName).toBe('Nordmann, Kari Anne')
+    expect(graphCalled).toBe(false)
   })
 
   test('rethrows the 401 when the token has no oid to fall back on', async () => {

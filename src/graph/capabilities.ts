@@ -9,7 +9,7 @@
 // All probes are non-mutating GETs - we never POST a test message to
 // verify send permissions.
 
-import { getActiveProfile, graph, GraphError } from './client'
+import { getActiveProfile, getAudiencePreference, graph, GraphError } from './client'
 import { getMe } from './me'
 import { getMyTeamsPresence, TeamsPresenceError } from './teamsPresence'
 
@@ -70,30 +70,39 @@ async function runProbe(fn: () => Promise<unknown>): Promise<CapabilityResult> {
 
 export async function probeCapabilities(opts?: ProbeOpts): Promise<Capabilities> {
   const signal = opts?.signal
+  // ic3-primary accounts are Conditional-Access gated on graph.microsoft.com;
+  // the chat list and teams come from the Teams CSA endpoints instead, so
+  // probing graph /chats and /me/joinedTeams would just 401 noisily. Treat
+  // them as available (the list loop serves them via CSA).
+  const ic3 = getAudiencePreference().audience === 'ic3'
   const [me, chats, joinedTeams, presence] = await Promise.all([
     // Use getMe (not a raw graph /me) so the token-claims fallback under a
     // Conditional Access gate counts as 'ok' — otherwise bootstrap's
     // me-unauthorized check would fatally abort a session that the CSA
     // migration can actually run.
     runProbe(() => getMe(signal)),
-    runProbe(() =>
-      graph({
-        method: 'GET',
-        path: '/chats',
-        query: { $top: 1, $expand: 'lastMessagePreview' },
-        signal,
-      }),
-    ),
-    runProbe(() =>
-      // /me/joinedTeams does not accept $top or $select under delegated auth -
-      // any unsupported query parameter returns 400 ("Query option ... is not
-      // allowed"). The probe pays the small cost of fetching the full list.
-      graph({
-        method: 'GET',
-        path: '/me/joinedTeams',
-        signal,
-      }),
-    ),
+    ic3
+      ? Promise.resolve<CapabilityResult>({ ok: true })
+      : runProbe(() =>
+          graph({
+            method: 'GET',
+            path: '/chats',
+            query: { $top: 1, $expand: 'lastMessagePreview' },
+            signal,
+          }),
+        ),
+    ic3
+      ? Promise.resolve<CapabilityResult>({ ok: true })
+      : runProbe(() =>
+          // /me/joinedTeams does not accept $top or $select under delegated auth -
+          // any unsupported query parameter returns 400 ("Query option ... is not
+          // allowed"). The probe pays the small cost of fetching the full list.
+          graph({
+            method: 'GET',
+            path: '/me/joinedTeams',
+            signal,
+          }),
+        ),
     // Presence probes the Teams unified presence endpoint
     // (presence.teams.microsoft.com) rather than Graph /me/presence.
     // Under FOCI the broker token has aud=presence.teams.microsoft.com
