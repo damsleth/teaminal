@@ -100,6 +100,25 @@ describe('message row viewport budgeting', () => {
     expect(messageRenderRowHeight(row, { inlineImageRows: 4 })).toBe(6)
   })
 
+  test('imageRowsForMessage resolver overrides the static image reservation', () => {
+    const row: MessageRenderRow = {
+      kind: 'message',
+      key: 'm1',
+      message: {
+        id: 'm1',
+        chatId: 'chat-1',
+        createdDateTime: '2026-05-05T10:00:00Z',
+        body: { contentType: 'html', content: '<p><img itemid="img-1"></p>' },
+        from: { user: { id: 'u1', displayName: 'User' } },
+      },
+    }
+    // body(1) + resolver(3). The static inlineImageRows is ignored when a
+    // resolver is supplied (the loaded image's fitted height is dynamic).
+    expect(messageRenderRowHeight(row, { inlineImageRows: 4, imageRowsForMessage: () => 3 })).toBe(
+      4,
+    )
+  })
+
   test('counts wrapped body text when estimating the viewport budget', () => {
     expect(
       messageRenderRowHeight(
