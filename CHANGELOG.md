@@ -6,6 +6,27 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-05-27
+
+### Added
+
+- **Works in tenants where Microsoft Graph is blocked by Conditional Access.** When `graph.microsoft.com` returns 401 for a Conditional-Access policy the broker token can't satisfy, teaminal now transparently sources the same data from the Teams web-client APIs the desktop/web clients use — the chat list and teams/channels via the chat-service aggregator (CSA, `chatsvcagg.teams.microsoft.com`), chat and channel messages (read + send) via chatsvc with the Skype token, and identity from the access-token claims when `/me` is gated. Each switch is latched on the first 401 per session, so tenants with healthy Graph access are unaffected and pay no extra cost. No re-authentication required.
+- **Activity feed (`Ctrl-A`).** A bell-panel view backed by the Teams CSA `/updates` endpoint: @mentions, replies, reactions, followed-channel posts, missed calls. `j`/`k` to move, `Enter` to jump to the source chat, `a` to mark all read. The header shows an `@N` unread-mentions badge spanning the whole tenant (including channels you haven't opened).
+- **Per-account token audience preference.** The esc-menu Accounts list now shows each account's preferred token audience (`[graph]` / `[ic3]`) and lets you cycle it with `t`. teaminal tries the preferred audience first and falls back to the other on a persistent 401 or when it can't be minted. Off by default — plain installs are unchanged.
+- **Non-image attachment rows.** Messages with file/voice attachments now render a `📎 name (size)` row. Inline images can fetch through the AsyncGW object store (with a per-profile session and on-401 refresh) in addition to Graph hosted content.
+- **Manual realtime retry.** When the push (trouter) connection gives up, the Diagnostics modal now offers `r` to force a reconnect instead of waiting for a restart.
+
+### Changed
+
+- **Region is auto-detected per account.** chatsvc / federation / external-search calls resolve the tenant's region (and middle-tier partition) from the Teams auth response instead of assuming `emea`, so accounts provisioned in `amer`/`apac`/`ind`/etc. work out of the box. Cached per profile.
+- **Adaptive poll cadence.** When realtime push is connected, the polling loops relax to a 60s belt-and-suspenders cadence; when push is degraded they tighten (active chat ~10s); when the terminal is blurred they stretch to 5 min. Trouter also retries longer (10 attempts, 5-min cap) before declaring the push connection dead.
+- **Single Skype-token path.** The trouter transport and the chat/federation code now share one per-profile Skype-token cache and one `regionGtms` parse instead of each doing its own auth round-trip.
+
+### Fixed
+
+- **chatsvc and presence calls now recover from a token expiring mid-flight.** A 401 invalidates the cached token and retries once instead of surfacing "failed to load".
+- **Cross-account safety.** Activity-feed fetches that resolve after an account switch no longer repopulate the new account's state with the previous account's items; a stale `onclose` during a manual realtime retry can no longer orphan the fresh socket or spawn a competing reconnect.
+
 ## [0.14.2] - 2026-05-15
 
 ### Fixed
