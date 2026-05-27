@@ -12,7 +12,7 @@
 // can surface the state.
 
 import { listChats } from '../../graph/chats'
-import { GraphError, RateLimitError } from '../../graph/client'
+import { getAudiencePreference, GraphError, RateLimitError } from '../../graph/client'
 import { fetchChatsAndTeams } from '../../graph/teamsCsa'
 import { recordEvent } from '../../log'
 import type { Channel, Chat, Team } from '../../types'
@@ -73,8 +73,9 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
   // Conditional Access policy on graph.microsoft.com that the FOCI token
   // can't satisfy — switch to the Teams CSA endpoints (what the web
   // client uses) for the rest of the session. Healthy tenants never 401,
-  // so they never switch and pay no CSA cost.
-  let useCsa = false
+  // so they never switch and pay no CSA cost. ic3-primary accounts start in
+  // CSA mode so they never hit the gated graph endpoints at all.
+  let useCsa = getAudiencePreference().audience === 'ic3'
 
   async function loadChatsTeams(signal: AbortSignal): Promise<ChatsTeams> {
     if (useCsa) return fetchChatsAndTeams({ signal })

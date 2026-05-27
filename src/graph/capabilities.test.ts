@@ -3,7 +3,12 @@ import {
   __resetForTests as resetAuth,
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
-import { __resetForTests, __setSleepForTests, __setTransportForTests } from './client'
+import {
+  __resetForTests,
+  __setSleepForTests,
+  __setTransportForTests,
+  setAudiencePreference,
+} from './client'
 import {
   __resetForTests as resetTeamsPresence,
   __setTransportForTests as setTeamsPresenceTransport,
@@ -75,6 +80,28 @@ describe('probeCapabilities', () => {
     expect(caps.chats.ok).toBe(true)
     expect(caps.joinedTeams.ok).toBe(true)
     expect(caps.presence.ok).toBe(true)
+  })
+
+  test('ic3 audience reports chats/joinedTeams ok without probing graph', async () => {
+    setAudiencePreference('ic3', { fallback: false })
+    primeAuth()
+    const seenUrls: string[] = []
+    installTransports(
+      {
+        'https://graph.microsoft.com/v1.0/me?': () =>
+          jsonResponse({ error: { message: 'CA' } }, { status: 401 }),
+        [TEAMS_PRESENCE_URL]: () => teamsPresenceOk(),
+      },
+      seenUrls,
+    )
+    const caps = await probeCapabilities()
+    // me via token claims, chats/joinedTeams assumed-ok (served by CSA).
+    expect(caps.me.ok).toBe(true)
+    expect(caps.chats.ok).toBe(true)
+    expect(caps.joinedTeams.ok).toBe(true)
+    // Graph chat/teams endpoints were never hit.
+    expect(seenUrls.some((u) => u.includes('/chats'))).toBe(false)
+    expect(seenUrls.some((u) => u.includes('/joinedTeams'))).toBe(false)
   })
 
   test('marks 403 probes as unavailable without bleeding to other probes', async () => {

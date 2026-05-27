@@ -2,7 +2,7 @@
 
 import { decodeJwtClaims, getToken } from '../auth/owaPiggy'
 import { recordEvent } from '../log'
-import { getActiveProfile, graph, GraphError } from './client'
+import { getActiveProfile, getAudiencePreference, graph, GraphError } from './client'
 
 export type Me = {
   id: string
@@ -12,6 +12,13 @@ export type Me = {
 }
 
 export async function getMe(signal?: AbortSignal): Promise<Me> {
+  // ic3-primary accounts are Conditional-Access gated on graph.microsoft.com,
+  // so the /me round-trip just 401s. Derive identity from the token claims
+  // directly (oid / name / upn are all present) and skip the gated call.
+  if (getAudiencePreference().audience === 'ic3') {
+    const fromToken = await meFromToken()
+    if (fromToken) return fromToken
+  }
   try {
     return await graph<Me>({
       method: 'GET',
