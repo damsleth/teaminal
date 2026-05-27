@@ -150,7 +150,7 @@ describe('extractInlineImages', () => {
     expect(extractInlineImages(m)).toEqual([])
   })
 
-  it('skips hostedContents images when chatId is empty (chatsvc-sourced)', () => {
+  it('skips hostedContents images when chatId is empty and no object id', () => {
     const m = msg({
       chatId: undefined,
       body: {
@@ -158,7 +158,78 @@ describe('extractInlineImages', () => {
         content: '<p><img alt="bilde" itemid="AAA"></p>',
       },
     })
-    // No chatId → cannot build /chats/{id}/.../hostedContents path, so skip.
+    // No chatId and "AAA" isn't a raw asm object id → nothing fetchable, skip.
     expect(extractInlineImages(m)).toEqual([])
+  })
+
+  it('carries the asm object id from <img itemid> for asyncgw retrieval', () => {
+    const m = msg({
+      body: {
+        contentType: 'html',
+        content:
+          '<img alt="bilde" itemid="0-wch-d2-eb9648399c14133f85ce9b9629d25f90" src="https://graph.microsoft.com/v1.0/chats/chat-1/messages/msg-1/hostedContents/AAA/$value">',
+      },
+    })
+    const refs = extractInlineImages(m)
+    expect(refs.length).toBe(1)
+    expect(refs[0]!.objectId).toBe('0-wch-d2-eb9648399c14133f85ce9b9629d25f90')
+    expect(refs[0]!.isExternal).toBe(false)
+  })
+
+  it('still yields an asyncgw-fetchable ref when chatId is empty but an object id is present', () => {
+    const m = msg({
+      chatId: undefined,
+      body: {
+        contentType: 'html',
+        content: '<p><img alt="bilde" itemid="0-wch-d2-eb9648399c14133f85ce9b9629d25f90"></p>',
+      },
+    })
+    const refs = extractInlineImages(m)
+    expect(refs.length).toBe(1)
+    expect(refs[0]!.objectId).toBe('0-wch-d2-eb9648399c14133f85ce9b9629d25f90')
+    expect(refs[0]!.sourcePath).toBe('') // no Graph path; asyncgw-only
+    expect(refs[0]!.isExternal).toBe(false)
+  })
+
+  it('extracts the object id from a base64 hostedContents id', () => {
+    const objectUrl = 'https://eu-api.asm.skype.com/v1/objects/0-eu-d3-abc123def456/views/imgo'
+    const b64 = Buffer.from(`id=,type=1,url=${objectUrl}`).toString('base64')
+    const m = msg({
+      body: {
+        contentType: 'html',
+        content: `<img src="https://graph.microsoft.com/v1.0/chats/chat-1/messages/msg-1/hostedContents/${b64}/$value">`,
+      },
+    })
+    const refs = extractInlineImages(m)
+    expect(refs.length).toBe(1)
+    expect(refs[0]!.objectId).toBe('0-eu-d3-abc123def456')
+  })
+
+  it('routes an asm.skype.com object URL through asyncgw (non-external, with object id)', () => {
+    const m = msg({
+      body: {
+        contentType: 'html',
+        content:
+          '<img src="https://eu-api.asm.skype.com/v1/objects/0-eu-d3-abc123def456/views/imgo">',
+      },
+    })
+    const refs = extractInlineImages(m)
+    expect(refs.length).toBe(1)
+    expect(refs[0]!.objectId).toBe('0-eu-d3-abc123def456')
+    expect(refs[0]!.isExternal).toBe(false)
+  })
+
+  it('keeps a raw asyncgw URL on the external (asyncgw-URL) path', () => {
+    const m = msg({
+      body: {
+        contentType: 'html',
+        content:
+          '<img src="https://eu-prod.asyncgw.teams.microsoft.com/v1/oid/objects/0-eu-d3-abc123def456/views/imgo">',
+      },
+    })
+    const refs = extractInlineImages(m)
+    expect(refs.length).toBe(1)
+    expect(refs[0]!.isExternal).toBe(true)
+    expect(refs[0]!.objectId).toBe('0-eu-d3-abc123def456')
   })
 })

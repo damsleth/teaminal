@@ -41,6 +41,11 @@ export type InlineImageRef = {
   name: string
   // Best-known MIME. Often empty for HTML-embedded inline images.
   contentType: string
+  // Raw asm/asyncgw object id (e.g. "0-wch-d2-..."), when derivable from the
+  // <img itemid>, an asm.skype.com object URL, or a base64 hostedContents id.
+  // Lets the image cache retrieve via asyncgw on Conditional-Access-gated
+  // (ic3) accounts where the Graph hostedContents endpoint 401s.
+  objectId?: string
 }
 
 // Widen-by-content-type list for shapes the basic isImageAttachment misses.
@@ -75,6 +80,61 @@ function hostedContentIdFromUrl(url: string): string | null {
   // Match /hostedContents/{id}/$value tolerating trailing query strings.
   const m = url.match(/\/hostedContents\/([^/?#]+)\/\$value\b/)
   return m ? decodeURIComponent(m[1]!) : null
+}
+
+// A raw asm/asyncgw object id, e.g. "0-wch-d2-eb96...". Teams puts this on
+// image bodies as <img itemid="..."> and embeds it in both asm.skype.com
+// object URLs and (base64-encoded) Graph hostedContents ids.
+const ASM_OBJECT_ID_RE = /^[0-9]+-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+$/i
+
+function objectIdFromObjectsUrl(url: string): string | null {
+  const m = url.match(/\/objects\/([^/?#]+)(?:\/views\/|\b)/)
+  return m ? decodeURIComponent(m[1]!) : null
+}
+
+// hostedContents ids are base64 of e.g.
+//   "id=,type=1,url=https://eu-api.asm.skype.com/v1/objects/0-.../views/imgo"
+// Decode and mine the embedded object id. Returns null on any other shape.
+function objectIdFromHostedContentId(id: string): string | null {
+  if (!/^[A-Za-z0-9_+/=-]{16,}$/.test(id)) return null
+  let decoded: string
+  try {
+    decoded = Buffer.from(id, 'base64').toString('utf8')
+  } catch {
+    return null
+  }
+  if (!decoded.includes('objects/')) return null
+  return objectIdFromObjectsUrl(decoded)
+}
+
+// Best-effort raw object id for asyncgw retrieval, from any of the shapes
+// Teams uses to reference a hosted image.
+function asmObjectId(itemid: string | null, src: string | null): string | undefined {
+  if (itemid && ASM_OBJECT_ID_RE.test(itemid)) return itemid
+  if (src && /\/objects\//.test(src)) {
+    const id = objectIdFromObjectsUrl(src)
+    if (id) return id
+  }
+  for (const cand of [hostedContentIdFromUrl(src ?? ''), itemid, src]) {
+    if (!cand) continue
+    const id = objectIdFromHostedContentId(cand)
+    if (id) return id
+  }
+  return undefined
+}
+
+// A raw asyncgw object URL. Kept local (rather than imported from the graph
+// client) so this stays a pure text module.
+function isAsyncGwUrl(url: string | null | undefined): boolean {
+  if (!url) return false
+  return /^https:\/\/[a-z-]+\.asyncgw\.teams\.microsoft\.com\//i.test(url)
+}
+
+// asm.skype.com object URLs need the asyncgw session auth, like asyncgw URLs
+// themselves — they must not go through the plain external-fetch path.
+function isObjectStoreUrl(url: string | null | undefined): boolean {
+  if (!url) return false
+  return isAsyncGwUrl(url) || /^https:\/\/[^/]*asm\.skype\.com\//i.test(url)
 }
 
 // Collect inline <img> references from a message body. Each entry has the
@@ -157,12 +217,30 @@ export function extractInlineImages(message: ChatMessage): InlineImageRef[] {
     // their alt as text — so never try to fetch them (it 400s/401s, and on
     // chatsvc messages chatId is empty, producing /chats//messages/...).
     if (isEmojiOnly(img.alt)) continue
+    const objectId = asmObjectId(img.itemid, img.src)
     // Prefer itemid: it's the hostedContents id. If absent, mine the src.
     let contentId = img.itemid
     if (!contentId && img.src) {
       contentId = hostedContentIdFromUrl(img.src)
     }
     if (!contentId) {
+      if (img.src && isObjectStoreUrl(img.src)) {
+        // asm.skype.com / asyncgw object URL embedded directly in the body.
+        // Both need the asyncgw session auth: raw asyncgw URLs go through the
+        // existing asyncgw-URL path (isExternal), asm URLs via the objectId.
+        const cacheKey = `${messageId}::${objectId ?? img.src}`
+        if (seen.has(cacheKey)) continue
+        seen.add(cacheKey)
+        out.push({
+          cacheKey,
+          sourcePath: img.src,
+          isExternal: isAsyncGwUrl(img.src),
+          name: img.alt || inferNameFromUrl(img.src),
+          contentType: '',
+          ...(objectId ? { objectId } : {}),
+        })
+        continue
+      }
       // Fall back: treat the raw src as the cache discriminant for external
       // images embedded directly via HTML. Rare in chat bodies, but tolerate.
       if (img.src && isExternalUrl(img.src)) {
@@ -179,19 +257,23 @@ export function extractInlineImages(message: ChatMessage): InlineImageRef[] {
       }
       continue
     }
-    // A hostedContents fetch needs the chat id. chatsvc-sourced messages
-    // don't carry one, so skip rather than build /chats//messages/... (400).
-    if (!chatId) continue
+    // The Graph hostedContents fetch needs the chat id. chatsvc-sourced
+    // messages don't carry one — fall back to asyncgw-by-objectId when we
+    // have it, else skip rather than build /chats//messages/... (400).
+    if (!chatId && !objectId) continue
     const cacheKey = `${messageId}::${contentId}`
     if (seen.has(cacheKey)) continue
     seen.add(cacheKey)
-    const sourcePath = `/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}/hostedContents/${encodeURIComponent(contentId)}/$value`
+    const sourcePath = chatId
+      ? `/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}/hostedContents/${encodeURIComponent(contentId)}/$value`
+      : ''
     out.push({
       cacheKey,
       sourcePath,
       isExternal: false,
       name: img.alt || 'image',
       contentType: '',
+      ...(objectId ? { objectId } : {}),
     })
   }
 

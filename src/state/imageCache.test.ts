@@ -4,6 +4,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { isImageAttachment, attachmentGraphPath } from '../types'
 import type { MessageAttachment } from '../types'
+import {
+  __resetForTests as resetClient,
+  __setTransportForTests as setClientTransport,
+  setAudiencePreference,
+} from '../graph/client'
+import {
+  __resetForTests as resetAsyncGw,
+  __setTransportForTests as setAsyncGwTransport,
+} from '../graph/teamsAsyncGw'
+import {
+  __resetForTests as resetAuth,
+  __setRunnerForTests as setAuthRunner,
+} from '../auth/owaPiggy'
 import { fetchAndCacheImage, imageCacheKey as cacheKey, readCachedImage } from './imageCache'
 
 describe('imageCacheKey', () => {
@@ -142,5 +155,62 @@ describe('fetchAndCacheImage isExternal branch', () => {
 
     expect(readCachedImage(key, '../escape/profile')).not.toBeNull()
     expect(existsSync(join(cacheRoot, 'escape'))).toBe(false)
+  })
+})
+
+describe('fetchAndCacheImage hosted-content routing (ic3)', () => {
+  const realXdg = process.env.XDG_CACHE_HOME
+  const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
+  let cacheRoot: string
+
+  function makeJwt(payload: Record<string, unknown>): string {
+    const header = Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url')
+    const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
+    return `${header}.${body}.sig`
+  }
+
+  afterEach(() => {
+    resetClient()
+    resetAsyncGw()
+    resetAuth()
+    if (realXdg === undefined) delete process.env.XDG_CACHE_HOME
+    else process.env.XDG_CACHE_HOME = realXdg
+    rmSync(cacheRoot, { recursive: true, force: true })
+  })
+
+  it('ic3-only routes a hosted-content image to asyncgw, never Graph', async () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-ic3`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    setAudiencePreference('ic3', { fallback: false })
+    setAuthRunner(async () => ({
+      stdout: makeJwt({ exp: FAR_FUTURE, oid: 'oid-self' }),
+      stderr: '',
+      exitCode: 0,
+    }))
+    // Graph transport must never be hit on the ic3-only path.
+    setClientTransport(async () => {
+      throw new Error('graph transport should not be called for ic3-only image fetch')
+    })
+    let objectUrl = ''
+    setAsyncGwTransport(async (url) => {
+      if (url.endsWith('/aadtokenauth')) {
+        return new Response(null, { status: 200, headers: { 'set-cookie': 'AGW=s1' } })
+      }
+      objectUrl = url
+      return new Response(new Uint8Array([1, 2, 3, 4, 5]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      })
+    })
+
+    const buf = await fetchAndCacheImage(
+      '/chats/chat-1/messages/msg-1/hostedContents/AAA/$value',
+      `ic3-test-${Date.now()}`,
+      { contentType: '', name: 'image' },
+      { profile: '__ic3_test__', objectId: '0-wch-d2-eb96' },
+    )
+    expect(buf).not.toBeNull()
+    expect(buf!.byteLength).toBe(5)
+    expect(objectUrl).toContain('/objects/0-wch-d2-eb96/views/imgpsh_fullsize')
   })
 })
