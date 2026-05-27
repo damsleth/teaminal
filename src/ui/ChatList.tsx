@@ -48,7 +48,7 @@ function labelContentWidth(
 ): number {
   let width = LIST_PANE_WIDTH - 2 // round border (1 each side)
   width -= 1 // paddingRight on the column container
-  if (density === 'cozy' || showPresence) width -= 2 // presence gutter
+  if (density === 'cozy' || showPresence) width -= 3 // presence/type-glyph gutter
   if (density === 'cozy') width -= 2 // selector gutter
   width -= indent.length
   return Math.max(1, width)
@@ -140,7 +140,7 @@ function presenceForChatItem(
   myUserId: string | undefined,
   memberPresence: Record<string, Presence>,
   theme: Theme,
-): { dot: string; color: string } | null {
+): { dot: string; color: string; wide?: boolean } | null {
   if (item.kind !== 'chat') return null
   const chat = item.chat
   if (chat.chatType !== 'oneOnOne') return null
@@ -169,10 +169,15 @@ const CHAT_TYPE_GLYPH: Partial<Record<string, string>> = {
   group: '',
 }
 
-function chatTypeGlyph(item: SelectableItem, theme: Theme): { dot: string; color: string } | null {
+function chatTypeGlyph(
+  item: SelectableItem,
+  theme: Theme,
+): { dot: string; color: string; wide?: boolean } | null {
   if (item.kind !== 'chat') return null
   const glyph = CHAT_TYPE_GLYPH[item.chat.chatType]
-  return glyph ? { dot: glyph, color: theme.mutedText } : null
+  // wide: nerd-font glyphs render two cells in most terminals, unlike the
+  // single-cell presence dots — the gutter accounts for that when spacing.
+  return glyph ? { dot: glyph, color: theme.mutedText, wide: true } : null
 }
 
 export function ChatList() {
@@ -360,9 +365,9 @@ export function ChatList() {
         // confused with the presence column.
         const unreadBadge = hasMention ? ' @' : hasUnread ? ' ●' : ''
         // Layout per row (left → right):
-        //   1. presence column (2 cols): dot/loading/blank, always
-        //      reserved when presence is enabled or in cozy mode so all
-        //      rows column-align even when individual chats have no
+        //   1. presence / type-glyph column (3 cols): dot/glyph/blank,
+        //      always reserved when presence is enabled or in cozy mode so
+        //      all rows column-align even when individual chats have no
         //      presence to show.
         //   2. selector column (cozy only): `> ` for the focused row,
         //      `  ` otherwise. Compact density saves those columns and
@@ -370,7 +375,15 @@ export function ChatList() {
         //   3. indent (cozy: channel/team indent)
         //   4. label
         const showGutter = density === 'cozy' || showPresence
-        const presenceText = presence ? presence.dot : ' '
+        // 3-cell gutter. Wide nerd-font type glyphs render two cells, so a
+        // single trailing space leaves a gap before the name. Single-cell
+        // presence dots get a leading space too, nudging them right so they
+        // line up under the type glyphs (and a trailing space for the gap).
+        const presenceText = presence
+          ? presence.wide
+            ? `${presence.dot} `
+            : ` ${presence.dot} `
+          : '   '
         const presenceColor = presence?.color
         // Non-indented last-message preview, independent of density. Read
         // chats render in muted gray, unread chats in the unread color.
@@ -382,8 +395,8 @@ export function ChatList() {
           <Box key={`${row.item.kind}-${row.index}`} flexDirection="column" flexShrink={0}>
             <Box flexDirection="row">
               {showGutter && (
-                <Box width={2} flexShrink={0}>
-                  <Text color={presenceColor}>{`${presenceText} `}</Text>
+                <Box width={3} flexShrink={0}>
+                  <Text color={presenceColor}>{presenceText}</Text>
                 </Box>
               )}
               {density === 'cozy' && (
