@@ -213,6 +213,7 @@ export function MessagePane(props: {
           {
             profile,
             isExternal: ref.isExternal,
+            ...(ref.objectId ? { objectId: ref.objectId } : {}),
             onChange: () => setImageRevision((r) => r + 1),
           },
         )

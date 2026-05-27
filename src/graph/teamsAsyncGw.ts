@@ -174,7 +174,10 @@ export async function bootstrap(opts?: AsyncGwOpts): Promise<AsyncGwSession> {
       }
     }
     if (!cookie) {
-      throw new TeamsAsyncGwError(res.status, 'asyncgw aadtokenauth: no session material in response')
+      throw new TeamsAsyncGwError(
+        res.status,
+        'asyncgw aadtokenauth: no session material in response',
+      )
     }
     const session: AsyncGwSession = {
       profile: opts?.profile,
@@ -273,6 +276,24 @@ export async function fetchObjectByUrl(
     }
     throw err
   }
+}
+
+// Fetch an asyncgw object by its raw object id (e.g. "0-wch-d2-...") plus a
+// view name ('imgpsh_fullsize' full / 'imgo' thumbnail). Builds the URL from
+// the session's host + authenticated user oid:
+//   {host}/v1/{userOid}/objects/{objectId}/views/{view}
+// Used for Conditional-Access-gated (ic3) accounts where the Graph
+// hostedContents endpoint 401s but the object is reachable via asyncgw.
+export async function fetchObjectById(
+  objectId: string,
+  opts?: AsyncGwOpts & { view?: string },
+): Promise<{ bytes: Uint8Array; contentType: string }> {
+  const session = await bootstrap(opts)
+  const view = opts?.view ?? 'imgpsh_fullsize'
+  const url = `${session.host}/v1/${encodeURIComponent(session.userOid)}/objects/${encodeURIComponent(
+    objectId,
+  )}/views/${encodeURIComponent(view)}`
+  return fetchObjectByUrl(url, opts)
 }
 
 function regionFromAsyncGwHost(host: string): string | undefined {
