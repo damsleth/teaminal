@@ -6,6 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Per-account chat routing modes.** The esc-menu Accounts list now cycles each account through four modes with `t`: `graph+ic3` (default), `ic3+graph`, `ic3-only`, and `graph-only`. The mode picks which token audience is minted and whether chat message reads/sends may fall back to the other transport. `ic3-only` reads and sends straight through chatsvc and never calls `graph.microsoft.com`, so accounts gated by Conditional Access stop re-hitting the same 401-returning Graph endpoints; `graph-only` disables the chatsvc fallback entirely.
+- **"Show message previews" in the chat list.** A new setting (default on, independent of chat-list density) renders up to two non-indented lines of the last message under each chat — muted gray when read, the unread color when unread.
+- **Chat-type glyphs in the chat list.** Meeting chats () and group chats () now show a nerd-font glyph in the gutter where 1:1 chats show their presence dot.
+
+### Changed
+
+- **Per-account routing replaces the `[graph]`/`[ic3]` audience toggle** added in 0.15.0. Existing `audienceByAccount` config migrates automatically (`graph` → `graph+ic3`, `ic3` → `ic3+graph`).
+- **Message-pane timestamps render light gray** with a space before the sender/message, instead of butting against the sender in the message's status color.
+- **Chat-list message previews are now an independent setting** rather than being tied to cozy density and only shown for unread chats.
+
+### Fixed
+
+- **The New-chat picker no longer opens the same 1:1 chat for two different people who share a display name.** Picking your own directory entry (e.g. a same-name guest identity) now maps to your notes-to-self chat rather than an arbitrary 1:1, and your own account is tagged `(You)`.
+- **Emoji sent in chats are shown as text rather than fetched as images.** chatsvc renders emoji as `<img>` (Graph uses `<emoji>`); these were being treated as hosted-content images and fetched — failing with a 400 on chatsvc messages (which carry no chat id). They now render as their alt text and are never fetched.
+
 ## [0.15.0] - 2026-05-27
 
 ### Added
