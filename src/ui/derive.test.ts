@@ -71,4 +71,40 @@ describe('findExistingOneOnOne', () => {
     })
     expect(findExistingOneOnOne([c1, c2], OTHER, SELF)).toBe(c1)
   })
+
+  // Regression: picking your own directory entry (otherUserId === selfUserId)
+  // must not match an arbitrary 1:1 chat that merely contains you. Before the
+  // fix, hasSelf and hasOther were both satisfied by the self member, so the
+  // first 1:1 in the list was returned - making every same-name peer open the
+  // same chat.
+  test('does not match a peer chat when other is self', () => {
+    const peerChat = chat({
+      id: 'peer',
+      members: [
+        { id: 'm1', userId: SELF, displayName: 'Me' },
+        { id: 'm2', userId: OTHER, displayName: 'Other' },
+      ],
+    })
+    expect(findExistingOneOnOne([peerChat], SELF, SELF)).toBeNull()
+  })
+
+  test('matches the notes-to-self chat when other is self', () => {
+    const selfChat = chat({
+      id: 'self',
+      members: [{ id: 'm1', userId: SELF, displayName: 'Me' }],
+    })
+    const peerChat = chat({
+      id: 'peer',
+      members: [
+        { id: 'm1', userId: SELF, displayName: 'Me' },
+        { id: 'm2', userId: OTHER, displayName: 'Other' },
+      ],
+    })
+    expect(findExistingOneOnOne([peerChat, selfChat], SELF, SELF)).toBe(selfChat)
+  })
+
+  test('does not treat an unhydrated chat as a notes-to-self match', () => {
+    const c = chat({ id: 'c1' })
+    expect(findExistingOneOnOne([c], SELF, SELF)).toBeNull()
+  })
 })

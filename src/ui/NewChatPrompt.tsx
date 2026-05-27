@@ -41,6 +41,7 @@ function userFromOid(oid: string): DirectoryUser {
 
 export function NewChatPrompt(props: {
   initialQuery: string
+  selfId?: string
   onClose: () => void
   onSelectUser: (user: DirectoryUser) => Promise<void>
 }) {
@@ -216,6 +217,10 @@ export function NewChatPrompt(props: {
         {results.map((user, i) => {
           const selected = zone === 'results' && i === clampCursor(cursor, results.length)
           const detail = user.mail ?? user.userPrincipalName ?? user.id
+          // Tag the signed-in account so identically-named directory entries
+          // (e.g. a same-name guest identity in another tenant) are
+          // distinguishable - picking yourself opens notes-to-self, not a peer.
+          const isSelf = props.selfId !== undefined && user.id === props.selfId
           return (
             <Text
               key={user.id}
@@ -224,6 +229,7 @@ export function NewChatPrompt(props: {
             >
               {selected ? '> ' : '  '}
               {user.displayName ?? detail}
+              {isSelf ? <Text color="gray"> (You)</Text> : null}
               <Text color="gray">{`  ${detail}`}</Text>
             </Text>
           )
