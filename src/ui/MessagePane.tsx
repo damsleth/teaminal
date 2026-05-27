@@ -473,10 +473,11 @@ function MessageRow(props: {
   // the cursor matters more.
   const sendStatusGlyph = sendError ? '✗' : isSending ? '…' : ' '
   const indicator = props.focused ? props.focusIndicatorChar.slice(0, 1) || '>' : sendStatusGlyph
-  // Timestamp column hosts HH:MM only - the trailing space and the
-  // status glyph have been pulled into the indicator column above.
-  // When timestamps are off the column collapses entirely.
-  const TIMESTAMP_WIDTH = 5
+  // Timestamp column hosts "HH:MM " - five chars plus a trailing space so
+  // the time doesn't butt up against the sender/message. The status glyph
+  // lives in the indicator column above. When timestamps are off the column
+  // collapses entirely.
+  const TIMESTAMP_WIDTH = 6
   const statusWidth = props.showTimestamp ? TIMESTAMP_WIDTH : 0
 
   const rowDir = flipRow ? 'row-reverse' : 'row'
@@ -515,8 +516,8 @@ function MessageRow(props: {
         </Box>
         {props.showTimestamp && (
           <Box width={statusWidth} flexShrink={0}>
-            <Text color={color} wrap="truncate-end">
-              {time}
+            <Text color={theme.timestamp} wrap="truncate-end">
+              {`${time} `}
             </Text>
           </Box>
         )}
