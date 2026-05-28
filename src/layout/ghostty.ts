@@ -76,73 +76,52 @@ type ScriptVars = {
 }
 
 function buildScript(v: ScriptVars): string {
-  // AppleScript quoting: backslashes and double quotes are special inside
-  // string literals. The commands are already shell-quoted, so they may
-  // contain single quotes which AppleScript doesn't care about.
+  // `make new window` in Ghostty currently returns a tab-group
+  // reference that AppleScript can't coerce to a window (error -2710).
+  // Sidestep by spawning the window via `open -na Ghostty`; once it's
+  // up we grab `focused terminal of selected tab of front window`,
+  // which works reliably.
   //
-  // We deliberately don't capture the result of `make new window` —
-  // Ghostty returns a tab-group reference there, not a window, and
-  // assigning it to `convWindow` was failing with -2710. Instead we
-  // reference `front window` after each operation; Ghostty brings the
-  // newly-active window/split to the front, so this is reliable.
+  // For refocusing the conversation pane between splits we use the
+  // `focus` verb directly on the captured `convTerm` reference — it's
+  // documented as "focuses terminal and brings window to front" and
+  // is robust as long as the underlying terminal still exists.
+  const windowOpenWait = Math.max(0.7, v.stepDelay * 2)
   return [
+    `do shell script "open -na Ghostty"`,
+    `delay ${windowOpenWait}`,
     'tell application "Ghostty"',
     '  activate',
-    '  make new window',
-    `  delay ${v.stepDelay}`,
-    // The freshly created window's focused terminal IS the conv pane.
-    // Capture its id so we can refocus it between splits without
-    // chasing whatever the "front" reference points at.
     '  set convTerm to focused terminal of selected tab of front window',
-    '  set convId to id of convTerm',
-    // Launch the host pane via the user's shell.
     `  tell convTerm to input text "${escape(v.convCmd)}" & return`,
     // Wait for the host's unix socket to appear before splitting off
-    // the view panes; they'd error out immediately otherwise.
+    // view panes — they'd error out immediately otherwise.
     `  set socketDeadline to (current date) + ${v.socketTimeout}`,
     '  repeat until (current date) > socketDeadline',
     `    if (do shell script "test -S ${escape(v.socketFile)} && echo yes || echo no") is "yes" then exit repeat`,
     '    delay 0.1',
     '  end repeat',
-    // Status pane — split up from the conversation pane.
+    // Status pane — split up from conv.
     '  tell convTerm to split up',
     `  delay ${v.stepDelay}`,
     '  tell focused terminal of selected tab of front window to input text ' +
       `"${escape(v.statusCmd)}" & return`,
-    // Refocus conv via its captured id so the next split lands on it.
-    '  my focusTerminalById(convId)',
+    '  focus convTerm',
     `  delay ${v.stepDelay}`,
     // Composer pane — split down from conv.
     '  tell convTerm to split down',
     `  delay ${v.stepDelay}`,
     '  tell focused terminal of selected tab of front window to input text ' +
       `"${escape(v.composerCmd)}" & return`,
-    '  my focusTerminalById(convId)',
+    '  focus convTerm',
     `  delay ${v.stepDelay}`,
     // List pane — split left from conv.
     '  tell convTerm to split left',
     `  delay ${v.stepDelay}`,
     '  tell focused terminal of selected tab of front window to input text ' +
       `"${escape(v.listCmd)}" & return`,
-    '  my focusTerminalById(convId)',
+    '  focus convTerm',
     'end tell',
-    '',
-    // Helper handler at the top level (must live outside the `tell`).
-    'on focusTerminalById(targetId)',
-    '  tell application "Ghostty"',
-    '    repeat with w in windows',
-    '      repeat with t in tabs of w',
-    '        try',
-    '          set ft to focused terminal of t',
-    '          if (id of ft) is targetId then',
-    '            focus ft',
-    '            return',
-    '          end if',
-    '        end try',
-    '      end repeat',
-    '    end repeat',
-    '  end tell',
-    'end focusTerminalById',
   ].join('\n')
 }
 
