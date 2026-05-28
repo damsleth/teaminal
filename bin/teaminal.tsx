@@ -81,6 +81,19 @@ function parseArgs(argv: string[]): {
     logFile?: string
     networkLog?: string
   } = { showHelp: false, showVersion: false, debugFlag: false }
+  // Allow both `--flag value` and `--flag=value`. For the equals form we
+  // splice the parts back into argv so the rest of the parser is
+  // unchanged.
+  const expanded: string[] = []
+  for (const a of argv) {
+    if (a.startsWith('--') && a.includes('=')) {
+      const eq = a.indexOf('=')
+      expanded.push(a.slice(0, eq), a.slice(eq + 1))
+    } else {
+      expanded.push(a)
+    }
+  }
+  argv = expanded
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--help' || a === '-h') out.showHelp = true
