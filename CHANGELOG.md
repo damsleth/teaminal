@@ -21,6 +21,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Always-on diagnostics tails no longer draw over modal overlays.** Opening Keybindings, Network, Events, Diagnostics, Accounts, Activity, or auth-expired modals now suppresses the live tail panels so the modal keeps the foreground.
 - **Accounts now respect the profile selected with `--profile`.** The Accounts modal uses the running session profile for the active marker and for live chat-routing changes, instead of only consulting the persisted `activeAccount`.
 - **Image-cache tests are hermetic.** External-image cache tests now write under a temporary `XDG_CACHE_HOME` instead of the user's real cache directory.
 - **The in-app keybinding reference now matches Esc behavior.** Chat and thread back navigation is shown as `h` / Left, while Esc is documented as opening the menu overlay.
