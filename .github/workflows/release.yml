@@ -65,6 +65,8 @@ jobs:
             fi
           done
 
+          npm pack --pack-destination "$archives_dir"
+
           cd "$archives_dir"
           shasum -a 256 * > SHA256SUMS.txt
           ls -la
