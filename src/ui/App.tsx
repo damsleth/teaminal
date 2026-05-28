@@ -30,6 +30,7 @@ import {
   moveMessageCursor as nextMessageCursor,
   setMessageCursor as setStoredMessageCursor,
   type Focus,
+  type ModalState,
 } from '../state/store'
 import { AccountsModal } from './AccountsModal'
 import { AuthExpiredModal } from './AuthExpiredModal'
@@ -61,6 +62,10 @@ import { useAppState, useAppStore, useTheme } from './StoreContext'
 import type { Chat, DirectoryUser } from '../types'
 
 const LIST_PANE_WIDTH = 30
+
+export function shouldShowTailPanels(modal: ModalState | null): boolean {
+  return modal === null
+}
 
 function otherUserIdForFederatedResolution(
   chatId: string,
@@ -361,6 +366,7 @@ export function App() {
     | 'activity'
     | null = modal && modal.kind !== 'auth-expired' ? modal.kind : null
   const replaceModal = modal?.kind === 'auth-expired' ? modal : null
+  const showTailPanels = shouldShowTailPanels(modal)
   const theme = useTheme()
   return (
     <Box flexDirection="column" height={terminalRows}>
@@ -441,7 +447,7 @@ export function App() {
           )}
         </Box>
       </Box>
-      <TailPanels />
+      {showTailPanels && <TailPanels />}
       <Box borderStyle={theme.borders.panel} borderColor={theme.border}>
         <Composer />
       </Box>
