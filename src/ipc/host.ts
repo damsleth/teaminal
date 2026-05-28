@@ -60,6 +60,19 @@ export async function startHost(opts: StartHostOptions): Promise<HostHandle> {
     for (const c of conns.values()) c.write(line)
   }
 
+  // Coalesce broadcast triggers within a single frame. Presence /
+  // typing / read-receipt updates can fire several store mutations per
+  // 16ms; without this, four view panes each parse + re-render every
+  // intermediate state. With it, they see the settled state once.
+  let coalesceHandle: ReturnType<typeof setTimeout> | null = null
+  function scheduleBroadcast(): void {
+    if (coalesceHandle !== null) return
+    coalesceHandle = setTimeout(() => {
+      coalesceHandle = null
+      broadcast()
+    }, 16)
+  }
+
   const server = Bun.listen({
     unix: path,
     socket: {
@@ -101,12 +114,16 @@ export async function startHost(opts: StartHostOptions): Promise<HostHandle> {
     },
   })
 
-  const unsubscribe = opts.store.subscribe(() => broadcast())
+  const unsubscribe = opts.store.subscribe(() => scheduleBroadcast())
 
   return {
     socket: path,
     stop() {
       unsubscribe()
+      if (coalesceHandle !== null) {
+        clearTimeout(coalesceHandle)
+        coalesceHandle = null
+      }
       for (const c of conns.values()) {
         c.write(encode({ type: 'goodbye', reason: 'host-shutdown' } satisfies HostToView))
         c.end()
