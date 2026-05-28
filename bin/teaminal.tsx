@@ -6,6 +6,7 @@ import { loadSettings } from '../src/config'
 import { loadThemeFile } from '../src/config/themes'
 import { startHost } from '../src/ipc/host'
 import { connectView } from '../src/ipc/view'
+import { launchGhostlyLayout } from '../src/layout/ghostty'
 import { runSession, type SessionHandle } from '../src/state/bootstrap'
 import { startForceAvailabilityDriver } from '../src/state/forceAvailability'
 import { createAppStore, messagesFromCaches, resetAccountScopedState } from '../src/state/store'
@@ -41,6 +42,9 @@ OPTIONS
   --profile, -p <alias> owa-piggy profile alias (otherwise uses owa-piggy default)
   --pane <zone>        render only one zone of the UI (list|conversation|status|composer).
                        Intended for split-pane layouts; see --layout=ghostty.
+  --layout <name>      open teaminal as a split-pane layout (currently only "ghostty").
+                       Spawns a new Ghostty window with conversation + list + status + composer
+                       panes via AppleScript. macOS / Ghostty only.
   --debug              enable verbose stderr logging (sets TEAMINAL_DEBUG=1)
   --log-file <path>    mirror event log to <path> (redacted, append-only)
   --network-log <path> mirror Graph requests to <path> (redacted, append-only)
@@ -54,10 +58,13 @@ ENVIRONMENT
 
 export type Pane = 'list' | 'conversation' | 'status' | 'composer'
 const PANES: ReadonlyArray<Pane> = ['list', 'conversation', 'status', 'composer']
+export type Layout = 'ghostty'
+const LAYOUTS: ReadonlyArray<Layout> = ['ghostty']
 
 function parseArgs(argv: string[]): {
   profile?: string
   pane?: Pane
+  layout?: Layout
   showHelp: boolean
   showVersion: boolean
   debugFlag: boolean
@@ -67,6 +74,7 @@ function parseArgs(argv: string[]): {
   const out: {
     profile?: string
     pane?: Pane
+    layout?: Layout
     showHelp: boolean
     showVersion: boolean
     debugFlag: boolean
@@ -98,6 +106,18 @@ function parseArgs(argv: string[]): {
       }
       out.pane = v as Pane
       i++
+    } else if (a === '--layout') {
+      const v = argv[i + 1]
+      if (!v || v.startsWith('-')) {
+        process.stderr.write('teaminal: --layout requires a value\n')
+        process.exit(2)
+      }
+      if (!LAYOUTS.includes(v as Layout)) {
+        process.stderr.write(`teaminal: --layout must be one of ${LAYOUTS.join('|')}\n`)
+        process.exit(2)
+      }
+      out.layout = v as Layout
+      i++
     } else if (a === '--log-file') {
       const v = argv[i + 1]
       if (!v || v.startsWith('-')) {
@@ -125,6 +145,7 @@ function parseArgs(argv: string[]): {
 const {
   profile: cliProfile,
   pane: cliPane,
+  layout: cliLayout,
   showHelp,
   showVersion,
   debugFlag,
@@ -147,6 +168,21 @@ if (!process.stdin.isTTY) {
     'teaminal: stdin is not a TTY. Run from an interactive terminal (iTerm, Terminal.app, etc).\n',
   )
   process.exit(2)
+}
+
+// Layout driver: spawn a new Ghostty window split into the four panes
+// and exit. The actual teaminal panes run as child processes inside
+// Ghostty terminals.
+if (cliLayout === 'ghostty') {
+  try {
+    await launchGhostlyLayout({ profile: cliProfile ?? null })
+    process.exit(0)
+  } catch (err) {
+    process.stderr.write(
+      `teaminal: --layout=ghostty failed: ${err instanceof Error ? err.message : String(err)}\n`,
+    )
+    process.exit(4)
+  }
 }
 
 // View mode: thin client. Skip bootstrap, connect to the host's socket,
