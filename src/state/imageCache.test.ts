@@ -224,10 +224,11 @@ describe('fetchAndCacheImage hosted-content routing (ic3)', () => {
       '/chats/chat-1/messages/msg-1/hostedContents/AAA/$value',
       `ic3-test-${Date.now()}`,
       { contentType: '', name: 'image' },
-      { profile: '__ic3_test__', objectId: '0-wch-d2-eb96' },
+      { profile: '__ic3_test__', objectId: '0-na-d2-eb96', region: 'amer' },
     )
     expect(buf).not.toBeNull()
     expect(buf!.byteLength).toBe(5)
-    expect(objectUrl).toContain('/objects/0-wch-d2-eb96/views/imgpsh_fullsize')
+    expect(objectUrl).toContain('https://na-prod.asyncgw.teams.microsoft.com/')
+    expect(objectUrl).toContain('/objects/0-na-d2-eb96/views/imgpsh_fullsize')
   })
 })

@@ -46,6 +46,9 @@ export type InlineImageRef = {
   // Lets the image cache retrieve via asyncgw on Conditional-Access-gated
   // (ic3) accounts where the Graph hostedContents endpoint 401s.
   objectId?: string
+  // Teams object-store region (`emea`, `amer`, `apac`, `ind`) when derivable
+  // from an asm.skype.com / asyncgw URL or encoded hostedContents id.
+  region?: string
 }
 
 // Widen-by-content-type list for shapes the basic isImageAttachment misses.
@@ -87,22 +90,26 @@ function hostedContentIdFromUrl(url: string): string | null {
 // object URLs and (base64-encoded) Graph hostedContents ids.
 const ASM_OBJECT_ID_RE = /^[0-9]+-[a-z0-9]+-[a-z0-9]+-[a-z0-9]+$/i
 
-function objectIdFromObjectsUrl(url: string): string | null {
-  const m = url.match(/\/objects\/([^/?#]+)(?:\/views\/|\b)/)
+function objectIdFromObjectsUrl(value: string): string | null {
+  const m = value.match(/\/objects\/([^/?#,\s"]+)(?:\/views\/|\b)/)
   return m ? decodeURIComponent(m[1]!) : null
+}
+
+function decodeHostedContentId(id: string): string | null {
+  if (!/^[A-Za-z0-9_+/=-]{16,}$/.test(id)) return null
+  try {
+    return Buffer.from(id, 'base64').toString('utf8')
+  } catch {
+    return null
+  }
 }
 
 // hostedContents ids are base64 of e.g.
 //   "id=,type=1,url=https://eu-api.asm.skype.com/v1/objects/0-.../views/imgo"
 // Decode and mine the embedded object id. Returns null on any other shape.
 function objectIdFromHostedContentId(id: string): string | null {
-  if (!/^[A-Za-z0-9_+/=-]{16,}$/.test(id)) return null
-  let decoded: string
-  try {
-    decoded = Buffer.from(id, 'base64').toString('utf8')
-  } catch {
-    return null
-  }
+  const decoded = decodeHostedContentId(id)
+  if (!decoded) return null
   if (!decoded.includes('objects/')) return null
   return objectIdFromObjectsUrl(decoded)
 }
@@ -119,6 +126,56 @@ function asmObjectId(itemid: string | null, src: string | null): string | undefi
     if (!cand) continue
     const id = objectIdFromHostedContentId(cand)
     if (id) return id
+  }
+  return undefined
+}
+
+function asyncGwRegionFromPrefix(prefix: string | undefined): string | undefined {
+  if (!prefix) return undefined
+  const map: Record<string, string> = {
+    eu: 'emea',
+    emea: 'emea',
+    na: 'amer',
+    amer: 'amer',
+    ap: 'apac',
+    apac: 'apac',
+    in: 'ind',
+    ind: 'ind',
+  }
+  return map[prefix.toLowerCase()]
+}
+
+function regionFromObjectStoreUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined
+  let host: string
+  try {
+    host = new URL(url).hostname.toLowerCase()
+  } catch {
+    return undefined
+  }
+  if (host.endsWith('.asyncgw.teams.microsoft.com')) {
+    return asyncGwRegionFromPrefix(host.match(/^([a-z]+)-prod\.asyncgw\./)?.[1])
+  }
+  if (host.endsWith('asm.skype.com')) {
+    return asyncGwRegionFromPrefix(host.match(/^([a-z]+)[-.]/)?.[1])
+  }
+  return undefined
+}
+
+function regionFromHostedContentId(id: string): string | undefined {
+  const decoded = decodeHostedContentId(id)
+  if (!decoded || !decoded.includes('objects/')) return undefined
+  const url = decoded.match(/https:\/\/[^,\s"]*\/objects\/[^,\s"]+/)?.[0]
+  return regionFromObjectStoreUrl(url)
+}
+
+function asmObjectRegion(itemid: string | null, src: string | null): string | undefined {
+  const direct = regionFromObjectStoreUrl(src)
+  if (direct) return direct
+  for (const cand of [hostedContentIdFromUrl(src ?? ''), itemid, src]) {
+    if (!cand) continue
+    const region = regionFromHostedContentId(cand)
+    if (region) return region
   }
   return undefined
 }
@@ -195,6 +252,8 @@ export function extractInlineImages(message: ChatMessage): InlineImageRef[] {
   for (const att of message.attachments ?? []) {
     if (!isImageLikeAttachment(att)) continue
     const { path, isExternal } = attachmentSourcePath(att, chatId, messageId)
+    const objectId = asmObjectId(att.id, att.contentUrl ?? null)
+    const region = asmObjectRegion(att.id, att.contentUrl ?? null)
     const cacheKey = `${messageId}::${att.id}`
     if (seen.has(cacheKey)) continue
     seen.add(cacheKey)
@@ -206,6 +265,8 @@ export function extractInlineImages(message: ChatMessage): InlineImageRef[] {
       isExternal,
       name,
       contentType: att.contentType,
+      ...(objectId ? { objectId } : {}),
+      ...(region ? { region } : {}),
     })
   }
 
@@ -218,6 +279,7 @@ export function extractInlineImages(message: ChatMessage): InlineImageRef[] {
     // chatsvc messages chatId is empty, producing /chats//messages/...).
     if (isEmojiOnly(img.alt)) continue
     const objectId = asmObjectId(img.itemid, img.src)
+    const region = asmObjectRegion(img.itemid, img.src)
     // Prefer itemid: it's the hostedContents id. If absent, mine the src.
     let contentId = img.itemid
     if (!contentId && img.src) {
@@ -238,6 +300,7 @@ export function extractInlineImages(message: ChatMessage): InlineImageRef[] {
           name: img.alt || inferNameFromUrl(img.src),
           contentType: '',
           ...(objectId ? { objectId } : {}),
+          ...(region ? { region } : {}),
         })
         continue
       }
@@ -274,6 +337,7 @@ export function extractInlineImages(message: ChatMessage): InlineImageRef[] {
       name: img.alt || 'image',
       contentType: '',
       ...(objectId ? { objectId } : {}),
+      ...(region ? { region } : {}),
     })
   }
 
