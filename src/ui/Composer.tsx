@@ -37,7 +37,7 @@
 
 import { Box, Text, useInput, useStdin, useStdout } from 'ink'
 import { useEffect, useRef, useState } from 'react'
-import { postChannelReply, sendChannelMessage, sendChatMessage } from '../state/chatActions'
+import { useViewDispatch } from './ViewDispatchContext'
 import { focusKey } from '../state/store'
 import type { ChatMessage } from '../types'
 import {
@@ -85,6 +85,7 @@ export function findRootQuote(
 
 export function Composer() {
   const store = useAppStore()
+  const viewDispatch = useViewDispatch()
   const { isRawModeSupported } = useStdin()
   const { stdout } = useStdout()
   const focus = useAppState((s) => s.focus)
@@ -239,20 +240,12 @@ export function Composer() {
     })
 
     try {
-      const sent =
-        focus.kind === 'chat'
-          ? await sendChatMessage(focus.chatId, trimmed)
-          : focus.kind === 'channel'
-            ? await sendChannelMessage(focus.teamId, focus.channelId, trimmed)
-            : await postChannelReply(focus.teamId, focus.channelId, focus.rootId, trimmed)
-      store.set((s) => ({
-        messagesByConvo: {
-          ...s.messagesByConvo,
-          [convForSend]: (s.messagesByConvo[convForSend] ?? []).map((m) =>
-            m._tempId === tempId ? sent : m,
-          ),
-        },
-      }))
+      await viewDispatch.submitMessage(focus, trimmed)
+      // The post-send poller refresh reconciles messagesByConvo from
+      // messageCacheByConvo, replacing the optimistic temp with the real
+      // message (or removing it if reconciliation drops the duplicate).
+      // In view mode the host runs the refresh; in host mode our local
+      // poller runs it.
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'send failed'
       // Restore the buffer so the user can edit + retry.

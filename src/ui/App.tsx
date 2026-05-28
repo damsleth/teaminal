@@ -57,6 +57,7 @@ import { handleMessageSearchKeys } from './keybinds/messageSearchKeys'
 import { readMessagePageState, type LoadMoreState } from './messageRows'
 import { messagesForTimelineNavigation } from './renderableMessage'
 import { usePollerHandleRef } from './PollerContext'
+import { useViewDispatch } from './ViewDispatchContext'
 import { StatusBar } from './StatusBar'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import type { Chat, DirectoryUser } from '../types'
@@ -96,6 +97,7 @@ export function App({ pane }: { pane?: Pane } = {}) {
   const { isRawModeSupported } = useStdin()
   const store = useAppStore()
   const pollerRef = usePollerHandleRef()
+  const viewDispatch = useViewDispatch()
 
   const terminalRows = useTerminalRows()
 
@@ -255,11 +257,11 @@ export function App({ pane }: { pane?: Pane } = {}) {
   }
 
   const refresh = (): void => {
-    pollerRef.current?.refresh()
+    viewDispatch.refresh()
   }
 
   const hardRefresh = (): void => {
-    pollerRef.current?.hardRefresh?.()
+    viewDispatch.hardRefresh()
   }
 
   // List / chat dispatcher. Tab is shared across both zones (move to

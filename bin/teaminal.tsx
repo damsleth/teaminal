@@ -4,6 +4,8 @@ import { render } from 'ink'
 import { isRefreshExpiredError } from '../src/auth/owaPiggy'
 import { loadSettings } from '../src/config'
 import { loadThemeFile } from '../src/config/themes'
+import { startHost } from '../src/ipc/host'
+import { connectView } from '../src/ipc/view'
 import { runSession, type SessionHandle } from '../src/state/bootstrap'
 import { startForceAvailabilityDriver } from '../src/state/forceAvailability'
 import { createAppStore, messagesFromCaches, resetAccountScopedState } from '../src/state/store'
@@ -20,6 +22,11 @@ import { PollerProvider } from '../src/ui/PollerContext'
 import type { PollerHandleRef } from '../src/state/poller'
 import { SessionProvider, type SessionApi } from '../src/ui/SessionContext'
 import { StoreProvider } from '../src/ui/StoreContext'
+import {
+  makeHostDispatch,
+  makeViewDispatch,
+  ViewDispatchProvider,
+} from '../src/ui/ViewDispatchContext'
 import { debug, setLogFile, setNetworkLog, warn } from '../src/log'
 import { VERSION } from '../src/version'
 
@@ -142,6 +149,57 @@ if (!process.stdin.isTTY) {
   process.exit(2)
 }
 
+// View mode: thin client. Skip bootstrap, connect to the host's socket,
+// render only the requested zone. The host (conversation pane, or the
+// single-process shell) owns the poller, auth, chatsvc.
+async function runViewMode(pane: 'list' | 'status' | 'composer'): Promise<void> {
+  const profile: string | null = cliProfile ?? null
+  const view = await connectView({ pane, profile })
+  await view.ready
+
+  // Apply theme settings from the synced store. Custom themes are
+  // already mirrored as state, so no need to load from disk.
+  const viewDispatch = makeViewDispatch(view)
+  // PollerProvider expects a handleRef; in view mode no poller runs
+  // here, so we pass a no-op ref. Components that try to read
+  // pollerRef.current?.refresh() are routed through viewDispatch
+  // instead and never touch this ref.
+  const noopPollerRef: PollerHandleRef = { current: null }
+
+  const viewInk = render(
+    <ErrorBoundary>
+      <StoreProvider store={view.store}>
+        <PollerProvider handleRef={noopPollerRef}>
+          <SessionProvider
+            api={{ getActiveProfile: () => profile, switchAccount: async () => {} }}
+          >
+            <ViewDispatchProvider value={viewDispatch}>
+              <App pane={pane} />
+            </ViewDispatchProvider>
+          </SessionProvider>
+        </PollerProvider>
+      </StoreProvider>
+    </ErrorBoundary>,
+  )
+
+  // Exit the view as soon as either Ink unmounts (user quits) or the
+  // host disconnects (conversation pane closed). Whichever wins gets
+  // teardown.
+  await Promise.race([viewInk.waitUntilExit(), view.closed])
+  try {
+    viewInk.unmount()
+  } catch {}
+  try {
+    view.stop()
+  } catch {}
+}
+
+const isViewMode = cliPane !== undefined && cliPane !== 'conversation'
+if (isViewMode) {
+  await runViewMode(cliPane as 'list' | 'status' | 'composer')
+  process.exit(0)
+}
+
 const store = createAppStore()
 
 // Resolve the active profile. CLI overrides config; null falls through
@@ -203,12 +261,15 @@ const cacheSubscription = store.subscribe((s) => {
 const pollerHandleRef: PollerHandleRef = { current: null }
 let currentSession: SessionHandle | null = null
 
+const hostDispatch = makeHostDispatch(pollerHandleRef)
 const ink = render(
   <ErrorBoundary>
     <StoreProvider store={store}>
       <PollerProvider handleRef={pollerHandleRef}>
         <SessionProvider api={makeSessionApi()}>
-          <App pane={cliPane} />
+          <ViewDispatchProvider value={hostDispatch}>
+            <App pane={cliPane} />
+          </ViewDispatchProvider>
         </SessionProvider>
       </PollerProvider>
     </StoreProvider>
@@ -271,6 +332,11 @@ function showAuthExpiredModal(profile: string | null, message: string): void {
   })
 }
 
+// IPC host server. Started only when this process is the conversation
+// pane (or the legacy single-process shell). View panes find this via
+// the unix socket at $XDG_RUNTIME_DIR/teaminal-<profile>.sock.
+let ipcHost: Awaited<ReturnType<typeof startHost>> | null = null
+
 ;(async () => {
   try {
     try {
@@ -298,6 +364,16 @@ function showAuthExpiredModal(profile: string | null, message: string): void {
       }
     }
 
+    // Expose the store on a unix socket so view panes (list / status /
+    // composer) can attach. Failure here is non-fatal — the single
+    // process shell still works without it.
+    try {
+      ipcHost = await startHost({ store, profile: activeProfile, pollerRef: pollerHandleRef })
+      debug(`ipc/host: listening on ${ipcHost.socket}`)
+    } catch (err) {
+      warn('ipc/host: start failed:', err instanceof Error ? err.message : String(err))
+    }
+
     await ink.waitUntilExit()
   } catch (err) {
     ink.unmount()
@@ -308,9 +384,13 @@ function showAuthExpiredModal(profile: string | null, message: string): void {
     }
     process.exit(1)
   } finally {
-    // Best-effort shutdown. Stop the session (push + poll), then the
-    // hardware-level helpers (focus tracker / force-availability), then
-    // flush the cache one last time.
+    // Best-effort shutdown. Stop the IPC host first so view panes
+    // disconnect cleanly, then the session (push + poll), the
+    // hardware-level helpers (focus tracker / force-availability), and
+    // finally flush the cache.
+    try {
+      ipcHost?.stop()
+    } catch {}
     try {
       cacheSubscription()
     } catch {}
