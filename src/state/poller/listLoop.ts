@@ -69,25 +69,43 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
   const prevPreviewIds = new Map<string, string>()
   let firstListPoll = true
 
-  // Once graph /chats or /me/joinedTeams 401s — typically a tenant
-  // Conditional Access policy on graph.microsoft.com that the FOCI token
-  // can't satisfy — switch to the Teams CSA endpoints (what the web
-  // client uses) for the rest of the session. Healthy tenants never 401,
-  // so they never switch and pay no CSA cost. ic3-primary accounts start in
-  // CSA mode so they never hit the gated graph endpoints at all.
-  let useCsa = getAudiencePreference().audience === 'ic3'
+  // Once graph /chats or /me/joinedTeams 401s in a fallback-enabled
+  // graph-primary mode, latch onto CSA for the rest of that routing mode.
+  // The active routing preference is read per iteration so Accounts-modal
+  // changes take effect without restarting the poller, and graph-only never
+  // inherits an older fallback latch.
+  let graphList401 = false
+
+  async function loadGraphChatsTeams(signal: AbortSignal): Promise<ChatsTeams> {
+    const [chats, tc] = await Promise.all([
+      listChats({ signal }),
+      fetchTeamsAndChannels(signal, reportError),
+    ])
+    return { chats, teams: tc.teams, channelsByTeam: tc.channelsByTeam }
+  }
 
   async function loadChatsTeams(signal: AbortSignal): Promise<ChatsTeams> {
-    if (useCsa) return fetchChatsAndTeams({ signal })
+    const { audience, fallback } = getAudiencePreference()
+    if (audience === 'ic3') {
+      try {
+        return await fetchChatsAndTeams({ signal })
+      } catch (err) {
+        if (!fallback) throw err
+        recordEvent(
+          'poller',
+          'warn',
+          `Teams CSA list failed (${err instanceof Error ? err.message : String(err)}) — trying Graph`,
+        )
+        return loadGraphChatsTeams(signal)
+      }
+    }
+
+    if (graphList401 && fallback) return fetchChatsAndTeams({ signal })
     try {
-      const [chats, tc] = await Promise.all([
-        listChats({ signal }),
-        fetchTeamsAndChannels(signal, reportError),
-      ])
-      return { chats, teams: tc.teams, channelsByTeam: tc.channelsByTeam }
+      return await loadGraphChatsTeams(signal)
     } catch (err) {
-      if (err instanceof GraphError && err.status === 401) {
-        useCsa = true
+      if (err instanceof GraphError && err.status === 401 && fallback) {
+        graphList401 = true
         recordEvent(
           'poller',
           'warn',

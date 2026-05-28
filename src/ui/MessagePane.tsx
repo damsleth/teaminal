@@ -224,6 +224,7 @@ export function MessagePane(props: {
             profile,
             isExternal: ref.isExternal,
             ...(ref.objectId ? { objectId: ref.objectId } : {}),
+            ...(ref.region ? { region: ref.region } : {}),
             onChange: () => setImageRevision((r) => r + 1),
           },
         )

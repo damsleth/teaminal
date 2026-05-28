@@ -83,6 +83,9 @@ export type FetchImageOpts = {
   // accounts retrieve the image via asyncgw instead of the Graph
   // hostedContents endpoint, which 401s under the CA gate.
   objectId?: string
+  // AsyncGW region (`emea`, `amer`, `apac`, `ind`) when known from the
+  // original asm/asyncgw object URL.
+  region?: string
 }
 
 // Whether `path` is something graphBinary can actually fetch (a Graph-relative
@@ -105,6 +108,7 @@ async function fetchHostedContent(path: string, opts?: FetchImageOpts): Promise<
   const viaAsyncGw = async (): Promise<Uint8Array> => {
     const { bytes } = await fetchObjectById(objectId!, {
       profile: opts?.profile,
+      region: opts?.region,
       signal: opts?.signal,
     })
     return bytes

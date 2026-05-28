@@ -27,6 +27,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 - **The in-app keybinding reference now matches Esc behavior.** Chat and thread back navigation is shown as `h` / Left, while Esc is documented as opening the menu overlay.
 - **The New-chat picker no longer opens the same 1:1 chat for two different people who share a display name.** Picking your own directory entry (e.g. a same-name guest identity) now maps to your notes-to-self chat rather than an arbitrary 1:1, and your own account is tagged `(You)`.
 - **Emoji sent in chats are shown as text rather than fetched as images.** chatsvc renders emoji as `<img>` (Graph uses `<emoji>`); these were being treated as hosted-content images and fetched — failing with a 400 on chatsvc messages (which carry no chat id). They now render as their alt text and are never fetched.
+- **Chat-list routing now respects the selected mode immediately.** Switching an active account to `ic3-only` or `graph-only` in Accounts affects the running list poller without restart, and `graph-only` no longer falls back to Teams CSA after a Graph 401.
+- **AsyncGW image fetches now use the image object's region.** Inline images backed by `na`/`ap`/`in` asm object URLs or encoded hostedContents ids are fetched from the matching regional AsyncGW host instead of defaulting to EMEA.
 
 ## [0.15.0] - 2026-05-27
 
