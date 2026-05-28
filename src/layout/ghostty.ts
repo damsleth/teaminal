@@ -77,49 +77,72 @@ type ScriptVars = {
 
 function buildScript(v: ScriptVars): string {
   // AppleScript quoting: backslashes and double quotes are special inside
-  // string literals. We assemble the commands as plain strings since the
-  // values are derived from shell-quoted paths.
+  // string literals. The commands are already shell-quoted, so they may
+  // contain single quotes which AppleScript doesn't care about.
+  //
+  // We deliberately don't capture the result of `make new window` —
+  // Ghostty returns a tab-group reference there, not a window, and
+  // assigning it to `convWindow` was failing with -2710. Instead we
+  // reference `front window` after each operation; Ghostty brings the
+  // newly-active window/split to the front, so this is reliable.
   return [
     'tell application "Ghostty"',
     '  activate',
-    '  set convWindow to make new window',
+    '  make new window',
     `  delay ${v.stepDelay}`,
-    '  set convTerm to focused terminal of selected tab of convWindow',
-    // Launch the host pane via the user's shell. The shell will exit
-    // back to a prompt when teaminal exits, leaving the window open so
-    // the user can see any error output.
+    // The freshly created window's focused terminal IS the conv pane.
+    // Capture its id so we can refocus it between splits without
+    // chasing whatever the "front" reference points at.
+    '  set convTerm to focused terminal of selected tab of front window',
+    '  set convId to id of convTerm',
+    // Launch the host pane via the user's shell.
     `  tell convTerm to input text "${escape(v.convCmd)}" & return`,
     // Wait for the host's unix socket to appear before splitting off
     // the view panes; they'd error out immediately otherwise.
     `  set socketDeadline to (current date) + ${v.socketTimeout}`,
-    '  repeat until socketDeadline < (current date)',
+    '  repeat until (current date) > socketDeadline',
     `    if (do shell script "test -S ${escape(v.socketFile)} && echo yes || echo no") is "yes" then exit repeat`,
     '    delay 0.1',
     '  end repeat',
     // Status pane — split up from the conversation pane.
     '  tell convTerm to split up',
     `  delay ${v.stepDelay}`,
-    '  set statusTerm to focused terminal of selected tab of convWindow',
-    `  tell statusTerm to input text "${escape(v.statusCmd)}" & return`,
-    // Refocus the conversation pane before the next split so the split
-    // lands relative to conv, not status.
-    '  focus convTerm',
+    '  tell focused terminal of selected tab of front window to input text ' +
+      `"${escape(v.statusCmd)}" & return`,
+    // Refocus conv via its captured id so the next split lands on it.
+    '  my focusTerminalById(convId)',
     `  delay ${v.stepDelay}`,
-    // Composer pane — split down.
+    // Composer pane — split down from conv.
     '  tell convTerm to split down',
     `  delay ${v.stepDelay}`,
-    '  set composerTerm to focused terminal of selected tab of convWindow',
-    `  tell composerTerm to input text "${escape(v.composerCmd)}" & return`,
-    '  focus convTerm',
+    '  tell focused terminal of selected tab of front window to input text ' +
+      `"${escape(v.composerCmd)}" & return`,
+    '  my focusTerminalById(convId)',
     `  delay ${v.stepDelay}`,
-    // List pane — split left.
+    // List pane — split left from conv.
     '  tell convTerm to split left',
     `  delay ${v.stepDelay}`,
-    '  set listTerm to focused terminal of selected tab of convWindow',
-    `  tell listTerm to input text "${escape(v.listCmd)}" & return`,
-    // Final focus: the conversation pane is the "main" surface.
-    '  focus convTerm',
+    '  tell focused terminal of selected tab of front window to input text ' +
+      `"${escape(v.listCmd)}" & return`,
+    '  my focusTerminalById(convId)',
     'end tell',
+    '',
+    // Helper handler at the top level (must live outside the `tell`).
+    'on focusTerminalById(targetId)',
+    '  tell application "Ghostty"',
+    '    repeat with w in windows',
+    '      repeat with t in tabs of w',
+    '        try',
+    '          set ft to focused terminal of t',
+    '          if (id of ft) is targetId then',
+    '            focus ft',
+    '            return',
+    '          end if',
+    '        end try',
+    '      end repeat',
+    '    end repeat',
+    '  end tell',
+    'end focusTerminalById',
   ].join('\n')
 }
 
