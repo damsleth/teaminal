@@ -32,6 +32,8 @@ USAGE
 
 OPTIONS
   --profile, -p <alias> owa-piggy profile alias (otherwise uses owa-piggy default)
+  --pane <zone>        render only one zone of the UI (list|conversation|status|composer).
+                       Intended for split-pane layouts; see --layout=ghostty.
   --debug              enable verbose stderr logging (sets TEAMINAL_DEBUG=1)
   --log-file <path>    mirror event log to <path> (redacted, append-only)
   --network-log <path> mirror Graph requests to <path> (redacted, append-only)
@@ -43,8 +45,12 @@ ENVIRONMENT
   XDG_CONFIG_HOME      override config dir (default ~/.config)
 `
 
+export type Pane = 'list' | 'conversation' | 'status' | 'composer'
+const PANES: ReadonlyArray<Pane> = ['list', 'conversation', 'status', 'composer']
+
 function parseArgs(argv: string[]): {
   profile?: string
+  pane?: Pane
   showHelp: boolean
   showVersion: boolean
   debugFlag: boolean
@@ -53,6 +59,7 @@ function parseArgs(argv: string[]): {
 } {
   const out: {
     profile?: string
+    pane?: Pane
     showHelp: boolean
     showVersion: boolean
     debugFlag: boolean
@@ -71,6 +78,18 @@ function parseArgs(argv: string[]): {
         process.exit(2)
       }
       out.profile = v
+      i++
+    } else if (a === '--pane') {
+      const v = argv[i + 1]
+      if (!v || v.startsWith('-')) {
+        process.stderr.write('teaminal: --pane requires a value\n')
+        process.exit(2)
+      }
+      if (!PANES.includes(v as Pane)) {
+        process.stderr.write(`teaminal: --pane must be one of ${PANES.join('|')}\n`)
+        process.exit(2)
+      }
+      out.pane = v as Pane
       i++
     } else if (a === '--log-file') {
       const v = argv[i + 1]
@@ -98,6 +117,7 @@ function parseArgs(argv: string[]): {
 
 const {
   profile: cliProfile,
+  pane: cliPane,
   showHelp,
   showVersion,
   debugFlag,
@@ -188,7 +208,7 @@ const ink = render(
     <StoreProvider store={store}>
       <PollerProvider handleRef={pollerHandleRef}>
         <SessionProvider api={makeSessionApi()}>
-          <App />
+          <App pane={cliPane} />
         </SessionProvider>
       </PollerProvider>
     </StoreProvider>
