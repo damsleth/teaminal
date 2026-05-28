@@ -122,6 +122,24 @@ export function App({ pane }: { pane?: Pane } = {}) {
   // they react to focus / message-list changes by updating the store.
   useHydrateMembers(focus, store)
   useClampMessageCursor(focus, messagesByConvo, store)
+
+  // Per-pane auto-focus. When this process renders only one zone, the
+  // user's keystrokes are routed to that zone by the OS (Ghostty
+  // pane focus). Mirror that in the store so the per-zone keybind
+  // gates fire correctly: e.g. the composer pane's useInput is gated
+  // on inputZone === 'composer'. Without this, the composer pane
+  // would render but silently swallow input until something else
+  // flipped inputZone.
+  useEffect(() => {
+    if (!pane) return
+    if (pane === 'composer' && inputZone !== 'composer') {
+      store.set({ inputZone: 'composer' })
+    } else if (pane === 'list' && inputZone !== 'list' && inputZone !== 'filter') {
+      store.set({ inputZone: 'list' })
+    }
+    // 'status' is read-only; 'conversation' stays driven by the
+    // user's chat-zone keys.
+  }, [pane, inputZone, store])
   useEffect(() => {
     if (focus.kind !== 'chat' || !me?.id) return
     if (federatedFocusCheckedRef.current.has(focus.chatId)) return
@@ -457,7 +475,7 @@ export function App({ pane }: { pane?: Pane } = {}) {
           </Box>
         )}
         {pane === 'composer' && (
-          <Box borderStyle={theme.borders.panel} borderColor={theme.border}>
+          <Box borderStyle={theme.borders.panel} borderColor={theme.borderActive}>
             <Composer />
           </Box>
         )}
