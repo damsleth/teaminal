@@ -3,7 +3,7 @@ import {
   __resetForTests as resetAuth,
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
-import { __resetForTests, __setTransportForTests } from '../graph/client'
+import { __resetForTests, __setTransportForTests, setAudiencePreference } from '../graph/client'
 import type { Capabilities } from '../graph/capabilities'
 import {
   __resetForTests as resetTeamsPresence,
@@ -509,6 +509,7 @@ describe('list loop', () => {
 
   test('falls back to Teams CSA when graph /chats 401s (Conditional Access)', async () => {
     primeAuth()
+    setAudiencePreference('graph', { fallback: true })
     __setRegionForTests(undefined, 'emea')
     // graph /chats + /me/joinedTeams are CA-gated → 401.
     installTransport(
@@ -553,6 +554,84 @@ describe('list loop', () => {
     expect(store.get().chats[0]?.id).toBe('19:csa-chat@unq.gbl.spaces')
     expect(store.get().teams[0]?.displayName).toBe('ONE Team')
     expect(store.get().conn).toBe('online')
+  })
+
+  test('graph-only does not fall back to Teams CSA when graph /chats 401s', async () => {
+    primeAuth()
+    setAudiencePreference('graph', { fallback: false })
+    installTransport(
+      makeHandlers({
+        '/chats': () =>
+          new Response(JSON.stringify({ error: { code: 'Unauthorized', message: 'CA' } }), {
+            status: 401,
+            headers: { 'content-type': 'application/json' },
+          }),
+      }),
+    )
+    let csaCalls = 0
+    setCsaTransport(async () => {
+      csaCalls++
+      return jsonResponse({ items: [] })
+    })
+    const store = createAppStore()
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
+    })
+    await waitFor(() => store.get().conn === 'authError')
+    expect(csaCalls).toBe(0)
+  })
+
+  test('list loop observes live routing changes without restart', async () => {
+    primeAuth()
+    setAudiencePreference('graph', { fallback: false })
+    __setRegionForTests(undefined, 'emea')
+    let graphCalls = 0
+    installTransport(
+      makeHandlers({
+        '/chats': () => {
+          graphCalls++
+          return jsonResponse({
+            value: [
+              {
+                id: 'graph-chat',
+                chatType: 'oneOnOne',
+                createdDateTime: '2026-04-29T08:00:00Z',
+              },
+            ],
+          })
+        },
+      }),
+    )
+    let csaCalls = 0
+    setCsaTransport(async (url) => {
+      csaCalls++
+      if (url.includes('/api/v2/teams/users/me/chats')) {
+        return jsonResponse({
+          items: [
+            {
+              id: 'csa-chat',
+              isOneOnOne: true,
+              threadType: 'chat',
+              createdAt: '2026-04-29T08:00:00Z',
+            },
+          ],
+        })
+      }
+      return jsonResponse({ teams: [] })
+    })
+    const store = createAppStore()
+    activeHandle = startPoller({
+      store,
+      intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
+    })
+    await waitFor(() => store.get().chats[0]?.id === 'graph-chat')
+
+    setAudiencePreference('ic3', { fallback: false })
+
+    await waitFor(() => store.get().chats[0]?.id === 'csa-chat')
+    expect(graphCalls).toBeGreaterThan(0)
+    expect(csaCalls).toBeGreaterThan(0)
   })
 
   test('sets lastListPollAt on a successful list poll', async () => {

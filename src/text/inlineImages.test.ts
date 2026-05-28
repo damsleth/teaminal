@@ -192,7 +192,7 @@ describe('extractInlineImages', () => {
   })
 
   it('extracts the object id from a base64 hostedContents id', () => {
-    const objectUrl = 'https://eu-api.asm.skype.com/v1/objects/0-eu-d3-abc123def456/views/imgo'
+    const objectUrl = 'https://na-api.asm.skype.com/v1/objects/0-na-d3-abc123def456/views/imgo'
     const b64 = Buffer.from(`id=,type=1,url=${objectUrl}`).toString('base64')
     const m = msg({
       body: {
@@ -202,7 +202,8 @@ describe('extractInlineImages', () => {
     })
     const refs = extractInlineImages(m)
     expect(refs.length).toBe(1)
-    expect(refs[0]!.objectId).toBe('0-eu-d3-abc123def456')
+    expect(refs[0]!.objectId).toBe('0-na-d3-abc123def456')
+    expect(refs[0]!.region).toBe('amer')
   })
 
   it('routes an asm.skype.com object URL through asyncgw (non-external, with object id)', () => {
@@ -216,6 +217,7 @@ describe('extractInlineImages', () => {
     const refs = extractInlineImages(m)
     expect(refs.length).toBe(1)
     expect(refs[0]!.objectId).toBe('0-eu-d3-abc123def456')
+    expect(refs[0]!.region).toBe('emea')
     expect(refs[0]!.isExternal).toBe(false)
   })
 
@@ -231,5 +233,6 @@ describe('extractInlineImages', () => {
     expect(refs.length).toBe(1)
     expect(refs[0]!.isExternal).toBe(true)
     expect(refs[0]!.objectId).toBe('0-eu-d3-abc123def456')
+    expect(refs[0]!.region).toBe('emea')
   })
 })
