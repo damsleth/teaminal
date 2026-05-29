@@ -4,6 +4,7 @@ import type { E2ETest } from '../types'
 const test: E2ETest = {
   name: 'listChats',
   description: 'Active chat list returns ≥1 chat',
+  authGated: true,
   async run(ctx) {
     const chats = await listChats()
     if (chats.length === 0) throw new Error('listChats returned 0 chats')

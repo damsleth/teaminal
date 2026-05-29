@@ -16,6 +16,7 @@ import type { E2ETest } from '../types'
 const test: E2ETest = {
   name: 'crud-self',
   description: 'Send + edit + soft-delete a message in the self-chat',
+  authGated: true,
   mutating: true,
   async run(ctx) {
     const me = await getMe()

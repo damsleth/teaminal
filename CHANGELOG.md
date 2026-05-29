@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **TUI test harness rewritten on `@microsoft/tui-test`.** The home-grown
+  `expect(1)` + ANSI-parser harness has been replaced with Microsoft's
+  [tui-test](https://github.com/microsoft/tui-test), which drives the real
+  Ink app through an xterm.js PTY for faithful rendering. Flow tests are now
+  native tui-test test files under `scripts/tui-loop/flows/` and run against
+  a seeded offline mode (`TEAMINAL_SEED=fixtures`) — no Microsoft 365 auth
+  required. Text and color `.snap` snapshots gate CI; PNG/SVG renders are
+  uploaded as artifacts for visual review.
+- **CI now runs TUI flow tests** on ubuntu-latest and macos-latest. PNG/SVG
+  shots and tui-test traces are uploaded as CI artifacts (14-day retention)
+  but are never a pass/fail gate — only the text `.snap` files are.
+
 ## [0.17.0] - 2026-05-29
 
 ### Added

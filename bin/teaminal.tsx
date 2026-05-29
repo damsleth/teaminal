@@ -20,6 +20,7 @@ import {
   loadListCache,
   scheduleListCacheSave,
 } from '../src/state/listCachePersistence'
+import { applySeededState, isSeededMode } from '../src/state/seedFixtures'
 import { App } from '../src/ui/App'
 import { ErrorBoundary } from '../src/ui/ErrorBoundary'
 import { startFocusTracker } from '../src/ui/focusTracker'
@@ -47,6 +48,7 @@ OPTIONS
 
 ENVIRONMENT
   TEAMINAL_DEBUG       1/0, enables debug logging on stderr
+  TEAMINAL_SEED        set to "fixtures" to run in seeded/offline mode (no auth)
   XDG_CONFIG_HOME      override config dir (default ~/.config)
 `
 
@@ -122,7 +124,10 @@ if (showVersion) {
 }
 if (debugFlag) process.env.TEAMINAL_DEBUG = '1'
 
-if (!process.stdin.isTTY) {
+// In seeded/offline mode (TEAMINAL_SEED=fixtures) the app is driven by a PTY
+// harness (e.g. @microsoft/tui-test) which may not report isTTY=true on stdin.
+// Skip the TTY guard so the real Ink render path works deterministically.
+if (!process.stdin.isTTY && !isSeededMode()) {
   process.stderr.write(
     'teaminal: stdin is not a TTY. Run from an interactive terminal (iTerm, Terminal.app, etc).\n',
   )
@@ -134,9 +139,22 @@ const store = createAppStore()
 // Resolve the active profile. CLI overrides config; null falls through
 // to owa-piggy's default profile.
 const configResult = loadSettings()
-store.set({ settings: configResult.settings })
+// In seeded mode, pin a deterministic settings baseline so snapshots don't
+// depend on the running machine's config.json: a fixed theme (stable colors)
+// and the diagnostics tails off (their live timestamps + absolute paths are
+// non-deterministic and machine-specific).
+const settings = isSeededMode()
+  ? {
+      ...configResult.settings,
+      theme: 'dark',
+      tailEvents: false,
+      tailNetwork: false,
+      tailDiagnostics: false,
+    }
+  : configResult.settings
+store.set({ settings })
 // Load custom theme JSON if settings.theme isn't a built-in name.
-const themeResult = loadThemeFile(configResult.settings.theme)
+const themeResult = loadThemeFile(settings.theme)
 if (themeResult.source === 'file') {
   store.set({ customTheme: { name: themeResult.name, data: themeResult.data ?? {} } })
   debug(`theme: loaded "${themeResult.name}" from ${themeResult.path}`)
@@ -257,7 +275,11 @@ process.on('unhandledRejection', (reason) => {
 })
 
 const focusTracker = startFocusTracker(store)
-const forceAvailability = startForceAvailabilityDriver(store)
+// Seeded/offline mode must not touch the network: the forceAvailability driver
+// PUTs to presence.teams.microsoft.com, so stub it out when seeded.
+const forceAvailability = isSeededMode()
+  ? { stop() {} }
+  : startForceAvailabilityDriver(store)
 
 function makeSessionApi(): SessionApi {
   return {
@@ -319,28 +341,36 @@ function showAuthExpiredModal(profile: string | null, message: string): void {
 
 ;(async () => {
   try {
-    try {
-      currentSession = await runSession({
-        store,
-        profile: activeProfile,
-        pollerHandleRef,
-        onFatal: (kind, msg) => {
-          ink.unmount()
-          process.stderr.write(`teaminal: auth failed (${kind}): ${msg}\n`)
-          process.exit(3)
-        },
-      })
-    } catch (err) {
-      // Refresh-token expiry: keep the UI mounted and offer
-      // reseed / switch / quit instead of dumping the AAD message.
-      // Any other bootstrap error still bubbles up to the outer
-      // catch and exits.
-      const message = err instanceof Error ? err.message : String(err)
-      if (isRefreshExpiredError(message)) {
-        warn(`bootstrap: refresh token expired for profile=${activeProfile ?? '(default)'}`)
-        showAuthExpiredModal(activeProfile, message)
-      } else {
-        throw err
+    if (isSeededMode()) {
+      // Seeded/offline mode: inject deterministic fixture data directly
+      // into the store and skip all Graph / owa-piggy auth. The real Ink
+      // render path still runs — only the data source differs.
+      debug('bootstrap: seeded mode active (TEAMINAL_SEED=%s)', process.env.TEAMINAL_SEED)
+      applySeededState(store)
+    } else {
+      try {
+        currentSession = await runSession({
+          store,
+          profile: activeProfile,
+          pollerHandleRef,
+          onFatal: (kind, msg) => {
+            ink.unmount()
+            process.stderr.write(`teaminal: auth failed (${kind}): ${msg}\n`)
+            process.exit(3)
+          },
+        })
+      } catch (err) {
+        // Refresh-token expiry: keep the UI mounted and offer
+        // reseed / switch / quit instead of dumping the AAD message.
+        // Any other bootstrap error still bubbles up to the outer
+        // catch and exits.
+        const message = err instanceof Error ? err.message : String(err)
+        if (isRefreshExpiredError(message)) {
+          warn(`bootstrap: refresh token expired for profile=${activeProfile ?? '(default)'}`)
+          showAuthExpiredModal(activeProfile, message)
+        } else {
+          throw err
+        }
       }
     }
 

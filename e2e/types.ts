@@ -3,6 +3,18 @@
 // Each file under e2e/tests/ exports a default E2ETest. The runner
 // imports them, runs them sequentially against the active owa-piggy
 // profile, and prints a pass/fail summary.
+//
+// ALL e2e tests in this directory require a live owa-piggy auth profile
+// (Microsoft Graph / Teams credentials) and are therefore excluded from CI.
+// They are run manually by developers against their own tenant:
+//
+//   bun run e2e                          # all read-only tests
+//   bun run e2e -- --profile work        # explicit profile
+//   bun run e2e -- --filter chat         # subset by name
+//   TEAMINAL_E2E_MUTATING=1 bun run e2e  # also run mutating tests
+//
+// The CI pipeline runs only `bun test` (unit tests) and
+// `bunx @microsoft/tui-test` against the seeded offline app (no auth).
 
 export type E2EContext = {
   profile: string
@@ -15,6 +27,13 @@ export type E2ETest = {
   name: string
   /** Longer description shown above the test execution. */
   description?: string
+  /**
+   * Mark whether this test requires a live auth profile (always true for
+   * Graph/Teams e2e tests — they are never run in CI). Defaults to true.
+   * The runner does not enforce this flag; it is documentation only so
+   * the CI exclusion intent is visible at the test level.
+   */
+  authGated?: boolean
   /**
    * Skip this test under certain conditions. Returning a string
    * skip-reason is preferred to silently skipping, so the runner can
