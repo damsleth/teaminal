@@ -23,6 +23,7 @@ import {
 import { isNewChatQueryCandidate } from '../ChatList'
 import { openKeybinds } from '../KeybindsModal'
 import { openMenu } from '../MenuModal'
+import { openMessageSearch } from '../MessageSearchModal'
 import type { KeyResult, RawKey } from './types'
 
 const HALF_PAGE = 10
@@ -72,6 +73,19 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
   // ? opens the keybindings reference.
   if (input === '?') {
     openKeybinds(store)
+    return 'handled'
+  }
+
+  // s opens tenant-wide server-side message search (distinct from the
+  // in-conversation `/` search bar).
+  if (ch === 's') {
+    openMessageSearch(store)
+    return 'handled'
+  }
+
+  // p opens the people directory search (find a person, start a 1:1).
+  if (ch === 'p') {
+    openNewChatPrompt('')
     return 'handled'
   }
 
