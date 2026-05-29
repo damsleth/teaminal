@@ -57,14 +57,11 @@ import { handleMessageSearchKeys } from './keybinds/messageSearchKeys'
 import { readMessagePageState, type LoadMoreState } from './messageRows'
 import { messagesForTimelineNavigation } from './renderableMessage'
 import { usePollerHandleRef } from './PollerContext'
-import { useViewDispatch } from './ViewDispatchContext'
 import { StatusBar } from './StatusBar'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import type { Chat, DirectoryUser } from '../types'
 
 const LIST_PANE_WIDTH = 30
-
-export type Pane = 'list' | 'conversation' | 'status' | 'composer'
 
 export function shouldShowTailPanels(modal: ModalState | null): boolean {
   return modal === null
@@ -92,12 +89,11 @@ function otherUserIdForFederatedResolution(
   return null
 }
 
-export function App({ pane }: { pane?: Pane } = {}) {
+export function App() {
   const { exit } = useApp()
   const { isRawModeSupported } = useStdin()
   const store = useAppStore()
   const pollerRef = usePollerHandleRef()
-  const viewDispatch = useViewDispatch()
 
   const terminalRows = useTerminalRows()
 
@@ -122,24 +118,6 @@ export function App({ pane }: { pane?: Pane } = {}) {
   // they react to focus / message-list changes by updating the store.
   useHydrateMembers(focus, store)
   useClampMessageCursor(focus, messagesByConvo, store)
-
-  // Per-pane auto-focus. When this process renders only one zone, the
-  // user's keystrokes are routed to that zone by the OS (Ghostty
-  // pane focus). Mirror that in the store so the per-zone keybind
-  // gates fire correctly: e.g. the composer pane's useInput is gated
-  // on inputZone === 'composer'. Without this, the composer pane
-  // would render but silently swallow input until something else
-  // flipped inputZone.
-  useEffect(() => {
-    if (!pane) return
-    if (pane === 'composer' && inputZone !== 'composer') {
-      store.set({ inputZone: 'composer' })
-    } else if (pane === 'list' && inputZone !== 'list' && inputZone !== 'filter') {
-      store.set({ inputZone: 'list' })
-    }
-    // 'status' is read-only; 'conversation' stays driven by the
-    // user's chat-zone keys.
-  }, [pane, inputZone, store])
   useEffect(() => {
     if (focus.kind !== 'chat' || !me?.id) return
     if (federatedFocusCheckedRef.current.has(focus.chatId)) return
@@ -275,11 +253,11 @@ export function App({ pane }: { pane?: Pane } = {}) {
   }
 
   const refresh = (): void => {
-    viewDispatch.refresh()
+    pollerRef.current?.refresh()
   }
 
   const hardRefresh = (): void => {
-    viewDispatch.hardRefresh()
+    pollerRef.current?.hardRefresh?.()
   }
 
   // List / chat dispatcher. Tab is shared across both zones (move to
@@ -390,99 +368,6 @@ export function App({ pane }: { pane?: Pane } = {}) {
   const replaceModal = modal?.kind === 'auth-expired' ? modal : null
   const showTailPanels = shouldShowTailPanels(modal)
   const theme = useTheme()
-
-  // Split-pane mode: each pane process renders one zone, occupying the
-  // whole terminal. Side-effect hooks above still run; in phase 1 each
-  // pane has its own copy of the store/poller (no IPC yet), so this is
-  // a render-scoping smoke test. Phase 2 swaps in a host/view socket.
-  if (pane) {
-    return (
-      <Box flexDirection="column" height={terminalRows}>
-        {pane === 'list' && (
-          <Box
-            flexGrow={1}
-            borderStyle={theme.borders.panel}
-            borderColor={theme.border}
-          >
-            <ChatList />
-          </Box>
-        )}
-        {pane === 'conversation' && (
-          <Box
-            flexGrow={1}
-            flexShrink={1}
-            minWidth={0}
-            borderStyle={theme.borders.panel}
-            borderColor={theme.border}
-          >
-            {newChatPrompt !== null ? (
-              <NewChatPrompt
-                initialQuery={newChatPrompt}
-                selfId={me?.id}
-                onClose={closeNewChatPrompt}
-                onSelectUser={createOrFocusChat}
-              />
-            ) : replaceModal ? (
-              <AuthExpiredModal />
-            ) : (
-              <Box
-                flexDirection="column"
-                flexGrow={1}
-                flexShrink={1}
-                minWidth={0}
-                position="relative"
-              >
-                <MessagePane
-                  focusedMessageId={focusedMessageId}
-                  focusIndicatorActive={focus.kind !== 'list' && inputZone === 'list'}
-                  loadOlderState={loadOlderState}
-                />
-                {overlayModalKind && (
-                  <Box
-                    position="absolute"
-                    top={0}
-                    left={0}
-                    right={0}
-                    bottom={0}
-                    flexDirection="column"
-                    alignItems="center"
-                    justifyContent="center"
-                  >
-                    {overlayModalKind === 'menu' ? (
-                      <MenuModal />
-                    ) : overlayModalKind === 'accounts' ? (
-                      <AccountsModal />
-                    ) : overlayModalKind === 'keybinds' ? (
-                      <KeybindsModal />
-                    ) : overlayModalKind === 'diagnostics' ? (
-                      <DiagnosticsModal />
-                    ) : overlayModalKind === 'events' ? (
-                      <EventsModal />
-                    ) : overlayModalKind === 'activity' ? (
-                      <ActivityModal />
-                    ) : (
-                      <NetworkModal />
-                    )}
-                  </Box>
-                )}
-              </Box>
-            )}
-          </Box>
-        )}
-        {pane === 'status' && (
-          <Box borderStyle={theme.borders.panel} borderColor={theme.border} paddingX={theme.layout.panePaddingX}>
-            <HeaderBar />
-          </Box>
-        )}
-        {pane === 'composer' && (
-          <Box borderStyle={theme.borders.panel} borderColor={theme.borderActive}>
-            <Composer />
-          </Box>
-        )}
-      </Box>
-    )
-  }
-
   return (
     <Box flexDirection="column" height={terminalRows}>
       <Box
