@@ -17,6 +17,7 @@ import type { E2ETest } from '../types'
 const test: E2ETest = {
   name: 'crud-linked-tenant',
   description: 'Send + edit + soft-delete a 1:1 message with a B2B-linked external user',
+  authGated: true,
   mutating: true,
   async run(ctx) {
     if (ctx.externalUsers.length === 0) {

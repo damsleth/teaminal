@@ -10,6 +10,7 @@ import type { E2ETest } from '../types'
 const test: E2ETest = {
   name: 'listChannelMessagesPage',
   description: 'Read channel messages via Teams chatsvc fallback',
+  authGated: true,
   async run(ctx) {
     const teams = await listJoinedTeams()
     if (teams.length === 0) throw new Error('no joined teams to probe')

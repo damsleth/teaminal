@@ -10,6 +10,7 @@ import type { E2ETest } from '../types'
 const test: E2ETest = {
   name: 'resolveExternalUsers',
   description: 'Graph + Teams external search resolves the configured federated test users',
+  authGated: true,
   async run(ctx) {
     if (ctx.externalUsers.length === 0) {
       throw new Error('no external users configured (--external-users)')

@@ -4,6 +4,7 @@ import type { E2ETest } from '../types'
 const test: E2ETest = {
   name: 'listJoinedTeams',
   description: 'GET /me/joinedTeams returns ≥1 team',
+  authGated: true,
   async run(ctx) {
     const teams = await listJoinedTeams()
     if (teams.length === 0) throw new Error('listJoinedTeams returned 0 teams')

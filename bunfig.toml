@@ -3,6 +3,10 @@
 [test]
 # bun test discovers *.test.ts files automatically; e2e/*.e2e.ts is run
 # explicitly through e2e/runner.ts and excluded here.
+# scripts/spike/ contains @microsoft/tui-test probe tests that must run via
+# `node node_modules/@microsoft/tui-test/index.js`, not bun's built-in runner.
+# scripts/tui-loop/flows/ contains native tui-test flow tests — same runner.
 coverage = false
 coverageReporter = ["text"]
 coverageSkipTestFiles = true
+pathIgnorePatterns = ["scripts/spike", "scripts/tui-loop/flows"]

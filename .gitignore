@@ -6,3 +6,13 @@ node_modules/
 dist/
 .env*
 !.env.example
+.claude/
+
+# tui-test artifacts — text/color .snap files ARE committed (CI gate).
+# Generated visuals and traces are local/CI-artifact only, never committed.
+.tui-test/
+tui-traces/
+scripts/tui-loop/flows/__snapshots__/*.png
+scripts/tui-loop/flows/__snapshots__/*.svg
+scripts/spike/__snapshots__/*.png
+scripts/spike/__snapshots__/*.svg

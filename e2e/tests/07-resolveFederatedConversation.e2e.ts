@@ -11,6 +11,7 @@ import type { E2ETest } from '../types'
 const test: E2ETest = {
   name: 'resolveFederatedEquivalentConversationId',
   description: 'Federated chat resolver plumbing for the configured test users',
+  authGated: true,
   async run(ctx) {
     if (ctx.externalUsers.length === 0) {
       throw new Error('no external users configured')
