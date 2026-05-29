@@ -247,16 +247,8 @@ describe('handleChatKeys', () => {
       kind: 'reaction-picker',
       chatId: 'c1',
       messageId: 'm1',
-      current: null,
     })
     expect(store.get().inputZone).toBe('menu')
-  })
-
-  test("r reflects the user's existing reaction as current", () => {
-    const msg = ownMsg({ reactions: [{ reactionType: 'heart', user: { user: { id: 'me-1' } } }] })
-    const { ctx, store } = makeCtx(CHAT_FOCUS, { focusedMessage: msg, myUserId: 'me-1' })
-    handleChatKeys({ input: 'r', key: makeKey() }, ctx)
-    expect((store.get().modal as { current?: string }).current).toBe('heart')
   })
 
   test("e starts editing the user's own message", () => {

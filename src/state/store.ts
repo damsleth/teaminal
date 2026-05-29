@@ -114,9 +114,10 @@ export type ModalState =
   // Tenant-wide server-side message search (Microsoft Search API). The
   // query / results / cursor live in the modal component's local state.
   | { kind: 'message-search-global' }
-  // Reaction picker for the focused chat message. `current` is the type the
-  // user has already set (so the picker can show it as toggled).
-  | { kind: 'reaction-picker'; chatId: string; messageId: string; current: string | null }
+  // Reaction picker for the focused chat message. Delegates to the macOS
+  // system emoji picker and captures the glyph it inserts (see
+  // ReactionPickerModal); toggleReaction resolves the existing reaction itself.
+  | { kind: 'reaction-picker'; chatId: string; messageId: string }
   // Confirm before soft-deleting the user's own chat message. `preview` is a
   // short excerpt of the message body for the prompt.
   | { kind: 'confirm-delete'; chatId: string; messageId: string; preview: string }
