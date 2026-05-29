@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-05-29
+
 ### Added
 
 - **TUI visual inspection prototype.** New `bun run tui:flows` and `bun run tui:shots` scripts drive a deterministic terminal fixture through a headless PTY, capture terminal cell grids, and write SVG/text artifacts plus a manifest under `.tui-loop/shots/`.
