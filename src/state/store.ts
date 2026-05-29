@@ -10,6 +10,7 @@ import type { Capabilities } from '../graph/capabilities'
 import type { Me } from '../graph/me'
 import type { ActivityItem } from '../graph/teamsActivity'
 import type { Channel, Chat, ChatMessage, LastMessagePreview, Presence, Team } from '../types'
+import type { InlineImageRef } from '../text/inlineImages'
 
 export type Listener<S> = (state: S) => void
 
@@ -119,6 +120,9 @@ export type ModalState =
   // Confirm before soft-deleting the user's own chat message. `preview` is a
   // short excerpt of the message body for the prompt.
   | { kind: 'confirm-delete'; chatId: string; messageId: string; preview: string }
+  // Full-size view of a focused inline image. Carries the InlineImageRef so
+  // the modal can resolve the cached blob (or fetch it on open).
+  | { kind: 'image'; ref: InlineImageRef }
   | AccountManagerModalState
   | AuthExpiredModalState
 
@@ -684,6 +688,11 @@ export type AppState = {
   // + channelsByTeam; the cursor is bounded against it at render time so
   // a stale value is not a bug, just a clamp.
   cursor: number
+  // Focus within the message under the pane cursor. 0 = the message body;
+  // > 0 indexes into that message's attachments (images then links), per
+  // src/ui/messageFocusables.ts. Reset to 0 whenever the message cursor or
+  // conversation changes.
+  focusedAttachmentIndex: number
   // Case-insensitive substring filter applied to the chat list. Empty
   // string means no filter.
   filter: string
@@ -768,6 +777,7 @@ export function initialAppState(): AppState {
     inputZone: 'list',
     messageCursorByConvo: {},
     cursor: 0,
+    focusedAttachmentIndex: 0,
     filter: '',
     messageSearchQuery: '',
     messageSearchFocusedId: null,

@@ -32,17 +32,23 @@ function makeCtx(
   ctx: ChatKeysCtx
   store: ReturnType<typeof createAppStore>
   movements: number[]
+  attachmentSets: number[]
+  openedLinks: string[]
   bottomCalls: number
   loadOlderCalls: number
 } {
   const store = createAppStore()
   const movements: number[] = []
+  const attachmentSets: number[] = []
+  const openedLinks: string[] = []
   let bottomCalls = 0
   let loadOlderCalls = 0
   const ctx: ChatKeysCtx = {
     store,
     focus,
     activeMessageCursor: 5,
+    focusables: [{ kind: 'message' }],
+    focusedAttachmentIndex: 0,
     moveMessageCursor: (d) => movements.push(d),
     jumpMessageBottom: () => {
       bottomCalls++
@@ -50,12 +56,16 @@ function makeCtx(
     tryLoadOlder: () => {
       loadOlderCalls++
     },
+    setAttachmentIndex: (i) => attachmentSets.push(i),
+    openLink: (href) => openedLinks.push(href),
     ...opts,
   }
   return {
     ctx,
     store,
     movements,
+    attachmentSets,
+    openedLinks,
     get bottomCalls() {
       return bottomCalls
     },
@@ -64,6 +74,15 @@ function makeCtx(
     },
   }
 }
+
+const IMG_REF = {
+  cacheKey: 'm1::img1',
+  sourcePath: 'https://media.giphy.com/x.gif',
+  isExternal: true,
+  name: 'cat.gif',
+  contentType: 'image/gif',
+}
+const LINK_REF = { href: 'https://example.com/', label: 'example', key: 'm1::link::0' }
 
 const CHAT_FOCUS: Focus = { kind: 'chat', chatId: 'c1' }
 
@@ -233,21 +252,21 @@ describe('handleChatKeys', () => {
     expect(store.get().inputZone).toBe('menu')
   })
 
-  test('r reflects the user\'s existing reaction as current', () => {
+  test("r reflects the user's existing reaction as current", () => {
     const msg = ownMsg({ reactions: [{ reactionType: 'heart', user: { user: { id: 'me-1' } } }] })
     const { ctx, store } = makeCtx(CHAT_FOCUS, { focusedMessage: msg, myUserId: 'me-1' })
     handleChatKeys({ input: 'r', key: makeKey() }, ctx)
     expect((store.get().modal as { current?: string }).current).toBe('heart')
   })
 
-  test('e starts editing the user\'s own message', () => {
+  test("e starts editing the user's own message", () => {
     const { ctx, store } = makeCtx(CHAT_FOCUS, { focusedMessage: ownMsg(), myUserId: 'me-1' })
     expect(handleChatKeys({ input: 'e', key: makeKey() }, ctx)).toBe('handled')
     expect(store.get().editingMessageId).toBe('m1')
     expect(store.get().inputZone).toBe('composer')
   })
 
-  test('e passes through on someone else\'s message', () => {
+  test("e passes through on someone else's message", () => {
     const msg = ownMsg({ from: { user: { id: 'them-1' } } })
     const { ctx, store } = makeCtx(CHAT_FOCUS, { focusedMessage: msg, myUserId: 'me-1' })
     expect(handleChatKeys({ input: 'e', key: makeKey() }, ctx)).toBe('pass')
@@ -263,7 +282,7 @@ describe('handleChatKeys', () => {
     expect(modal.preview).toBe('hi there')
   })
 
-  test('x passes through on someone else\'s message', () => {
+  test("x passes through on someone else's message", () => {
     const msg = ownMsg({ from: { user: { id: 'them-1' } } })
     const { ctx } = makeCtx(CHAT_FOCUS, { focusedMessage: msg, myUserId: 'me-1' })
     expect(handleChatKeys({ input: 'x', key: makeKey() }, ctx)).toBe('pass')
@@ -276,6 +295,64 @@ describe('handleChatKeys', () => {
     )
     expect(handleChatKeys({ input: 'r', key: makeKey() }, ctx)).toBe('pass')
     expect(handleChatKeys({ input: 'x', key: makeKey() }, ctx)).toBe('pass')
+  })
+
+  test('j steps into attachments before moving to the next message', () => {
+    const a = makeCtx(CHAT_FOCUS, {
+      focusables: [{ kind: 'message' }, { kind: 'image', ref: IMG_REF }],
+      focusedAttachmentIndex: 0,
+    })
+    handleChatKeys({ input: 'j', key: makeKey() }, a.ctx)
+    expect(a.attachmentSets).toEqual([1])
+    expect(a.movements).toEqual([])
+  })
+
+  test('j at the last focusable rolls over to the next message', () => {
+    const a = makeCtx(CHAT_FOCUS, {
+      focusables: [{ kind: 'message' }, { kind: 'image', ref: IMG_REF }],
+      focusedAttachmentIndex: 1,
+    })
+    handleChatKeys({ input: 'j', key: makeKey() }, a.ctx)
+    expect(a.attachmentSets).toEqual([])
+    expect(a.movements).toEqual([1])
+  })
+
+  test('k steps back through attachments before leaving the message', () => {
+    const a = makeCtx(CHAT_FOCUS, {
+      focusables: [{ kind: 'message' }, { kind: 'image', ref: IMG_REF }],
+      focusedAttachmentIndex: 1,
+    })
+    handleChatKeys({ input: 'k', key: makeKey() }, a.ctx)
+    expect(a.attachmentSets).toEqual([0])
+    expect(a.movements).toEqual([])
+  })
+
+  test('Space on a focused image opens the image modal', () => {
+    const { ctx, store } = makeCtx(CHAT_FOCUS, {
+      focusables: [{ kind: 'message' }, { kind: 'image', ref: IMG_REF }],
+      focusedAttachmentIndex: 1,
+    })
+    expect(handleChatKeys({ input: ' ', key: makeKey() }, ctx)).toBe('handled')
+    expect(store.get().modal).toEqual({ kind: 'image', ref: IMG_REF })
+    expect(store.get().inputZone).toBe('menu')
+  })
+
+  test('Space on the message body (index 0) passes through', () => {
+    const { ctx } = makeCtx(CHAT_FOCUS, {
+      focusables: [{ kind: 'message' }, { kind: 'link', ref: LINK_REF }],
+      focusedAttachmentIndex: 0,
+    })
+    expect(handleChatKeys({ input: ' ', key: makeKey() }, ctx)).toBe('pass')
+  })
+
+  test('Space on a focused link is handled (opens externally) without a modal', () => {
+    const a = makeCtx(CHAT_FOCUS, {
+      focusables: [{ kind: 'message' }, { kind: 'link', ref: LINK_REF }],
+      focusedAttachmentIndex: 1,
+    })
+    expect(handleChatKeys({ input: ' ', key: makeKey() }, a.ctx)).toBe('handled')
+    expect(a.store.get().modal).toBeNull()
+    expect(a.openedLinks).toEqual(['https://example.com/'])
   })
 
   test('Esc in thread opens the menu (does not return to parent channel)', () => {
