@@ -2,12 +2,23 @@
 // capability, unread, and refresh details live in HeaderBar.
 
 import { Box, Text } from 'ink'
+import { selectFocusedAttachment } from './messageFocusables'
 import { useAppState, useTheme } from './StoreContext'
 
 export function StatusBar() {
   const focus = useAppState((s) => s.focus)
   const inputZone = useAppState((s) => s.inputZone)
   const filter = useAppState((s) => s.filter)
+  // Description of the currently-focused attachment (image / link), or null
+  // when focus is on a message body. Returns a primitive so the selector is
+  // stable across unrelated store updates.
+  const attachmentHint = useAppState((s) => {
+    const f = selectFocusedAttachment(s)
+    if (!f) return null
+    if (f.kind === 'image') return `▸ image: ${f.ref.name} · space opens`
+    if (f.kind === 'link') return `▸ link: ${f.ref.href} · space opens`
+    return null
+  })
   const theme = useTheme()
 
   let hint = 'j/k move · l/Enter open · / filter · n new chat · ? help · q quit'
@@ -15,7 +26,9 @@ export function StatusBar() {
   else if (inputZone === 'composer') hint = 'Enter send · Ctrl+J newline · Tab chat'
   else if (inputZone === 'menu') hint = 'menu open'
   else if (focus.kind !== 'list') {
-    hint = 'j/k msg · u/d half · u/k older top · l bottom · h back · Tab compose · r refresh'
+    hint =
+      attachmentHint ??
+      'j/k msg · u/d half · u/k older top · l bottom · h back · Tab compose · r refresh'
   }
 
   return (

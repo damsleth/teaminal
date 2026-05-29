@@ -47,6 +47,7 @@ import { NetworkModal } from './NetworkModal'
 import { NewChatPrompt } from './NewChatPrompt'
 import { ReactionPickerModal } from './ReactionPickerModal'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
+import { ImageModal } from './ImageModal'
 import { MessageSearchModal } from './MessageSearchModal'
 import { TailPanels } from './TailPanels'
 import { findExistingOneOnOne } from './derive'
@@ -59,6 +60,8 @@ import { handleListKeys } from './keybinds/listKeys'
 import { handleMessageSearchKeys } from './keybinds/messageSearchKeys'
 import { readMessagePageState, type LoadMoreState } from './messageRows'
 import { messagesForTimelineNavigation } from './renderableMessage'
+import { messageFocusables } from './messageFocusables'
+import { openExternal } from './openExternal'
 import { usePollerHandleRef } from './PollerContext'
 import { StatusBar } from './StatusBar'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
@@ -112,6 +115,7 @@ export function App() {
   const messagesByConvo = useAppState((s) => s.messagesByConvo)
   const messageCacheByConvo = useAppState((s) => s.messageCacheByConvo)
   const messageCursorByConvo = useAppState((s) => s.messageCursorByConvo)
+  const focusedAttachmentIndex = useAppState((s) => s.focusedAttachmentIndex)
   const statusBarPosition = useAppState((s) => s.settings.statusBarPosition)
 
   const [newChatPrompt, setNewChatPrompt] = useState<string | null>(null)
@@ -121,6 +125,10 @@ export function App() {
   // they react to focus / message-list changes by updating the store.
   useHydrateMembers(focus, store)
   useClampMessageCursor(focus, messagesByConvo, store)
+  // Reset attachment focus to the message body when the conversation changes.
+  useEffect(() => {
+    store.set({ focusedAttachmentIndex: 0 })
+  }, [focus])
   useEffect(() => {
     if (focus.kind !== 'chat' || !me?.id) return
     if (federatedFocusCheckedRef.current.has(focus.chatId)) return
@@ -159,6 +167,11 @@ export function App() {
       : 0
   const focusedMessage = activeNavigationMessages[activeMessageCursor]
   const focusedMessageId = focusedMessage?.id
+  // Focus ring for the focused message ([message, ...images, ...links]).
+  // The stored index is clamped here so a message changing underneath the
+  // cursor (new reaction, edit) can't leave focus pointing past the end.
+  const focusables = messageFocusables(focusedMessage)
+  const attachmentIndex = clampCursor(focusedAttachmentIndex, focusables.length)
   const pageState = readMessagePageState(activeCache ?? activeMessages)
   const loadOlderState: LoadMoreState = pageState.loading
     ? 'loading'
@@ -177,6 +190,8 @@ export function App() {
         next,
         activeNavigationMessages.length,
       ),
+      // Landing on a different message resets focus to that message's body.
+      focusedAttachmentIndex: 0,
     }))
   }
 
@@ -189,7 +204,15 @@ export function App() {
         nextMessageCursor(activeMessageCursor, delta, activeNavigationMessages.length),
         activeNavigationMessages.length,
       ),
+      focusedAttachmentIndex: 0,
     }))
+  }
+
+  // Set the focus index within the focused message's focusables, clamped to
+  // the available range.
+  function setAttachmentIndex(index: number): void {
+    const clamped = clampCursor(index, focusables.length)
+    store.set({ focusedAttachmentIndex: clamped })
   }
 
   function jumpMessageBottom(): void {
@@ -293,9 +316,15 @@ export function App() {
           focusedMessageId,
           focusedMessage,
           myUserId: me?.id,
+          focusables,
+          focusedAttachmentIndex: attachmentIndex,
           moveMessageCursor,
           jumpMessageBottom,
           tryLoadOlder,
+          setAttachmentIndex,
+          openLink: (href) => {
+            openExternal(href)
+          },
         })
         if (result === 'handled') return
       }
@@ -373,6 +402,7 @@ export function App() {
     | 'reaction-picker'
     | 'confirm-delete'
     | 'message-search-global'
+    | 'image'
     | null = modal && modal.kind !== 'auth-expired' ? modal.kind : null
   const replaceModal = modal?.kind === 'auth-expired' ? modal : null
   const showTailPanels = shouldShowTailPanels(modal)
@@ -459,6 +489,8 @@ export function App() {
                     <ConfirmDeleteModal />
                   ) : overlayModalKind === 'message-search-global' ? (
                     <MessageSearchModal />
+                  ) : overlayModalKind === 'image' ? (
+                    <ImageModal />
                   ) : (
                     <NetworkModal />
                   )}
