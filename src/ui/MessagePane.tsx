@@ -96,6 +96,7 @@ export function MessagePane(props: {
   const inlineImages = useAppState((s) => s.settings.inlineImages)
   const inlineImageMaxRows = useAppState((s) => s.settings.inlineImageMaxRows)
   const statusBarHidden = useAppState((s) => s.settings.statusBarPosition === 'hidden')
+  const reactionPickerOpen = useAppState((s) => s.modal?.kind === 'reaction-picker')
   const theme = useTheme()
 
   const [, setImageRevision] = useState(0)
@@ -178,7 +179,9 @@ export function MessagePane(props: {
   })
   const windowStart = chooseMessageRowsWindowStart(allRows, {
     focusedMessageId: props.focusedMessageId,
-    focusActive: props.focusIndicatorActive === true,
+    // Keep the focused message in view while the reaction picker is open even
+    // though inputZone is 'menu' — the system emoji picker anchors to its row.
+    focusActive: props.focusIndicatorActive === true || reactionPickerOpen,
     imageRowsForMessage,
     messageTextColumns,
     reactionDisplayMode,
@@ -286,6 +289,32 @@ export function MessagePane(props: {
     return () => {
       clearKittyImages(stdout)
     }
+  })
+
+  // While the reaction picker is open we delegate to the macOS Character
+  // Viewer, which anchors to the terminal's text cursor (after an Ink render
+  // that sits at the bottom-left prompt). Park the cursor on the focused
+  // message's row — re-applied after every render so a background re-render
+  // can't snap it back — so the system picker pops next to the message being
+  // reacted to. Best-effort: the row is approximate and exact placement is
+  // ultimately up to the terminal/IME.
+  useEffect(() => {
+    if (!stdout || !reactionPickerOpen) return
+    const idx = rows.findIndex(
+      (r) => r.kind === 'message' && r.message.id === props.focusedMessageId,
+    )
+    if (idx < 0) return
+    const heightOpts = { imageRowsForMessage, messageTextColumns, reactionDisplayMode }
+    let rowsBefore = 0
+    for (let i = 0; i < idx; i++) rowsBefore += messageRenderRowHeight(rows[i]!, heightOpts)
+    // Chrome above the pane content: header bar (3) + message-pane top border
+    // (1); pane content then starts on the next row. Add the in-pane prelude
+    // (cozy header, search bar, loading-older line) that pushes messages down.
+    const preludeRows =
+      cozyRows + (searchActive ? 1 : 0) + (isLoadingOlder && !showingHistoryTop ? 1 : 0)
+    const row = 4 + 1 + preludeRows + rowsBefore
+    const col = LIST_PANE_WIDTH + 3
+    stdout.write(`\x1b[${row};${col}H`)
   })
 
   if (isListFocus) {
