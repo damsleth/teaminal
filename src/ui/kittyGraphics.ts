@@ -23,6 +23,55 @@ export type KittyPlacement = {
   reservedRows: number
 }
 
+export type ImageFormat = 'png' | 'jpeg' | 'gif' | 'webp' | 'bmp'
+
+// Sniff the image format from the leading magic bytes. Used to decide
+// whether a cached blob can be handed to the terminal as-is (Kitty only
+// natively decodes PNG) and to label non-rendered placeholders.
+export function detectImageFormat(buf: Buffer): ImageFormat | null {
+  if (buf.length < 4) return null
+  if (
+    buf[0] === 0x89 &&
+    buf[1] === 0x50 &&
+    buf[2] === 0x4e &&
+    buf[3] === 0x47 &&
+    buf[4] === 0x0d &&
+    buf[5] === 0x0a &&
+    buf[6] === 0x1a &&
+    buf[7] === 0x0a
+  ) {
+    return 'png'
+  }
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpeg'
+  // "GIF87a" / "GIF89a"
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38) return 'gif'
+  // "RIFF" .... "WEBP"
+  if (
+    buf.length >= 12 &&
+    buf[0] === 0x52 &&
+    buf[1] === 0x49 &&
+    buf[2] === 0x46 &&
+    buf[3] === 0x46 &&
+    buf[8] === 0x57 &&
+    buf[9] === 0x45 &&
+    buf[10] === 0x42 &&
+    buf[11] === 0x50
+  ) {
+    return 'webp'
+  }
+  if (buf[0] === 0x42 && buf[1] === 0x4d) return 'bmp'
+  return null
+}
+
+// The Kitty graphics protocol's f=100 path decodes PNG only. JPEG/GIF/WebP
+// blobs sent down that path are silently dropped by the terminal, which is
+// what left photos and picker GIFs as blank reserved rows. Callers gate
+// both the APC emit and the reserved layout on this so non-PNG images fall
+// back to a labeled placeholder instead of empty space.
+export function isKittyRenderable(buf: Buffer): boolean {
+  return detectImageFormat(buf) === 'png'
+}
+
 // Kitty itself, Ghostty, and WezTerm all implement the Kitty graphics
 // protocol. Detection is env-based - no APC query roundtrip needed.
 export function isKittyCapable(): boolean {
@@ -68,6 +117,9 @@ export function fitKittyPlacement(
 // Placement uses either cols or rows, not both, so terminals preserve
 // aspect ratio instead of stretching to an arbitrary cell rectangle.
 export function buildKittyAPC(png: Buffer, placement: KittyPlacement): string {
+  // f=100 is the PNG transmit path; non-PNG blobs would be dropped by the
+  // terminal, so refuse to emit a malformed escape for them.
+  if (!isKittyRenderable(png)) return ''
   const b64 = png.toString('base64')
   if (!b64) return ''
 
