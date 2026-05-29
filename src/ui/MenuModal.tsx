@@ -33,8 +33,10 @@ import {
 } from './menu'
 import type { Settings } from '../state/store'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
+import { useSessionApi } from './SessionContext'
+import { clearProfileCaches } from '../state/cacheClear'
 import { updateSettings } from '../config'
-import { warn } from '../log'
+import { recordEvent, warn } from '../log'
 import { REPOSITORY_URL, VERSION } from '../version'
 
 const LOGO = [
@@ -79,6 +81,7 @@ export function openAccounts(store: ReturnType<typeof useAppStore>): void {
 export function MenuModal() {
   const { exit } = useApp()
   const store = useAppStore()
+  const session = useSessionApi()
   const modal = useAppState((s) => s.modal)
   const settings = useAppState((s) => s.settings)
   const theme = useTheme()
@@ -176,6 +179,21 @@ export function MenuModal() {
       case 'show-network':
         store.set({ modal: { kind: 'network' }, inputZone: 'menu' })
         return
+      case 'clear-cache': {
+        const profile = session.getActiveProfile()
+        try {
+          const { removed } = clearProfileCaches(profile)
+          recordEvent(
+            'app',
+            'info',
+            `cache cleared for profile=${profile ?? '(default)'}: removed ${removed.length} item(s)`,
+          )
+        } catch (err) {
+          warn('cache: clear failed:', errMessage(err))
+        }
+        store.set({ modal: null, inputZone: 'list' })
+        return
+      }
       case 'show-accounts':
         openAccounts(store)
         return
