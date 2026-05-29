@@ -4,6 +4,7 @@ import type { E2ETest } from '../types'
 const test: E2ETest = {
   name: 'getMe',
   description: 'Identity probe via Graph /me',
+  authGated: true,
   async run(ctx) {
     const me = await getMe()
     if (!me.id) throw new Error('me.id is empty')

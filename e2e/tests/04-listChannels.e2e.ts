@@ -4,6 +4,7 @@ import type { E2ETest } from '../types'
 const test: E2ETest = {
   name: 'listChannels',
   description: 'Channels for the first joined team return ≥1 channel',
+  authGated: true,
   async run(ctx) {
     const teams = await listJoinedTeams()
     if (teams.length === 0) throw new Error('no joined teams to probe')

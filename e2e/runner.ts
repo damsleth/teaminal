@@ -1,5 +1,9 @@
 #!/usr/bin/env bun
-// e2e test runner.
+// e2e test runner — auth-gated Graph / Teams tests.
+//
+// ALL tests here require a live owa-piggy Microsoft 365 auth profile.
+// They are NOT run in CI. Use `bun test` for unit tests and
+// `bunx @microsoft/tui-test` for TUI flow tests (seeded, no auth).
 //
 // Discovers files in e2e/tests/, runs each against the real owa-piggy
 // profile, and prints a pass/fail/skip summary. Each test gets a
@@ -19,6 +23,10 @@
 // Tests are READ-ONLY unless they opt in via { mutating: true }, and
 // mutating tests refuse to run without the env var. We don't want a
 // stray test run to spam someone's actual chat history.
+//
+// CI EXCLUSION: these tests will not run in a standard CI environment
+// (no owa-piggy credentials). To explicitly run in CI with a service
+// account set TEAMINAL_E2E_CI_ALLOWED=1 in addition to the profile env.
 
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -190,6 +198,18 @@ function formatLines(lines: string[], indent: string, max = 30): string {
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2))
+
+  // Guard: refuse to run auth-gated tests in CI unless explicitly opted in.
+  // tui-test flows (bunx @microsoft/tui-test) are the correct CI test target.
+  if ((process.env.CI || process.env.GITHUB_ACTIONS) && !process.env.TEAMINAL_E2E_CI_ALLOWED) {
+    console.error(
+      'e2e: auth-gated Graph tests are excluded from CI.\n' +
+        '  Use `bun test` for unit tests or `bun run tui:flows` for TUI flow tests.\n' +
+        '  To run e2e in CI with a service account, set TEAMINAL_E2E_CI_ALLOWED=1.',
+    )
+    process.exit(1)
+  }
+
   installLogging()
   setActiveProfile(args.profile)
 

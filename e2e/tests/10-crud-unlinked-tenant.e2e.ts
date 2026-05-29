@@ -21,6 +21,7 @@ import type { E2ETest } from '../types'
 const test: E2ETest = {
   name: 'crud-unlinked-tenant',
   description: 'CRUD with an unlinked-tenant user via the external-search fallback',
+  authGated: true,
   mutating: true,
   async run(ctx) {
     if (ctx.externalUsers.length === 0) {

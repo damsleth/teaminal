@@ -260,6 +260,38 @@ no shell interpolation in notifications) are documented in
 
 [advisory]: https://github.com/damsleth/teaminal/security/advisories/new
 
+## TUI testing
+
+teaminal uses [`@microsoft/tui-test`](https://github.com/microsoft/tui-test)
+to drive the real Ink app through a headless PTY and capture what it renders.
+Tests run against a **seeded offline mode** (`TEAMINAL_SEED=fixtures`) so no
+Microsoft 365 auth is required.
+
+```bash
+# Run all TUI flow tests (text-snapshot regression gate)
+bun run tui:shots
+
+# Accept new/changed snapshots (after intentional UI changes)
+bun run tui:update
+
+# Replay a failing test from its recorded trace
+bun run tui:trace
+
+# List discovered flow test files
+bun run tui:flows
+```
+
+**What is gated vs. what is just recorded:**
+
+- Text and color `.snap` files (under `__snapshots__/` next to each test) are
+  the CI gate — a snapshot mismatch fails the build.
+- PNG and SVG renders of each step are uploaded as CI artifacts for human
+  and agent review but never gate the build (font/AA differences across
+  platforms make pixel-perfect cross-OS image comparison unreliable).
+
+Flow test files live under `scripts/tui-loop/flows/`. Add a new
+`*.test.ts` there to cover additional UI flows.
+
 ## Contributing
 
 Patches, bug reports, and design feedback welcome. See

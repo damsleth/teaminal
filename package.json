@@ -5,7 +5,7 @@
   "description": "Lightweight terminal Microsoft Teams client",
   "type": "module",
   "engines": {
-    "bun": ">=1.1.0"
+    "bun": ">=1.3.5"
   },
   "bin": {
     "teaminal": "./bin/teaminal.tsx"
@@ -20,19 +20,27 @@
     "typecheck": "bun x tsc --noEmit",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "tui:flows": "bun run scripts/tui-loop.ts flows",
-    "tui:shots": "bun run scripts/tui-loop.ts shots"
+    "tui:shots": "node node_modules/@microsoft/tui-test/index.js",
+    "tui:update": "node node_modules/@microsoft/tui-test/index.js --updateSnapshot",
+    "tui:trace": "node node_modules/@microsoft/tui-test/index.js --trace",
+    "tui:manifest": "bun run scripts/tui-loop.ts manifest"
   },
   "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "entities": "^8.0.0",
     "htmlparser2": "^12.0.0",
     "ink": "^7.0.4",
     "react": "^19.2.6"
   },
   "devDependencies": {
+    "@microsoft/tui-test": "latest",
     "@types/bun": "latest",
     "@types/react": "^19.2.15",
     "prettier": "^3.8.3",
     "react-devtools-core": "^7.0.1",
     "typescript": "^6.0.3"
-  }
+  },
+  "trustedDependencies": [
+    "@swc/core"
+  ]
 }
