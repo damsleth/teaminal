@@ -12,9 +12,13 @@
 
 import {
   createOneOnOneChat as createOneOnOneChatGraph,
+  editMessage as editMessageGraph,
   getChat,
   searchChatUsers as searchChatUsersGraph,
   sendMessage as sendMessageGraph,
+  setReaction as setReactionGraph,
+  softDeleteMessage as softDeleteMessageGraph,
+  unsetReaction as unsetReactionGraph,
 } from '../graph/chats'
 import { searchExternalUsers as searchExternalUsersGraph } from '../graph/teamsExternalSearch'
 import { resolveFederatedEquivalentConversationId } from '../graph/teamsFederation'
@@ -23,7 +27,14 @@ import {
   sendChannelMessage as sendChannelMessageGraph,
 } from '../graph/teams'
 import { recordEvent } from '../log'
-import type { Chat, ChatMessage, DirectoryUser } from '../types'
+import type { Chat, ChatMessage, DirectoryUser, IdentityUser } from '../types'
+import {
+  applyDelete,
+  applyEdit,
+  applyReaction,
+  ownReactionType,
+  removeReaction,
+} from './messageMutations'
 import type { AppState, Store } from './store'
 
 /**
@@ -108,6 +119,111 @@ export async function postChannelReply(
   opts?: { signal?: AbortSignal },
 ): ReturnType<typeof postChannelReplyGraph> {
   return postChannelReplyGraph(teamId, channelId, rootId, content, opts)
+}
+
+// --- Write path: reactions, edits, deletes (chat messages only) ---
+//
+// Each action optimistically mutates messagesByConvo[`chat:${chatId}`] via
+// the pure reducers in ./messageMutations, fires the Graph call, and rolls
+// the conversation back to its pre-action snapshot on failure (logging the
+// error). Channel write support is a follow-up — the Graph paths differ.
+
+const chatConvKey = (chatId: string): string => `chat:${chatId}`
+
+function setConvMessages(
+  store: Store<AppState>,
+  convKey: string,
+  next: ChatMessage[],
+): void {
+  store.set((s) => ({
+    messagesByConvo: { ...s.messagesByConvo, [convKey]: next },
+  }))
+}
+
+// Run an optimistic mutation against a chat conversation, then a Graph call.
+// Restores the snapshot if the call throws so a failed write never sticks.
+async function withOptimisticChatUpdate(
+  store: Store<AppState>,
+  chatId: string,
+  mutate: (messages: ChatMessage[]) => ChatMessage[],
+  commit: () => Promise<void>,
+  label: string,
+): Promise<void> {
+  const convKey = chatConvKey(chatId)
+  const snapshot = store.get().messagesByConvo[convKey] ?? []
+  setConvMessages(store, convKey, mutate(snapshot))
+  try {
+    await commit()
+  } catch (err) {
+    setConvMessages(store, convKey, snapshot)
+    recordEvent('graph', 'warn', `${label} failed: ${err instanceof Error ? err.message : String(err)}`)
+    throw err
+  }
+}
+
+/**
+ * Toggle the current user's reaction on a chat message. Reacting with the
+ * type already set removes it; any other type replaces the existing one
+ * (Teams allows a single reaction per user per message).
+ */
+export async function toggleReaction(
+  store: Store<AppState>,
+  chatId: string,
+  messageId: string,
+  reactionType: string,
+  me: IdentityUser,
+): Promise<void> {
+  const convKey = chatConvKey(chatId)
+  const message = (store.get().messagesByConvo[convKey] ?? []).find((m) => m.id === messageId)
+  const existing = message ? ownReactionType(message, me.id) : null
+  const removing = existing === reactionType
+
+  await withOptimisticChatUpdate(
+    store,
+    chatId,
+    (messages) =>
+      removing
+        ? removeReaction(messages, messageId, me.id)
+        : applyReaction(messages, messageId, reactionType, me),
+    () =>
+      removing
+        ? unsetReactionGraph(chatId, messageId, reactionType)
+        : setReactionGraph(chatId, messageId, reactionType),
+    removing ? 'unset reaction' : 'set reaction',
+  )
+}
+
+/** Edit the content of one of the user's own chat messages. */
+export async function editChatMessageContent(
+  store: Store<AppState>,
+  chatId: string,
+  messageId: string,
+  content: string,
+): Promise<void> {
+  const trimmed = content.trim()
+  if (!trimmed) return
+  await withOptimisticChatUpdate(
+    store,
+    chatId,
+    (messages) => applyEdit(messages, messageId, trimmed, new Date().toISOString()),
+    () => editMessageGraph(chatId, messageId, trimmed),
+    'edit message',
+  )
+}
+
+/** Soft-delete one of the user's own chat messages (renders as a tombstone). */
+export async function deleteChatMessageById(
+  store: Store<AppState>,
+  chatId: string,
+  messageId: string,
+): Promise<void> {
+  await withOptimisticChatUpdate(
+    store,
+    chatId,
+    (messages) => applyDelete(messages, messageId, new Date().toISOString()),
+    () => softDeleteMessageGraph(chatId, messageId),
+    'delete message',
+  )
 }
 
 /** Internal-tenant directory search for the new-chat prompt. */

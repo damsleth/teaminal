@@ -45,6 +45,8 @@ import { MenuModal } from './MenuModal'
 import { MessagePane } from './MessagePane'
 import { NetworkModal } from './NetworkModal'
 import { NewChatPrompt } from './NewChatPrompt'
+import { ReactionPickerModal } from './ReactionPickerModal'
+import { ConfirmDeleteModal } from './ConfirmDeleteModal'
 import { TailPanels } from './TailPanels'
 import { findExistingOneOnOne } from './derive'
 import { useClampMessageCursor } from './hooks/useClampMessageCursor'
@@ -154,7 +156,8 @@ export function App() {
           activeNavigationMessages.length,
         )
       : 0
-  const focusedMessageId = activeNavigationMessages[activeMessageCursor]?.id
+  const focusedMessage = activeNavigationMessages[activeMessageCursor]
+  const focusedMessageId = focusedMessage?.id
   const pageState = readMessagePageState(activeCache ?? activeMessages)
   const loadOlderState: LoadMoreState = pageState.loading
     ? 'loading'
@@ -287,6 +290,8 @@ export function App() {
           focus,
           activeMessageCursor,
           focusedMessageId,
+          focusedMessage,
+          myUserId: me?.id,
           moveMessageCursor,
           jumpMessageBottom,
           tryLoadOlder,
@@ -364,6 +369,8 @@ export function App() {
     | 'events'
     | 'network'
     | 'activity'
+    | 'reaction-picker'
+    | 'confirm-delete'
     | null = modal && modal.kind !== 'auth-expired' ? modal.kind : null
   const replaceModal = modal?.kind === 'auth-expired' ? modal : null
   const showTailPanels = shouldShowTailPanels(modal)
@@ -438,6 +445,10 @@ export function App() {
                     <EventsModal />
                   ) : overlayModalKind === 'activity' ? (
                     <ActivityModal />
+                  ) : overlayModalKind === 'reaction-picker' ? (
+                    <ReactionPickerModal />
+                  ) : overlayModalKind === 'confirm-delete' ? (
+                    <ConfirmDeleteModal />
                   ) : (
                     <NetworkModal />
                   )}

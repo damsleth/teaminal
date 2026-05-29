@@ -342,6 +342,38 @@ export async function softDeleteMessage(
   })
 }
 
+// Add a reaction to a chat message. reactionType is one of Graph's
+// documented short names (like / heart / laugh / surprised / sad / angry).
+// Returns 204 on success.
+export async function setReaction(
+  chatId: string,
+  messageId: string,
+  reactionType: string,
+  opts?: SendMessageOpts,
+): Promise<void> {
+  await graph<void>({
+    method: 'POST',
+    path: `/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}/setReaction`,
+    body: { reactionType },
+    signal: opts?.signal,
+  })
+}
+
+// Remove a previously-set reaction of the given type from a chat message.
+export async function unsetReaction(
+  chatId: string,
+  messageId: string,
+  reactionType: string,
+  opts?: SendMessageOpts,
+): Promise<void> {
+  await graph<void>({
+    method: 'POST',
+    path: `/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}/unsetReaction`,
+    body: { reactionType },
+    signal: opts?.signal,
+  })
+}
+
 export type SearchPeopleOpts = {
   top?: number
   signal?: AbortSignal

@@ -7,6 +7,9 @@
 // shared App-level dispatcher because it is identical across zones.
 
 import type { AppState, Focus, Store } from '../../state/store'
+import type { ChatMessage } from '../../types'
+import { ownReactionType } from '../../state/messageMutations'
+import { htmlToText } from '../../text/html'
 import { openMenu } from '../MenuModal'
 import type { KeyResult, RawKey } from './types'
 
@@ -18,9 +21,30 @@ export type ChatKeysCtx = {
   activeMessageCursor: number
   // Id of the message under the cursor, used to open a thread.
   focusedMessageId?: string
+  // The message under the cursor, when one is focused. Used to gate edit /
+  // delete to the user's own messages and to seed the reaction picker.
+  focusedMessage?: ChatMessage
+  // The signed-in user's id, for the self-message gate.
+  myUserId?: string
   moveMessageCursor: (delta: number) => void
   jumpMessageBottom: () => void
   tryLoadOlder: () => void
+}
+
+const DELETE_PREVIEW_MAX = 60
+
+function messagePreview(m: ChatMessage): string {
+  const raw = m.body?.content ?? ''
+  const text = m.body?.contentType === 'text' ? raw.replace(/\s+/g, ' ').trim() : htmlToText(raw).trim()
+  return text.length > DELETE_PREVIEW_MAX ? `${text.slice(0, DELETE_PREVIEW_MAX - 1)}…` : text
+}
+
+function isOwnEditableMessage(m: ChatMessage | undefined, myUserId: string | undefined): m is ChatMessage {
+  if (!m || !myUserId) return false
+  if (m.from?.user?.id !== myUserId) return false
+  if (m.messageType === 'systemEventMessage') return false
+  if (m.deletedDateTime) return false
+  return true
 }
 
 // Half-page step used by U / D / PageUp / PageDown.
@@ -82,6 +106,37 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
       },
     })
     return 'handled'
+  }
+  // Write actions are chat-only for now (channel message write paths differ).
+  if (ctx.focus.kind === 'chat' && ctx.focusedMessage) {
+    const chatId = ctx.focus.chatId
+    const msg = ctx.focusedMessage
+    // 'r' opens the reaction picker for the focused message.
+    if (ch === 'r') {
+      store.set({
+        modal: {
+          kind: 'reaction-picker',
+          chatId,
+          messageId: msg.id,
+          current: ctx.myUserId ? ownReactionType(msg, ctx.myUserId) : null,
+        },
+        inputZone: 'menu',
+      })
+      return 'handled'
+    }
+    // 'e' edits the focused message (own, non-deleted, non-system only).
+    if (ch === 'e' && isOwnEditableMessage(msg, ctx.myUserId)) {
+      store.set({ editingMessageId: msg.id, inputZone: 'composer' })
+      return 'handled'
+    }
+    // 'x' deletes the focused message after a confirmation prompt.
+    if (ch === 'x' && isOwnEditableMessage(msg, ctx.myUserId)) {
+      store.set({
+        modal: { kind: 'confirm-delete', chatId, messageId: msg.id, preview: messagePreview(msg) },
+        inputZone: 'menu',
+      })
+      return 'handled'
+    }
   }
   // Esc always opens the menu overlay, regardless of focus. The menu
   // itself toggles closed on Esc, so the binding behaves as a toggle.
