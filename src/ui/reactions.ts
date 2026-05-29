@@ -53,12 +53,15 @@ export function aggregateReactions(reactions: Reaction[] | undefined): ReactionB
 }
 
 export function reactionGlyph(type: string): string {
-  if (looksLikeEmojiGlyph(type)) return type
+  if (isEmojiGlyph(type)) return type
   return REACTION_GLYPH[type] ?? `:${type}:`
 }
 
-function looksLikeEmojiGlyph(type: string): boolean {
-  return /\p{Extended_Pictographic}/u.test(type)
+// True when the value already contains an emoji glyph (as opposed to a short
+// name like 'heart'). Used both to render glyph-typed reactions verbatim and
+// to recognise the glyph the system emoji picker inserts.
+export function isEmojiGlyph(value: string): boolean {
+  return /\p{Extended_Pictographic}/u.test(value)
 }
 
 /**

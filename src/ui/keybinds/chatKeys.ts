@@ -8,7 +8,6 @@
 
 import type { AppState, Focus, Store } from '../../state/store'
 import type { ChatMessage } from '../../types'
-import { ownReactionType } from '../../state/messageMutations'
 import { htmlToText } from '../../text/html'
 import { openMenu } from '../MenuModal'
 import type { Focusable } from '../messageFocusables'
@@ -152,15 +151,11 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
   if (ctx.focus.kind === 'chat' && ctx.focusedMessage) {
     const chatId = ctx.focus.chatId
     const msg = ctx.focusedMessage
-    // 'r' opens the reaction picker for the focused message.
+    // 'r' opens the reaction picker for the focused message (delegates to the
+    // macOS system emoji picker — see ReactionPickerModal).
     if (ch === 'r') {
       store.set({
-        modal: {
-          kind: 'reaction-picker',
-          chatId,
-          messageId: msg.id,
-          current: ctx.myUserId ? ownReactionType(msg, ctx.myUserId) : null,
-        },
+        modal: { kind: 'reaction-picker', chatId, messageId: msg.id },
         inputZone: 'menu',
       })
       return 'handled'

@@ -248,6 +248,14 @@ const ink = render(
   </ErrorBoundary>,
 )
 
+// Safety net: a stray rejected promise from a fire-and-forget action (e.g. a
+// failed reaction/delete) would otherwise terminate the process while Ink
+// still holds the terminal in raw mode, leaving keystrokes leaking to the
+// shell. Log and stay alive instead — explicit fatal paths use process.exit.
+process.on('unhandledRejection', (reason) => {
+  warn('unhandled rejection:', reason instanceof Error ? reason.message : String(reason))
+})
+
 const focusTracker = startFocusTracker(store)
 const forceAvailability = startForceAvailabilityDriver(store)
 

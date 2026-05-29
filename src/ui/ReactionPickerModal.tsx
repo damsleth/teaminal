@@ -1,17 +1,18 @@
-// Reaction picker overlay for the focused chat message.
+// Reaction picker for the focused chat message.
 //
-// Opened by the chat-zone `r` key (App routes input here while the modal is
-// open). Number keys 1-6 pick one of Graph's documented reactions; the same
-// reaction the user already set is marked and re-selecting it removes it
-// (toggleReaction handles the toggle). Esc cancels.
+// Opened by the chat-zone `r` key (App routes input here while the overlay is
+// open). Rather than render our own fixed emoji grid, we delegate to the macOS
+// Character Viewer: on open we pop the system picker (⌃⌘Space), then capture
+// the glyph it inserts into the terminal and send that as the reaction. This
+// gives the user the full system emoji set and matches the Graph setReaction
+// API, which wants the unicode glyph. Esc cancels.
 
 import { Box, Text, useApp, useInput } from 'ink'
+import { useEffect } from 'react'
 import { toggleReaction } from '../state/chatActions'
-import { reactionGlyph } from './reactions'
+import { openSystemEmojiPicker } from './emojiPicker'
+import { isEmojiGlyph } from './reactions'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
-
-// Order matches Teams' own picker and the 1-6 hotkeys below.
-const PICKER_REACTIONS = ['like', 'heart', 'laugh', 'surprised', 'sad', 'angry'] as const
 
 export function ReactionPickerModal() {
   const { exit } = useApp()
@@ -20,6 +21,11 @@ export function ReactionPickerModal() {
   const me = useAppState((s) => s.me)
   const theme = useTheme()
   const isOpen = modal?.kind === 'reaction-picker'
+
+  // Pop the system emoji picker once, when the overlay opens.
+  useEffect(() => {
+    if (isOpen) openSystemEmojiPicker()
+  }, [isOpen])
 
   useInput(
     (input, key) => {
@@ -32,13 +38,15 @@ export function ReactionPickerModal() {
         exit()
         return
       }
-      const idx = Number.parseInt(input, 10) - 1
-      if (Number.isInteger(idx) && idx >= 0 && idx < PICKER_REACTIONS.length) {
-        const type = PICKER_REACTIONS[idx]!
-        const { chatId, messageId } = modal
-        store.set({ modal: null, inputZone: 'list' })
-        if (me) void toggleReaction(store, chatId, messageId, type, me)
-      }
+      // The picker inserts the chosen emoji as terminal input. Ignore anything
+      // that isn't an emoji (a stray keypress) so we never react with junk.
+      if (!isEmojiGlyph(input)) return
+      const { chatId, messageId } = modal
+      store.set({ modal: null, inputZone: 'list' })
+      // toggleReaction logs + rolls back its optimistic update on failure;
+      // swallow the rejection so a Graph error never escapes as an unhandled
+      // rejection and tears down the TUI.
+      if (me) void toggleReaction(store, chatId, messageId, input.trim(), me).catch(() => {})
     },
     { isActive: isOpen },
   )
@@ -55,24 +63,8 @@ export function ReactionPickerModal() {
       paddingY={theme.layout.modalPaddingY}
     >
       <Text bold={theme.emphasis.modalTitleBold}>React</Text>
-      <Box marginTop={1} flexDirection="row">
-        {PICKER_REACTIONS.map((type, i) => {
-          const selected = modal.current === type
-          return (
-            <Box key={type} marginRight={2}>
-              <Text color={selected ? theme.selected : undefined} bold={selected}>
-                {`${i + 1} ${reactionGlyph(type)}`}
-              </Text>
-            </Box>
-          )
-        })}
-      </Box>
       <Box marginTop={1}>
-        <Text color={theme.mutedText}>
-          {modal.current
-            ? 'press the marked one to remove · esc cancels'
-            : '1-6 to react · esc cancels'}
-        </Text>
+        <Text color={theme.mutedText}>pick an emoji from the system picker · esc cancels</Text>
       </Box>
     </Box>
   )

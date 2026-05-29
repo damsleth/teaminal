@@ -60,6 +60,20 @@ describe('toggleReaction', () => {
     expect(convMsgs(store)[0]!.reactions?.[0]!.reactionType).toBe('like')
   })
 
+  it('sends the unicode glyph (not the short name) in the Graph payload', async () => {
+    // Graph rejects short names with `400 Unicode 'heart' ... not supported`;
+    // the payload must carry the emoji glyph. The internal store still tracks
+    // the short name.
+    let body: unknown
+    const store = setup(async (_url, init) => {
+      body = init.body ? JSON.parse(String(init.body)) : undefined
+      return ok()
+    })
+    await toggleReaction(store, 'c1', 'm1', 'heart', me)
+    expect(body).toEqual({ reactionType: '❤️' })
+    expect(convMsgs(store)[0]!.reactions?.[0]!.reactionType).toBe('heart')
+  })
+
   it('removes the reaction when the same type is already set (toggle)', async () => {
     let path = ''
     const store = setup(async (url) => {
@@ -68,7 +82,9 @@ describe('toggleReaction', () => {
     })
     store.set({
       messagesByConvo: {
-        'chat:c1': [{ ...convMsgs(store)[0]!, reactions: [{ reactionType: 'like', user: { user: me } }] }],
+        'chat:c1': [
+          { ...convMsgs(store)[0]!, reactions: [{ reactionType: 'like', user: { user: me } }] },
+        ],
       },
     })
     await toggleReaction(store, 'c1', 'm1', 'like', me)
