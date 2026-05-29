@@ -244,7 +244,10 @@ export function MenuModal() {
           {items.map((item, idx) => {
             const selected = idx === modal.cursor
             const marker = selected && !item.disabled ? '> ' : '  '
-            const color = item.disabled ? 'gray' : selected ? theme.selected : undefined
+            // Use theme.text (not the terminal default fg) so rows stay
+            // readable on the themed modal background even when the active
+            // terminal palette's default foreground doesn't match the theme.
+            const color = item.disabled ? 'gray' : selected ? theme.selected : theme.text
             const valueSuffix = formatValueSuffix(item, settings)
             const hint = item.hint ? `  (${item.hint})` : ''
             return (

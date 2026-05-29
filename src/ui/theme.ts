@@ -177,9 +177,16 @@ const DARK: Theme = {
   emphasis: EMPHASIS_DEFAULT,
 }
 
+// The light theme uses explicit hex values for its background and dark-text
+// tokens rather than the named ANSI colors 'white' / 'black'. Named ANSI
+// colors resolve through the terminal's 16-color palette, and many light
+// palettes (e.g. Ghostty's Kanso Pearl) map color-7 ("white") to a muted
+// gray rather than the light terminal background — which made the menu /
+// modal backgrounds render dark under the light theme. Hex is palette-
+// independent on truecolor terminals.
 const LIGHT: Theme = {
-  background: 'white',
-  text: 'black',
+  background: '#ffffff',
+  text: '#1c1c1c',
   mutedText: 'gray',
   border: 'gray',
   borderActive: 'blue',
@@ -188,12 +195,12 @@ const LIGHT: Theme = {
   unread: 'magenta',
   unreadRow: 'magenta',
   timestamp: 'gray',
-  sender: 'black',
+  sender: '#1c1c1c',
   selfMessage: 'blue',
   systemEvent: 'gray',
   errorText: 'red',
   warnText: 'yellow',
-  infoText: 'black',
+  infoText: '#1c1c1c',
   messageFocusIndicator: 'blue',
   messageFocusBackground: null,
   presence: PRESENCE_DARK,
