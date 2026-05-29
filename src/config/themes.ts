@@ -100,8 +100,9 @@ export function ensureThemesDir(env: Env = process.env): void {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
 }
 
-// Built-in names short-circuit — there is no on-disk file to load.
-const BUILTIN_NAMES = new Set(['dark', 'light', 'compact', 'comfortable'])
+// Built-in names short-circuit — there is no on-disk file to load. 'auto'
+// is a mode (resolves to dark/light at render time), not a file either.
+const BUILTIN_NAMES = new Set(['auto', 'dark', 'light'])
 
 export function loadThemeFile(name: string, env: Env = process.env): LoadedTheme {
   const path = getThemePath(name, env)

@@ -90,11 +90,10 @@ describe('nextSelectable', () => {
 })
 
 describe('cycleSetting', () => {
-  test('cycles theme through built-in presets', () => {
+  test('cycles theme through auto / dark / light', () => {
+    expect(cycleSetting('theme', 'auto')).toBe('dark')
     expect(cycleSetting('theme', 'dark')).toBe('light')
-    expect(cycleSetting('theme', 'light')).toBe('compact')
-    expect(cycleSetting('theme', 'compact')).toBe('comfortable')
-    expect(cycleSetting('theme', 'comfortable')).toBe('dark')
+    expect(cycleSetting('theme', 'light')).toBe('auto')
   })
 
   test('flips chat list density between cozy and compact', () => {
@@ -123,6 +122,11 @@ describe('cycleSetting', () => {
     expect(cycleSetting('showReactions', 'all')).toBe('off')
     expect(cycleSetting('showReactions', 'off')).toBe('current')
   })
+
+  test('flips inline images between auto and off', () => {
+    expect(cycleSetting('inlineImages', 'auto')).toBe('off')
+    expect(cycleSetting('inlineImages', 'off')).toBe('auto')
+  })
 })
 
 describe('renderSettingValue', () => {
@@ -141,6 +145,11 @@ describe('renderSettingValue', () => {
 
   test('renders focused-message marker char', () => {
     expect(renderSettingValue('messageFocusIndicatorChar', '|')).toBe('|')
+  })
+
+  test('renders inline images as inline / as links', () => {
+    expect(renderSettingValue('inlineImages', 'auto')).toBe('inline')
+    expect(renderSettingValue('inlineImages', 'off')).toBe('as links')
   })
 })
 
@@ -176,6 +185,7 @@ describe('ROOT_MENU shape', () => {
       'realtimeEnabled',
       'showTimestampsInPane',
       'showReactions',
+      'inlineImages',
       'notifyMuted',
       'notifyActiveBanner',
       'messageFocusIndicatorEnabled',

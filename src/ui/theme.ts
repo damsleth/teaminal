@@ -2,13 +2,14 @@
 // chalk, so config validation accepts common named colors plus hex strings.
 //
 // A Theme is a flat record of colors, plus three sub-objects that group
-// related layout/border/emphasis tokens. Built-in themes (`dark`, `light`,
-// `compact`, `comfortable`) live in this file; user themes live as JSON
-// files under ~/.config/teaminal/themes/<name>.json (loaded by
-// src/config/themes.ts) and are layered between the resolved built-in
-// base and Settings.themeOverrides.
+// related layout/border/emphasis tokens. Built-in themes (`dark`, `light`)
+// live in this file; `auto` is not a base theme but a mode that resolves to
+// `dark` or `light` from the OS appearance at render time. User themes live
+// as JSON files under ~/.config/teaminal/themes/<name>.json (loaded by
+// src/config/themes.ts) and are layered between the resolved built-in base
+// and Settings.themeOverrides.
 
-import type { Settings, ThemeOverrides, ThemePresenceKey } from '../state/store'
+import type { Settings, SystemAppearance, ThemeOverrides, ThemePresenceKey } from '../state/store'
 
 export type PresenceMap = Record<ThemePresenceKey, string>
 
@@ -114,26 +115,6 @@ const LAYOUT_DEFAULT: ThemeLayout = {
   chatListPaddingRight: 1,
 }
 
-const LAYOUT_COMPACT: ThemeLayout = {
-  panePaddingX: 0,
-  modalPaddingX: 2,
-  modalPaddingY: 0,
-  paneHeaderPaddingLeft: 0,
-  paneHeaderMarginBottom: 0,
-  tailGap: 1,
-  chatListPaddingRight: 1,
-}
-
-const LAYOUT_COMFORTABLE: ThemeLayout = {
-  panePaddingX: 2,
-  modalPaddingX: 4,
-  modalPaddingY: 2,
-  paneHeaderPaddingLeft: 2,
-  paneHeaderMarginBottom: 1,
-  tailGap: 2,
-  chatListPaddingRight: 2,
-}
-
 const BORDERS_DEFAULT: ThemeBorders = { panel: 'round', modal: 'round' }
 
 const EMPHASIS_DEFAULT: ThemeEmphasis = {
@@ -145,7 +126,9 @@ const EMPHASIS_DEFAULT: ThemeEmphasis = {
   inlineKeyBold: true,
 }
 
-export const BUILTIN_THEME_NAMES = ['dark', 'light', 'compact', 'comfortable'] as const
+// Concrete base themes only. `auto` is a mode (resolves to one of these from
+// the OS appearance) and is intentionally not listed here.
+export const BUILTIN_THEME_NAMES = ['dark', 'light'] as const
 export type BuiltinThemeName = (typeof BUILTIN_THEME_NAMES)[number]
 
 export function isBuiltinTheme(name: string): name is BuiltinThemeName {
@@ -177,9 +160,16 @@ const DARK: Theme = {
   emphasis: EMPHASIS_DEFAULT,
 }
 
+// The light theme uses explicit hex values for its background and dark-text
+// tokens rather than the named ANSI colors 'white' / 'black'. Named ANSI
+// colors resolve through the terminal's 16-color palette, and many light
+// palettes (e.g. Ghostty's Kanso Pearl) map color-7 ("white") to a muted
+// gray rather than the light terminal background — which made the menu /
+// modal backgrounds render dark under the light theme. Hex is palette-
+// independent on truecolor terminals.
 const LIGHT: Theme = {
-  background: 'white',
-  text: 'black',
+  background: '#ffffff',
+  text: '#1c1c1c',
   mutedText: 'gray',
   border: 'gray',
   borderActive: 'blue',
@@ -188,12 +178,12 @@ const LIGHT: Theme = {
   unread: 'magenta',
   unreadRow: 'magenta',
   timestamp: 'gray',
-  sender: 'black',
+  sender: '#1c1c1c',
   selfMessage: 'blue',
   systemEvent: 'gray',
   errorText: 'red',
   warnText: 'yellow',
-  infoText: 'black',
+  infoText: '#1c1c1c',
   messageFocusIndicator: 'blue',
   messageFocusBackground: null,
   presence: PRESENCE_DARK,
@@ -202,15 +192,9 @@ const LIGHT: Theme = {
   emphasis: EMPHASIS_DEFAULT,
 }
 
-// Compact / comfortable inherit colors from dark; only layout differs.
-const COMPACT: Theme = { ...DARK, layout: LAYOUT_COMPACT }
-const COMFORTABLE: Theme = { ...DARK, layout: LAYOUT_COMFORTABLE }
-
 export const builtinThemes: Record<BuiltinThemeName, Theme> = {
   dark: DARK,
   light: LIGHT,
-  compact: COMPACT,
-  comfortable: COMFORTABLE,
 }
 
 export function getTheme(mode: string): Theme {
@@ -245,8 +229,15 @@ export type PartialTheme = {
   emphasis?: Partial<ThemeEmphasis>
 }
 
-export function resolveTheme(settings: Settings, customTheme?: PartialTheme | null): Theme {
-  const baseName = isBuiltinTheme(settings.theme) ? settings.theme : 'dark'
+export function resolveTheme(
+  settings: Settings,
+  customTheme?: PartialTheme | null,
+  systemAppearance: SystemAppearance = 'dark',
+): Theme {
+  // 'auto' follows the OS appearance; everything else is a literal theme
+  // name (built-in or a user theme file, which falls back to 'dark').
+  const requested = settings.theme === 'auto' ? systemAppearance : settings.theme
+  const baseName = isBuiltinTheme(requested) ? requested : 'dark'
   const base = cloneTheme(builtinThemes[baseName])
   const withCustom = customTheme ? mergePartial(base, customTheme) : base
   const merged = applyOverrides(withCustom, settings.themeOverrides)
