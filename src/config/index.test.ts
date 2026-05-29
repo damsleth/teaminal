@@ -289,48 +289,63 @@ describe('Settings ↔ config.json parity', () => {
     }
   })
 
+  // A settings object where every key holds a deliberately non-default
+  // value, so that a writer/validator that silently drops a key shows up as
+  // a round-trip diff. Keep this exhaustive — the guard test below fails if
+  // any key is left at its default, which is what forces new keys to be
+  // wired through settingsToConfig + the validator (and tested here).
+  const MUTATED: Settings = {
+    ...defaultSettings,
+    theme: 'light',
+    themeOverrides: {
+      selected: 'cyan',
+      layout: { modalPaddingX: 3 },
+    },
+    accounts: ['profile-a', 'profile-b'],
+    activeAccount: 'profile-a',
+    chatListDensity: 'compact',
+    chatListShortNames: !defaultSettings.chatListShortNames,
+    showMessagePreviews: !defaultSettings.showMessagePreviews,
+    messagePaneShortNames: !defaultSettings.messagePaneShortNames,
+    showPresenceInList: !defaultSettings.showPresenceInList,
+    showTimestampsInPane: !defaultSettings.showTimestampsInPane,
+    showReactions: 'all',
+    messageFocusIndicatorEnabled: !defaultSettings.messageFocusIndicatorEnabled,
+    messageFocusIndicatorChar: '|',
+    messageFocusIndicatorColor: 'magenta',
+    messageFocusBackgroundColor: 'gray',
+    useTeamsPresence: !defaultSettings.useTeamsPresence,
+    forceAvailableWhenFocused: !defaultSettings.forceAvailableWhenFocused,
+    realtimeEnabled: !defaultSettings.realtimeEnabled,
+    notifyMuted: !defaultSettings.notifyMuted,
+    notifyActiveBanner: !defaultSettings.notifyActiveBanner,
+    quietHoursStart: '22:00',
+    quietHoursEnd: '07:00',
+    logFile: '/tmp/teaminal.log',
+    tailEvents: !defaultSettings.tailEvents,
+    tailNetwork: !defaultSettings.tailNetwork,
+    tailDiagnostics: !defaultSettings.tailDiagnostics,
+    selfMessagesOnRight: !defaultSettings.selfMessagesOnRight,
+    inlineImages: 'off',
+    inlineImageMaxRows: 7,
+    statusBarPosition: 'hidden',
+    chatRoutingByAccount: { 'profile-a': 'ic3-only', 'profile-b': 'graph+ic3' },
+  }
+
+  test('round-trip fixture assigns a non-default value to every key', () => {
+    // Forces MUTATED to stay exhaustive: a new Settings key left at its
+    // default here would not be exercised by the round-trip test, so a
+    // missing validator case for it could slip through unnoticed.
+    const unchanged = (Object.keys(defaultSettings) as Array<keyof Settings>).filter(
+      (key) => JSON.stringify(MUTATED[key]) === JSON.stringify(defaultSettings[key]),
+    )
+    expect(unchanged).toEqual([])
+  })
+
   test('every setting round-trips through config without loss', () => {
-    // Pick a non-default value for every scalar / enum so accidental
-    // stripping in either direction shows up as a diff.
-    const mutated: Settings = {
-      ...defaultSettings,
-      theme: 'comfortable',
-      themeOverrides: {
-        selected: 'cyan',
-        layout: { modalPaddingX: 3 },
-      },
-      accounts: ['profile-a', 'profile-b'],
-      activeAccount: 'profile-a',
-      chatListDensity: 'compact',
-      chatListShortNames: !defaultSettings.chatListShortNames,
-      messagePaneShortNames: !defaultSettings.messagePaneShortNames,
-      showPresenceInList: !defaultSettings.showPresenceInList,
-      showTimestampsInPane: !defaultSettings.showTimestampsInPane,
-      showReactions: 'all',
-      messageFocusIndicatorEnabled: !defaultSettings.messageFocusIndicatorEnabled,
-      messageFocusIndicatorChar: '|',
-      messageFocusIndicatorColor: 'magenta',
-      messageFocusBackgroundColor: 'gray',
-      useTeamsPresence: !defaultSettings.useTeamsPresence,
-      forceAvailableWhenFocused: !defaultSettings.forceAvailableWhenFocused,
-      realtimeEnabled: !defaultSettings.realtimeEnabled,
-      notifyMuted: !defaultSettings.notifyMuted,
-      notifyActiveBanner: !defaultSettings.notifyActiveBanner,
-      quietHoursStart: '22:00',
-      quietHoursEnd: '07:00',
-      logFile: '/tmp/teaminal.log',
-      tailEvents: !defaultSettings.tailEvents,
-      tailNetwork: !defaultSettings.tailNetwork,
-      tailDiagnostics: !defaultSettings.tailDiagnostics,
-      selfMessagesOnRight: !defaultSettings.selfMessagesOnRight,
-      inlineImages: 'off',
-      inlineImageMaxRows: 7,
-      statusBarPosition: 'hidden',
-      chatRoutingByAccount: { 'profile-a': 'ic3-only', 'profile-b': 'graph+ic3' },
-    }
-    const config = settingsToConfig(mutated)
+    const config = settingsToConfig(MUTATED)
     const roundtripped = configToSettings(config as Record<string, unknown>, [])
-    expect(roundtripped).toEqual(mutated)
+    expect(roundtripped).toEqual(MUTATED)
   })
 
   test('chatRoutingByAccount drops invalid modes with a warning', () => {

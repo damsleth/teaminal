@@ -10,6 +10,7 @@ import type { Capabilities } from '../graph/capabilities'
 import type { Me } from '../graph/me'
 import type { ActivityItem } from '../graph/teamsActivity'
 import type { Channel, Chat, ChatMessage, LastMessagePreview, Presence, Team } from '../types'
+import type { InlineImageRef } from '../text/inlineImages'
 
 export type Listener<S> = (state: S) => void
 
@@ -113,12 +114,16 @@ export type ModalState =
   // Tenant-wide server-side message search (Microsoft Search API). The
   // query / results / cursor live in the modal component's local state.
   | { kind: 'message-search-global' }
-  // Reaction picker for the focused chat message. `current` is the type the
-  // user has already set (so the picker can show it as toggled).
-  | { kind: 'reaction-picker'; chatId: string; messageId: string; current: string | null }
+  // Reaction picker for the focused chat message. Delegates to the macOS
+  // system emoji picker and captures the glyph it inserts (see
+  // ReactionPickerModal); toggleReaction resolves the existing reaction itself.
+  | { kind: 'reaction-picker'; chatId: string; messageId: string }
   // Confirm before soft-deleting the user's own chat message. `preview` is a
   // short excerpt of the message body for the prompt.
   | { kind: 'confirm-delete'; chatId: string; messageId: string; preview: string }
+  // Full-size view of a focused inline image. Carries the InlineImageRef so
+  // the modal can resolve the cached blob (or fetch it on open).
+  | { kind: 'image'; ref: InlineImageRef }
   | AccountManagerModalState
   | AuthExpiredModalState
 
@@ -161,11 +166,13 @@ export type AccountManagerModalState =
       error?: string
     }
 
-// Theme name. Built-in values are 'dark' | 'light' | 'compact' |
-// 'comfortable'; any other string is treated as a user theme file under
-// ~/.config/teaminal/themes/<name>.json. Kept as plain string here so
-// the config validator stays the single source of truth.
+// Theme name. Built-in values are 'auto' | 'dark' | 'light' ('auto'
+// follows the OS appearance); any other string is treated as a user theme
+// file under ~/.config/teaminal/themes/<name>.json. Kept as plain string
+// here so the config validator stays the single source of truth.
 export type ThemeMode = string
+// Resolved OS appearance the 'auto' theme follows.
+export type SystemAppearance = 'dark' | 'light'
 export type ChatListDensity = 'cozy' | 'compact'
 export type BorderStyleName =
   | 'single'
@@ -390,7 +397,7 @@ export function audienceFromRouting(mode: ChatRoutingMode): {
 }
 
 export const defaultSettings: Settings = {
-  theme: 'dark',
+  theme: 'auto',
   themeOverrides: {},
   accounts: [],
   activeAccount: null,
@@ -684,6 +691,11 @@ export type AppState = {
   // + channelsByTeam; the cursor is bounded against it at render time so
   // a stale value is not a bug, just a clamp.
   cursor: number
+  // Focus within the message under the pane cursor. 0 = the message body;
+  // > 0 indexes into that message's attachments (images then links), per
+  // src/ui/messageFocusables.ts. Reset to 0 whenever the message cursor or
+  // conversation changes.
+  focusedAttachmentIndex: number
   // Case-insensitive substring filter applied to the chat list. Empty
   // string means no filter.
   filter: string
@@ -737,6 +749,10 @@ export type AppState = {
   // is stored with the data so cycling away from a custom theme cannot
   // accidentally keep applying its tokens to built-in themes.
   customTheme: { name: string; data: Record<string, unknown> } | null
+  // Current OS appearance, detected by startSystemAppearanceDriver. Drives
+  // the 'auto' theme (settings.theme === 'auto' resolves to this). Not
+  // account-scoped — it's a machine-level fact preserved across switches.
+  systemAppearance: SystemAppearance
   // User-tunable display preferences. Persisted to disk via
   // src/config/index.ts (loadSettings/saveSettings/updateSettings).
   settings: Settings
@@ -768,6 +784,7 @@ export function initialAppState(): AppState {
     inputZone: 'list',
     messageCursorByConvo: {},
     cursor: 0,
+    focusedAttachmentIndex: 0,
     filter: '',
     messageSearchQuery: '',
     messageSearchFocusedId: null,
@@ -782,6 +799,7 @@ export function initialAppState(): AppState {
     modal: null,
     editingMessageId: null,
     customTheme: null,
+    systemAppearance: 'dark',
     settings: { ...defaultSettings },
     activityFeed: [],
     unreadMentionCount: 0,
@@ -809,5 +827,6 @@ export function resetAccountScopedState(store: Store<AppState>): void {
   fresh.settings = prev.settings
   fresh.terminalFocused = prev.terminalFocused
   fresh.focusReportingHealthy = prev.focusReportingHealthy
+  fresh.systemAppearance = prev.systemAppearance
   store.replace(fresh)
 }

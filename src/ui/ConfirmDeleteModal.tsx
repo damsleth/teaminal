@@ -29,7 +29,10 @@ export function ConfirmDeleteModal() {
       if (key.return || ch === 'y') {
         const { chatId, messageId } = modal
         store.set({ modal: null, inputZone: 'list' })
-        void deleteChatMessageById(store, chatId, messageId)
+        // deleteChatMessageById logs + rolls back on failure; swallow the
+        // rejection so a Graph error never escapes as an unhandled rejection
+        // and tears down the TUI.
+        void deleteChatMessageById(store, chatId, messageId).catch(() => {})
       }
     },
     { isActive: isOpen },
@@ -42,6 +45,7 @@ export function ConfirmDeleteModal() {
       flexDirection="column"
       borderStyle={theme.borders.modal}
       borderColor={theme.borderActive}
+      backgroundColor={theme.background}
       paddingX={theme.layout.modalPaddingX}
       paddingY={theme.layout.modalPaddingY}
     >

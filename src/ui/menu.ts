@@ -34,6 +34,7 @@ export type ToggleKey =
   | 'showPresenceInList'
   | 'showTimestampsInPane'
   | 'showReactions'
+  | 'inlineImages'
   | 'messageFocusIndicatorEnabled'
   | 'messageFocusIndicatorChar'
   | 'forceAvailableWhenFocused'
@@ -57,6 +58,7 @@ export type MenuAction =
   | { kind: 'show-diagnostics' }
   | { kind: 'show-events' }
   | { kind: 'show-network' }
+  | { kind: 'clear-cache' }
 
 // Preset windows for the quiet-hours menu entry. The first preset (both
 // null) is "off"; remaining presets cover the typical sleep windows.
@@ -158,6 +160,11 @@ export const ROOT_MENU: MenuItem[] = [
         action: { kind: 'toggle-setting', key: 'showReactions' },
       },
       {
+        id: 'inlineImages',
+        label: 'Show images',
+        action: { kind: 'toggle-setting', key: 'inlineImages' },
+      },
+      {
         id: 'notifyMuted',
         label: 'Mute notifications',
         action: { kind: 'toggle-setting', key: 'notifyMuted' },
@@ -201,6 +208,12 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'statusBarPosition',
         label: 'Status bar',
         action: { kind: 'toggle-setting', key: 'statusBarPosition' },
+      },
+      {
+        id: 'clearCache',
+        label: 'Empty cache (this profile)',
+        action: { kind: 'clear-cache' },
+        hint: 'messages, list, images',
       },
     ],
   },
@@ -290,7 +303,7 @@ function cycleReactionDisplayMode(current: Settings['showReactions']): Settings[
 export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]): Settings[K] {
   switch (key) {
     case 'theme': {
-      const order = ['dark', 'light', 'compact', 'comfortable']
+      const order = ['auto', 'dark', 'light']
       const idx = order.indexOf(current as string)
       const next = order[(idx === -1 ? -1 : idx) + 1] ?? order[0]!
       return next as Settings[K]
@@ -299,6 +312,8 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
       return (current === 'cozy' ? 'compact' : 'cozy') as Settings[K]
     case 'statusBarPosition':
       return (current === 'bottom' ? 'hidden' : 'bottom') as Settings[K]
+    case 'inlineImages':
+      return (current === 'auto' ? 'off' : 'auto') as Settings[K]
     case 'showReactions':
       return cycleReactionDisplayMode(current as Settings['showReactions']) as Settings[K]
     case 'chatListShortNames':
@@ -339,6 +354,10 @@ export async function updateSetting<K extends ToggleKey>(
 // suffix on toggle-setting menu rows.
 export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[K]): string {
   switch (key) {
+    case 'inlineImages':
+      // The stored 'auto'/'off' values read more clearly as how images
+      // appear in the pane: drawn inline, or as openable text placeholders.
+      return value === 'auto' ? 'inline' : 'as links'
     case 'theme':
     case 'chatListDensity':
     case 'showReactions':
