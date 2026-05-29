@@ -47,6 +47,7 @@ import { NetworkModal } from './NetworkModal'
 import { NewChatPrompt } from './NewChatPrompt'
 import { ReactionPickerModal } from './ReactionPickerModal'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
+import { MessageSearchModal } from './MessageSearchModal'
 import { TailPanels } from './TailPanels'
 import { findExistingOneOnOne } from './derive'
 import { useClampMessageCursor } from './hooks/useClampMessageCursor'
@@ -371,6 +372,7 @@ export function App() {
     | 'activity'
     | 'reaction-picker'
     | 'confirm-delete'
+    | 'message-search-global'
     | null = modal && modal.kind !== 'auth-expired' ? modal.kind : null
   const replaceModal = modal?.kind === 'auth-expired' ? modal : null
   const showTailPanels = shouldShowTailPanels(modal)
@@ -449,6 +451,8 @@ export function App() {
                     <ReactionPickerModal />
                   ) : overlayModalKind === 'confirm-delete' ? (
                     <ConfirmDeleteModal />
+                  ) : overlayModalKind === 'message-search-global' ? (
+                    <MessageSearchModal />
                   ) : (
                     <NetworkModal />
                   )}

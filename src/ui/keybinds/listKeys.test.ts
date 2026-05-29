@@ -105,6 +105,19 @@ describe('handleListKeys', () => {
     expect(a.refreshes).toBe(1)
   })
 
+  test('s opens server-side message search', () => {
+    const a = makeCtx()
+    expect(handleListKeys({ input: 's', key: makeKey() }, a.ctx)).toBe('handled')
+    expect(a.store.get().modal?.kind).toBe('message-search-global')
+    expect(a.store.get().inputZone).toBe('menu')
+  })
+
+  test('p opens the people directory (new-chat prompt with empty query)', () => {
+    const a = makeCtx()
+    expect(handleListKeys({ input: 'p', key: makeKey() }, a.ctx)).toBe('handled')
+    expect(a.newChats).toEqual([''])
+  })
+
   test('Shift+R calls hard refresh', () => {
     const a = makeCtx()
     handleListKeys({ input: 'R', key: makeKey() }, a.ctx)
