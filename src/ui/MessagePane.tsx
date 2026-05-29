@@ -32,6 +32,8 @@ import type { Theme } from './theme'
 import { useAppState, useTheme } from './StoreContext'
 import {
   isKittyCapable,
+  isKittyRenderable,
+  detectImageFormat,
   buildKittyAPC,
   clearKittyImages,
   fitKittyPlacement,
@@ -685,7 +687,7 @@ function ImageRows(props: {
         <Box width={props.senderColWidth + 1} flexShrink={0} />
         <Box flexGrow={1} flexShrink={1} minWidth={0}>
           <Text color={props.theme.mutedText} wrap="truncate-end">
-            {`[img] ${props.label}`}
+            {inlineImagePlaceholder(props.cacheKey, props.label)}
           </Text>
         </Box>
       </Box>
@@ -733,7 +735,21 @@ function inlineImageReservedRows(
 ): number | null {
   const data = getImageData(cacheKey)
   if (!data) return null
+  // Only PNG can actually be painted by the Kitty layer. Returning null for
+  // anything else makes the row render its labeled placeholder instead of
+  // reserving blank space the picture will never fill.
+  if (!isKittyRenderable(data)) return null
   return fitKittyPlacement(data, imgCols, maxRows).reservedRows
+}
+
+// Placeholder text for an image we can't paint: still loading, or a format
+// (JPEG/GIF/WebP) Kitty terminals can't decode. Noting the format makes
+// "why isn't my image showing" answerable at a glance.
+function inlineImagePlaceholder(cacheKey: string, name: string): string {
+  const data = getImageData(cacheKey)
+  const fmt = data ? detectImageFormat(data) : null
+  if (fmt && fmt !== 'png') return `[img] ${name} (${fmt})`
+  return `[img] ${name}`
 }
 
 function previewBody(m: ChatMessage): string {
