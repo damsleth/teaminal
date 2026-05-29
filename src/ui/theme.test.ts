@@ -60,11 +60,19 @@ describe('resolveTheme', () => {
     expect(theme.messageFocusBackground).toBeNull()
   })
 
-  test('compact and comfortable presets differ in layout but inherit dark colors', () => {
-    expect(builtinThemes.compact.layout.modalPaddingX).toBe(2)
-    expect(builtinThemes.comfortable.layout.modalPaddingX).toBe(4)
-    expect(builtinThemes.compact.background).toBe(builtinThemes.dark.background)
-    expect(builtinThemes.comfortable.borders.panel).toBe('round')
+  test('auto theme resolves to the dark base under a dark system appearance', () => {
+    const theme = resolveTheme({ ...defaultSettings, theme: 'auto' }, null, 'dark')
+    expect(theme.background).toBe(builtinThemes.dark.background)
+  })
+
+  test('auto theme resolves to the light base under a light system appearance', () => {
+    const theme = resolveTheme({ ...defaultSettings, theme: 'auto' }, null, 'light')
+    expect(theme.background).toBe(builtinThemes.light.background)
+  })
+
+  test('explicit theme ignores system appearance', () => {
+    const theme = resolveTheme({ ...defaultSettings, theme: 'dark' }, null, 'light')
+    expect(theme.background).toBe(builtinThemes.dark.background)
   })
 
   test('layered partial theme is applied between built-in base and overrides', () => {

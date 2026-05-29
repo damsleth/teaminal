@@ -6,6 +6,7 @@ import { loadSettings } from '../src/config'
 import { loadThemeFile } from '../src/config/themes'
 import { runSession, type SessionHandle } from '../src/state/bootstrap'
 import { startForceAvailabilityDriver } from '../src/state/forceAvailability'
+import { startSystemAppearanceDriver } from '../src/state/systemAppearance'
 import { createAppStore, messagesFromCaches, resetAccountScopedState } from '../src/state/store'
 import {
   flushMessageCache,
@@ -194,6 +195,10 @@ function hydrateListCache(profile: string | null): void {
 hydrateCache(activeProfile)
 hydrateListCache(activeProfile)
 
+// Detect the OS appearance before the first render so the 'auto' theme
+// paints the right base immediately, then keep it updated on an interval.
+const systemAppearance = startSystemAppearanceDriver(store)
+
 // Persist message cache on every relevant store change. Debounced inside
 // scheduleMessageCacheSave so chat-spam doesn't thrash the disk. The
 // path is tied to the *current* active profile and rebuilt on switch.
@@ -355,6 +360,9 @@ function showAuthExpiredModal(profile: string | null, message: string): void {
     } catch {}
     try {
       forceAvailability.stop()
+    } catch {}
+    try {
+      systemAppearance.stop()
     } catch {}
     try {
       focusTracker.stop()

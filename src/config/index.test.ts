@@ -296,7 +296,7 @@ describe('Settings ↔ config.json parity', () => {
   // wired through settingsToConfig + the validator (and tested here).
   const MUTATED: Settings = {
     ...defaultSettings,
-    theme: 'comfortable',
+    theme: 'light',
     themeOverrides: {
       selected: 'cyan',
       layout: { modalPaddingX: 3 },

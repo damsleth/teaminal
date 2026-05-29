@@ -165,11 +165,13 @@ export type AccountManagerModalState =
       error?: string
     }
 
-// Theme name. Built-in values are 'dark' | 'light' | 'compact' |
-// 'comfortable'; any other string is treated as a user theme file under
-// ~/.config/teaminal/themes/<name>.json. Kept as plain string here so
-// the config validator stays the single source of truth.
+// Theme name. Built-in values are 'auto' | 'dark' | 'light' ('auto'
+// follows the OS appearance); any other string is treated as a user theme
+// file under ~/.config/teaminal/themes/<name>.json. Kept as plain string
+// here so the config validator stays the single source of truth.
 export type ThemeMode = string
+// Resolved OS appearance the 'auto' theme follows.
+export type SystemAppearance = 'dark' | 'light'
 export type ChatListDensity = 'cozy' | 'compact'
 export type BorderStyleName =
   | 'single'
@@ -394,7 +396,7 @@ export function audienceFromRouting(mode: ChatRoutingMode): {
 }
 
 export const defaultSettings: Settings = {
-  theme: 'dark',
+  theme: 'auto',
   themeOverrides: {},
   accounts: [],
   activeAccount: null,
@@ -746,6 +748,10 @@ export type AppState = {
   // is stored with the data so cycling away from a custom theme cannot
   // accidentally keep applying its tokens to built-in themes.
   customTheme: { name: string; data: Record<string, unknown> } | null
+  // Current OS appearance, detected by startSystemAppearanceDriver. Drives
+  // the 'auto' theme (settings.theme === 'auto' resolves to this). Not
+  // account-scoped — it's a machine-level fact preserved across switches.
+  systemAppearance: SystemAppearance
   // User-tunable display preferences. Persisted to disk via
   // src/config/index.ts (loadSettings/saveSettings/updateSettings).
   settings: Settings
@@ -792,6 +798,7 @@ export function initialAppState(): AppState {
     modal: null,
     editingMessageId: null,
     customTheme: null,
+    systemAppearance: 'dark',
     settings: { ...defaultSettings },
     activityFeed: [],
     unreadMentionCount: 0,
@@ -819,5 +826,6 @@ export function resetAccountScopedState(store: Store<AppState>): void {
   fresh.settings = prev.settings
   fresh.terminalFocused = prev.terminalFocused
   fresh.focusReportingHealthy = prev.focusReportingHealthy
+  fresh.systemAppearance = prev.systemAppearance
   store.replace(fresh)
 }
