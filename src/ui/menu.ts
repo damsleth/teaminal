@@ -34,6 +34,7 @@ export type ToggleKey =
   | 'showPresenceInList'
   | 'showTimestampsInPane'
   | 'showReactions'
+  | 'inlineImages'
   | 'messageFocusIndicatorEnabled'
   | 'messageFocusIndicatorChar'
   | 'forceAvailableWhenFocused'
@@ -157,6 +158,11 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'showReactions',
         label: 'Show reactions',
         action: { kind: 'toggle-setting', key: 'showReactions' },
+      },
+      {
+        id: 'inlineImages',
+        label: 'Show images',
+        action: { kind: 'toggle-setting', key: 'inlineImages' },
       },
       {
         id: 'notifyMuted',
@@ -306,6 +312,8 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
       return (current === 'cozy' ? 'compact' : 'cozy') as Settings[K]
     case 'statusBarPosition':
       return (current === 'bottom' ? 'hidden' : 'bottom') as Settings[K]
+    case 'inlineImages':
+      return (current === 'auto' ? 'off' : 'auto') as Settings[K]
     case 'showReactions':
       return cycleReactionDisplayMode(current as Settings['showReactions']) as Settings[K]
     case 'chatListShortNames':
@@ -346,6 +354,10 @@ export async function updateSetting<K extends ToggleKey>(
 // suffix on toggle-setting menu rows.
 export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[K]): string {
   switch (key) {
+    case 'inlineImages':
+      // The stored 'auto'/'off' values read more clearly as how images
+      // appear in the pane: drawn inline, or as openable text placeholders.
+      return value === 'auto' ? 'inline' : 'as links'
     case 'theme':
     case 'chatListDensity':
     case 'showReactions':
