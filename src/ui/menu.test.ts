@@ -123,6 +123,11 @@ describe('cycleSetting', () => {
     expect(cycleSetting('showReactions', 'all')).toBe('off')
     expect(cycleSetting('showReactions', 'off')).toBe('current')
   })
+
+  test('flips inline images between auto and off', () => {
+    expect(cycleSetting('inlineImages', 'auto')).toBe('off')
+    expect(cycleSetting('inlineImages', 'off')).toBe('auto')
+  })
 })
 
 describe('renderSettingValue', () => {
@@ -141,6 +146,11 @@ describe('renderSettingValue', () => {
 
   test('renders focused-message marker char', () => {
     expect(renderSettingValue('messageFocusIndicatorChar', '|')).toBe('|')
+  })
+
+  test('renders inline images as inline / as links', () => {
+    expect(renderSettingValue('inlineImages', 'auto')).toBe('inline')
+    expect(renderSettingValue('inlineImages', 'off')).toBe('as links')
   })
 })
 
@@ -176,6 +186,7 @@ describe('ROOT_MENU shape', () => {
       'realtimeEnabled',
       'showTimestampsInPane',
       'showReactions',
+      'inlineImages',
       'notifyMuted',
       'notifyActiveBanner',
       'messageFocusIndicatorEnabled',
