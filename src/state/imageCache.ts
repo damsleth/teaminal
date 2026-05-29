@@ -6,7 +6,7 @@
 // other credentials. Blobs are rejected above MAX_IMAGE_BYTES to bound disk use.
 
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { getAudiencePreference, graphBinary, GraphError } from '../graph/client'
@@ -34,6 +34,27 @@ function getCacheDir(profile?: string): string {
   const xdg = process.env.XDG_CACHE_HOME
   const base = xdg && xdg.length > 0 ? xdg : join(homedir(), '.cache')
   return join(base, 'teaminal', safeProfileSegment(profile), 'images')
+}
+
+/** Absolute path to a profile's on-disk image cache directory. */
+export function getImageCacheDir(profile?: string | null): string {
+  return getCacheDir(profile ?? undefined)
+}
+
+// Remove a profile's on-disk image blobs and drop the in-memory fetch
+// status / blob maps so the next render re-fetches from the network.
+// Best-effort: a missing directory is a no-op. Returns the directory it
+// targeted so callers can log it.
+export function clearImageCache(profile?: string | null): string {
+  const dir = getCacheDir(profile ?? undefined)
+  try {
+    rmSync(dir, { recursive: true, force: true })
+  } catch {
+    // best-effort
+  }
+  fetchStatus.clear()
+  imageDataCache.clear()
+  return dir
 }
 
 function safeProfileSegment(profile?: string): string {
