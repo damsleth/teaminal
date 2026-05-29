@@ -57,6 +57,7 @@ export type MenuAction =
   | { kind: 'show-diagnostics' }
   | { kind: 'show-events' }
   | { kind: 'show-network' }
+  | { kind: 'clear-cache' }
 
 // Preset windows for the quiet-hours menu entry. The first preset (both
 // null) is "off"; remaining presets cover the typical sleep windows.
@@ -201,6 +202,12 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'statusBarPosition',
         label: 'Status bar',
         action: { kind: 'toggle-setting', key: 'statusBarPosition' },
+      },
+      {
+        id: 'clearCache',
+        label: 'Empty cache (this profile)',
+        action: { kind: 'clear-cache' },
+        hint: 'messages, list, images',
       },
     ],
   },

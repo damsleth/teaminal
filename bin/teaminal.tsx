@@ -13,6 +13,12 @@ import {
   loadMessageCache,
   scheduleMessageCacheSave,
 } from '../src/state/messageCachePersistence'
+import {
+  flushListCache,
+  getListCachePath,
+  loadListCache,
+  scheduleListCacheSave,
+} from '../src/state/listCachePersistence'
 import { App } from '../src/ui/App'
 import { ErrorBoundary } from '../src/ui/ErrorBoundary'
 import { startFocusTracker } from '../src/ui/focusTracker'
@@ -164,7 +170,29 @@ function hydrateCache(profile: string | null): void {
     )
   }
 }
+
+// Hydrate the per-profile chat/teams list cache so the sidebar is
+// populated before the first list-poll completes. The poller overwrites
+// it on its first successful refresh; failure is silent.
+function hydrateListCache(profile: string | null): void {
+  try {
+    const persisted = loadListCache(getListCachePath(process.env, profile))
+    if (persisted) {
+      store.set({
+        chats: persisted.chats,
+        teams: persisted.teams,
+        channelsByTeam: persisted.channelsByTeam,
+      })
+      debug(
+        `bootstrap: hydrated ${persisted.chats.length} chats / ${persisted.teams.length} teams from list cache`,
+      )
+    }
+  } catch (err) {
+    warn('bootstrap: hydrate list cache failed:', err instanceof Error ? err.message : String(err))
+  }
+}
 hydrateCache(activeProfile)
+hydrateListCache(activeProfile)
 
 // Persist message cache on every relevant store change. Debounced inside
 // scheduleMessageCacheSave so chat-spam doesn't thrash the disk. The
@@ -175,6 +203,26 @@ const cacheSubscription = store.subscribe((s) => {
   if (s.messageCacheByConvo === lastSavedCaches) return
   lastSavedCaches = s.messageCacheByConvo
   scheduleMessageCacheSave(s.messageCacheByConvo, undefined, activeCachePath)
+})
+
+// Persist the chat/teams list whenever the poller refreshes it. Debounced
+// inside scheduleListCacheSave; path tracks the active profile.
+let lastSavedChats = store.get().chats
+let lastSavedTeams = store.get().teams
+let activeListCachePath = getListCachePath(process.env, activeProfile)
+const listCacheSubscription = store.subscribe((s) => {
+  if (s.chats === lastSavedChats && s.teams === lastSavedTeams) return
+  lastSavedChats = s.chats
+  lastSavedTeams = s.teams
+  // Don't persist a wiped list — resetAccountScopedState clears chats/teams
+  // on account switch, and that empty state must not clobber either
+  // profile's cached sidebar.
+  if (s.chats.length === 0 && s.teams.length === 0) return
+  scheduleListCacheSave(
+    { chats: s.chats, teams: s.teams, channelsByTeam: s.channelsByTeam },
+    undefined,
+    activeListCachePath,
+  )
 })
 
 // PollerHandleRef and current session handle are mutated by the
@@ -220,14 +268,19 @@ async function switchAccount(nextProfile: string | null): Promise<void> {
     }
     currentSession = null
   }
-  // Flush the previous profile's cache before swapping the path.
+  // Flush the previous profile's caches before swapping the paths.
   try {
     flushMessageCache()
+  } catch {}
+  try {
+    flushListCache()
   } catch {}
   resetAccountScopedState(store)
   activeProfile = nextProfile
   activeCachePath = getMessageCachePath(process.env, activeProfile)
+  activeListCachePath = getListCachePath(process.env, activeProfile)
   hydrateCache(activeProfile)
+  hydrateListCache(activeProfile)
 
   try {
     currentSession = await runSession({
@@ -295,6 +348,9 @@ function showAuthExpiredModal(profile: string | null, message: string): void {
       cacheSubscription()
     } catch {}
     try {
+      listCacheSubscription()
+    } catch {}
+    try {
       if (currentSession) await currentSession.stop()
     } catch {}
     try {
@@ -305,6 +361,9 @@ function showAuthExpiredModal(profile: string | null, message: string): void {
     } catch {}
     try {
       flushMessageCache()
+    } catch {}
+    try {
+      flushListCache()
     } catch {}
   }
 })()
