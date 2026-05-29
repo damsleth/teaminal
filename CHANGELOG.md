@@ -6,6 +6,27 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-05-29
+
+### Added
+
+- **React to, edit, and delete your own chat messages.** With a message focused, `r` opens the macOS system emoji picker (Character Viewer) anchored next to the message and reacts with whatever glyph you pick; `e` edits your own message (the composer is pre-seeded and the save shows "(edited)"); `x` deletes it after a `y`/`n` confirm, leaving a tombstone. All three update optimistically and roll back if Graph rejects the change. 1:1 and group chats only — channel write paths are a follow-up.
+- **Server-side message search and a people-directory key.** `s` opens a tenant-wide message search (Microsoft Search API): type to query, `↑`/`↓` through hits (sender · time · snippet), `Enter` jumps to the hit's chat. `p` opens directory search to find people and start a 1:1, reusing the new-chat picker.
+- **Focusable message attachments.** `j`/`k` now step through a focused message's images and links before rolling over to the next message. `Space` opens a focused image in a full-size modal, or a focused link in the system browser; ATP Safe-Links are unwrapped to the real target first. The status bar shows what's focused and that `Space` opens it.
+- **Auto theme that follows the OS appearance.** A new `auto` theme — now the default — resolves to the dark or light base from the system appearance (`AppleInterfaceStyle` on macOS; dark elsewhere) and re-themes the running app when you flip the OS between light and dark.
+- **Per-profile chat-list cache.** The sidebar (chats / teams / channels) now persists per profile and hydrates from disk on startup, removing the empty-list delay before the first poll. A new "Empty cache (this profile)" Settings action clears the active profile's message, list, and image caches without touching other accounts.
+- **"Show images" in the Settings menu.** Toggles inline image rendering between "inline" (Kitty graphics) and "as links" (focusable `[img]` placeholders that open on `Space`) — the latter a performance win for image-heavy chats.
+
+### Changed
+
+- **`auto` replaces `dark` as the default theme**, and the theme cycle is now `auto` → `dark` → `light`. The `compact` and `comfortable` built-in themes are removed: they only varied padding, not color, and chat-list density is already its own setting. Configs naming them fall back to the dark base.
+
+### Fixed
+
+- **Reacting no longer crashes the app.** Graph's `setReaction`/`unsetReaction` reject the documented short names (`heart`/`like`) and want the unicode glyph, and the rejected request escaped as an unhandled promise rejection that tore down the TUI — leaving the terminal in raw mode with keystrokes leaking to the shell. Reactions now send the glyph, failed reaction/delete calls are contained, and a process-level guard keeps a stray rejection from ever dropping raw mode again.
+- **The light theme renders modal overlays with the correct background** instead of a dark box, by giving every modal a theme hex background.
+- **Inline images only use the Kitty graphics protocol for PNG.** Teams serves photos as JPEG and picker GIFs as GIF; those were sent down the PNG-only transmit path, silently dropped by the terminal, and left as blank reserved rows. Non-PNG formats now render a labeled placeholder (`[img] name (jpeg)`) instead of empty space.
+
 ## [0.16.0] - 2026-05-29
 
 ### Added
@@ -894,7 +915,10 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.14.2...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/damsleth/teaminal/compare/v0.16.0...v0.17.0
+[0.16.0]: https://github.com/damsleth/teaminal/compare/v0.15.0...v0.16.0
+[0.15.0]: https://github.com/damsleth/teaminal/compare/v0.14.2...v0.15.0
 [0.14.2]: https://github.com/damsleth/teaminal/compare/v0.14.1...v0.14.2
 [0.14.1]: https://github.com/damsleth/teaminal/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/damsleth/teaminal/compare/v0.13.0...v0.14.0
