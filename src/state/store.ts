@@ -110,6 +110,9 @@ export type ModalState =
   | { kind: 'events' }
   | { kind: 'network' }
   | { kind: 'activity'; cursor: number }
+  // Tenant-wide server-side message search (Microsoft Search API). The
+  // query / results / cursor live in the modal component's local state.
+  | { kind: 'message-search-global' }
   // Reaction picker for the focused chat message. `current` is the type the
   // user has already set (so the picker can show it as toggled).
   | { kind: 'reaction-picker'; chatId: string; messageId: string; current: string | null }

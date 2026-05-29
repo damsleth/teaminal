@@ -193,6 +193,18 @@ export type ChatMessage = {
   _sendError?: string
 }
 
+// One result from a server-side (Graph /search/query) message search.
+// chatId is null for channel-message hits (jumping to those needs a
+// team/channel mapping we don't carry here) and for any hit whose
+// container shape we couldn't resolve.
+export type ChatMessageSearchHit = {
+  messageId: string
+  chatId: string | null
+  snippet: string
+  createdDateTime: string
+  senderDisplayName: string | null
+}
+
 export type ScoredEmailAddress = {
   address?: string | null
   relevanceScore?: number | null

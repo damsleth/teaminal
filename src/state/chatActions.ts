@@ -20,6 +20,10 @@ import {
   softDeleteMessage as softDeleteMessageGraph,
   unsetReaction as unsetReactionGraph,
 } from '../graph/chats'
+import {
+  searchMessages as searchMessagesGraph,
+  type SearchMessagesOpts,
+} from '../graph/messageSearch'
 import { searchExternalUsers as searchExternalUsersGraph } from '../graph/teamsExternalSearch'
 import { resolveFederatedEquivalentConversationId } from '../graph/teamsFederation'
 import {
@@ -27,7 +31,7 @@ import {
   sendChannelMessage as sendChannelMessageGraph,
 } from '../graph/teams'
 import { recordEvent } from '../log'
-import type { Chat, ChatMessage, DirectoryUser, IdentityUser } from '../types'
+import type { Chat, ChatMessage, ChatMessageSearchHit, DirectoryUser, IdentityUser } from '../types'
 import {
   applyDelete,
   applyEdit,
@@ -240,4 +244,12 @@ export async function searchExternalUsers(
   opts?: { top?: number; signal?: AbortSignal },
 ): Promise<DirectoryUser[]> {
   return searchExternalUsersGraph(query, opts)
+}
+
+/** Tenant-wide server-side message search (Microsoft Search API). */
+export async function searchAllMessages(
+  query: string,
+  opts?: SearchMessagesOpts,
+): Promise<ChatMessageSearchHit[]> {
+  return searchMessagesGraph(query, opts)
 }
