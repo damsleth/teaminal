@@ -464,12 +464,6 @@ export function App() {
                   flexDirection="column"
                   alignItems="center"
                   justifyContent="center"
-                  // Paint the backdrop with the theme background so the modal
-                  // sits on a solid surface rather than letting the message
-                  // pane bleed through. Without this the surround stays the
-                  // terminal default (dark), which reads as a dark menu
-                  // background under a light theme.
-                  backgroundColor={theme.background}
                 >
                   {overlayModalKind === 'menu' ? (
                     <MenuModal />
