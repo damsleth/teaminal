@@ -90,11 +90,10 @@ describe('nextSelectable', () => {
 })
 
 describe('cycleSetting', () => {
-  test('cycles theme through built-in presets', () => {
+  test('cycles theme through auto / dark / light', () => {
+    expect(cycleSetting('theme', 'auto')).toBe('dark')
     expect(cycleSetting('theme', 'dark')).toBe('light')
-    expect(cycleSetting('theme', 'light')).toBe('compact')
-    expect(cycleSetting('theme', 'compact')).toBe('comfortable')
-    expect(cycleSetting('theme', 'comfortable')).toBe('dark')
+    expect(cycleSetting('theme', 'light')).toBe('auto')
   })
 
   test('flips chat list density between cozy and compact', () => {

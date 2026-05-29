@@ -36,7 +36,12 @@ export function useAppState<T>(selector: (s: AppState) => T): T {
 export function useTheme(): Theme {
   const settings = useAppState((s) => s.settings)
   const customTheme = useAppState((s) => s.customTheme)
-  return resolveTheme(settings, activeCustomThemeData(settings.theme, customTheme))
+  const systemAppearance = useAppState((s) => s.systemAppearance)
+  return resolveTheme(
+    settings,
+    activeCustomThemeData(settings.theme, customTheme),
+    systemAppearance,
+  )
 }
 
 export function activeCustomThemeData(

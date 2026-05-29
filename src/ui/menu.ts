@@ -303,7 +303,7 @@ function cycleReactionDisplayMode(current: Settings['showReactions']): Settings[
 export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]): Settings[K] {
   switch (key) {
     case 'theme': {
-      const order = ['dark', 'light', 'compact', 'comfortable']
+      const order = ['auto', 'dark', 'light']
       const idx = order.indexOf(current as string)
       const next = order[(idx === -1 ? -1 : idx) + 1] ?? order[0]!
       return next as Settings[K]
