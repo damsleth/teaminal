@@ -3,6 +3,7 @@ import type { Key } from 'ink'
 import { handleChatKeys, type ChatKeysCtx } from './chatKeys'
 import { createAppStore } from '../../state/store'
 import type { Focus } from '../../state/store'
+import type { ChatMessage } from '../../types'
 
 function makeKey(overrides: Partial<Key> = {}): Key {
   return {
@@ -209,6 +210,72 @@ describe('handleChatKeys', () => {
       teamId: 't1',
       channelId: 'ch1',
     })
+  })
+
+  const ownMsg = (over: Record<string, unknown> = {}) =>
+    ({
+      id: 'm1',
+      createdDateTime: '2026-05-29T10:00:00Z',
+      body: { contentType: 'text', content: 'hi there' },
+      from: { user: { id: 'me-1', displayName: 'Me' } },
+      ...over,
+    }) as unknown as ChatMessage
+
+  test('r opens the reaction picker for the focused chat message', () => {
+    const { ctx, store } = makeCtx(CHAT_FOCUS, { focusedMessage: ownMsg(), myUserId: 'me-1' })
+    expect(handleChatKeys({ input: 'r', key: makeKey() }, ctx)).toBe('handled')
+    expect(store.get().modal).toEqual({
+      kind: 'reaction-picker',
+      chatId: 'c1',
+      messageId: 'm1',
+      current: null,
+    })
+    expect(store.get().inputZone).toBe('menu')
+  })
+
+  test('r reflects the user\'s existing reaction as current', () => {
+    const msg = ownMsg({ reactions: [{ reactionType: 'heart', user: { user: { id: 'me-1' } } }] })
+    const { ctx, store } = makeCtx(CHAT_FOCUS, { focusedMessage: msg, myUserId: 'me-1' })
+    handleChatKeys({ input: 'r', key: makeKey() }, ctx)
+    expect((store.get().modal as { current?: string }).current).toBe('heart')
+  })
+
+  test('e starts editing the user\'s own message', () => {
+    const { ctx, store } = makeCtx(CHAT_FOCUS, { focusedMessage: ownMsg(), myUserId: 'me-1' })
+    expect(handleChatKeys({ input: 'e', key: makeKey() }, ctx)).toBe('handled')
+    expect(store.get().editingMessageId).toBe('m1')
+    expect(store.get().inputZone).toBe('composer')
+  })
+
+  test('e passes through on someone else\'s message', () => {
+    const msg = ownMsg({ from: { user: { id: 'them-1' } } })
+    const { ctx, store } = makeCtx(CHAT_FOCUS, { focusedMessage: msg, myUserId: 'me-1' })
+    expect(handleChatKeys({ input: 'e', key: makeKey() }, ctx)).toBe('pass')
+    expect(store.get().editingMessageId).toBeNull()
+  })
+
+  test('x opens the delete confirmation for an own message', () => {
+    const { ctx, store } = makeCtx(CHAT_FOCUS, { focusedMessage: ownMsg(), myUserId: 'me-1' })
+    expect(handleChatKeys({ input: 'x', key: makeKey() }, ctx)).toBe('handled')
+    const modal = store.get().modal as { kind: string; messageId: string; preview: string }
+    expect(modal.kind).toBe('confirm-delete')
+    expect(modal.messageId).toBe('m1')
+    expect(modal.preview).toBe('hi there')
+  })
+
+  test('x passes through on someone else\'s message', () => {
+    const msg = ownMsg({ from: { user: { id: 'them-1' } } })
+    const { ctx } = makeCtx(CHAT_FOCUS, { focusedMessage: msg, myUserId: 'me-1' })
+    expect(handleChatKeys({ input: 'x', key: makeKey() }, ctx)).toBe('pass')
+  })
+
+  test('write keys pass through in channel focus', () => {
+    const { ctx } = makeCtx(
+      { kind: 'channel', teamId: 't1', channelId: 'ch1' },
+      { focusedMessage: ownMsg(), myUserId: 'me-1' },
+    )
+    expect(handleChatKeys({ input: 'r', key: makeKey() }, ctx)).toBe('pass')
+    expect(handleChatKeys({ input: 'x', key: makeKey() }, ctx)).toBe('pass')
   })
 
   test('Esc in thread opens the menu (does not return to parent channel)', () => {

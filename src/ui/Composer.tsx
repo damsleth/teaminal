@@ -37,7 +37,12 @@
 
 import { Box, Text, useInput, useStdin, useStdout } from 'ink'
 import { useEffect, useRef, useState } from 'react'
-import { postChannelReply, sendChannelMessage, sendChatMessage } from '../state/chatActions'
+import {
+  editChatMessageContent,
+  postChannelReply,
+  sendChannelMessage,
+  sendChatMessage,
+} from '../state/chatActions'
 import { focusKey } from '../state/store'
 import type { ChatMessage } from '../types'
 import {
@@ -91,6 +96,7 @@ export function Composer() {
   const inputZone = useAppState((s) => s.inputZone)
   const drafts = useAppState((s) => s.draftsByConvo)
   const messagesByConvo = useAppState((s) => s.messagesByConvo)
+  const editingMessageId = useAppState((s) => s.editingMessageId)
   const theme = useTheme()
   const [buf, setBuf] = useState<ComposerBuffer>(emptyBuffer)
   const [sending, setSending] = useState(false)
@@ -104,14 +110,34 @@ export function Composer() {
     (focus.kind === 'chat' || focus.kind === 'channel' || focus.kind === 'thread')
 
   // Re-seed the buffer from the per-conversation draft when focus changes.
-  // Tracked by `conv` (a string), so equality comparison is cheap.
+  // Tracked by `conv` (a string), so equality comparison is cheap. Switching
+  // conversations also cancels any in-progress edit.
   const lastConvRef = useRef<string | null>(conv)
   useEffect(() => {
     if (conv === lastConvRef.current) return
     lastConvRef.current = conv
+    if (store.get().editingMessageId) store.set({ editingMessageId: null })
     const draft = conv ? (drafts[conv] ?? '') : ''
     setBuf({ text: draft, cursor: draft.length })
-  }, [conv, drafts])
+  }, [conv, drafts, store])
+
+  // Seed the buffer with the target message's body when an edit begins, so
+  // the user tweaks the existing text rather than retyping it. Reads
+  // messages from the store (not a dep) so a background poll mid-edit can't
+  // re-seed over the user's changes.
+  const lastEditingRef = useRef<string | null>(editingMessageId)
+  useEffect(() => {
+    if (editingMessageId === lastEditingRef.current) return
+    lastEditingRef.current = editingMessageId
+    if (!editingMessageId || focus.kind !== 'chat') return
+    const editConv = `chat:${focus.chatId}`
+    const msg = (store.get().messagesByConvo[editConv] ?? []).find((m) => m.id === editingMessageId)
+    if (!msg) return
+    const raw = msg.body?.content ?? ''
+    const text =
+      msg.body?.contentType === 'text' ? raw.replace(/\s+/g, ' ').trim() : htmlToText(raw).trim()
+    setBuf({ text, cursor: text.length })
+  }, [editingMessageId, focus, store])
 
   // Toggle bracketed paste mode while the composer has focus.
   useEffect(() => {
@@ -126,6 +152,9 @@ export function Composer() {
   // switch immediately after typing doesn't drop the last keystroke.
   useEffect(() => {
     if (!conv) return
+    // While editing, the buffer holds an existing message's body — not a
+    // draft of a new message — so don't mirror it into draftsByConvo.
+    if (editingMessageId) return
     if ((drafts[conv] ?? '') === buf.text) return
     store.set((s) => {
       const next = { ...s.draftsByConvo }
@@ -160,16 +189,24 @@ export function Composer() {
       }
 
       if (key.escape || key.tab) {
+        // Cancel an in-progress edit and restore the conversation's draft.
+        if (editingMessageId) {
+          store.set({ editingMessageId: null, inputZone: 'list' })
+          const draft = conv ? (store.get().draftsByConvo[conv] ?? '') : ''
+          setBuf({ text: draft, cursor: draft.length })
+          return
+        }
         store.set({ inputZone: 'list' })
         return
       }
-      // Ctrl+J inserts a newline; plain Enter sends.
+      // Ctrl+J inserts a newline; plain Enter sends (or commits the edit).
       if (key.ctrl && input === 'j') {
         dispatch({ kind: 'newline' })
         return
       }
       if (key.return) {
-        void doSend(buf.text)
+        if (editingMessageId) void doEdit(buf.text)
+        else void doSend(buf.text)
         return
       }
       // Cursor motion
@@ -271,6 +308,27 @@ export function Composer() {
     }
   }
 
+  async function doEdit(content: string): Promise<void> {
+    const trimmed = content.trim()
+    const id = store.get().editingMessageId
+    if (focus.kind !== 'chat' || !id || sending) return
+    if (!trimmed) return
+
+    setSending(true)
+    setBuf(emptyBuffer)
+    store.set({ editingMessageId: null, inputZone: 'list' })
+    try {
+      // editChatMessageContent updates the message optimistically and rolls
+      // back on failure; restore the buffer so the user can retry.
+      await editChatMessageContent(store, focus.chatId, id, trimmed)
+    } catch {
+      setBuf({ text: trimmed, cursor: trimmed.length })
+      store.set({ editingMessageId: id, inputZone: 'composer' })
+    } finally {
+      setSending(false)
+    }
+  }
+
   if (focus.kind === 'list') {
     return (
       <Box paddingX={theme.layout.panePaddingX}>
@@ -298,6 +356,13 @@ export function Composer() {
 
   return (
     <Box paddingX={theme.layout.panePaddingX} flexDirection="column">
+      {editingMessageId && (
+        <Box>
+          <Text color={theme.warnText} wrap="truncate-end">
+            editing message · enter to save · esc to cancel
+          </Text>
+        </Box>
+      )}
       {quote && (
         <Box>
           <Text color={theme.mutedText} wrap="truncate-end">
