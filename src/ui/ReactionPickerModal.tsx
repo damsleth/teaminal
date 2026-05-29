@@ -50,6 +50,7 @@ export function ReactionPickerModal() {
       flexDirection="column"
       borderStyle={theme.borders.modal}
       borderColor={theme.borderActive}
+      backgroundColor={theme.background}
       paddingX={theme.layout.modalPaddingX}
       paddingY={theme.layout.modalPaddingY}
     >
@@ -68,7 +69,9 @@ export function ReactionPickerModal() {
       </Box>
       <Box marginTop={1}>
         <Text color={theme.mutedText}>
-          {modal.current ? 'press the marked one to remove · esc cancels' : '1-6 to react · esc cancels'}
+          {modal.current
+            ? 'press the marked one to remove · esc cancels'
+            : '1-6 to react · esc cancels'}
         </Text>
       </Box>
     </Box>
