@@ -110,6 +110,12 @@ export type ModalState =
   | { kind: 'events' }
   | { kind: 'network' }
   | { kind: 'activity'; cursor: number }
+  // Reaction picker for the focused chat message. `current` is the type the
+  // user has already set (so the picker can show it as toggled).
+  | { kind: 'reaction-picker'; chatId: string; messageId: string; current: string | null }
+  // Confirm before soft-deleting the user's own chat message. `preview` is a
+  // short excerpt of the message body for the prompt.
+  | { kind: 'confirm-delete'; chatId: string; messageId: string; preview: string }
   | AccountManagerModalState
   | AuthExpiredModalState
 
@@ -716,6 +722,10 @@ export type AppState = {
   threadMetaByRoot: Record<string, ThreadMeta>
   // Active modal overlay (e.g. pause menu). null = no modal.
   modal: ModalState | null
+  // Id of the chat message currently being edited in the composer, or null
+  // when composing a new message. Set by the chat-zone `e` key; cleared on
+  // send or cancel. Editing is gated to the user's own chat messages.
+  editingMessageId: string | null
   // Custom theme loaded from ~/.config/teaminal/themes/<name>.json when
   // settings.theme is not a built-in name. Layered between the built-in
   // base ('dark') and settings.themeOverrides during theme resolution.
@@ -767,6 +777,7 @@ export function initialAppState(): AppState {
     readReceiptsByConvo: {},
     threadMetaByRoot: {},
     modal: null,
+    editingMessageId: null,
     customTheme: null,
     settings: { ...defaultSettings },
     activityFeed: [],
