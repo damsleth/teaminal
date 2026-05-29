@@ -90,6 +90,7 @@ export function AuthExpiredModal() {
         flexDirection="column"
         borderStyle={theme.borders.modal}
         borderColor={theme.borderActive}
+        backgroundColor={theme.background}
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
       >

@@ -342,9 +342,28 @@ export async function softDeleteMessage(
   })
 }
 
-// Add a reaction to a chat message. reactionType is one of Graph's
-// documented short names (like / heart / laugh / surprised / sad / angry).
-// Returns 204 on success.
+// Graph's set/unsetReaction now expect the reaction as its unicode emoji
+// glyph, NOT the documented short name — sending "heart"/"like" fails with
+// `400 Unicode 'heart' in the payload is not supported`. Translate the short
+// names our callers use to the matching glyph; anything already glyph-shaped
+// (e.g. a custom emoji) passes through unchanged. Kept here (not the UI's
+// REACTION_GLYPH) so the graph layer stays free of UI imports.
+const REACTION_PAYLOAD_GLYPH: Record<string, string> = {
+  like: '👍',
+  heart: '❤️',
+  laugh: '😂',
+  surprised: '😮',
+  sad: '😢',
+  angry: '😠',
+}
+
+function reactionPayload(reactionType: string): string {
+  return REACTION_PAYLOAD_GLYPH[reactionType] ?? reactionType
+}
+
+// Add a reaction to a chat message. reactionType is one of Graph's documented
+// short names (like / heart / laugh / surprised / sad / angry), translated to
+// its unicode glyph for the payload. Returns 204 on success.
 export async function setReaction(
   chatId: string,
   messageId: string,
@@ -354,7 +373,7 @@ export async function setReaction(
   await graph<void>({
     method: 'POST',
     path: `/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}/setReaction`,
-    body: { reactionType },
+    body: { reactionType: reactionPayload(reactionType) },
     signal: opts?.signal,
   })
 }
@@ -369,7 +388,7 @@ export async function unsetReaction(
   await graph<void>({
     method: 'POST',
     path: `/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}/unsetReaction`,
-    body: { reactionType },
+    body: { reactionType: reactionPayload(reactionType) },
     signal: opts?.signal,
   })
 }
