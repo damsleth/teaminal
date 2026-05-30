@@ -243,6 +243,8 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     inlineImageMaxRows: settings.inlineImageMaxRows,
     statusBarPosition: settings.statusBarPosition,
     chatRoutingByAccount: { ...settings.chatRoutingByAccount },
+    chatListWidth: settings.chatListWidth,
+    composerHeight: settings.composerHeight,
   }
 }
 
@@ -504,6 +506,28 @@ function validateAndAssign(
       }
       return false
     }
+    case 'chatListWidth':
+      if (value === null) {
+        out.chatListWidth = null
+        return true
+      }
+      if (typeof value === 'number' && Number.isInteger(value) && value >= 12 && value <= 120) {
+        out.chatListWidth = value
+        return true
+      }
+      warnings.push('config: "chatListWidth" must be null or an integer between 12 and 120')
+      return false
+    case 'composerHeight':
+      if (value === null) {
+        out.composerHeight = null
+        return true
+      }
+      if (typeof value === 'number' && Number.isInteger(value) && value >= 3 && value <= 20) {
+        out.composerHeight = value
+        return true
+      }
+      warnings.push('config: "composerHeight" must be null or an integer between 3 and 20')
+      return false
   }
 }
 

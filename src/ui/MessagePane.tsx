@@ -64,15 +64,16 @@ const MIN_VISIBLE_ROWS = 5
 //     external bot account) from pushing every body row absurdly right.
 const SENDER_COL_MIN = 4
 const SENDER_COL_MAX = 16
-// Mirrors LIST_PANE_WIDTH in App.tsx. Kitty image placement is done
-// outside Ink, so it needs the absolute terminal column where the
-// message pane content starts.
-const LIST_PANE_WIDTH = 30
+// Fallback for LIST_PANE_WIDTH when no prop is provided. Kept to avoid
+// breaking isolated renders; App.tsx always passes the resolved width.
+const LIST_PANE_WIDTH_DEFAULT = 30
 
 export function MessagePane(props: {
   focusedMessageId?: string | null
   focusIndicatorActive?: boolean
   loadOlderState?: LoadMoreState
+  /** Resolved chat-list pane width, used for Kitty cursor placement. */
+  listPaneWidth?: number
 }) {
   const focus = useAppState((s) => s.focus)
   const messagesByConvo = useAppState((s) => s.messagesByConvo)
@@ -99,6 +100,8 @@ export function MessagePane(props: {
   const statusBarHidden = useAppState((s) => s.settings.statusBarPosition === 'hidden')
   const reactionPickerOpen = useAppState((s) => s.modal?.kind === 'reaction-picker')
   const theme = useTheme()
+
+  const listPaneWidth = props.listPaneWidth ?? LIST_PANE_WIDTH_DEFAULT
 
   const [, setImageRevision] = useState(0)
   const kittyEnabled = inlineImages === 'auto' && isKittyCapable()
@@ -165,7 +168,7 @@ export function MessagePane(props: {
   )
   const messageTextColumns = Math.max(12, terminalSize.columns - 60)
   // Cell budget for an inline image (message pane minus the gutter columns).
-  const imgCols = Math.max(12, terminalSize.columns - LIST_PANE_WIDTH - 20)
+  const imgCols = Math.max(12, terminalSize.columns - listPaneWidth - 20)
   // Rows a message's inline images occupy: each loaded image takes its fitted
   // height (no label), each still-loading image takes one `[img]` label row.
   // Recomputed each render (imageRevision bumps on load) so layout, the
@@ -255,6 +258,7 @@ export function MessagePane(props: {
     const imageColumn = messageBodyTerminalColumn({
       senderColWidth,
       showTimestamps,
+      listPaneWidth,
     })
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
       const row = rows[rowIndex]!
@@ -315,7 +319,7 @@ export function MessagePane(props: {
     const preludeRows =
       cozyRows + (searchActive ? 1 : 0) + (isLoadingOlder && !showingHistoryTop ? 1 : 0)
     const row = 4 + 1 + preludeRows + rowsBefore
-    const col = LIST_PANE_WIDTH + 3
+    const col = listPaneWidth + 3
     stdout.write(`\x1b[${row};${col}H`)
   })
 
@@ -746,8 +750,12 @@ function bottomChromeRows(statusBarHidden: boolean): number {
   return 4 - (statusBarHidden ? 1 : 0)
 }
 
-function messageBodyTerminalColumn(opts: { senderColWidth: number; showTimestamps: boolean }) {
-  const messagePaneContentStart = LIST_PANE_WIDTH + 2
+function messageBodyTerminalColumn(opts: {
+  senderColWidth: number
+  showTimestamps: boolean
+  listPaneWidth: number
+}) {
+  const messagePaneContentStart = opts.listPaneWidth + 2
   const indicatorWidth = 1
   // Matches TIMESTAMP_WIDTH (HH:MM + trailing space).
   const timestampWidth = opts.showTimestamps ? 6 : 0

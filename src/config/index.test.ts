@@ -330,6 +330,8 @@ describe('Settings ↔ config.json parity', () => {
     inlineImageMaxRows: 7,
     statusBarPosition: 'hidden',
     chatRoutingByAccount: { 'profile-a': 'ic3-only', 'profile-b': 'graph+ic3' },
+    chatListWidth: 36,
+    composerHeight: 5,
   }
 
   test('round-trip fixture assigns a non-default value to every key', () => {
@@ -382,5 +384,79 @@ describe('Settings ↔ config.json parity', () => {
       warnings,
     )
     expect(settings.chatRoutingByAccount).toEqual({ a: 'ic3-only' })
+  })
+
+  describe('chatListWidth validation', () => {
+    test('accepts null (auto)', () => {
+      const w: string[] = []
+      const s = configToSettings({ chatListWidth: null } as Record<string, unknown>, w)
+      expect(s.chatListWidth).toBeNull()
+      expect(w).toEqual([])
+    })
+
+    test('accepts integer in range', () => {
+      const w: string[] = []
+      const s = configToSettings({ chatListWidth: 40 } as Record<string, unknown>, w)
+      expect(s.chatListWidth).toBe(40)
+      expect(w).toEqual([])
+    })
+
+    test('rejects out-of-range integer', () => {
+      const w: string[] = []
+      const s = configToSettings({ chatListWidth: 5 } as Record<string, unknown>, w)
+      expect(s.chatListWidth).toBeNull()
+      expect(w.some((m) => /"chatListWidth"/.test(m))).toBe(true)
+    })
+
+    test('rejects non-integer number', () => {
+      const w: string[] = []
+      const s = configToSettings({ chatListWidth: 30.5 } as Record<string, unknown>, w)
+      expect(s.chatListWidth).toBeNull()
+      expect(w.some((m) => /"chatListWidth"/.test(m))).toBe(true)
+    })
+
+    test('rejects string', () => {
+      const w: string[] = []
+      const s = configToSettings({ chatListWidth: '30' } as Record<string, unknown>, w)
+      expect(s.chatListWidth).toBeNull()
+      expect(w.some((m) => /"chatListWidth"/.test(m))).toBe(true)
+    })
+  })
+
+  describe('composerHeight validation', () => {
+    test('accepts null (auto)', () => {
+      const w: string[] = []
+      const s = configToSettings({ composerHeight: null } as Record<string, unknown>, w)
+      expect(s.composerHeight).toBeNull()
+      expect(w).toEqual([])
+    })
+
+    test('accepts integer in range', () => {
+      const w: string[] = []
+      const s = configToSettings({ composerHeight: 5 } as Record<string, unknown>, w)
+      expect(s.composerHeight).toBe(5)
+      expect(w).toEqual([])
+    })
+
+    test('rejects out-of-range integer (too small)', () => {
+      const w: string[] = []
+      const s = configToSettings({ composerHeight: 1 } as Record<string, unknown>, w)
+      expect(s.composerHeight).toBeNull()
+      expect(w.some((m) => /"composerHeight"/.test(m))).toBe(true)
+    })
+
+    test('rejects out-of-range integer (too large)', () => {
+      const w: string[] = []
+      const s = configToSettings({ composerHeight: 25 } as Record<string, unknown>, w)
+      expect(s.composerHeight).toBeNull()
+      expect(w.some((m) => /"composerHeight"/.test(m))).toBe(true)
+    })
+
+    test('rejects string', () => {
+      const w: string[] = []
+      const s = configToSettings({ composerHeight: 'auto' } as Record<string, unknown>, w)
+      expect(s.composerHeight).toBeNull()
+      expect(w.some((m) => /"composerHeight"/.test(m))).toBe(true)
+    })
   })
 })

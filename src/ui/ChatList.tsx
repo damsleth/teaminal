@@ -27,10 +27,10 @@ import { useTerminalRows } from './hooks/useTerminalRows'
 import { useAppState, useTheme } from './StoreContext'
 import type { PresenceColorKey, Theme } from './theme'
 
-// Mirrors LIST_PANE_WIDTH in App.tsx. Re-declared here so the chat-list
-// row-height math (visual lines per wrapped label) doesn't need to
-// thread the width through props.
-const LIST_PANE_WIDTH = 30
+// Fallback width used when no listPaneWidth prop is supplied. Should
+// not be reached in normal operation — App.tsx always passes the resolved
+// width — but kept as a safe default so isolated renders don't crash.
+const LIST_PANE_WIDTH_DEFAULT = 30
 
 type Row =
   | { kind: 'header'; label: string }
@@ -45,8 +45,9 @@ function labelContentWidth(
   density: ChatListDensity,
   showPresence: boolean,
   indent: string,
+  listPaneWidth: number,
 ): number {
-  let width = LIST_PANE_WIDTH - 2 // round border (1 each side)
+  let width = listPaneWidth - 2 // round border (1 each side)
   width -= 1 // paddingRight on the column container
   if (density === 'cozy' || showPresence) width -= 3 // presence/type-glyph gutter
   if (density === 'cozy') width -= 2 // selector gutter
@@ -186,7 +187,7 @@ function chatTypeGlyph(
   return glyph ? { dot: glyph, color: theme.mutedText, wide: true } : null
 }
 
-export function ChatList() {
+export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPaneWidth?: number }) {
   const chats = useAppState((s) => s.chats)
   const teams = useAppState((s) => s.teams)
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
@@ -207,6 +208,9 @@ export function ChatList() {
   const tailDiagnostics = useAppState((s) => s.settings.tailDiagnostics)
   const theme = useTheme()
   const terminalRows = useTerminalRows()
+  // Width of the (non-indented) preview rows: the full list pane minus the
+  // round border and the column container's paddingRight.
+  const previewContentWidth = listPaneWidth - 2 - 1
   const hasFilterBanner = inputZone === 'filter' || !!filter
   const anyTailEnabled = tailEvents || tailNetwork || tailDiagnostics
   const rowsVisible = Math.max(
@@ -234,11 +238,11 @@ export function ChatList() {
   const heights = rows.map((row) => {
     if (row.kind === 'header' || row.kind === 'spacer') return 1
     if (row.kind === 'synthetic-new-chat') {
-      const cw = labelContentWidth(density, showPresence, '')
+      const cw = labelContentWidth(density, showPresence, '', listPaneWidth)
       return visualLines(`Create chat with "${row.query}"`, cw)
     }
     const indent = density === 'cozy' ? rowIndent(row.item) : ''
-    const cw = labelContentWidth(density, showPresence, indent)
+    const cw = labelContentWidth(density, showPresence, indent, listPaneWidth)
     const label = rowLabel(row.item, me?.id, shortNames, nameByUserId)
     const unread = row.item.kind === 'chat' ? unreadByChatId[row.item.chat.id] : undefined
     const hasMention = !!unread && unread.mentionCount > 0
@@ -246,8 +250,8 @@ export function ChatList() {
     const unreadBadge = hasMention ? ' @' : hasUnread ? ' ●' : ''
     let h = visualLines(label + unreadBadge, cw)
     if (showMessagePreviews && row.item.kind === 'chat') {
-      const preview = previewLineForChat(row.item.chat, PREVIEW_CONTENT_WIDTH)
-      if (preview) h += visualLines(preview, PREVIEW_CONTENT_WIDTH)
+      const preview = previewLineForChat(row.item.chat, previewContentWidth)
+      if (preview) h += visualLines(preview, previewContentWidth)
     }
     return h
   })
@@ -325,7 +329,10 @@ export function ChatList() {
                   </Text>
                 </Box>
               )}
-              <Box width={labelContentWidth(density, showPresence, '')} flexShrink={0}>
+              <Box
+                width={labelContentWidth(density, showPresence, '', listPaneWidth)}
+                flexShrink={0}
+              >
                 <Text
                   color={isSelected ? theme.selected : theme.mutedText}
                   bold={isSelected && theme.emphasis.selectedBold}
@@ -396,14 +403,14 @@ export function ChatList() {
         // chats render in muted gray, unread chats in the unread color.
         const preview =
           showMessagePreviews && row.item.kind === 'chat'
-            ? previewLineForChat(row.item.chat, PREVIEW_CONTENT_WIDTH)
+            ? previewLineForChat(row.item.chat, previewContentWidth)
             : ''
         // Background highlight for the selected row. Pad the label to fill
         // its column width so the background renders as a continuous bar
         // rather than only behind glyphs (Ink paints background per text
         // cell, not per Box). Mirror the MenuModal pad-to-width approach.
         const rowBg = isSelected ? (theme.selectedRowBackground ?? undefined) : undefined
-        const labelWidth = labelContentWidth(density, showPresence, indent)
+        const labelWidth = labelContentWidth(density, showPresence, indent, listPaneWidth)
         const labelText = label + unreadBadge
         const labelPadded =
           isSelected && rowBg !== undefined
@@ -444,7 +451,7 @@ export function ChatList() {
               </Box>
             </Box>
             {preview && (
-              <Box width={PREVIEW_CONTENT_WIDTH} flexShrink={0}>
+              <Box width={previewContentWidth} flexShrink={0}>
                 <Text
                   color={hasUnread ? theme.unread : theme.mutedText}
                   bold={hasUnread && theme.emphasis.unreadBold}
@@ -470,12 +477,6 @@ function previewChat(chat: Extract<SelectableItem, { kind: 'chat' }>['chat']): s
       : body.content.replace(/\s+/g, ' ').trim()
   return text
 }
-
-// Width of the (non-indented) preview rows: the full list pane minus the
-// round border and the column container's paddingRight. No presence /
-// selector gutters or channel indent apply — previews start at the left
-// edge so they don't look ragged under the chat name.
-const PREVIEW_CONTENT_WIDTH = LIST_PANE_WIDTH - 2 - 1
 
 // Truncate to at most `maxLines` visual lines worth of characters, adding an
 // ellipsis when clipped. Keeps the rendered preview and the viewport height

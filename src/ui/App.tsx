@@ -21,7 +21,7 @@
 // individual modal components. The dispatcher below only routes the
 // list / chat / filter zones plus a few app-wide shortcuts.
 
-import { Box, useApp, useInput, useStdin } from 'ink'
+import { Box, useApp, useInput, useStdin, useStdout } from 'ink'
 import { useEffect, useRef, useState } from 'react'
 import { createOneOnOneChat, materializeChat, resolveFederatedChatId } from '../state/chatActions'
 import { clampCursor } from '../state/selectables'
@@ -58,6 +58,8 @@ import { handleChatKeys } from './keybinds/chatKeys'
 import { handleFilterKeys } from './keybinds/filterKeys'
 import { handleListKeys } from './keybinds/listKeys'
 import { handleMessageSearchKeys } from './keybinds/messageSearchKeys'
+import { handleResizeKeys } from './keybinds/resizeKeys'
+import { computeLayout } from './layout'
 import { readMessagePageState, type LoadMoreState } from './messageRows'
 import { messagesForTimelineNavigation } from './renderableMessage'
 import { messageFocusables } from './messageFocusables'
@@ -66,8 +68,6 @@ import { usePollerHandleRef } from './PollerContext'
 import { StatusBar } from './StatusBar'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import type { Chat, DirectoryUser } from '../types'
-
-const LIST_PANE_WIDTH = 30
 
 export function shouldShowTailPanels(modal: ModalState | null): boolean {
   return modal === null
@@ -102,6 +102,16 @@ export function App() {
   const pollerRef = usePollerHandleRef()
 
   const terminalRows = useTerminalRows()
+  const { stdout: stdoutForCols } = useStdout()
+  const [terminalCols, setTerminalCols] = useState<number>(stdoutForCols?.columns ?? 80)
+  useEffect(() => {
+    if (!stdoutForCols) return
+    const onResize = () => setTerminalCols(stdoutForCols.columns ?? 80)
+    stdoutForCols.on('resize', onResize)
+    return () => {
+      stdoutForCols.off('resize', onResize)
+    }
+  }, [stdoutForCols])
 
   const focus = useAppState((s) => s.focus)
   const cursor = useAppState((s) => s.cursor)
@@ -117,6 +127,9 @@ export function App() {
   const messageCursorByConvo = useAppState((s) => s.messageCursorByConvo)
   const focusedAttachmentIndex = useAppState((s) => s.focusedAttachmentIndex)
   const statusBarPosition = useAppState((s) => s.settings.statusBarPosition)
+  const chatListWidthSetting = useAppState((s) => s.settings.chatListWidth)
+  const composerHeightSetting = useAppState((s) => s.settings.composerHeight)
+  const draftsByConvo = useAppState((s) => s.draftsByConvo)
 
   const [newChatPrompt, setNewChatPrompt] = useState<string | null>(null)
   const federatedFocusCheckedRef = useRef<Set<string>>(new Set())
@@ -153,6 +166,21 @@ export function App() {
       cancelled = true
     }
   }, [focus, me?.id, chats])
+
+  // Compute dynamic layout dimensions from terminal size + settings.
+  const activeConvForDraft = focusKey(focus)
+  const activeDraft = activeConvForDraft ? (draftsByConvo[activeConvForDraft] ?? '') : ''
+  const draftLines = activeDraft ? activeDraft.split('\n').length : 1
+  const layout = computeLayout({
+    cols: terminalCols,
+    rows: terminalRows,
+    draftLines,
+    quoteRows: 0,
+    chatListWidth: chatListWidthSetting,
+    composerHeight: composerHeightSetting,
+  })
+  const resolvedChatListWidth = layout.chatListWidth
+  const resolvedComposerHeight = layout.composerHeight
 
   const activeConv = focusKey(focus)
   const activeMessages = activeConv ? (messagesByConvo[activeConv] ?? []) : []
@@ -300,6 +328,10 @@ export function App() {
         openActivity(store)
         return
       }
+      if (key.ctrl && input === 'x') {
+        store.set({ inputZone: 'resize' })
+        return
+      }
       if (key.tab && focus.kind !== 'list') {
         store.set({ inputZone: 'composer' })
         return
@@ -384,6 +416,21 @@ export function App() {
     { isActive: isRawModeSupported && inputZone === 'message-search' },
   )
 
+  // Resize-mode dispatcher. Entered via Ctrl-X in list zone.
+  useInput(
+    (input, key) => {
+      handleResizeKeys(
+        { input, key },
+        {
+          store,
+          currentChatListWidth: resolvedChatListWidth,
+          currentComposerHeight: resolvedComposerHeight,
+        },
+      )
+    },
+    { isActive: isRawModeSupported && inputZone === 'resize' },
+  )
+
   // Modal rendering: header / composer / status bar stay visible. The
   // menu / accounts / keybinds / diagnostics / events / network modals
   // render as absolute-positioned overlays on top of the message pane,
@@ -418,12 +465,12 @@ export function App() {
       </Box>
       <Box flexDirection="row" flexGrow={1}>
         <Box
-          width={LIST_PANE_WIDTH}
+          width={resolvedChatListWidth}
           flexShrink={0}
           borderStyle={theme.borders.panel}
           borderColor={theme.border}
         >
-          <ChatList />
+          <ChatList listPaneWidth={resolvedChatListWidth} />
         </Box>
         <Box
           flexGrow={1}
@@ -453,6 +500,7 @@ export function App() {
                 focusedMessageId={focusedMessageId}
                 focusIndicatorActive={focus.kind !== 'list' && inputZone === 'list'}
                 loadOlderState={loadOlderState}
+                listPaneWidth={resolvedChatListWidth}
               />
               {overlayModalKind && (
                 <Box
@@ -495,7 +543,11 @@ export function App() {
         </Box>
       </Box>
       {showTailPanels && <TailPanels />}
-      <Box borderStyle={theme.borders.panel} borderColor={theme.border}>
+      <Box
+        borderStyle={theme.borders.panel}
+        borderColor={theme.border}
+        height={resolvedComposerHeight}
+      >
         <Composer />
       </Box>
       {statusBarPosition !== 'hidden' && <StatusBar />}

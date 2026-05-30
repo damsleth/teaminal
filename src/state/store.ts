@@ -98,8 +98,9 @@ export type ConnectionState = 'connecting' | 'online' | 'offline' | 'authError' 
 //   composer - text editing in Composer
 //   filter   - typing into the chat-list filter buffer
 //   menu     - navigating the modal pause-menu (MenuModal owns input)
+//   resize   - transient pane-resize mode (Ctrl-X from list)
 // Distinct from `focus` (which conv is open).
-export type InputZone = 'list' | 'composer' | 'filter' | 'menu' | 'message-search'
+export type InputZone = 'list' | 'composer' | 'filter' | 'menu' | 'message-search' | 'resize'
 
 // Active modal overlay. When set, App renders the modal in the central pane
 // area (replacing chat list + message pane) and inputZone is 'menu'. Add
@@ -345,6 +346,14 @@ export type Settings = {
   // 'ic3-only' to avoid hammering the same 401-returning endpoints. Toggled
   // per account in the esc-menu Accounts list. Absent => graph+ic3.
   chatRoutingByAccount: Record<string, ChatRoutingMode>
+  // Explicit chat-list panel width in terminal columns. null means automatic
+  // (derived from terminal width via computeLayout). Adjusted interactively
+  // via Ctrl-X resize mode; persisted to config.json.
+  chatListWidth: number | null
+  // Explicit composer height in terminal rows. null means automatic (derived
+  // from draft line count via computeLayout). Adjusted interactively via
+  // Ctrl-X resize mode; persisted to config.json.
+  composerHeight: number | null
 }
 
 export type TokenAudience = 'graph' | 'ic3'
@@ -429,6 +438,8 @@ export const defaultSettings: Settings = {
   inlineImageMaxRows: 10,
   statusBarPosition: 'bottom',
   chatRoutingByAccount: {},
+  chatListWidth: null,
+  composerHeight: null,
 }
 
 export type MessageCache = {
