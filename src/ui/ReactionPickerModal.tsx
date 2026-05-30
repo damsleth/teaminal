@@ -7,19 +7,18 @@
 // gives the user the full system emoji set and matches the Graph setReaction
 // API, which wants the unicode glyph. Esc cancels.
 
-import { Box, Text, useApp, useInput } from 'ink'
+import { useApp, useInput } from 'ink'
 import { useEffect } from 'react'
 import { toggleReaction } from '../state/chatActions'
 import { openSystemEmojiPicker } from './emojiPicker'
 import { isEmojiGlyph } from './reactions'
-import { useAppState, useAppStore, useTheme } from './StoreContext'
+import { useAppState, useAppStore } from './StoreContext'
 
 export function ReactionPickerModal() {
   const { exit } = useApp()
   const store = useAppStore()
   const modal = useAppState((s) => s.modal)
   const me = useAppState((s) => s.me)
-  const theme = useTheme()
   const isOpen = modal?.kind === 'reaction-picker'
 
   // Pop the system emoji picker once, when the overlay opens.
@@ -51,21 +50,5 @@ export function ReactionPickerModal() {
     { isActive: isOpen },
   )
 
-  if (!isOpen || modal.kind !== 'reaction-picker') return null
-
-  return (
-    <Box
-      flexDirection="column"
-      borderStyle={theme.borders.modal}
-      borderColor={theme.borderActive}
-      backgroundColor={theme.background}
-      paddingX={theme.layout.modalPaddingX}
-      paddingY={theme.layout.modalPaddingY}
-    >
-      <Text bold={theme.emphasis.modalTitleBold}>React</Text>
-      <Box marginTop={1}>
-        <Text color={theme.mutedText}>pick an emoji from the system picker · esc cancels</Text>
-      </Box>
-    </Box>
-  )
+  return null
 }
