@@ -215,6 +215,7 @@ export type ThemeOverrides = {
   infoText?: string
   messageFocusIndicator?: string
   messageFocusBackground?: string | null
+  selectedRowBackground?: string | null
   presence?: Partial<Record<ThemePresenceKey, string>>
   layout?: Partial<{
     panePaddingX: number

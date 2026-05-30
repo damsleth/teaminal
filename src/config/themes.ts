@@ -69,6 +69,8 @@ const COLOR_KEYS = new Set([
   'messageFocusIndicator',
 ])
 
+const NULLABLE_COLOR_KEYS = new Set(['messageFocusBackground', 'selectedRowBackground'])
+
 const PRESENCE_KEYS = new Set([
   'Available',
   'AvailableIdle',
@@ -175,11 +177,11 @@ function validatePartialTheme(
       if (emphasis && Object.keys(emphasis).length > 0) out.emphasis = emphasis
       continue
     }
-    if (key === 'messageFocusBackground') {
+    if (NULLABLE_COLOR_KEYS.has(key)) {
       if (value === null || isColor(value)) {
-        out.messageFocusBackground = value
+        out[key] = value
       } else {
-        warnings.push('theme: "messageFocusBackground" must be null, a named color, or hex')
+        warnings.push(`theme: "${key}" must be null, a named color, or hex`)
       }
       continue
     }

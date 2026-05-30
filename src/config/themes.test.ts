@@ -83,4 +83,34 @@ describe('loadThemeFile', () => {
     expect(r.source).toBe('missing')
     expect(r.warnings[0]).toMatch(/invalid JSON/)
   })
+
+  test('accepts selectedRowBackground as a hex color or null', () => {
+    const home = tmpHome()
+    const dir = join(home, '.config', 'teaminal', 'themes')
+    require('node:fs').mkdirSync(dir, { recursive: true })
+
+    // Valid hex value
+    writeFileSync(join(dir, 'rowbg-hex.json'), JSON.stringify({ selectedRowBackground: '#262626' }))
+    const r1 = loadThemeFile('rowbg-hex', { HOME: home })
+    expect(r1.source).toBe('file')
+    expect(r1.warnings).toEqual([])
+    expect((r1.data as Record<string, unknown>).selectedRowBackground).toBe('#262626')
+
+    // null (disables the highlight)
+    writeFileSync(join(dir, 'rowbg-null.json'), JSON.stringify({ selectedRowBackground: null }))
+    const r2 = loadThemeFile('rowbg-null', { HOME: home })
+    expect(r2.source).toBe('file')
+    expect(r2.warnings).toEqual([])
+    expect((r2.data as Record<string, unknown>).selectedRowBackground).toBeNull()
+
+    // Invalid value warns and ignores
+    writeFileSync(
+      join(dir, 'rowbg-bad.json'),
+      JSON.stringify({ selectedRowBackground: 'not-a-color' }),
+    )
+    const r3 = loadThemeFile('rowbg-bad', { HOME: home })
+    expect(r3.source).toBe('file')
+    expect(r3.warnings.some((w) => /selectedRowBackground/.test(w))).toBe(true)
+    expect((r3.data as Record<string, unknown>).selectedRowBackground).toBeUndefined()
+  })
 })
