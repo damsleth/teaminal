@@ -24,6 +24,7 @@ import {
   type ConvKey,
   type Store,
 } from '../store'
+import { indexNamesFromMessages } from '../nameIndex'
 import { isAbortError } from './intervals'
 import { countNewMessages, mergeChronological } from './merge'
 import type { MessagesPage } from './pagePatch'
@@ -155,6 +156,7 @@ export async function loadOlderMessages(deps: LoadOlderDeps): Promise<LoadOlderM
           ...s.messagesByConvo,
           [conv]: merged,
         },
+        nameByUserId: indexNamesFromMessages(s.nameByUserId, page.messages),
       }
     })
     return result

@@ -73,6 +73,7 @@ function formatRelative(date: Date | undefined, now: number): string | null {
 
 export function HeaderBar() {
   const me = useAppState((s) => s.me)
+  const nameByUserId = useAppState((s) => s.nameByUserId)
   const myPresence = useAppState((s) => s.myPresence)
   const conn = useAppState((s) => s.conn)
   const chats = useAppState((s) => s.chats)
@@ -110,7 +111,7 @@ export function HeaderBar() {
   }
 
   const updated = formatRelative(lastListPollAt, now)
-  const unreadText = formatUnread(unreadByChatId, chats, me?.id)
+  const unreadText = formatUnread(unreadByChatId, chats, me?.id, nameByUserId)
 
   return (
     <Box paddingX={theme.layout.panePaddingX}>
@@ -133,9 +134,7 @@ export function HeaderBar() {
       <Text color="gray">{` ${conn}`}</Text>
       <Text color="gray">{` · ${chats.length} chats`}</Text>
       {unreadText && <Text color={theme.unread}>{` · ${unreadText.toLowerCase()}`}</Text>}
-      {unreadMentionCount > 0 && (
-        <Text color={theme.unread}>{` · @${unreadMentionCount}`}</Text>
-      )}
+      {unreadMentionCount > 0 && <Text color={theme.unread}>{` · @${unreadMentionCount}`}</Text>}
       {realtimeState !== 'off' && (
         <>
           <Text color="gray">{' · push '}</Text>
@@ -155,19 +154,25 @@ function formatUnread(
   unreadByChatId: Record<string, ChatUnreadActivity>,
   chats: Chat[],
   myUserId?: string,
+  nameByUserId?: Record<string, string>,
 ): string | null {
   const totals = unreadTotals(unreadByChatId)
   if (totals.unreadCount <= 0 && totals.mentionCount <= 0) return null
   const parts = [`${totals.unreadCount} unread`]
   if (totals.mentionCount > 0) parts.push(`${totals.mentionCount} mention`)
   const labels = recentUnreadNotifications(unreadByChatId, 3)
-    .map((n) => n.lastSenderName ?? chatLabelForId(chats, n.chatId, myUserId))
+    .map((n) => n.lastSenderName ?? chatLabelForId(chats, n.chatId, myUserId, nameByUserId))
     .filter((label): label is string => Boolean(label))
   if (labels.length > 0) parts.push(labels.join(', '))
   return parts.join(' / ')
 }
 
-function chatLabelForId(chats: Chat[], chatId: string, myUserId?: string): string | undefined {
+function chatLabelForId(
+  chats: Chat[],
+  chatId: string,
+  myUserId?: string,
+  nameByUserId?: Record<string, string>,
+): string | undefined {
   const chat = chats.find((c) => c.id === chatId)
-  return chat ? chatLabel(chat, myUserId, { compact: true }) : undefined
+  return chat ? chatLabel(chat, myUserId, { compact: true, nameByUserId }) : undefined
 }

@@ -769,6 +769,12 @@ export type AppState = {
   unreadMentionCount: number
   // Opaque CSA pagination cursor; sent on the next /updates call.
   activitySyncState?: string | undefined
+  // userId -> resolved full display name, harvested from message senders
+  // and lastMessagePreview. Lets chatLabel recover a real name for chat
+  // members whose Graph roster displayName is missing ("(unknown)") or is
+  // just the email address. Built by src/state/nameIndex.ts and persisted
+  // per-profile via nameCachePersistence.ts.
+  nameByUserId: Record<string, string>
 }
 
 export function initialAppState(): AppState {
@@ -803,6 +809,7 @@ export function initialAppState(): AppState {
     settings: { ...defaultSettings },
     activityFeed: [],
     unreadMentionCount: 0,
+    nameByUserId: {},
   }
 }
 
