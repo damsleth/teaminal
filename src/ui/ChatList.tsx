@@ -398,6 +398,17 @@ export function ChatList() {
           showMessagePreviews && row.item.kind === 'chat'
             ? previewLineForChat(row.item.chat, PREVIEW_CONTENT_WIDTH)
             : ''
+        // Background highlight for the selected row. Pad the label to fill
+        // its column width so the background renders as a continuous bar
+        // rather than only behind glyphs (Ink paints background per text
+        // cell, not per Box). Mirror the MenuModal pad-to-width approach.
+        const rowBg = isSelected ? (theme.selectedRowBackground ?? undefined) : undefined
+        const labelWidth = labelContentWidth(density, showPresence, indent)
+        const labelText = label + unreadBadge
+        const labelPadded =
+          isSelected && rowBg !== undefined
+            ? labelText + ' '.repeat(Math.max(0, labelWidth - labelText.length))
+            : labelText
         return (
           <Box key={`${row.item.kind}-${row.index}`} flexDirection="column" flexShrink={0}>
             <Box flexDirection="row">
@@ -408,7 +419,7 @@ export function ChatList() {
               )}
               {density === 'cozy' && (
                 <Box width={2} flexShrink={0}>
-                  <Text color={isSelected ? theme.selected : undefined}>
+                  <Text color={isSelected ? theme.selected : undefined} backgroundColor={rowBg}>
                     {isSelected ? '> ' : '  '}
                   </Text>
                 </Box>
@@ -418,17 +429,17 @@ export function ChatList() {
                   <Text>{indent}</Text>
                 </Box>
               )}
-              <Box width={labelContentWidth(density, showPresence, indent)} flexShrink={0}>
+              <Box width={labelWidth} flexShrink={0}>
                 <Text
                   color={isSelected ? theme.selected : hasUnread ? theme.unread : undefined}
+                  backgroundColor={rowBg}
                   bold={
                     (isSelected && theme.emphasis.selectedBold) ||
                     (hasUnread && theme.emphasis.unreadBold)
                   }
                   wrap="wrap"
                 >
-                  {label}
-                  {unreadBadge}
+                  {labelPadded}
                 </Text>
               </Box>
             </Box>

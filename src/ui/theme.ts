@@ -84,6 +84,7 @@ export type Theme = {
   infoText: string
   messageFocusIndicator: string
   messageFocusBackground: string | null
+  selectedRowBackground: string | null
   presence: PresenceMap
   layout: ThemeLayout
   borders: ThemeBorders
@@ -154,6 +155,7 @@ const DARK: Theme = {
   infoText: 'gray',
   messageFocusIndicator: 'cyan',
   messageFocusBackground: null,
+  selectedRowBackground: '#262626',
   presence: PRESENCE_DARK,
   layout: LAYOUT_DEFAULT,
   borders: BORDERS_DEFAULT,
@@ -186,6 +188,7 @@ const LIGHT: Theme = {
   infoText: '#1c1c1c',
   messageFocusIndicator: 'blue',
   messageFocusBackground: null,
+  selectedRowBackground: '#e6e6e6',
   presence: PRESENCE_DARK,
   layout: LAYOUT_DEFAULT,
   borders: BORDERS_DEFAULT,
@@ -223,6 +226,7 @@ export type PartialTheme = {
   infoText?: string
   messageFocusIndicator?: string
   messageFocusBackground?: string | null
+  selectedRowBackground?: string | null
   presence?: Partial<PresenceMap>
   layout?: Partial<ThemeLayout>
   borders?: Partial<ThemeBorders>
