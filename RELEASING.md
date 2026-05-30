@@ -40,36 +40,38 @@ update all of these together in the same PR:
 
 [tap]: https://github.com/damsleth/homebrew-tap
 
-## Pre-release checklist
-
-1. `bun install --frozen-lockfile`
-2. `bun run typecheck`
-3. `bun test`
-4. `bun run build && ./dist/teaminal --version` (smoke)
-5. CHANGELOG promoted: rename `## [Unreleased]` to
-   `## [X.Y.Z] - YYYY-MM-DD`, add a fresh empty `## [Unreleased]`
-   above it, update the comparison links at the bottom.
-6. `package.json` `"version"` and `bin/teaminal.tsx` `const VERSION`
-   both bumped to `X.Y.Z`.
-
 ## Cutting a release
 
+Use the script — it does the whole bump deterministically so the three
+places the version lives never drift, and it runs the same pre-flight CI
+runs (the `--frozen-lockfile` check is what failed the v0.17.0 release —
+a stale lockfile that a local install would have caught):
+
 ```bash
-git checkout main
-git pull --ff-only
+git checkout main && git pull --ff-only
+# Commit your feature work FIRST — release.sh requires a clean tree so the
+# bump lands as its own commit.
 
-# Bump version in package.json + bin/teaminal.tsx, promote CHANGELOG.
-$EDITOR package.json bin/teaminal.tsx CHANGELOG.md
-git commit -am "release: vX.Y.Z"
-git push
+./scripts/release.sh patch           # 0.17.0 -> 0.17.1  (also: minor | major | X.Y.Z)
+# Pre-flights (install --frozen-lockfile, typecheck, test), then bumps
+# package.json + src/version.ts, promotes the CHANGELOG, commits
+# `chore(release): X.Y.Z`, and tags vX.Y.Z. Review, then publish:
+git push origin main && git push origin vX.Y.Z
 
-# Annotated tag with release notes in the message.
-git tag -a vX.Y.Z -m "vX.Y.Z - <headline>
-
-- bullet: ...
-"
-git push origin vX.Y.Z
+# Or in one shot once you trust it:
+./scripts/release.sh patch --push
 ```
+
+What "promote the CHANGELOG" means (the script does this): the current
+`## [Unreleased]` notes become `## [X.Y.Z] - YYYY-MM-DD`, a fresh empty
+`## [Unreleased]` is left on top, and the compare links at the bottom are
+updated. The version is bumped in **`package.json` `"version"`** and
+**`src/version.ts` `VERSION`** (NOT `bin/teaminal.tsx` — `VERSION` moved
+to `src/version.ts`).
+
+If you must do it by hand, the pre-flight is: `bun install
+--frozen-lockfile` → `bun run typecheck` → `bun test` → `bun run build &&
+./dist/teaminal --version` (smoke).
 
 The tag push triggers `release.yml`. Verify:
 
