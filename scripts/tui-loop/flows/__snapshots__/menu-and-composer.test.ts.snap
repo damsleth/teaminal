@@ -2,36 +2,36 @@
 
 exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
 ╭────────────────────────────────────────────────────────────────────────────────────────────────────╮
-││                            ││                                                                    ││
-││                     ╭─────────────────────────────────────────────────────────────────────────────│
-│───────╮                                                                                            │
-││                     │                                                                             │
-│       │                                                                                            │
-││                     │   Activity                                                                  │
-│       │                                                                                            │
-││                     │                                                                             │
-│       │                                                                                            │
-││                     │   (no activity)                                                             │
-│       │                                                                                            │
-││                     │                                                                             │
-│       │                                                                                            │
-││                     │   j/k: move · enter: open · a: mark all read · esc: close                   │
-│       │                                                                                            │
-││                     │                                                                             │
-│       │                                                                                            │
-││                     ╰─────────────────────────────────────────────────────────────────────────────│
-│───────╯                                                                                            │
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-│╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────╯│
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                    ╭──────────────────────────────────────────────────────────────────────────────│
+│──────╮                                                                                             │
+││                    │                                                                              │
+│      │                                                                                             │
+││                    │   Activity                                                                   │
+│      │                                                                                             │
+││                    │                                                                              │
+│      │                                                                                             │
+││                    │   (no activity)                                                              │
+│      │                                                                                             │
+││                    │                                                                              │
+│      │                                                                                             │
+││                    │   j/k: move · enter: open · a: mark all read · esc: close                    │
+│      │                                                                                             │
+││                    │                                                                              │
+│      │                                                                                             │
+││                    ╰──────────────────────────────────────────────────────────────────────────────│
+│──────╯                                                                                             │
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+│╰──────────────────────────╯╰──────────────────────────────────────────────────────────────────────╯│
 │╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
 ││ open a chat to compose                                                                           ││
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
-│ menu open                                                                                          │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
 {
   "0,9": {
@@ -53,11 +53,11 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,9": {
+  "27,9": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,9": {
+  "29,9": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -69,265 +69,265 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "22,10": {
-    "fgColorMode": 16777216,
-    "fgColor": 6
-  },
-  "8,11": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "0,12": {
+  "27,10": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,12": {
+  "29,10": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "22,12": {
+  "99,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,11": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "21,11": {
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "23,12": {
+  "7,12": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "0,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,13": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "21,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "22,13": {
     "bgColorMode": 16777216,
     "bgColor": 0,
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "7,13": {
+  "6,14": {
     "bgColorMode": 0,
     "bgColor": -1,
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "8,13": {
+  "7,14": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "0,14": {
+  "0,15": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,14": {
+  "1,15": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "22,14": {
+  "21,15": {
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "23,14": {
+  "22,15": {
     "bgColorMode": 16777216,
     "bgColor": 0,
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "26,14": {
+  "25,15": {
     "bold": 134217728
   },
-  "34,14": {
+  "33,15": {
     "bold": 0
   },
-  "7,15": {
+  "6,16": {
     "bgColorMode": 0,
     "bgColor": -1,
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "8,15": {
+  "7,16": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "0,16": {
+  "0,17": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,16": {
+  "1,17": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "22,16": {
+  "21,17": {
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "23,16": {
+  "22,17": {
     "bgColorMode": 16777216,
     "bgColor": 0,
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "7,17": {
+  "6,18": {
     "bgColorMode": 0,
     "bgColor": -1,
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "8,17": {
+  "7,18": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "0,18": {
+  "0,19": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,18": {
+  "1,19": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "22,18": {
+  "21,19": {
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "23,18": {
+  "22,19": {
     "bgColorMode": 16777216,
     "bgColor": 0,
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "26,18": {
+  "25,19": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "39,18": {
+  "38,19": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "7,19": {
+  "6,20": {
     "bgColorMode": 0,
     "bgColor": -1,
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "8,19": {
+  "7,20": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "0,20": {
+  "0,21": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,20": {
+  "1,21": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "22,20": {
+  "21,21": {
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "23,20": {
+  "22,21": {
     "bgColorMode": 16777216,
     "bgColor": 0,
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "7,21": {
+  "6,22": {
     "bgColorMode": 0,
     "bgColor": -1,
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "8,21": {
+  "7,22": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "0,22": {
+  "0,23": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,22": {
+  "1,23": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "22,22": {
+  "21,23": {
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "23,22": {
+  "22,23": {
     "bgColorMode": 16777216,
     "bgColor": 0,
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "26,22": {
+  "25,23": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "81,22": {
+  "80,23": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "7,23": {
+  "6,24": {
     "bgColorMode": 0,
     "bgColor": -1,
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "8,23": {
+  "7,24": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "0,24": {
+  "0,25": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,24": {
+  "1,25": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "22,24": {
+  "21,25": {
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "23,24": {
+  "22,25": {
     "bgColorMode": 16777216,
     "bgColor": 0,
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "7,25": {
+  "6,26": {
     "bgColorMode": 0,
     "bgColor": -1,
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "8,25": {
+  "7,26": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "0,26": {
+  "0,27": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,26": {
+  "1,27": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "22,26": {
+  "21,27": {
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "8,27": {
+  "7,28": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "0,28": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "1,28": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "29,28": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "31,28": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "99,28": {
+  "0,29": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -335,11 +335,11 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,29": {
+  "27,29": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,29": {
+  "29,29": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -351,11 +351,11 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,30": {
+  "27,30": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,30": {
+  "29,30": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -367,11 +367,11 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,31": {
+  "27,31": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,31": {
+  "29,31": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -383,11 +383,11 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,32": {
+  "27,32": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,32": {
+  "29,32": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -399,11 +399,11 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,33": {
+  "27,33": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,33": {
+  "29,33": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -411,33 +411,37 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,36": {
+  "1,34": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "2,36": {
+  "27,34": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "24,36": {
+  "29,34": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "99,36": {
+  "99,34": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "0,38": {
+  "1,37": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "1,38": {
+  "2,37": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "10,38": {
+  "24,37": {
     "fgColorMode": 0,
     "fgColor": -1
+  },
+  "99,37": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
   }
 }
 `;
@@ -447,33 +451,33 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
 │╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
 ││  teaminal · You (example.com) · presence ● ? · graph ● online · 3 chats                          ││
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
-│╭────────────────────────────╮╭────────────────────────────────────────────────────────────────────╮│
-││ ◯ Ada Byron                ││ Older history unavailable until poller pagination is wired         ││
-││  Design Sync              ││ Today                                                              ││
-││  Ops Channel              ││ 09:00 You  I will read them now.                                   ││
-││                            ││ 09:01 Ada  The launch notes are ready for review.                  ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-│╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────╯│
+│╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
+││ ◯ Ada Byron              ││ Older history unavailable until poller pagination is wired           ││
+││  Design Sync            ││ Yesterday                                                            ││
+││  Ops Channel            ││ 09:00 You       I will read them now.                                ││
+││                          ││ 09:01 Ada Byron The launch notes are ready for review.               ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+│╰──────────────────────────╯╰──────────────────────────────────────────────────────────────────────╯│
 │╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
 ││ > █                                                                                              ││
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
-│ Enter send · Ctrl+J newline · Tab chat                                                             │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
 {
   "0,0": {
@@ -519,29 +523,35 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "1,4": {
+    "bgColorMode": 33554432,
+    "bgColor": 235
+  },
   "4,4": {
     "fgColorMode": 16777216,
     "fgColor": 6,
     "bold": 134217728
   },
-  "13,4": {
+  "26,4": {
+    "bgColorMode": 0,
+    "bgColor": -1,
     "fgColorMode": 0,
     "fgColor": -1,
     "bold": 0
   },
-  "29,4": {
+  "27,4": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,4": {
+  "29,4": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "32,4": {
+  "30,4": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "90,4": {
+  "88,4": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -553,20 +563,20 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,5": {
+  "27,5": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,5": {
+  "29,5": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "32,5": {
+  "30,5": {
     "fgColorMode": 16777216,
     "fgColor": 8,
     "bold": 134217728
   },
-  "37,5": {
+  "39,5": {
     "fgColorMode": 0,
     "fgColor": -1,
     "bold": 0
@@ -579,27 +589,27 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,6": {
+  "27,6": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,6": {
+  "29,6": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "32,6": {
+  "30,6": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "38,6": {
+  "36,6": {
     "fgColorMode": 16777216,
     "fgColor": 4,
     "bold": 134217728
   },
-  "43,6": {
+  "46,6": {
     "bold": 0
   },
-  "64,6": {
+  "67,6": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -611,24 +621,24 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,7": {
+  "27,7": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,7": {
+  "29,7": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "32,7": {
+  "30,7": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "38,7": {
+  "36,7": {
     "fgColorMode": 0,
     "fgColor": -1,
     "bold": 134217728
   },
-  "43,7": {
+  "46,7": {
     "bold": 0
   },
   "99,7": {
@@ -639,11 +649,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,8": {
+  "27,8": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,8": {
+  "29,8": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -655,11 +665,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,9": {
+  "27,9": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,9": {
+  "29,9": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -671,11 +681,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,10": {
+  "27,10": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,10": {
+  "29,10": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -687,11 +697,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,11": {
+  "27,11": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,11": {
+  "29,11": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -703,11 +713,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,12": {
+  "27,12": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,12": {
+  "29,12": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -719,11 +729,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,13": {
+  "27,13": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,13": {
+  "29,13": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -735,11 +745,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,14": {
+  "27,14": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,14": {
+  "29,14": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -751,11 +761,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,15": {
+  "27,15": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,15": {
+  "29,15": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -767,11 +777,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,16": {
+  "27,16": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,16": {
+  "29,16": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -783,11 +793,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,17": {
+  "27,17": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,17": {
+  "29,17": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -799,11 +809,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,18": {
+  "27,18": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,18": {
+  "29,18": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -815,11 +825,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,19": {
+  "27,19": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,19": {
+  "29,19": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -831,11 +841,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,20": {
+  "27,20": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,20": {
+  "29,20": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -847,11 +857,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,21": {
+  "27,21": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,21": {
+  "29,21": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -863,11 +873,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,22": {
+  "27,22": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,22": {
+  "29,22": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -879,11 +889,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,23": {
+  "27,23": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,23": {
+  "29,23": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -895,11 +905,11 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,24": {
+  "27,24": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,24": {
+  "29,24": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -907,33 +917,37 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,27": {
+  "1,25": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "4,27": {
+  "27,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,25": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,28": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,28": {
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "5,27": {
+  "5,28": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "99,27": {
+  "99,28": {
     "fgColorMode": 16777216,
     "fgColor": 8
-  },
-  "0,29": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "1,29": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "39,29": {
-    "fgColorMode": 0,
-    "fgColor": -1
   }
 }
 `;

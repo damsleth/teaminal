@@ -418,7 +418,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
             : labelText
         return (
           <Box key={`${row.item.kind}-${row.index}`} flexDirection="column" flexShrink={0}>
-            <Box flexDirection="row">
+            <Box flexDirection="row" backgroundColor={rowBg}>
               {showGutter && (
                 <Box width={3} flexShrink={0}>
                   <Text color={presenceColor}>{presenceText}</Text>
@@ -436,7 +436,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
                   <Text>{indent}</Text>
                 </Box>
               )}
-              <Box width={labelWidth} flexShrink={0}>
+              <Box width={labelWidth} flexShrink={0} backgroundColor={rowBg}>
                 <Text
                   color={isSelected ? theme.selected : hasUnread ? theme.unread : undefined}
                   backgroundColor={rowBg}
