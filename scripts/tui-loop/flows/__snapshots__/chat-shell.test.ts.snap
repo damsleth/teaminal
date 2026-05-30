@@ -5,33 +5,33 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
 │╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
 ││  teaminal · You (example.com) · presence ● ? · graph ● online · 3 chats                          ││
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
-│╭────────────────────────────╮╭────────────────────────────────────────────────────────────────────╮│
-││ ◯ Ada Byron                ││Select a chat or channel · Enter to open · q to quit                ││
-││  Design Sync              ││                                                                    ││
-││  Ops Channel              ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-│╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────╯│
+│╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
+││ ◯ Ada Byron              ││Select a chat or channel · Enter to open · q to quit                  ││
+││  Design Sync            ││                                                                      ││
+││  Ops Channel            ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+│╰──────────────────────────╯╰──────────────────────────────────────────────────────────────────────╯│
 │╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
 ││ open a chat to compose                                                                           ││
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
-│ j/k move · l/Enter open · / filter · n new chat · ? help · q quit                                  │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
 {
   "0,0": {
@@ -77,21 +77,27 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "1,4": {
+    "bgColorMode": 33554432,
+    "bgColor": 235
+  },
   "4,4": {
     "fgColorMode": 16777216,
     "fgColor": 6,
     "bold": 134217728
   },
-  "13,4": {
+  "26,4": {
+    "bgColorMode": 0,
+    "bgColor": -1,
     "fgColorMode": 0,
     "fgColor": -1,
     "bold": 0
   },
-  "29,4": {
+  "27,4": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "83,4": {
+  "81,4": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -103,11 +109,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,5": {
+  "27,5": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,5": {
+  "29,5": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -119,11 +125,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,6": {
+  "27,6": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,6": {
+  "29,6": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -135,11 +141,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,7": {
+  "27,7": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,7": {
+  "29,7": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -151,11 +157,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,8": {
+  "27,8": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,8": {
+  "29,8": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -167,11 +173,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,9": {
+  "27,9": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,9": {
+  "29,9": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -183,11 +189,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,10": {
+  "27,10": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,10": {
+  "29,10": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -199,11 +205,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,11": {
+  "27,11": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,11": {
+  "29,11": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -215,11 +221,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,12": {
+  "27,12": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,12": {
+  "29,12": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -231,11 +237,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,13": {
+  "27,13": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,13": {
+  "29,13": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -247,11 +253,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,14": {
+  "27,14": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,14": {
+  "29,14": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -263,11 +269,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,15": {
+  "27,15": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,15": {
+  "29,15": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -279,11 +285,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,16": {
+  "27,16": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,16": {
+  "29,16": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -295,11 +301,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,17": {
+  "27,17": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,17": {
+  "29,17": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -311,11 +317,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,18": {
+  "27,18": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,18": {
+  "29,18": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -327,11 +333,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,19": {
+  "27,19": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,19": {
+  "29,19": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -343,11 +349,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,20": {
+  "27,20": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,20": {
+  "29,20": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -359,11 +365,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,21": {
+  "27,21": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,21": {
+  "29,21": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -375,11 +381,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,22": {
+  "27,22": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,22": {
+  "29,22": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -391,11 +397,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,23": {
+  "27,23": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,23": {
+  "29,23": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -407,11 +413,11 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,24": {
+  "27,24": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,24": {
+  "29,24": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -419,33 +425,37 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,27": {
+  "1,25": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "2,27": {
+  "27,25": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "24,27": {
+  "29,25": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "99,27": {
+  "99,25": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "0,29": {
+  "1,28": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "1,29": {
+  "2,28": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "66,29": {
+  "24,28": {
     "fgColorMode": 0,
     "fgColor": -1
+  },
+  "99,28": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
   }
 }
 `;
@@ -455,33 +465,33 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
 │╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
 ││  teaminal · You (example.com) · presence ● ? · graph ● online · 3 chats                          ││
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
-│╭────────────────────────────╮╭────────────────────────────────────────────────────────────────────╮│
-││ ◯ Ada Byron                ││Select a chat or channel · Enter to open · q to quit                ││
-││  Design Sync              ││                                                                    ││
-││  Ops Channel              ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-││                            ││                                                                    ││
-│╰────────────────────────────╯╰────────────────────────────────────────────────────────────────────╯│
+│╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
+││ ◯ Ada Byron              ││Select a chat or channel · Enter to open · q to quit                  ││
+││  Design Sync            ││                                                                      ││
+││  Ops Channel            ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+│╰──────────────────────────╯╰──────────────────────────────────────────────────────────────────────╯│
 │╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
 ││ open a chat to compose                                                                           ││
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
-│ j/k move · l/Enter open · / filter · n new chat · ? help · q quit                                  │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
 {
   "0,0": {
@@ -527,21 +537,27 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "1,4": {
+    "bgColorMode": 33554432,
+    "bgColor": 235
+  },
   "4,4": {
     "fgColorMode": 16777216,
     "fgColor": 6,
     "bold": 134217728
   },
-  "13,4": {
+  "26,4": {
+    "bgColorMode": 0,
+    "bgColor": -1,
     "fgColorMode": 0,
     "fgColor": -1,
     "bold": 0
   },
-  "29,4": {
+  "27,4": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "83,4": {
+  "81,4": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -553,11 +569,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,5": {
+  "27,5": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,5": {
+  "29,5": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -569,11 +585,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,6": {
+  "27,6": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,6": {
+  "29,6": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -585,11 +601,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,7": {
+  "27,7": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,7": {
+  "29,7": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -601,11 +617,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,8": {
+  "27,8": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,8": {
+  "29,8": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -617,11 +633,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,9": {
+  "27,9": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,9": {
+  "29,9": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -633,11 +649,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,10": {
+  "27,10": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,10": {
+  "29,10": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -649,11 +665,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,11": {
+  "27,11": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,11": {
+  "29,11": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -665,11 +681,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,12": {
+  "27,12": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,12": {
+  "29,12": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -681,11 +697,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,13": {
+  "27,13": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,13": {
+  "29,13": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -697,11 +713,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,14": {
+  "27,14": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,14": {
+  "29,14": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -713,11 +729,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,15": {
+  "27,15": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,15": {
+  "29,15": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -729,11 +745,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,16": {
+  "27,16": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,16": {
+  "29,16": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -745,11 +761,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,17": {
+  "27,17": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,17": {
+  "29,17": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -761,11 +777,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,18": {
+  "27,18": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,18": {
+  "29,18": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -777,11 +793,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,19": {
+  "27,19": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,19": {
+  "29,19": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -793,11 +809,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,20": {
+  "27,20": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,20": {
+  "29,20": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -809,11 +825,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,21": {
+  "27,21": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,21": {
+  "29,21": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -825,11 +841,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,22": {
+  "27,22": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,22": {
+  "29,22": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -841,11 +857,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,23": {
+  "27,23": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,23": {
+  "29,23": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -857,11 +873,11 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "29,24": {
+  "27,24": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "31,24": {
+  "29,24": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -869,33 +885,37 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,27": {
+  "1,25": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "2,27": {
+  "27,25": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "24,27": {
+  "29,25": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "99,27": {
+  "99,25": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "0,29": {
+  "1,28": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "1,29": {
+  "2,28": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "66,29": {
+  "24,28": {
     "fgColorMode": 0,
     "fgColor": -1
+  },
+  "99,28": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
   }
 }
 `;
