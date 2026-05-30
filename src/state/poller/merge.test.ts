@@ -64,6 +64,72 @@ describe('mergeChronological', () => {
     // 'a' has parsedTime=0; 'b' has positive time — 'a' sorts first.
     expect(merged.map((m) => m.id)).toEqual(['a', 'b'])
   })
+
+  // --- Reaction-preservation tests ---
+
+  test('incoming-without-reactions does not clobber existing-with-reactions (propagation window)', () => {
+    // Simulates: user reacted (optimistic), server poll returns same message
+    // without reactions (reaction not yet propagated). Existing reactions must
+    // survive the merge.
+    const reaction = { reactionType: 'like', user: { user: { id: 'user-1' } } }
+    const existing = [msg('m1', '2026-01-01T00:00:00Z', { reactions: [reaction] })]
+    // Server copy has no reactions key at all (typical for chatsvc path).
+    const incoming = [msg('m1', '2026-01-01T00:00:00Z')]
+    const merged = mergeChronological(existing, incoming)
+    expect(merged).toHaveLength(1)
+    expect(merged[0]?.reactions).toEqual([reaction])
+  })
+
+  test('incoming-without-reactions does not clobber when incoming has explicit empty array', () => {
+    // chatsvc sometimes returns reactions: [] explicitly; treated as "no reactions"
+    // from the server — existing optimistic reactions should still be preserved.
+    const reaction = { reactionType: 'heart', user: { user: { id: 'user-2' } } }
+    const existing = [msg('m1', '2026-01-01T00:00:00Z', { reactions: [reaction] })]
+    const incoming = [msg('m1', '2026-01-01T00:00:00Z', { reactions: [] })]
+    const merged = mergeChronological(existing, incoming)
+    expect(merged[0]?.reactions).toEqual([reaction])
+  })
+
+  test('incoming-with-reactions overrides existing reactions (server is authoritative)', () => {
+    // Once the server propagates the reaction, the server copy wins.
+    const serverReaction = { reactionType: 'like', user: { user: { id: 'user-1' } } }
+    const existing = [
+      msg('m1', '2026-01-01T00:00:00Z', {
+        reactions: [{ reactionType: 'heart', user: { user: { id: 'user-1' } } }],
+      }),
+    ]
+    const incoming = [msg('m1', '2026-01-01T00:00:00Z', { reactions: [serverReaction] })]
+    const merged = mergeChronological(existing, incoming)
+    expect(merged[0]?.reactions).toEqual([serverReaction])
+  })
+
+  test('incoming-with-reactions that clears all reactions is allowed (server authoritative)', () => {
+    // When the server returns a message WITH reactions field and it is non-empty,
+    // that value wins. The no-reactions case is handled above. Here we verify
+    // that the server value is used when it is present and non-empty even if the
+    // existing copy had different reactions.
+    const reaction = { reactionType: 'laugh', user: { user: { id: 'user-3' } } }
+    const existing = [
+      msg('m1', '2026-01-01T00:00:00Z', {
+        reactions: [{ reactionType: 'angry', user: { user: { id: 'user-3' } } }],
+      }),
+    ]
+    const incoming = [msg('m1', '2026-01-01T00:00:00Z', { reactions: [reaction] })]
+    const merged = mergeChronological(existing, incoming)
+    expect(merged[0]?.reactions).toEqual([reaction])
+  })
+
+  test('optimistic _sending messages are still preserved (no regression)', () => {
+    // Regression guard: reaction fix must not disturb optimistic-send preservation.
+    const existing = [
+      msg('m1', '2026-01-01T00:00:00Z'),
+      msg('temp-2', '2026-01-01T00:00:01Z', { _sending: true }),
+    ]
+    const incoming = [msg('m1', '2026-01-01T00:00:00Z')]
+    const merged = mergeChronological(existing, incoming)
+    expect(merged.map((m) => m.id)).toEqual(['m1', 'temp-2'])
+    expect(merged[1]?._sending).toBe(true)
+  })
 })
 
 describe('countNewMessages', () => {
