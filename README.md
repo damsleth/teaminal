@@ -151,6 +151,8 @@ warnings and fall back to defaults.
 | `inlineImageMaxRows`           | integer 1-50         |    `10` | Maximum terminal rows reserved for a single inline image.                                |
 | `statusBarPosition`            | `bottom`, `hidden`   | `bottom` | Where the status bar renders. `hidden` suppresses it entirely, freeing one row of vertical space in the message pane. |
 | `chatRoutingByAccount`         | object               |    `{}` | Per-account chat transport mode: `graph+ic3`, `ic3+graph`, `ic3-only`, or `graph-only`. |
+| `chatListWidth`                | integer or null      |  `null` | Explicit chat-list panel width in columns. `null` = automatic (~28% of terminal, clamped 18–60). Adjusted interactively with Ctrl-X resize mode. |
+| `composerHeight`               | integer or null      |  `null` | Explicit composer height in rows. `null` = automatic (from draft line count, clamped 3–10). Adjusted interactively with Ctrl-X resize mode. |
 
 <!-- prettier-ignore-end -->
 
@@ -207,39 +209,40 @@ The in-app Settings menu persists changes back to `config.json`.
 
 ## Keybindings
 
-| Keys           | When              | Action                                                         |
-| -------------- | ----------------- | -------------------------------------------------------------- |
-| `j` / Down     | list              | Move cursor down.                                              |
-| `k` / Up       | list              | Move cursor up.                                                |
-| `u` / PageUp   | list              | Move up half a page.                                           |
-| `d` / PageDown | list              | Move down half a page.                                         |
-| Enter          | list              | Open selected chat or channel.                                 |
-| Tab            | chat / channel    | Toggle between message navigation and composer.                |
-| Tab            | composer          | Return to message navigation.                                  |
-| Esc            | composer / filter | Leave mode.                                                    |
-| Esc            | anywhere else     | Toggle the menu overlay. Use `h` / Left to step back a pane.   |
-| Enter          | composer          | Send message.                                                  |
-| Ctrl+J         | composer          | Insert newline.                                                |
-| `/`            | list              | Filter chats.                                                  |
-| `n`            | list              | Open the new-chat prompt.                                      |
-| `m`            | list              | Toggle the focused chat read/unread.                           |
-| `a`            | Accounts          | Find valid `owa-piggy status` profiles to add.                 |
-| `d` / Delete   | Accounts          | Remove the focused account from teaminal's list.               |
-| `t`            | Accounts          | Cycle the focused account's chat routing mode.                 |
-| `h` / Left     | chat / channel    | Return to chat list.                                           |
-| `j` / Down     | chat / channel    | Focus next message.                                            |
-| `k` / Up       | chat / channel    | Focus previous message, or load older when focused at the top. |
-| `l` / Right    | chat / channel    | Jump to latest message.                                        |
-| `u` / PageUp   | chat / channel    | Move up half a page, or load older if that reaches the top.    |
-| `d` / PageDown | chat / channel    | Move down half a page.                                         |
-| `t`            | channel           | Open the thread for the focused channel message.               |
-| `/`            | chat / channel    | Search messages in the open conversation.                      |
-| Ctrl+A         | any               | Open the activity feed.                                        |
-| `?`            | list              | Show keybindings.                                              |
-| `r`            | any               | Refresh now.                                                   |
-| `Shift+R`      | any               | Hard refresh: clear visible data and reload from Graph.        |
-| `q`            | list / menu       | Quit.                                                          |
-| Ctrl+C         | any               | Quit.                                                          |
+| Keys           | When              | Action                                                              |
+| -------------- | ----------------- | ------------------------------------------------------------------- |
+| `j` / Down     | list              | Move cursor down.                                                   |
+| `k` / Up       | list              | Move cursor up.                                                     |
+| `u` / PageUp   | list              | Move up half a page.                                                |
+| `d` / PageDown | list              | Move down half a page.                                              |
+| Enter          | list              | Open selected chat or channel.                                      |
+| Tab            | chat / channel    | Toggle between message navigation and composer.                     |
+| Tab            | composer          | Return to message navigation.                                       |
+| Esc            | composer / filter | Leave mode.                                                         |
+| Esc            | anywhere else     | Toggle the menu overlay. Use `h` / Left to step back a pane.        |
+| Enter          | composer          | Send message.                                                       |
+| Ctrl+J         | composer          | Insert newline.                                                     |
+| `/`            | list              | Filter chats.                                                       |
+| `n`            | list              | Open the new-chat prompt.                                           |
+| `m`            | list              | Toggle the focused chat read/unread.                                |
+| `a`            | Accounts          | Find valid `owa-piggy status` profiles to add.                      |
+| `d` / Delete   | Accounts          | Remove the focused account from teaminal's list.                    |
+| `t`            | Accounts          | Cycle the focused account's chat routing mode.                      |
+| `h` / Left     | chat / channel    | Return to chat list.                                                |
+| `j` / Down     | chat / channel    | Focus next message.                                                 |
+| `k` / Up       | chat / channel    | Focus previous message, or load older when focused at the top.      |
+| `l` / Right    | chat / channel    | Jump to latest message.                                             |
+| `u` / PageUp   | chat / channel    | Move up half a page, or load older if that reaches the top.         |
+| `d` / PageDown | chat / channel    | Move down half a page.                                              |
+| `t`            | channel           | Open the thread for the focused channel message.                    |
+| `/`            | chat / channel    | Search messages in the open conversation.                           |
+| Ctrl+A         | any               | Open the activity feed.                                             |
+| Ctrl+X         | list              | Enter resize mode (h/l chat list, j/k composer, 0 reset, Esc done). |
+| `?`            | list              | Show keybindings.                                                   |
+| `r`            | any               | Refresh now.                                                        |
+| `Shift+R`      | any               | Hard refresh: clear visible data and reload from Graph.             |
+| `q`            | list / menu       | Quit.                                                               |
+| Ctrl+C         | any               | Quit.                                                               |
 
 Open the in-app keybindings reference with `?` from the list or
 through Help -> Keybindings.
