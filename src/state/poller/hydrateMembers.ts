@@ -10,6 +10,7 @@
 
 import { getChatsBatch } from '../../graph/chats'
 import type { Chat } from '../../types'
+import { indexNamesFromChats } from '../nameIndex'
 import type { AppState, Store } from '../store'
 import { isAbortError } from './intervals'
 
@@ -46,13 +47,14 @@ export async function hydrateMissingMembers(
     for (const id of result.hydrated.keys()) hydrated.add(id)
     for (const id of result.errors.keys()) hydrated.add(id) // don't retry per-chat 4xx
     if (result.hydrated.size > 0) {
-      store.set((s) => ({
-        chats: s.chats.map((c) => {
+      store.set((s) => {
+        const chats = s.chats.map((c) => {
           const full = result.hydrated.get(c.id)
           if (!full || !full.members || full.members.length === 0) return c
           return { ...c, members: full.members }
-        }),
-      }))
+        })
+        return { chats, nameByUserId: indexNamesFromChats(s.nameByUserId, chats) }
+      })
     }
   } catch (err) {
     if (isAbortError(err)) return

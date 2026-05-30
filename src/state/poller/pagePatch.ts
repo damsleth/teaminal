@@ -3,6 +3,7 @@
 // pages and optimistic sends; updates the unread tracker for chats.
 
 import type { ChatMessage } from '../../types'
+import { indexNamesFromMessages } from '../nameIndex'
 import { type AppState, type ConvKey, type Focus, emptyMessageCache, markChatRead } from '../store'
 import { mergeWithOptimistic, newestMessageId } from './merge'
 
@@ -77,6 +78,7 @@ export function mergeActivePagePatch(
       ...state.messageCursorByConvo,
       [conv]: nextCursor,
     },
+    nameByUserId: indexNamesFromMessages(state.nameByUserId, merged),
   }
   if (focus.kind === 'chat') {
     patch.unreadByChatId = markChatRead(state.unreadByChatId, focus.chatId, newestMessageId(merged))

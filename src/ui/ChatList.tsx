@@ -102,12 +102,18 @@ function buildRows(
   return rows
 }
 
-function rowLabel(item: SelectableItem, myUserId?: string, shortNames = false): string {
+function rowLabel(
+  item: SelectableItem,
+  myUserId?: string,
+  shortNames = false,
+  nameByUserId?: Record<string, string>,
+): string {
   // Chat rows respect the user's `chatListShortNames` setting. Default
   // (false) renders the full member display name; turning it on
   // collapses to first names. The MessagePane header always uses the
   // full form regardless.
-  if (item.kind === 'chat') return chatLabel(item.chat, myUserId, { compact: shortNames })
+  if (item.kind === 'chat')
+    return chatLabel(item.chat, myUserId, { compact: shortNames, nameByUserId })
   if (item.kind === 'team') return item.team.displayName
   return `# ${item.label}`
 }
@@ -194,6 +200,7 @@ export function ChatList() {
   const showMessagePreviews = useAppState((s) => s.settings.showMessagePreviews)
   const showPresence = useAppState((s) => s.settings.showPresenceInList)
   const memberPresence = useAppState((s) => s.memberPresence)
+  const nameByUserId = useAppState((s) => s.nameByUserId)
   const unreadByChatId = useAppState((s) => s.unreadByChatId)
   const tailEvents = useAppState((s) => s.settings.tailEvents)
   const tailNetwork = useAppState((s) => s.settings.tailNetwork)
@@ -211,7 +218,7 @@ export function ChatList() {
   // the data we actually depend on. (useAppState's selectors guarantee
   // referential stability of the store, not derived data, so we recompute
   // on every render - cheap given the list sizes.)
-  const all = buildSelectableList({ me, chats, teams, channelsByTeam })
+  const all = buildSelectableList({ me, chats, teams, channelsByTeam, nameByUserId })
   const items = filter ? all.filter((i) => itemMatchesFilter(i, filter)) : all
   const syntheticNewChatQuery =
     filter && items.length === 0 && isNewChatQueryCandidate(filter) ? filter.trim() : null
@@ -232,7 +239,7 @@ export function ChatList() {
     }
     const indent = density === 'cozy' ? rowIndent(row.item) : ''
     const cw = labelContentWidth(density, showPresence, indent)
-    const label = rowLabel(row.item, me?.id, shortNames)
+    const label = rowLabel(row.item, me?.id, shortNames, nameByUserId)
     const unread = row.item.kind === 'chat' ? unreadByChatId[row.item.chat.id] : undefined
     const hasMention = !!unread && unread.mentionCount > 0
     const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
@@ -350,7 +357,7 @@ export function ChatList() {
 
         const isSelected = row.index === safeCursor
         const indent = density === 'cozy' ? rowIndent(row.item) : ''
-        const label = rowLabel(row.item, me?.id, shortNames)
+        const label = rowLabel(row.item, me?.id, shortNames, nameByUserId)
         // Gutter glyph: 1:1 chats show a presence dot (when presence is
         // enabled), while meeting / group chats show a chat-type glyph so
         // they're distinguishable. Type glyphs need no fetched data, so they

@@ -8,6 +8,7 @@
 // are small (typically <100 chats, <30 teams * <20 channels).
 
 import type { AppState } from './store'
+import { resolveMemberName } from './nameIndex'
 import type { Channel, Chat, Team } from '../types'
 
 export type SelectableItem =
@@ -15,12 +16,18 @@ export type SelectableItem =
   | { kind: 'team'; team: Team }
   | { kind: 'channel'; team: Team; channel: Channel; label: string }
 
-export type SelectableInput = Pick<AppState, 'chats' | 'teams' | 'channelsByTeam' | 'me'>
+export type SelectableInput = Pick<AppState, 'chats' | 'teams' | 'channelsByTeam' | 'me'> & {
+  nameByUserId?: Record<string, string>
+}
 
 export function buildSelectableList(state: SelectableInput): SelectableItem[] {
   const items: SelectableItem[] = []
   for (const chat of state.chats) {
-    items.push({ kind: 'chat', chat, label: chatLabel(chat, state.me?.id) })
+    items.push({
+      kind: 'chat',
+      chat,
+      label: chatLabel(chat, state.me?.id, { nameByUserId: state.nameByUserId }),
+    })
   }
   for (const team of state.teams) {
     items.push({ kind: 'team', team })
@@ -42,20 +49,30 @@ export function buildSelectableList(state: SelectableInput): SelectableItem[] {
 // name only). The sidebar uses compact; the message-pane header uses
 // the full form so users can disambiguate "Carl Damsleth" from
 // "Carl Joakim Damsleth" / "Carl Boberg" at a glance.
-export function chatLabel(chat: Chat, myUserId?: string, opts?: { compact?: boolean }): string {
+export function chatLabel(
+  chat: Chat,
+  myUserId?: string,
+  opts?: { compact?: boolean; nameByUserId?: Record<string, string> },
+): string {
   const compact = opts?.compact ?? false
-  const fmt = (n: string | null | undefined): string => (compact ? shortName(n) : (n ?? '?'))
-
   if (chat.topic) return chat.topic
   const others = (chat.members ?? []).filter((m) => m.userId !== myUserId)
+  // Prefer a name resolved from message senders when the roster's
+  // displayName is missing or just an email (see nameIndex.ts).
+  const name = (i: number): string | null => resolveMemberName(others[i], opts?.nameByUserId)
+  const fmt = (i: number): string => {
+    const n = name(i)
+    return compact ? shortName(n) : (n ?? '?')
+  }
   if (others.length === 1) {
-    return compact ? shortName(others[0]?.displayName) : (others[0]?.displayName ?? '(unknown)')
+    const n = name(0)
+    return compact ? shortName(n) : (n ?? '(unknown)')
   }
   if (others.length === 2) {
-    return `${fmt(others[0]?.displayName)}, ${fmt(others[1]?.displayName)}`
+    return `${fmt(0)}, ${fmt(1)}`
   }
   if (others.length > 2) {
-    return `${fmt(others[0]?.displayName)}, ${fmt(others[1]?.displayName)}, +${others.length - 2}`
+    return `${fmt(0)}, ${fmt(1)}, +${others.length - 2}`
   }
   // Fall back to chat type when we have nothing else (members not hydrated yet)
   return chat.chatType === 'oneOnOne' ? '(1:1)' : chat.chatType === 'group' ? '(group)' : '(chat)'
