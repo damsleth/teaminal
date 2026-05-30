@@ -20,6 +20,13 @@ import {
   loadListCache,
   scheduleListCacheSave,
 } from '../src/state/listCachePersistence'
+import {
+  flushNameCache,
+  getNameCachePath,
+  loadNameCache,
+  scheduleNameCacheSave,
+} from '../src/state/nameCachePersistence'
+import { indexNamesFromChats, indexNamesFromMessages } from '../src/state/nameIndex'
 import { applySeededState, isSeededMode } from '../src/state/seedFixtures'
 import { App } from '../src/ui/App'
 import { ErrorBoundary } from '../src/ui/ErrorBoundary'
@@ -176,10 +183,14 @@ function hydrateCache(profile: string | null): void {
   try {
     const persisted = loadMessageCache(getMessageCachePath(process.env, profile))
     if (Object.keys(persisted).length > 0) {
-      store.set({
+      const messages = messagesFromCaches(persisted)
+      store.set((s) => ({
         messageCacheByConvo: persisted,
-        messagesByConvo: messagesFromCaches(persisted),
-      })
+        messagesByConvo: messages,
+        // Seed the name index from cached senders so 1:1 / group labels
+        // resolve real names before the first poll re-fetches messages.
+        nameByUserId: indexNamesFromMessages(s.nameByUserId, Object.values(messages).flat()),
+      }))
       debug(`bootstrap: hydrated ${Object.keys(persisted).length} cached conversations`)
     }
   } catch (err) {
@@ -190,6 +201,23 @@ function hydrateCache(profile: string | null): void {
   }
 }
 
+// Hydrate the per-profile userId -> name index so sidebar labels show
+// real names immediately, even for chats whose roster displayName is
+// missing or just an email. Merged with (not overwritten by) names
+// already seeded from the message/list caches above.
+function hydrateNameCache(profile: string | null): void {
+  try {
+    const persisted = loadNameCache(getNameCachePath(process.env, profile))
+    const count = Object.keys(persisted).length
+    if (count > 0) {
+      store.set((s) => ({ nameByUserId: { ...persisted, ...s.nameByUserId } }))
+      debug(`bootstrap: hydrated ${count} cached display names`)
+    }
+  } catch (err) {
+    warn('bootstrap: hydrate name cache failed:', err instanceof Error ? err.message : String(err))
+  }
+}
+
 // Hydrate the per-profile chat/teams list cache so the sidebar is
 // populated before the first list-poll completes. The poller overwrites
 // it on its first successful refresh; failure is silent.
@@ -197,11 +225,12 @@ function hydrateListCache(profile: string | null): void {
   try {
     const persisted = loadListCache(getListCachePath(process.env, profile))
     if (persisted) {
-      store.set({
+      store.set((s) => ({
         chats: persisted.chats,
         teams: persisted.teams,
         channelsByTeam: persisted.channelsByTeam,
-      })
+        nameByUserId: indexNamesFromChats(s.nameByUserId, persisted.chats),
+      }))
       debug(
         `bootstrap: hydrated ${persisted.chats.length} chats / ${persisted.teams.length} teams from list cache`,
       )
@@ -210,6 +239,7 @@ function hydrateListCache(profile: string | null): void {
     warn('bootstrap: hydrate list cache failed:', err instanceof Error ? err.message : String(err))
   }
 }
+hydrateNameCache(activeProfile)
 hydrateCache(activeProfile)
 hydrateListCache(activeProfile)
 
@@ -248,6 +278,18 @@ const listCacheSubscription = store.subscribe((s) => {
   )
 })
 
+// Persist the userId -> name index whenever it grows. Debounced; path
+// tracks the active profile. An empty index is the wiped post-switch
+// state, which must not clobber the previous profile's cached names.
+let lastSavedNames = store.get().nameByUserId
+let activeNameCachePath = getNameCachePath(process.env, activeProfile)
+const nameCacheSubscription = store.subscribe((s) => {
+  if (s.nameByUserId === lastSavedNames) return
+  lastSavedNames = s.nameByUserId
+  if (Object.keys(s.nameByUserId).length === 0) return
+  scheduleNameCacheSave(s.nameByUserId, undefined, activeNameCachePath)
+})
+
 // PollerHandleRef and current session handle are mutated by the
 // bootstrap + restart flows; the App reads ref.current inside event
 // handlers, so it observes the assignment without needing a re-render.
@@ -277,9 +319,7 @@ process.on('unhandledRejection', (reason) => {
 const focusTracker = startFocusTracker(store)
 // Seeded/offline mode must not touch the network: the forceAvailability driver
 // PUTs to presence.teams.microsoft.com, so stub it out when seeded.
-const forceAvailability = isSeededMode()
-  ? { stop() {} }
-  : startForceAvailabilityDriver(store)
+const forceAvailability = isSeededMode() ? { stop() {} } : startForceAvailabilityDriver(store)
 
 function makeSessionApi(): SessionApi {
   return {
@@ -310,10 +350,15 @@ async function switchAccount(nextProfile: string | null): Promise<void> {
   try {
     flushListCache()
   } catch {}
+  try {
+    flushNameCache()
+  } catch {}
   resetAccountScopedState(store)
   activeProfile = nextProfile
   activeCachePath = getMessageCachePath(process.env, activeProfile)
   activeListCachePath = getListCachePath(process.env, activeProfile)
+  activeNameCachePath = getNameCachePath(process.env, activeProfile)
+  hydrateNameCache(activeProfile)
   hydrateCache(activeProfile)
   hydrateListCache(activeProfile)
 
@@ -394,6 +439,9 @@ function showAuthExpiredModal(profile: string | null, message: string): void {
       listCacheSubscription()
     } catch {}
     try {
+      nameCacheSubscription()
+    } catch {}
+    try {
       if (currentSession) await currentSession.stop()
     } catch {}
     try {
@@ -410,6 +458,9 @@ function showAuthExpiredModal(profile: string | null, message: string): void {
     } catch {}
     try {
       flushListCache()
+    } catch {}
+    try {
+      flushNameCache()
     } catch {}
   }
 })()

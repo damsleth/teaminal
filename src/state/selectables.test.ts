@@ -132,6 +132,35 @@ describe('chatLabel', () => {
   test('compact mode does not change topic-driven labels', () => {
     expect(chatLabel(chat('c', { topic: 'Standup' }), undefined, { compact: true })).toBe('Standup')
   })
+
+  test('resolves a real name from nameByUserId when the roster has none', () => {
+    const c = chat('c', {
+      chatType: 'oneOnOne',
+      members: [
+        { id: 'm1', userId: 'me', displayName: 'Me' },
+        { id: 'm2', userId: 'other', displayName: null },
+      ],
+    })
+    expect(chatLabel(c, 'me')).toBe('(unknown)')
+    expect(chatLabel(c, 'me', { nameByUserId: { other: 'Tarjei Ormestøyl' } })).toBe(
+      'Tarjei Ormestøyl',
+    )
+  })
+
+  test('prefers the indexed name over an email-shaped roster displayName', () => {
+    const c = chat('c', {
+      chatType: 'oneOnOne',
+      members: [
+        { id: 'm1', userId: 'me', displayName: 'Me' },
+        { id: 'm2', userId: 'other', displayName: 'tarjei.ormestoyl@crayon.no' },
+      ],
+    })
+    // Without an index we still show the email rather than nothing.
+    expect(chatLabel(c, 'me')).toBe('tarjei.ormestoyl@crayon.no')
+    expect(chatLabel(c, 'me', { nameByUserId: { other: 'Ormestøyl, Tarjei E.' } })).toBe(
+      'Ormestøyl, Tarjei E.',
+    )
+  })
 })
 
 describe('clampCursor', () => {

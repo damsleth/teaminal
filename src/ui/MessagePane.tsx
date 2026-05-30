@@ -78,6 +78,7 @@ export function MessagePane(props: {
   const messagesByConvo = useAppState((s) => s.messagesByConvo)
   const messageCacheByConvo = useAppState((s) => s.messageCacheByConvo)
   const me = useAppState((s) => s.me)
+  const nameByUserId = useAppState((s) => s.nameByUserId)
   const chats = useAppState((s) => s.chats)
   const teams = useAppState((s) => s.teams)
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
@@ -141,6 +142,7 @@ export function MessagePane(props: {
         teams,
         channelsByTeam,
         me?.id,
+        nameByUserId,
       )
   const pageState = readMessagePageState(cache ?? messages)
   const loadMoreState =
@@ -886,11 +888,12 @@ function headerForFocus(
   teams: Team[],
   channelsByTeam: Record<string, Channel[]>,
   myUserId?: string,
+  nameByUserId?: Record<string, string>,
 ): string {
   if (focus.kind === 'chat') {
     const chat = chats.find((c) => c.id === focus.chatId)
     if (!chat) return `chat ${focus.chatId.slice(0, 16)}...`
-    return chatLabel(chat, myUserId)
+    return chatLabel(chat, myUserId, { nameByUserId })
   }
   const team = teams.find((t) => t.id === focus.teamId)
   const channel = (channelsByTeam[focus.teamId] ?? []).find((c) => c.id === focus.channelId)

@@ -17,6 +17,7 @@ import { fetchChatsAndTeams } from '../../graph/teamsCsa'
 import { recordEvent } from '../../log'
 import type { Channel, Chat, Team } from '../../types'
 import { mergeChatMembers } from './chatList'
+import { indexNamesFromChats } from '../nameIndex'
 import { runCrossChatMentionPass } from './crossChatMentions'
 import { fetchTeamsAndChannels } from './teamsAndChannels'
 import { hydrateMissingMembers } from './hydrateMembers'
@@ -140,13 +141,19 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
           durationMs: Date.now() - startedAt,
         })
         if (isStopped()) return
-        store.set((s) => ({
-          chats: mergeChatMembers(s.chats, chats),
-          teams: teamsAndChannels.teams,
-          channelsByTeam: teamsAndChannels.channelsByTeam,
-          conn: 'online',
-          lastListPollAt: new Date(),
-        }))
+        store.set((s) => {
+          const mergedChats = mergeChatMembers(s.chats, chats)
+          return {
+            chats: mergedChats,
+            teams: teamsAndChannels.teams,
+            channelsByTeam: teamsAndChannels.channelsByTeam,
+            conn: 'online',
+            lastListPollAt: new Date(),
+            // Harvest names from lastMessagePreview senders (covers chats
+            // never opened) and any usable roster displayNames.
+            nameByUserId: indexNamesFromChats(s.nameByUserId, mergedChats),
+          }
+        })
 
         // Fire-and-forget; helper has its own concurrency cap.
         hydrateMissingMembers(
