@@ -74,7 +74,7 @@ describe('toggleReaction', () => {
     expect(convMsgs(store)[0]!.reactions?.[0]!.reactionType).toBe('heart')
   })
 
-  it('removes the reaction when the same type is already set (toggle)', async () => {
+  it('removes the reaction when the same type is already set (per-type toggle)', async () => {
     let path = ''
     const store = setup(async (url) => {
       path = url
@@ -90,6 +90,50 @@ describe('toggleReaction', () => {
     await toggleReaction(store, 'c1', 'm1', 'like', me)
     expect(path).toContain('/messages/m1/unsetReaction')
     expect(convMsgs(store)[0]!.reactions).toEqual([])
+  })
+
+  it('adds a new type without removing the prior type (additive multi-reaction)', async () => {
+    const paths: string[] = []
+    const store = setup(async (url) => {
+      paths.push(url)
+      return ok()
+    })
+    // Seed with one existing reaction.
+    store.set({
+      messagesByConvo: {
+        'chat:c1': [
+          { ...convMsgs(store)[0]!, reactions: [{ reactionType: 'like', user: { user: me } }] },
+        ],
+      },
+    })
+    await toggleReaction(store, 'c1', 'm1', 'heart', me)
+    // Should have called setReaction (not unset).
+    expect(paths[0]).toContain('/messages/m1/setReaction')
+    // Both reactions must be present.
+    const types = convMsgs(store)[0]!.reactions!.map((r) => r.reactionType)
+    expect(types).toContain('like')
+    expect(types).toContain('heart')
+  })
+
+  it('removes only the targeted type, keeping other types intact', async () => {
+    const store = setup(ok)
+    // Seed with two reactions.
+    store.set({
+      messagesByConvo: {
+        'chat:c1': [
+          {
+            ...convMsgs(store)[0]!,
+            reactions: [
+              { reactionType: 'like', user: { user: me } },
+              { reactionType: 'heart', user: { user: me } },
+            ],
+          },
+        ],
+      },
+    })
+    await toggleReaction(store, 'c1', 'm1', 'like', me)
+    const reactions = convMsgs(store)[0]!.reactions!
+    expect(reactions.map((r) => r.reactionType)).toEqual(['heart'])
   })
 
   it('rolls back the optimistic reaction on failure', async () => {

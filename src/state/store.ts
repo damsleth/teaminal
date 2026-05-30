@@ -125,6 +125,9 @@ export type ModalState =
   // Full-size view of a focused inline image. Carries the InlineImageRef so
   // the modal can resolve the cached blob (or fetch it on open).
   | { kind: 'image'; ref: InlineImageRef }
+  // Edit-reactions overlay: lists the current user's reactions on a message
+  // so they can remove individual ones with j/k to move, x/Enter to remove.
+  | { kind: 'edit-reactions'; chatId: string; messageId: string }
   | AccountManagerModalState
   | AuthExpiredModalState
 

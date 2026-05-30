@@ -21,6 +21,21 @@ export function ownReactionType(message: ChatMessage, userId: string): string | 
   return null
 }
 
+// All reaction types the given user has currently set on this message.
+// Teams allows multiple distinct reactions per user per message.
+export function ownReactionTypes(message: ChatMessage, userId: string): string[] {
+  return (message.reactions ?? [])
+    .filter((r) => r.user?.user?.id === userId)
+    .map((r) => r.reactionType)
+}
+
+// True when the user already has a reaction of the exact given type.
+export function hasReactionType(message: ChatMessage, userId: string, type: string): boolean {
+  return (message.reactions ?? []).some(
+    (r) => r.user?.user?.id === userId && r.reactionType === type,
+  )
+}
+
 function mapMessage(
   messages: ChatMessage[],
   messageId: string,
@@ -35,8 +50,9 @@ function mapMessage(
   return changed ? next : messages
 }
 
-// Add `user`'s reaction of `reactionType`, replacing any reaction the same
-// user previously had on the message (Teams allows one reaction per user).
+// Add `user`'s reaction of `reactionType` additively — does NOT remove the
+// user's other-type reactions. Guard against duplicates: if the user already
+// has that exact type this is a no-op so the reactions array is stable.
 export function applyReaction(
   messages: ChatMessage[],
   messageId: string,
@@ -44,17 +60,34 @@ export function applyReaction(
   user: IdentityUser,
 ): ChatMessage[] {
   return mapMessage(messages, messageId, (m) => {
-    const others = (m.reactions ?? []).filter((r) => r.user?.user?.id !== user.id)
+    // No-op if the user already has this exact type.
+    if (hasReactionType(m, user.id, reactionType)) return m
     const reaction: Reaction = {
       reactionType,
       createdDateTime: undefined,
       user: { user },
     }
-    return { ...m, reactions: [...others, reaction] }
+    return { ...m, reactions: [...(m.reactions ?? []), reaction] }
   })
 }
 
-// Remove `user`'s reaction (of any type) from the message.
+// Remove ONLY the (user, type) pair from the message, leaving the user's
+// other-type reactions intact.
+export function removeReactionType(
+  messages: ChatMessage[],
+  messageId: string,
+  userId: string,
+  type: string,
+): ChatMessage[] {
+  return mapMessage(messages, messageId, (m) => {
+    const reactions = (m.reactions ?? []).filter(
+      (r) => !(r.user?.user?.id === userId && r.reactionType === type),
+    )
+    return { ...m, reactions }
+  })
+}
+
+// Remove `user`'s reactions of ALL types from the message.
 export function removeReaction(
   messages: ChatMessage[],
   messageId: string,
