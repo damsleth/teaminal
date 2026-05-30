@@ -41,6 +41,7 @@ import {
 } from './kittyGraphics'
 import { ensureImageFetched, getImageData } from '../state/imageCache'
 import { getActiveProfile } from '../graph/client'
+import { pickerAnchorCol } from './pickerAnchor'
 
 export { effectiveSenderName, isRenderableMessage } from './renderableMessage'
 
@@ -300,10 +301,11 @@ export function MessagePane(props: {
   // While the reaction picker is open we delegate to the macOS Character
   // Viewer, which anchors to the terminal's text cursor (after an Ink render
   // that sits at the bottom-left prompt). Park the cursor on the focused
-  // message's row — re-applied after every render so a background re-render
-  // can't snap it back — so the system picker pops next to the message being
-  // reacted to. Best-effort: the row is approximate and exact placement is
-  // ultimately up to the terminal/IME.
+  // message's row at the END of the message body's last wrapped line — so the
+  // system picker pops at the trailing edge of the message being reacted to,
+  // rather than the far-left of the message pane. Re-applied after every
+  // render so a background re-render can't snap it back. Best-effort: row and
+  // column are approximate; exact placement is up to the terminal/IME.
   useEffect(() => {
     if (!stdout || !reactionPickerOpen) return
     const idx = rows.findIndex(
@@ -319,7 +321,26 @@ export function MessagePane(props: {
     const preludeRows =
       cozyRows + (searchActive ? 1 : 0) + (isLoadingOlder && !showingHistoryTop ? 1 : 0)
     const row = 4 + 1 + preludeRows + rowsBefore
-    const col = listPaneWidth + 3
+    // Compute the column at the end of the focused message body's last wrapped
+    // line. `messageBodyTerminalColumn` gives the 1-based terminal column where
+    // the body text begins; `pickerAnchorCol` adds the display width of the
+    // last wrapped line so the picker anchors to the trailing edge.
+    const focusedRow = rows[idx]
+    const focusedMsg = focusedRow?.kind === 'message' ? focusedRow.message : null
+    const bodyText = focusedMsg ? previewBody(focusedMsg) : ''
+    const bodyStartCol = messageBodyTerminalColumn({
+      senderColWidth,
+      showTimestamps,
+      listPaneWidth,
+    })
+    const fallbackCol = listPaneWidth + 3
+    const col = pickerAnchorCol({
+      bodyText,
+      bodyStartCol,
+      messageTextColumns,
+      fallbackCol,
+      terminalColumns: terminalSize.columns,
+    })
     stdout.write(`\x1b[${row};${col}H`)
   })
 
