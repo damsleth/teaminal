@@ -47,6 +47,7 @@ import { NetworkModal } from './NetworkModal'
 import { NewChatPrompt } from './NewChatPrompt'
 import { ReactionPickerModal } from './ReactionPickerModal'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
+import { EditReactionsModal } from './EditReactionsModal'
 import { ImageModal } from './ImageModal'
 import { MessageSearchModal } from './MessageSearchModal'
 import { TailPanels } from './TailPanels'
@@ -450,6 +451,7 @@ export function App() {
     | 'confirm-delete'
     | 'message-search-global'
     | 'image'
+    | 'edit-reactions'
     | null = modal && modal.kind !== 'auth-expired' ? modal.kind : null
   const replaceModal = modal?.kind === 'auth-expired' ? modal : null
   const showTailPanels = shouldShowTailPanels(modal)
@@ -533,6 +535,8 @@ export function App() {
                     <MessageSearchModal />
                   ) : overlayModalKind === 'image' ? (
                     <ImageModal />
+                  ) : overlayModalKind === 'edit-reactions' ? (
+                    <EditReactionsModal />
                   ) : (
                     <NetworkModal />
                   )}

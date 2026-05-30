@@ -4,8 +4,11 @@ import {
   applyDelete,
   applyEdit,
   applyReaction,
+  hasReactionType,
   ownReactionType,
+  ownReactionTypes,
   removeReaction,
+  removeReactionType,
 } from './messageMutations'
 
 const me: IdentityUser = { id: 'me-1', displayName: 'Me' }
@@ -32,13 +35,61 @@ describe('ownReactionType', () => {
   })
 })
 
+describe('ownReactionTypes', () => {
+  it('returns all types the user has set', () => {
+    const m = msg({
+      reactions: [
+        { reactionType: 'like', user: { user: me } },
+        { reactionType: 'heart', user: { user: me } },
+        { reactionType: 'laugh', user: { user: other } },
+      ],
+    })
+    expect(ownReactionTypes(m, me.id)).toEqual(['like', 'heart'])
+  })
+
+  it('returns empty array when user has no reactions', () => {
+    const m = msg({ reactions: [{ reactionType: 'like', user: { user: other } }] })
+    expect(ownReactionTypes(m, me.id)).toEqual([])
+  })
+
+  it('returns empty array when message has no reactions', () => {
+    expect(ownReactionTypes(msg(), me.id)).toEqual([])
+  })
+})
+
+describe('hasReactionType', () => {
+  it('returns true when user has that exact type', () => {
+    const m = msg({ reactions: [{ reactionType: 'like', user: { user: me } }] })
+    expect(hasReactionType(m, me.id, 'like')).toBe(true)
+  })
+
+  it('returns false when user has a different type', () => {
+    const m = msg({ reactions: [{ reactionType: 'like', user: { user: me } }] })
+    expect(hasReactionType(m, me.id, 'heart')).toBe(false)
+  })
+
+  it('returns false when user has no reactions', () => {
+    expect(hasReactionType(msg(), me.id, 'like')).toBe(false)
+  })
+})
+
 describe('applyReaction', () => {
   it('adds the reaction to the target message', () => {
     const next = applyReaction([msg()], 'm1', 'like', me)
-    expect(next[0]!.reactions).toEqual([{ reactionType: 'like', createdDateTime: undefined, user: { user: me } }])
+    expect(next[0]!.reactions).toEqual([
+      { reactionType: 'like', createdDateTime: undefined, user: { user: me } },
+    ])
   })
 
-  it('replaces the user\'s existing reaction but keeps others', () => {
+  it('adds a second distinct type without removing the first (additive)', () => {
+    const m = msg({ reactions: [{ reactionType: 'like', user: { user: me } }] })
+    const next = applyReaction([m], 'm1', 'heart', me)
+    const reactions = next[0]!.reactions!
+    const myReactions = reactions.filter((r) => r.user?.user?.id === me.id)
+    expect(myReactions.map((r) => r.reactionType)).toEqual(['like', 'heart'])
+  })
+
+  it("preserves other users' reactions when adding", () => {
     const m = msg({
       reactions: [
         { reactionType: 'like', user: { user: me } },
@@ -47,10 +98,18 @@ describe('applyReaction', () => {
     })
     const next = applyReaction([m], 'm1', 'heart', me)
     const reactions = next[0]!.reactions!
-    expect(reactions.filter((r) => r.user?.user?.id === me.id)).toEqual([
-      { reactionType: 'heart', createdDateTime: undefined, user: { user: me } },
-    ])
-    expect(reactions.some((r) => r.user?.user?.id === other.id && r.reactionType === 'laugh')).toBe(true)
+    expect(reactions.some((r) => r.user?.user?.id === other.id && r.reactionType === 'laugh')).toBe(
+      true,
+    )
+  })
+
+  it('is a no-op (same reference) when user already has that exact type', () => {
+    const m = msg({ reactions: [{ reactionType: 'like', user: { user: me } }] })
+    const arr = [m]
+    const next = applyReaction(arr, 'm1', 'like', me)
+    // The message object should be the same reference (no change)
+    expect(next[0]!.reactions).toHaveLength(1)
+    expect(next[0]!.reactions![0]!.reactionType).toBe('like')
   })
 
   it('returns the same array reference when the message is absent', () => {
@@ -65,16 +124,42 @@ describe('applyReaction', () => {
   })
 })
 
-describe('removeReaction', () => {
-  it('drops only the user\'s reaction', () => {
+describe('removeReactionType', () => {
+  it('removes only the matching (user, type) pair', () => {
     const m = msg({
       reactions: [
         { reactionType: 'like', user: { user: me } },
+        { reactionType: 'heart', user: { user: me } },
+        { reactionType: 'like', user: { user: other } },
+      ],
+    })
+    const next = removeReactionType([m], 'm1', me.id, 'like')
+    const reactions = next[0]!.reactions!
+    expect(reactions.filter((r) => r.user?.user?.id === me.id).map((r) => r.reactionType)).toEqual([
+      'heart',
+    ])
+    expect(reactions.some((r) => r.user?.user?.id === other.id)).toBe(true)
+  })
+
+  it('is a no-op when the user does not have that type', () => {
+    const m = msg({ reactions: [{ reactionType: 'like', user: { user: me } }] })
+    const next = removeReactionType([m], 'm1', me.id, 'heart')
+    expect(next[0]!.reactions).toHaveLength(1)
+  })
+})
+
+describe('removeReaction', () => {
+  it("drops all of the user's reactions", () => {
+    const m = msg({
+      reactions: [
+        { reactionType: 'like', user: { user: me } },
+        { reactionType: 'heart', user: { user: me } },
         { reactionType: 'like', user: { user: other } },
       ],
     })
     const next = removeReaction([m], 'm1', me.id)
-    expect(next[0]!.reactions).toEqual([{ reactionType: 'like', user: { user: other } }])
+    expect(next[0]!.reactions!.filter((r) => r.user?.user?.id === me.id)).toHaveLength(0)
+    expect(next[0]!.reactions!.some((r) => r.user?.user?.id === other.id)).toBe(true)
   })
 })
 

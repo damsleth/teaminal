@@ -86,3 +86,19 @@ describe('reactionsSummary', () => {
     expect(reactionsSummary([r('😆'), r('😆'), r('❤️')])).toBe('😆2|❤️')
   })
 })
+
+describe('aggregateReactions — multi-reaction per user', () => {
+  test('user with two distinct reactions shows both buckets', () => {
+    // User A has both like and heart; both should appear as separate buckets.
+    const out = aggregateReactions([
+      r('like', undefined, 'A'),
+      r('heart', undefined, 'A'),
+      r('like', undefined, 'B'),
+    ])
+    expect(out.find((b) => b.reactionType === 'like')?.count).toBe(2)
+    expect(out.find((b) => b.reactionType === 'heart')?.count).toBe(1)
+    // Both buckets include A's name.
+    expect(out.find((b) => b.reactionType === 'like')?.users).toContain('A')
+    expect(out.find((b) => b.reactionType === 'heart')?.users).toContain('A')
+  })
+})
