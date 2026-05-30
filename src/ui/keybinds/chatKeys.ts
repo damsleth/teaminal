@@ -160,6 +160,15 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
       })
       return 'handled'
     }
+    // 't' opens the edit-reactions modal to view / remove the user's
+    // existing reactions on the focused message.
+    if (ch === 't') {
+      store.set({
+        modal: { kind: 'edit-reactions', chatId, messageId: msg.id },
+        inputZone: 'menu',
+      })
+      return 'handled'
+    }
     // 'e' edits the focused message (own, non-deleted, non-system only).
     if (ch === 'e' && isOwnEditableMessage(msg, ctx.myUserId)) {
       store.set({ editingMessageId: msg.id, inputZone: 'composer' })

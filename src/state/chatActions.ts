@@ -36,8 +36,8 @@ import {
   applyDelete,
   applyEdit,
   applyReaction,
-  ownReactionType,
-  removeReaction,
+  hasReactionType,
+  removeReactionType,
 } from './messageMutations'
 import type { AppState, Store } from './store'
 
@@ -134,11 +134,7 @@ export async function postChannelReply(
 
 const chatConvKey = (chatId: string): string => `chat:${chatId}`
 
-function setConvMessages(
-  store: Store<AppState>,
-  convKey: string,
-  next: ChatMessage[],
-): void {
+function setConvMessages(store: Store<AppState>, convKey: string, next: ChatMessage[]): void {
   store.set((s) => ({
     messagesByConvo: { ...s.messagesByConvo, [convKey]: next },
   }))
@@ -160,15 +156,21 @@ async function withOptimisticChatUpdate(
     await commit()
   } catch (err) {
     setConvMessages(store, convKey, snapshot)
-    recordEvent('graph', 'warn', `${label} failed: ${err instanceof Error ? err.message : String(err)}`)
+    recordEvent(
+      'graph',
+      'warn',
+      `${label} failed: ${err instanceof Error ? err.message : String(err)}`,
+    )
     throw err
   }
 }
 
 /**
- * Toggle the current user's reaction on a chat message. Reacting with the
- * type already set removes it; any other type replaces the existing one
- * (Teams allows a single reaction per user per message).
+ * Toggle the current user's reaction of the given type on a chat message.
+ * Per-type semantics: if the user already has THAT exact type, unset just
+ * that type; otherwise add it as an ADDITIONAL reaction (Teams allows
+ * multiple distinct reactions per user per message). Picking a new emoji
+ * thus adds to the user's reactions while picking the same emoji removes it.
  */
 export async function toggleReaction(
   store: Store<AppState>,
@@ -179,15 +181,14 @@ export async function toggleReaction(
 ): Promise<void> {
   const convKey = chatConvKey(chatId)
   const message = (store.get().messagesByConvo[convKey] ?? []).find((m) => m.id === messageId)
-  const existing = message ? ownReactionType(message, me.id) : null
-  const removing = existing === reactionType
+  const removing = message ? hasReactionType(message, me.id, reactionType) : false
 
   await withOptimisticChatUpdate(
     store,
     chatId,
     (messages) =>
       removing
-        ? removeReaction(messages, messageId, me.id)
+        ? removeReactionType(messages, messageId, me.id, reactionType)
         : applyReaction(messages, messageId, reactionType, me),
     () =>
       removing
