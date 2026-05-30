@@ -110,4 +110,43 @@ describe('resolveTheme', () => {
     expect(theme.background).toBe(builtinThemes.dark.background)
     expect(theme.layout).toEqual(builtinThemes.dark.layout)
   })
+
+  test('selectedRowBackground is set on both built-in themes', () => {
+    const dark = resolveTheme({ ...defaultSettings, theme: 'dark' })
+    expect(typeof dark.selectedRowBackground).toBe('string')
+    expect(dark.selectedRowBackground).not.toBeNull()
+
+    const light = resolveTheme({ ...defaultSettings, theme: 'light' })
+    expect(typeof light.selectedRowBackground).toBe('string')
+    expect(light.selectedRowBackground).not.toBeNull()
+
+    // The two built-in values must differ (dark/light distinction)
+    expect(dark.selectedRowBackground).not.toBe(light.selectedRowBackground)
+  })
+
+  test('selectedRowBackground themeOverrides value overrides the built-in', () => {
+    const theme = resolveTheme({
+      ...defaultSettings,
+      theme: 'dark',
+      themeOverrides: { selectedRowBackground: '#333333' },
+    })
+    expect(theme.selectedRowBackground).toBe('#333333')
+  })
+
+  test('selectedRowBackground themeOverrides null overrides to null', () => {
+    const theme = resolveTheme({
+      ...defaultSettings,
+      theme: 'dark',
+      themeOverrides: { selectedRowBackground: null },
+    })
+    expect(theme.selectedRowBackground).toBeNull()
+  })
+
+  test('selectedRowBackground from a partial custom theme is merged correctly', () => {
+    const theme = resolveTheme(
+      { ...defaultSettings, theme: 'dark' },
+      { selectedRowBackground: '#1a1a1a' },
+    )
+    expect(theme.selectedRowBackground).toBe('#1a1a1a')
+  })
 })
