@@ -6,6 +6,45 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-05-31
+
+### Added
+
+- **Keyboard-driven resizable panes.** `Ctrl-X` enters a transient resize
+  mode: `h`/`l` (or Left/Right) adjust the chat-list width, `j`/`k` (or
+  Down/Up) adjust the composer height, `0` resets the focused dimension to
+  automatic, and `Esc`/`Enter` leaves the mode. Widths and heights derive
+  sane defaults from terminal dimensions and clamp to keep the conversation
+  usable on small terminals; explicit overrides persist in config.
+- **Edit-reactions modal on `t`.** Bound next to `r`, it lists the current
+  user's reactions on the focused message and lets you remove individual
+  ones — needed now that a user can hold several reactions on one message.
+
+### Changed
+
+- **Multiple reactions per user per message.** Picking a new emoji now
+  *adds* a reaction instead of replacing the existing one, matching Teams'
+  behaviour where a user can react several times to the same message.
+- **System emoji picker anchors to the end of the focused message body**
+  (where reactions hang off the message) instead of the far-left of the
+  row — the cursor moves to the computed end-of-body column before the
+  picker opens.
+- **Focused chat in the chat list now renders a contiguous full-row
+  highlight bar**, with a background colour slightly off from the theme
+  base (white in light, black in dark) for clearer focus visibility.
+- **Reaction picker no longer draws a redundant "React" overlay box.** On
+  macOS the system Character Viewer alone drives emoji selection; the
+  picker still captures the inserted glyph and handles `Esc`, but leaves no
+  leftover box in the message pane.
+
+### Fixed
+
+- **Reactions persist across poll/cache merges.** Optimistic reactions
+  previously vanished after seconds-to-a-minute and were gone on re-opening
+  the conversation. The poller/cache merge no longer drops them, so a
+  reaction survives leaving and re-entering the conversation as it does in
+  the real Teams client.
+
 ## [0.17.1] - 2026-05-30
 
 ### Fixed
@@ -935,7 +974,8 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.17.1...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/damsleth/teaminal/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/damsleth/teaminal/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/damsleth/teaminal/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/damsleth/teaminal/compare/v0.15.0...v0.16.0
