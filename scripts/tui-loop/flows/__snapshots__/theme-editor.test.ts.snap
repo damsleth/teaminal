@@ -1,0 +1,1316 @@
+// TUI Test Snapshot v1
+
+exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = String.raw`
+╭────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
+││  teaminal · You (example.com) · presence ● ? · graph ● online · 3 chats                          ││
+│╰──────────────────────────────╭────────────────────────────────────────────────────────────────╮──╯│
+│╭──────────────────────────╮╭──│                                                                │──╮│
+││Chats                     ││Se│   Theme editor                                                 │  ││
+││ ◯ > Ada Byron            ││  │   • = overridden · adjust live, persists to config             │  ││
+││Ada: The launch notes are ││  │   ── Spacing / Layout                                          │  ││
+││ ready for review.        ││  │   >   Pane padding X        1 (0–6)                            │  ││
+││    Design Sync          ││  │       Modal padding X       3                                  │  ││
+││Nina: Nina shared two     ││  │       Modal padding Y       1                                  │  ││
+││compact layout options.   ││  │       Pane header pad L     1                                  │  ││
+││    Ops Channel          ││  │       Pane header gap B     1                                  │  ││
+││Mina: Deploy is green in  ││  │       Tail strip gap        1                                  │  ││
+││the EU region.            ││  │       Chat list pad R       1                                  │  ││
+││                          ││  │   ── Colors                                                    │  ││
+││                          ││  │       Background            ██ black                           │  ││
+││                          ││  │      ↓ 28 more                                                 │  ││
+││                          ││  │                                                                │  ││
+││                          ││  │   ╭────────────────────────────────────────────────────────╮   │  ││
+││                          ││  │   │Ada  Sample message body  12:34                         │   │  ││
+││                          ││  │   │  Selected chat row                                     │   │  ││
+││                          ││  │   │  Unread chat · 3 new                                   │   │  ││
+││                          ││  │   │You  · joined the chat                                  │   │  ││
+││                          ││  │   │error warn info                                         │   │  ││
+││                          ││  │   ╰────────────────────────────────────────────────────────╯   │  ││
+│╰──────────────────────────╯╰──│   ↑↓ field · ←→ adjust · e hex · r reset · R reset all · esc   │──╯│
+│╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
+││ open a chat to compose       ╰────────────────────────────────────────────────────────────────╯  ││
+│╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
+│ menu open                                                                                          │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
+{
+  "0,0": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 8,
+    "blink": 0,
+    "bold": 0,
+    "dim": 0,
+    "inverse": 0,
+    "invisible": 0,
+    "italic": 0,
+    "overline": 0,
+    "strike": 0,
+    "underline": 0
+  },
+  "1,1": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "3,1": {
+    "bold": 134217728
+  },
+  "11,1": {
+    "fgColorMode": 16777216,
+    "fgColor": 8,
+    "bold": 0
+  },
+  "55,1": {
+    "fgColorMode": 16777216,
+    "fgColor": 2
+  },
+  "56,1": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "73,1": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,1": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "31,2": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,2": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "31,3": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,3": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,3": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,3": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,4": {
+    "fgColorMode": 0,
+    "fgColor": -1,
+    "bold": 134217728
+  },
+  "6,4": {
+    "bold": 0
+  },
+  "27,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "31,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,4": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,4": {
+    "bold": 134217728
+  },
+  "87,4": {
+    "bold": 0
+  },
+  "96,4": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,4": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,5": {
+    "bgColorMode": 33554432,
+    "bgColor": 235
+  },
+  "4,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "6,5": {
+    "bold": 134217728
+  },
+  "26,5": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 0,
+    "fgColor": -1,
+    "bold": 0
+  },
+  "27,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,5": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,5": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "87,5": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,5": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,5": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "26,6": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,6": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,6": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "87,6": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,6": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,6": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "19,7": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,7": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,7": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "37,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 3
+  },
+  "39,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 6,
+    "bold": 134217728
+  },
+  "61,7": {
+    "bold": 0
+  },
+  "62,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "68,7": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,7": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,7": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "3,8": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,8": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,8": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "37,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 3
+  },
+  "39,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "62,8": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,8": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,8": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "23,9": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,9": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,9": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "37,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 3
+  },
+  "39,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "62,9": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,9": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,9": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "24,10": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,10": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,10": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "37,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 3
+  },
+  "39,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "62,10": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,10": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,10": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "3,11": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,11": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,11": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "37,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 3
+  },
+  "39,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "62,11": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,11": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,11": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "26,12": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,12": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,12": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "37,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 3
+  },
+  "39,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "62,12": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,12": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,12": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "15,13": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,13": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,13": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "37,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 3
+  },
+  "39,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "62,13": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,13": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,13": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,14": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,14": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,14": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "87,14": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,14": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,14": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,15": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,15": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,15": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "37,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 3
+  },
+  "39,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "61,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 0
+  },
+  "63,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "69,15": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,15": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,15": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,16": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,16": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,16": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "87,16": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,16": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,16": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,17": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,17": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,17": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,17": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,17": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,18": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,18": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,18": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,18": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,18": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,18": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "93,18": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,18": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,18": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,18": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,19": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,19": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,19": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,19": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "36,19": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 16777216,
+    "fgColor": 7,
+    "bold": 134217728
+  },
+  "41,19": {
+    "bold": 0
+  },
+  "62,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "67,19": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "92,19": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "93,19": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,19": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,19": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,20": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,20": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,20": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,20": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "36,20": {
+    "bgColorMode": 33554432,
+    "bgColor": 235,
+    "fgColorMode": 16777216,
+    "fgColor": 6,
+    "bold": 134217728
+  },
+  "88,20": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1,
+    "bold": 0
+  },
+  "92,20": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "93,20": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,20": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,20": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,21": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,21": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,21": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,21": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "36,21": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 16777216,
+    "fgColor": 3,
+    "bold": 134217728
+  },
+  "88,21": {
+    "fgColorMode": 0,
+    "fgColor": -1,
+    "bold": 0
+  },
+  "92,21": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "93,21": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,21": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,21": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,22": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,22": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,22": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,22": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "36,22": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 16777216,
+    "fgColor": 4
+  },
+  "41,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "58,22": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "92,22": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "93,22": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,22": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,22": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,23": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,23": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,23": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,23": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "36,23": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 16777216,
+    "fgColor": 1
+  },
+  "42,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 3
+  },
+  "47,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "51,23": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "92,23": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "93,23": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,23": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,23": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,24": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,24": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,24": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,24": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "93,24": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,24": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,24": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "31,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "32,25": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "93,25": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "96,25": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,27": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "2,27": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "24,27": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "31,27": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "97,27": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,27": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "0,29": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "1,29": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "10,29": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  }
+}
+`;
+

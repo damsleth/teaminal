@@ -34,6 +34,7 @@ import {
 import type { Settings } from '../state/store'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useSessionApi } from './SessionContext'
+import { openThemeEditor } from './ThemeEditorModal'
 import { clearProfileCaches } from '../state/cacheClear'
 import { updateSettings } from '../config'
 import { recordEvent, warn } from '../log'
@@ -177,6 +178,9 @@ export function MenuModal() {
         })
         return
       }
+      case 'show-theme-editor':
+        openThemeEditor(store)
+        return
       case 'show-keybinds':
         store.set({ modal: { kind: 'keybinds' }, inputZone: 'menu' })
         return

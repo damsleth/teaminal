@@ -8,6 +8,7 @@ import {
   loadConfig,
   loadSettings,
   mergeSettings,
+  replaceThemeOverrides,
   saveConfig,
   settingsToConfig,
   updateConfig,
@@ -278,6 +279,53 @@ describe('saveConfig/updateConfig', () => {
     expect(next.themeOverrides?.borders?.modal).toBe('double')
     expect(next.themeOverrides?.emphasis?.selectedBold).toBe(true)
     expect(next.themeOverrides?.emphasis?.unreadBold).toBe(false)
+  })
+})
+
+describe('replaceThemeOverrides', () => {
+  test('replaces overrides wholesale, deleting keys absent from the new set', async () => {
+    writeFileSync(
+      cfgPath,
+      JSON.stringify({
+        theme: 'dark',
+        themeOverrides: {
+          selected: 'cyan',
+          timestamp: 'gray',
+          layout: { modalPaddingX: 3, panePaddingX: 2 },
+        },
+      }),
+    )
+
+    const next = await replaceThemeOverrides({ background: 'magenta' }, cfgPath)
+
+    // The new set wins entirely — old keys are gone, not merged.
+    expect(next.themeOverrides).toEqual({ background: 'magenta' })
+    expect(next.theme).toBe('dark') // other settings untouched
+
+    const loaded = loadSettings(cfgPath)
+    expect(loaded.settings.themeOverrides).toEqual({ background: 'magenta' })
+    expect(loaded.warnings).toEqual([])
+  })
+
+  test('clears overrides back to {}', async () => {
+    writeFileSync(cfgPath, JSON.stringify({ themeOverrides: { selected: 'cyan' } }))
+    const next = await replaceThemeOverrides({}, cfgPath)
+    expect(next.themeOverrides).toEqual({})
+    expect(loadSettings(cfgPath).settings.themeOverrides).toEqual({})
+  })
+
+  test('validates the incoming overrides, dropping invalid values', async () => {
+    const warnings: string[] = []
+    const next = await replaceThemeOverrides(
+      { selected: 'magenta', timestamp: 'notacolor' as string } as never,
+      cfgPath,
+    )
+    expect(next.themeOverrides.selected).toBe('magenta')
+    expect(next.themeOverrides.timestamp).toBeUndefined()
+    // Re-load is clean: the bad value never reached disk.
+    const loaded = loadSettings(cfgPath)
+    expect(loaded.warnings).toEqual([])
+    void warnings
   })
 })
 

@@ -204,6 +204,28 @@ export async function updateSettings(
   return configToSettings(config, warnings)
 }
 
+/**
+ * Replace `themeOverrides` wholesale, validating through the same
+ * validateThemeOverrides path used on load.
+ *
+ * updateSettings/updateConfig deep-MERGE themeOverrides (so a partial patch
+ * can't clobber sibling tokens), which means they can never *remove* a key.
+ * The live theme editor holds the complete override set in the store and
+ * needs delete semantics for per-field / global reset, so it persists the
+ * full object through this replace path instead.
+ */
+export async function replaceThemeOverrides(
+  overrides: ThemeOverrides,
+  path: string = getConfigPath(),
+): Promise<Settings> {
+  const current = loadSettings(path).settings
+  const warnings: string[] = []
+  const validated = validateThemeOverrides(overrides, warnings) ?? {}
+  const next: Settings = { ...current, themeOverrides: validated }
+  writeConfigAtomically(settingsToConfig(next), path)
+  return next
+}
+
 export function configToSettings(
   config: Record<string, unknown>,
   warnings: string[] = [],
@@ -599,7 +621,7 @@ function validateChatRoutingByAccount(
   return out
 }
 
-function validateThemeOverrides(value: unknown, warnings: string[]): ThemeOverrides | null {
+export function validateThemeOverrides(value: unknown, warnings: string[]): ThemeOverrides | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     warnings.push('config: "themeOverrides" must be a JSON object')
     return null

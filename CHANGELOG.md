@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Live theme & layout editor.** Settings → Theme editor opens an in-app
+  editor for colors, spacing/layout, borders, emphasis, and inline-image
+  sizing. Values adjust live (`←`/`→` or `-`/`+` to step, `e` for raw hex,
+  Space/Enter to cycle), persist to `themeOverrides` immediately, and reset
+  per-field (`r`) or all at once (`R`).
+
 ## [0.18.1] - 2026-06-01
 
 ### Added

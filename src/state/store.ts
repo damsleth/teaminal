@@ -107,6 +107,10 @@ export type InputZone = 'list' | 'composer' | 'filter' | 'menu' | 'message-searc
 // new `kind` variants here when introducing more modal surfaces.
 export type ModalState =
   | { kind: 'menu'; path: string[]; cursor: number }
+  // Live theme/layout editor. `cursor` indexes into the flat editable-field
+  // list (src/ui/themeEditor.ts); the per-field hex-entry buffer lives in the
+  // component's local state, not here.
+  | { kind: 'theme-editor'; cursor: number }
   | { kind: 'keybinds' }
   | { kind: 'diagnostics' }
   | { kind: 'events' }
