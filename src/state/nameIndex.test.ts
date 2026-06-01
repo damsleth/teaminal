@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import type { Chat, ChatMessage } from '../types'
+import type { Chat, ChatMessage, DirectoryUser } from '../types'
 import {
+  indexNameFromDirectoryUser,
   indexNamesFromChats,
   indexNamesFromMessages,
   looksLikeEmail,
@@ -80,6 +81,34 @@ describe('indexNamesFromChats', () => {
       }),
     ])
     expect(out).toEqual({ 'u-a': 'Anna Aas', 'u-b': 'Bjørn Hansen' })
+  })
+})
+
+describe('indexNameFromDirectoryUser', () => {
+  const user = (overrides: Partial<DirectoryUser>): DirectoryUser => ({ id: 'u', ...overrides })
+
+  test('seeds a resolved picker name into the index', () => {
+    const out = indexNameFromDirectoryUser({}, user({ id: 'u-a', displayName: 'Anna Aas' }))
+    expect(out).toEqual({ 'u-a': 'Anna Aas' })
+  })
+
+  test('ignores email-shaped and empty names', () => {
+    const base = {}
+    expect(indexNameFromDirectoryUser(base, user({ displayName: 'a@b.no' }))).toBe(base)
+    expect(indexNameFromDirectoryUser(base, user({ displayName: null }))).toBe(base)
+    expect(indexNameFromDirectoryUser(base, user({ displayName: '  ' }))).toBe(base)
+  })
+
+  test('returns the same reference when the name is already indexed', () => {
+    const base = { 'u-a': 'Anna Aas' }
+    expect(indexNameFromDirectoryUser(base, user({ id: 'u-a', displayName: 'Anna Aas' }))).toBe(base)
+  })
+
+  test('does not overwrite with a worse name (email skipped, keeps existing)', () => {
+    const base = { 'u-a': 'Anna Aas' }
+    expect(indexNameFromDirectoryUser(base, user({ id: 'u-a', displayName: 'anna@x.no' }))).toBe(
+      base,
+    )
   })
 })
 
