@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-06-01
+
 ### Added
 
 - **Live theme & layout editor.** Settings → Theme editor opens an in-app
@@ -1005,7 +1007,8 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.18.1...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/damsleth/teaminal/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/damsleth/teaminal/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/damsleth/teaminal/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/damsleth/teaminal/compare/v0.17.0...v0.17.1
