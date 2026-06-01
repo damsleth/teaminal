@@ -181,25 +181,33 @@ describe('ROOT_MENU shape', () => {
       .map((c) => (c.action.kind === 'toggle-setting' ? c.action.key : null))
       .filter((k): k is NonNullable<typeof k> => k !== null)
     expect(toggleKeys).toEqual([
+      // Appearance
       'theme',
+      'statusBarPosition',
+      // Chat list
       'chatListDensity',
       'chatListShortNames',
       'showMessagePreviews',
-      'messagePaneShortNames',
       'showPresenceInList',
-      'forceAvailableWhenFocused',
-      'realtimeEnabled',
+      // Messages
+      'messagePaneShortNames',
       'showTimestampsInPane',
       'showReactions',
       'inlineImages',
-      'notifyMuted',
-      'notifyActiveBanner',
+      'selfMessagesOnRight',
       'messageFocusIndicatorEnabled',
       'messageFocusIndicatorChar',
+      // Notifications (quietHours is a cycle action, not a toggle key)
+      'notifyMuted',
+      'notifyActiveBanner',
+      // Presence
+      'forceAvailableWhenFocused',
+      'useTeamsPresence',
+      // Advanced / debug
+      'realtimeEnabled',
       'tailEvents',
       'tailNetwork',
       'tailDiagnostics',
-      'statusBarPosition',
     ])
   })
 

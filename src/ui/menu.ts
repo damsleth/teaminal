@@ -37,7 +37,9 @@ export type ToggleKey =
   | 'inlineImages'
   | 'messageFocusIndicatorEnabled'
   | 'messageFocusIndicatorChar'
+  | 'selfMessagesOnRight'
   | 'forceAvailableWhenFocused'
+  | 'useTeamsPresence'
   | 'realtimeEnabled'
   | 'notifyMuted'
   | 'notifyActiveBanner'
@@ -107,12 +109,23 @@ export const ROOT_MENU: MenuItem[] = [
     id: 'settings',
     label: 'Settings',
     action: { kind: 'submenu' },
+    // Flat list, but ordered into logical clusters so it scans top-to-bottom:
+    // Appearance → Chat list → Messages → Notifications → Presence →
+    // Advanced/debug → Maintenance. Submenus were considered but kept flat
+    // intentionally.
     children: [
+      // — Appearance —
       {
         id: 'theme',
         label: 'Theme',
         action: { kind: 'toggle-setting', key: 'theme' },
       },
+      {
+        id: 'statusBarPosition',
+        label: 'Status bar',
+        action: { kind: 'toggle-setting', key: 'statusBarPosition' },
+      },
+      // — Chat list —
       {
         id: 'chatListDensity',
         label: 'Chat list density',
@@ -129,25 +142,15 @@ export const ROOT_MENU: MenuItem[] = [
         action: { kind: 'toggle-setting', key: 'showMessagePreviews' },
       },
       {
-        id: 'messagePaneShortNames',
-        label: 'Short names in chats',
-        action: { kind: 'toggle-setting', key: 'messagePaneShortNames' },
-      },
-      {
         id: 'showPresenceInList',
         label: 'Show presence in chat list',
         action: { kind: 'toggle-setting', key: 'showPresenceInList' },
       },
+      // — Messages —
       {
-        id: 'forceAvailableWhenFocused',
-        label: 'Set Available while terminal focused',
-        action: { kind: 'toggle-setting', key: 'forceAvailableWhenFocused' },
-      },
-      {
-        id: 'realtimeEnabled',
-        label: 'Real-time push',
-        action: { kind: 'toggle-setting', key: 'realtimeEnabled' },
-        hint: 'restart',
+        id: 'messagePaneShortNames',
+        label: 'Short names in chats',
+        action: { kind: 'toggle-setting', key: 'messagePaneShortNames' },
       },
       {
         id: 'showTimestampsInPane',
@@ -165,6 +168,22 @@ export const ROOT_MENU: MenuItem[] = [
         action: { kind: 'toggle-setting', key: 'inlineImages' },
       },
       {
+        id: 'selfMessagesOnRight',
+        label: 'Right-align my messages',
+        action: { kind: 'toggle-setting', key: 'selfMessagesOnRight' },
+      },
+      {
+        id: 'messageFocusIndicatorEnabled',
+        label: 'Focused message marker',
+        action: { kind: 'toggle-setting', key: 'messageFocusIndicatorEnabled' },
+      },
+      {
+        id: 'messageFocusIndicatorChar',
+        label: 'Focused message marker char',
+        action: { kind: 'toggle-setting', key: 'messageFocusIndicatorChar' },
+      },
+      // — Notifications —
+      {
         id: 'notifyMuted',
         label: 'Mute notifications',
         action: { kind: 'toggle-setting', key: 'notifyMuted' },
@@ -179,15 +198,23 @@ export const ROOT_MENU: MenuItem[] = [
         label: 'Quiet hours',
         action: { kind: 'cycle-quiet-hours' },
       },
+      // — Presence —
       {
-        id: 'messageFocusIndicatorEnabled',
-        label: 'Focused message marker',
-        action: { kind: 'toggle-setting', key: 'messageFocusIndicatorEnabled' },
+        id: 'forceAvailableWhenFocused',
+        label: 'Set Available while terminal focused',
+        action: { kind: 'toggle-setting', key: 'forceAvailableWhenFocused' },
       },
       {
-        id: 'messageFocusIndicatorChar',
-        label: 'Focused message marker char',
-        action: { kind: 'toggle-setting', key: 'messageFocusIndicatorChar' },
+        id: 'useTeamsPresence',
+        label: 'Use Teams presence source',
+        action: { kind: 'toggle-setting', key: 'useTeamsPresence' },
+      },
+      // — Advanced / debug —
+      {
+        id: 'realtimeEnabled',
+        label: 'Real-time push',
+        action: { kind: 'toggle-setting', key: 'realtimeEnabled' },
+        hint: 'restart',
       },
       {
         id: 'tailEvents',
@@ -204,11 +231,7 @@ export const ROOT_MENU: MenuItem[] = [
         label: 'Tail diagnostics',
         action: { kind: 'toggle-setting', key: 'tailDiagnostics' },
       },
-      {
-        id: 'statusBarPosition',
-        label: 'Status bar',
-        action: { kind: 'toggle-setting', key: 'statusBarPosition' },
-      },
+      // — Maintenance —
       {
         id: 'clearCache',
         label: 'Empty cache (this profile)',
@@ -324,7 +347,9 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'showPresenceInList':
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
+    case 'selfMessagesOnRight':
     case 'forceAvailableWhenFocused':
+    case 'useTeamsPresence':
     case 'realtimeEnabled':
     case 'notifyMuted':
     case 'notifyActiveBanner':
@@ -371,7 +396,9 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'showPresenceInList':
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
+    case 'selfMessagesOnRight':
     case 'forceAvailableWhenFocused':
+    case 'useTeamsPresence':
     case 'realtimeEnabled':
     case 'notifyMuted':
     case 'notifyActiveBanner':
