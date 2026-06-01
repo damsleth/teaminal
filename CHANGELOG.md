@@ -6,6 +6,29 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-06-01
+
+### Added
+
+- **Configurable `HeaderBar` elements** with an option to merge the header
+  into the status bar, so the title row can be slimmed down or folded away.
+- **Status bar gains a `top` position** alongside `bottom` and `hidden`.
+- **Settings menu reorganised into clusters** with two previously missing
+  toggles surfaced.
+- **Links and inline images are highlighted in conversations.**
+
+### Changed
+
+- **Homebrew tap updates are automated** via `scripts/update-tap.sh`.
+
+### Fixed
+
+- **Name index seeds from the picked user when creating a chat**, so a new
+  conversation shows the real name immediately instead of falling back to
+  `(unknown)` or an email.
+- **Inline Kitty images are hidden while a modal overlay is open**, so they
+  no longer bleed through dialogs.
+
 ## [0.18.0] - 2026-05-31
 
 ### Added
@@ -974,7 +997,8 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.18.1...HEAD
+[0.18.1]: https://github.com/damsleth/teaminal/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/damsleth/teaminal/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/damsleth/teaminal/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/damsleth/teaminal/compare/v0.16.0...v0.17.0
