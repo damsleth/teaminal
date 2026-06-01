@@ -21,7 +21,13 @@
 // implying the feature works yet.
 
 import { updateSettings } from '../config'
-import type { AccountManagerModalState, AppState, Settings, Store } from '../state/store'
+import type {
+  AccountManagerModalState,
+  AppState,
+  HeaderElementVisibility,
+  Settings,
+  Store,
+} from '../state/store'
 
 // Toggle-setting keys are the subset of Settings keys exposed via menu
 // toggles. Restricting at the type level keeps the menu schema honest.
@@ -47,6 +53,7 @@ export type ToggleKey =
   | 'tailNetwork'
   | 'tailDiagnostics'
   | 'statusBarPosition'
+  | 'statusBarShowKeyHints'
 
 export type MenuAction =
   | { kind: 'resume' }
@@ -55,6 +62,7 @@ export type MenuAction =
   | { kind: 'submenu' }
   | { kind: 'noop' }
   | { kind: 'toggle-setting'; key: ToggleKey }
+  | { kind: 'toggle-header-element'; key: keyof HeaderElementVisibility }
   | { kind: 'cycle-quiet-hours' }
   | { kind: 'show-keybinds' }
   | { kind: 'show-diagnostics' }
@@ -124,6 +132,54 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'statusBarPosition',
         label: 'Status bar',
         action: { kind: 'toggle-setting', key: 'statusBarPosition' },
+      },
+      {
+        id: 'statusBarShowKeyHints',
+        label: 'Status bar key hints',
+        action: { kind: 'toggle-setting', key: 'statusBarShowKeyHints' },
+        hint: 'off = link/image actions only',
+      },
+      {
+        id: 'headerBar',
+        label: 'Header bar elements',
+        action: { kind: 'submenu' },
+        children: [
+          {
+            id: 'header-user',
+            label: 'User / tenant',
+            action: { kind: 'toggle-header-element', key: 'user' },
+          },
+          {
+            id: 'header-presence',
+            label: 'Presence',
+            action: { kind: 'toggle-header-element', key: 'presence' },
+          },
+          {
+            id: 'header-graph',
+            label: 'Graph status',
+            action: { kind: 'toggle-header-element', key: 'graph' },
+          },
+          {
+            id: 'header-chats',
+            label: 'Chat count',
+            action: { kind: 'toggle-header-element', key: 'chats' },
+          },
+          {
+            id: 'header-unread',
+            label: 'Unread / mentions',
+            action: { kind: 'toggle-header-element', key: 'unread' },
+          },
+          {
+            id: 'header-push',
+            label: 'Push status',
+            action: { kind: 'toggle-header-element', key: 'push' },
+          },
+          {
+            id: 'header-updated',
+            label: 'Updated time',
+            action: { kind: 'toggle-header-element', key: 'updated' },
+          },
+        ],
       },
       // — Chat list —
       {
@@ -356,6 +412,7 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'tailEvents':
     case 'tailNetwork':
     case 'tailDiagnostics':
+    case 'statusBarShowKeyHints':
       return !current as Settings[K]
     case 'messageFocusIndicatorChar':
       return cycleMessageFocusIndicatorChar(current as string) as Settings[K]
@@ -405,6 +462,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'tailEvents':
     case 'tailNetwork':
     case 'tailDiagnostics':
+    case 'statusBarShowKeyHints':
       return value ? 'on' : 'off'
     case 'messageFocusIndicatorChar':
       return String(value)

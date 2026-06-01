@@ -12,6 +12,7 @@ import {
   defaultSettings,
   type BorderStyleName,
   type ChatRoutingMode,
+  type HeaderElementVisibility,
   type Settings,
   type ThemeOverrides,
   type ThemePresenceKey,
@@ -242,6 +243,8 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     inlineImages: settings.inlineImages,
     inlineImageMaxRows: settings.inlineImageMaxRows,
     statusBarPosition: settings.statusBarPosition,
+    headerElements: { ...settings.headerElements },
+    statusBarShowKeyHints: settings.statusBarShowKeyHints,
     chatRoutingByAccount: { ...settings.chatRoutingByAccount },
     chatListWidth: settings.chatListWidth,
     composerHeight: settings.composerHeight,
@@ -340,6 +343,7 @@ function cloneSettings(settings: Settings): Settings {
     ...settings,
     accounts: [...settings.accounts],
     themeOverrides: cloneThemeOverrides(settings.themeOverrides),
+    headerElements: { ...settings.headerElements },
     chatRoutingByAccount: { ...settings.chatRoutingByAccount },
   }
 }
@@ -419,12 +423,22 @@ function validateAndAssign(
     case 'tailNetwork':
     case 'tailDiagnostics':
     case 'selfMessagesOnRight':
+    case 'statusBarShowKeyHints':
       if (typeof value === 'boolean') {
         out[key] = value
         return true
       }
       warnings.push(`config: "${key}" must be a boolean`)
       return false
+    case 'headerElements': {
+      const parsed = validateHeaderElements(value, warnings)
+      if (parsed) {
+        // Merge over defaults so an omitted segment keeps its default.
+        out.headerElements = { ...out.headerElements, ...parsed }
+        return true
+      }
+      return false
+    }
     case 'showReactions':
       if (value === 'off' || value === 'current' || value === 'all') {
         out.showReactions = value
@@ -529,6 +543,39 @@ function validateAndAssign(
       warnings.push('config: "composerHeight" must be null or an integer between 3 and 20')
       return false
   }
+}
+
+const HEADER_ELEMENT_KEYS: (keyof HeaderElementVisibility)[] = [
+  'user',
+  'presence',
+  'graph',
+  'chats',
+  'unread',
+  'push',
+  'updated',
+]
+
+function validateHeaderElements(
+  value: unknown,
+  warnings: string[],
+): Partial<HeaderElementVisibility> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    warnings.push('config: "headerElements" must be a JSON object')
+    return null
+  }
+  const out: Partial<HeaderElementVisibility> = {}
+  for (const [key, val] of Object.entries(value)) {
+    if (!HEADER_ELEMENT_KEYS.includes(key as keyof HeaderElementVisibility)) {
+      warnings.push(`config: headerElements["${key}"] is not a known segment — ignored`)
+      continue
+    }
+    if (typeof val !== 'boolean') {
+      warnings.push(`config: headerElements["${key}"] must be a boolean — ignored`)
+      continue
+    }
+    out[key as keyof HeaderElementVisibility] = val
+  }
+  return out
 }
 
 function validateChatRoutingByAccount(
