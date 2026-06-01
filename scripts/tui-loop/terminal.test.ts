@@ -9,7 +9,14 @@
  */
 
 import { describe, expect, test } from 'bun:test'
-import { color256Decode, rgbHexDecode, ansiIndexToHex, ANSI_COLORS } from './terminal'
+import {
+  color256Decode,
+  rgbHexDecode,
+  ansiIndexToHex,
+  ANSI_COLORS,
+  decodeXtermColor,
+  XTERM_COLOR_MODE,
+} from './terminal'
 
 describe('rgbHexDecode', () => {
   test('formats r/g/b to lowercase hex with leading zeros', () => {
@@ -87,5 +94,44 @@ describe('ANSI_COLORS', () => {
 
   test('ANSI code 36 (cyan) matches the brand teal used in the TUI border', () => {
     expect(ANSI_COLORS[36]).toBe('#2f8f9d')
+  })
+})
+
+describe('decodeXtermColor', () => {
+  const { DEFAULT, P16, P256, RGB } = XTERM_COLOR_MODE
+
+  test('returns null for the default color', () => {
+    expect(decodeXtermColor(0, DEFAULT)).toBeNull()
+    // xterm reports color -1 alongside DEFAULT, but guard either signal.
+    expect(decodeXtermColor(-1, P256)).toBeNull()
+  })
+
+  test('decodes P16 palette indices via the base ANSI palette', () => {
+    expect(decodeXtermColor(0, P16)).toBe('#111111') // black
+    expect(decodeXtermColor(4, P16)).toBe('#3971ed') // blue
+    expect(decodeXtermColor(15, P16)).toBe('#ffffff') // white
+  })
+
+  test('decodes P256 palette indices, not as packed RGB', () => {
+    // Regression: 235 is in the grayscale ramp. The old code mislabeled P256's
+    // mode (0x2000000) as RGB and bit-unpacked 235 → r=0/g=0/b=235 → #0000eb
+    // (blue). It must decode through color256Decode instead.
+    expect(decodeXtermColor(235, P256)).toBe('#262626')
+    expect(decodeXtermColor(235, P256)).not.toBe('#0000eb')
+    // A cube index and a base index still resolve correctly under P256.
+    expect(decodeXtermColor(196, P256)).toBe('#ff0000')
+    expect(decodeXtermColor(7, P256)).toBe('#d6d6d6')
+  })
+
+  test('decodes RGB mode as 24-bit packed 0xRRGGBB', () => {
+    expect(decodeXtermColor(0x3971ed, RGB)).toBe('#3971ed')
+    expect(decodeXtermColor(0x000000, RGB)).toBe('#000000')
+    expect(decodeXtermColor(0xffffff, RGB)).toBe('#ffffff')
+    // The value 235 under RGB really is near-blue — proving the modes differ.
+    expect(decodeXtermColor(235, RGB)).toBe('#0000eb')
+  })
+
+  test('returns null for an unknown mode rather than misdecoding', () => {
+    expect(decodeXtermColor(235, 0x4000000)).toBeNull()
   })
 })

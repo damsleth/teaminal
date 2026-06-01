@@ -72,3 +72,48 @@ export function color256Decode(index: number): string | null {
 export function ansiIndexToHex(index: number): string | null {
   return ANSI_256_BASE[index] ?? null
 }
+
+/**
+ * xterm.js packed color modes, as returned by getFgColorMode()/getBgColorMode().
+ * These are the CM_* constants from xterm.js's AttributeData — stable across
+ * versions and confirmed against @xterm/headless (getFgColor()'s switch):
+ *   DEFAULT (0)          — no explicit color; getFgColor() returns -1
+ *   P16     (0x1000000)  — basic 16-color palette; color is index 0–15
+ *   P256    (0x2000000)  — 256-color palette; color is index 0–255
+ *   RGB     (0x3000000)  — truecolor; color is 24-bit packed 0xRRGGBB
+ *
+ * NOTE: P256 is 0x2000000 and RGB is 0x3000000. Mislabeling P256 as RGB makes a
+ * palette index (e.g. 235) get bit-unpacked into r=0/g=0/b=235 → blue.
+ */
+export const XTERM_COLOR_MODE = {
+  DEFAULT: 0,
+  P16: 0x1000000,
+  P256: 0x2000000,
+  RGB: 0x3000000,
+} as const
+
+/**
+ * Decode an xterm.js cell color value + mode (as returned by getFgColor()/
+ * getFgColorMode() and the bg equivalents) to a hex string, or null for the
+ * terminal default color.
+ *
+ * P16 and P256 both carry a palette index — decoded via color256Decode, whose
+ * first 16 entries are the basic ANSI palette, so the same path serves both.
+ * RGB carries a 24-bit packed 0xRRGGBB value.
+ *
+ * @param color - raw value from getFgColor()/getBgColor()
+ * @param mode  - raw value from getFgColorMode()/getBgColorMode()
+ */
+export function decodeXtermColor(color: number, mode: number): string | null {
+  if (mode === XTERM_COLOR_MODE.DEFAULT || color === -1) return null
+  if (mode === XTERM_COLOR_MODE.P16 || mode === XTERM_COLOR_MODE.P256) {
+    return color256Decode(color)
+  }
+  if (mode === XTERM_COLOR_MODE.RGB) {
+    const r = (color >> 16) & 0xff
+    const g = (color >> 8) & 0xff
+    const b = color & 0xff
+    return rgbHexDecode(r, g, b)
+  }
+  return null
+}
