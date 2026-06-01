@@ -8,52 +8,19 @@
  *   → getChars(), getFgColor(), getFgColorMode(), getBgColor(), getBgColorMode(),
  *     isBold(), isInverse()
  *
- * Color mode constants (xterm.js internal, stable across versions):
- *   0x0000000  (0)          = default color (no color set)
- *   0x1000000  (16777216)   = 256-color palette index
- *   0x2000000  (33554432)   = truecolor RGB packed as (r<<16|g<<8|b)
+ * Color decoding (xterm cell color/mode → hex) lives in terminal.ts as
+ * decodeXtermColor(); see XTERM_COLOR_MODE there for the mode constants.
  */
 
 import { join } from 'node:path'
 import { Resvg } from '@resvg/resvg-js'
 import type { Cell } from './terminal'
-import { color256Decode, rgbHexDecode } from './terminal.js'
+import { decodeXtermColor } from './terminal.js'
 import { renderGridSvg } from './svg.js'
-
-// xterm.js color mode constants (confirmed from probe and xterm.js source)
-const COLOR_MODE_DEFAULT = 0
-const COLOR_MODE_256 = 0x1000000 // 16777216
-const COLOR_MODE_RGB = 0x2000000 // 33554432
 
 // Path to the bundled monospace TTF used for PNG rasterization.
 // Resolved relative to this file's directory so it works regardless of cwd.
 const MONO_TTF_PATH = join(import.meta.dirname, '../../assets/mono.ttf')
-
-/**
- * Decode an xterm.js color value + mode to a hex string, or null for default.
- *
- * @param color - raw color value from getFgColor()/getBgColor()
- * @param mode  - raw color mode from getFgColorMode()/getBgColorMode()
- */
-function decodeXtermColor(color: number, mode: number): string | null {
-  if (mode === COLOR_MODE_DEFAULT || color === -1) return null
-
-  if (mode === COLOR_MODE_256) {
-    // color is a 0–255 palette index
-    return color256Decode(color)
-  }
-
-  if (mode === COLOR_MODE_RGB) {
-    // color is a 24-bit packed RGB: 0xRRGGBB
-    const r = (color >> 16) & 0xff
-    const g = (color >> 8) & 0xff
-    const b = color & 0xff
-    return rgbHexDecode(r, g, b)
-  }
-
-  // Fallback: treat as ANSI 256-color index (defensive)
-  return color256Decode(color)
-}
 
 /**
  * Read a Cell[][] from a tui-test Terminal by accessing the underlying xterm.js
