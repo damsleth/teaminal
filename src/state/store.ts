@@ -334,8 +334,8 @@ export type Settings = {
   //              vertical space in the message pane. The terminal title
   //              and the diagnostics modal remain available for the
   //              information the status bar would have shown.
-  // A 'top' option is plausible but deferred until asked for.
-  statusBarPosition: 'bottom' | 'hidden'
+  // 'top' renders the same bar as the first row of the layout instead.
+  statusBarPosition: 'bottom' | 'top' | 'hidden'
   // Per-account chat routing mode, keyed by profile/account name. Controls
   // both which owa-piggy token audience is minted for default Graph calls
   // and whether chat message reads/sends use graph.microsoft.com or the

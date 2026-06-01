@@ -466,6 +466,7 @@ export function App() {
   const theme = useTheme()
   return (
     <Box flexDirection="column" height={terminalRows}>
+      {statusBarPosition === 'top' && <StatusBar />}
       <Box
         borderStyle={theme.borders.panel}
         borderColor={theme.border}
@@ -562,7 +563,7 @@ export function App() {
       >
         <Composer />
       </Box>
-      {statusBarPosition !== 'hidden' && <StatusBar />}
+      {statusBarPosition === 'bottom' && <StatusBar />}
     </Box>
   )
 }

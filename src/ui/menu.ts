@@ -311,7 +311,9 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'chatListDensity':
       return (current === 'cozy' ? 'compact' : 'cozy') as Settings[K]
     case 'statusBarPosition':
-      return (current === 'bottom' ? 'hidden' : 'bottom') as Settings[K]
+      return (
+        current === 'bottom' ? 'top' : current === 'top' ? 'hidden' : 'bottom'
+      ) as Settings[K]
     case 'inlineImages':
       return (current === 'auto' ? 'off' : 'auto') as Settings[K]
     case 'showReactions':

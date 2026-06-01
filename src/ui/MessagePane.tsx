@@ -100,7 +100,10 @@ export function MessagePane(props: {
   const threadMetaByRoot = useAppState((s) => s.threadMetaByRoot)
   const inlineImages = useAppState((s) => s.settings.inlineImages)
   const inlineImageMaxRows = useAppState((s) => s.settings.inlineImageMaxRows)
-  const statusBarHidden = useAppState((s) => s.settings.statusBarPosition === 'hidden')
+  // True when no status bar occupies the bottom row (hidden, or moved to the
+  // top): the Kitty image offset and the row budget both anchor to the bottom
+  // chrome, so 'top' frees the same row that 'hidden' does.
+  const statusBarHidden = useAppState((s) => s.settings.statusBarPosition !== 'bottom')
   const reactionPickerOpen = useAppState((s) => s.modal?.kind === 'reaction-picker')
   // Any open modal renders as a centred overlay on top of this pane. Kitty
   // images are written out-of-band at a positive z-index, so they composite

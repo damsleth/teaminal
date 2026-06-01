@@ -1,4 +1,5 @@
-// Bottom row: compact input-mode and key hints. Profile, presence,
+// Compact input-mode and key hints on a single row, rendered at the bottom
+// or top of the layout per settings.statusBarPosition. Profile, presence,
 // capability, unread, and refresh details live in HeaderBar.
 
 import { Box, Text } from 'ink'
