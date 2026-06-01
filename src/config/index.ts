@@ -490,11 +490,11 @@ function validateAndAssign(
       warnings.push('config: "inlineImageMaxRows" must be an integer between 1 and 50')
       return false
     case 'statusBarPosition':
-      if (value === 'bottom' || value === 'hidden') {
+      if (value === 'bottom' || value === 'top' || value === 'hidden') {
         out.statusBarPosition = value
         return true
       }
-      warnings.push('config: "statusBarPosition" must be "bottom" or "hidden"')
+      warnings.push('config: "statusBarPosition" must be "bottom", "top", or "hidden"')
       return false
     case 'chatRoutingByAccount': {
       const parsed = validateChatRoutingByAccount(value, warnings)
