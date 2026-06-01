@@ -35,8 +35,10 @@ update all of these together in the same PR:
 - [`.github/workflows/release.yml`](./.github/workflows/release.yml)
 - [`README.md`](./README.md)
 - This file
-- The Homebrew tap formula (`docs/homebrew/teaminal.rb` mirrors the
-  authoritative copy in [`damsleth/homebrew-tap`][tap])
+- The formula template in [`scripts/update-tap.sh`](./scripts/update-tap.sh)
+  (it generates the authoritative `Formula/teaminal.rb` in
+  [`damsleth/homebrew-tap`][tap] and the mirror at
+  `docs/homebrew/teaminal.rb`)
 
 [tap]: https://github.com/damsleth/homebrew-tap
 
@@ -78,6 +80,15 @@ The tag push triggers `release.yml`. Verify:
 3. Each archive extracts to a single `teaminal` (or `teaminal.exe`)
    binary that prints the expected version.
 
+Then update the Homebrew tap from the published release:
+
+```bash
+scripts/update-tap.sh           # writes + commits Formula/teaminal.rb
+git -C ../homebrew-tap push
+```
+
+See [Homebrew tap](#homebrew-tap) below for details.
+
 ## Local archive build
 
 The same packaging logic, runnable locally:
@@ -98,57 +109,45 @@ tar -C dist/release/linux-arm64 -czf dist/release-archives/teaminal-${version}-l
 ## Homebrew tap
 
 The authoritative formula lives in
-[`damsleth/homebrew-tap`][tap] at
-`Formula/teaminal.rb`. A draft is tracked here at
-[`docs/homebrew/teaminal.rb`](./docs/homebrew/teaminal.rb).
+[`damsleth/homebrew-tap`][tap] at `Formula/teaminal.rb`. A mirror is
+tracked here at [`docs/homebrew/teaminal.rb`](./docs/homebrew/teaminal.rb)
+and is kept in sync automatically by the update script below.
 
-The current draft formula builds from source against `main`. Once a
-release exists, the tap formula should switch to release-archive URLs
-and pinned SHA-256 values:
+The formula installs prebuilt release archives (no Bun needed at install
+time): it points at the per-platform `.tar.gz` on the GitHub Release with
+the `sha256` pinned from that release's `SHA256SUMS.txt`, for both macOS
+(arm64 / x64) and Linux (arm64 / x64).
 
-```ruby
-class Teaminal < Formula
-  desc "Lightweight terminal Microsoft Teams client"
-  homepage "https://github.com/damsleth/teaminal"
-  version "X.Y.Z"
-  license "MIT"
+### Automated update
 
-  on_macos do
-    if Hardware::CPU.arm?
-      url "https://github.com/damsleth/teaminal/releases/download/v#{version}/teaminal-#{version}-darwin-arm64.tar.gz"
-      sha256 "REPLACE_WITH_DARWIN_ARM64_SHA256"
-    else
-      url "https://github.com/damsleth/teaminal/releases/download/v#{version}/teaminal-#{version}-darwin-x64.tar.gz"
-      sha256 "REPLACE_WITH_DARWIN_X64_SHA256"
-    end
-  end
+[`scripts/update-tap.sh`](./scripts/update-tap.sh) does the whole update:
+it pulls `SHA256SUMS.txt` from the published release, renders the formula
+for the new version, writes it into the sibling `../homebrew-tap` checkout
+(and the mirror here), and commits it in the tap repo.
 
-  depends_on "owa-piggy"
-
-  def install
-    bin.install "teaminal"
-  end
-
-  test do
-    assert_match "teaminal #{version}", shell_output("#{bin}/teaminal --version")
-  end
-end
-```
-
-After tagging, update the tap:
+Run it **after** the GitHub Release for the tag is green — the checksums
+must come from the CI-built artifacts, not a local build:
 
 ```bash
-# Grab the new checksums from the release.
-curl -sL https://github.com/damsleth/teaminal/releases/download/vX.Y.Z/SHA256SUMS.txt
+# Defaults: version from package.json, tap at ../homebrew-tap.
+scripts/update-tap.sh
 
-# Update Formula/teaminal.rb in damsleth/homebrew-tap with the new
-# version + sha256 values, then:
-brew audit --strict --online teaminal
-brew test teaminal
+# Or pin the version / tap path explicitly:
+scripts/update-tap.sh v0.18.0 ../homebrew-tap
+
+# Then push the tap commit (and optionally verify locally first):
+brew style ../homebrew-tap/Formula/teaminal.rb
+git -C ../homebrew-tap push
 ```
 
-Install both Apple Silicon and Intel formula paths (or at least verify
-both URLs + checksums) before publishing the tap commit.
+Useful env overrides:
+
+- `CHECKSUMS=/path/to/SHA256SUMS.txt` — use a local checksums file instead
+  of downloading from the release.
+- `NO_COMMIT=1` — write the formula but skip the commit (review first).
+
+The script aborts if the release (or a per-platform checksum) is missing,
+so it can't produce a half-filled formula.
 
 ## Backout / rollback
 
