@@ -14,7 +14,7 @@
 
 import { describe, expect, test } from 'bun:test'
 import { readCells, renderToSvg, svgToPng } from './render'
-import type { Cell } from './terminal'
+import { XTERM_COLOR_MODE, type Cell } from './terminal'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -25,19 +25,18 @@ function makeXtermStub(cells: Cell[][]): unknown {
   const rows = cells.length
   const cols = cells[0]?.length ?? 0
 
-  // Map Cell hex colors back to xterm.js colorMode + color pairs.
-  // We use COLOR_MODE_256 (0x1000000) with the palette index for colors,
-  // and COLOR_MODE_DEFAULT (0) for null (no color).
-  // For simplicity, this stub uses RGB truecolor mode (0x2000000) for all hex values.
-  const COLOR_MODE_DEFAULT = 0
-  const COLOR_MODE_RGB = 0x2000000
-
+  // Map Cell hex colors back to xterm.js colorMode + color pairs. The stub
+  // packs a 24-bit 0xRRGGBB value, which is xterm.js's RGB (truecolor) mode;
+  // null maps to DEFAULT (no explicit color). Use the shared XTERM_COLOR_MODE
+  // constants so this can't drift from decodeXtermColor again — RGB is
+  // 0x3000000, NOT 0x2000000 (that's P256, a palette index, which would make
+  // a packed truecolor value decode to null).
   function hexToRgbPacked(hex: string | null): { color: number; mode: number } {
-    if (hex === null) return { color: -1, mode: COLOR_MODE_DEFAULT }
+    if (hex === null) return { color: -1, mode: XTERM_COLOR_MODE.DEFAULT }
     const r = parseInt(hex.slice(1, 3), 16)
     const g = parseInt(hex.slice(3, 5), 16)
     const b = parseInt(hex.slice(5, 7), 16)
-    return { color: (r << 16) | (g << 8) | b, mode: COLOR_MODE_RGB }
+    return { color: (r << 16) | (g << 8) | b, mode: XTERM_COLOR_MODE.RGB }
   }
 
   return {
