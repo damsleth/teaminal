@@ -1,54 +1,33 @@
 class Teaminal < Formula
   desc "Lightweight terminal Microsoft Teams client"
   homepage "https://github.com/damsleth/teaminal"
-  url "https://github.com/damsleth/teaminal.git", branch: "main"
-  version "0.14.2"
+  version "0.18.0"
   license "MIT"
-  head "https://github.com/damsleth/teaminal.git", branch: "main"
 
-  depends_on :macos
   depends_on "damsleth/tap/owa-piggy" => :recommended
 
-  # Bun is not in Homebrew (upstream policy: https://bun.com/docs/installation),
-  # so we look for it on disk and add its directory to PATH for this build.
-  # If it isn't installed, we fail with a one-line install hint rather than
-  # silently failing on the first `system "bun"` call.
-  #
-  # Brew sets HOME to a sandbox dir during install, so Dir.home returns the
-  # fake home. Resolve the real user's home via passwd (USER is preserved).
-  def find_bun
-    real_home = Dir.home(ENV.fetch("USER"))
-    xdg_data = ENV["XDG_DATA_HOME"] || "#{real_home}/.local/share"
-    candidates = [
-      ENV["BUN_INSTALL"] ? "#{ENV["BUN_INSTALL"]}/bin/bun" : nil,
-      "#{real_home}/.bun/bin/bun",
-      "#{xdg_data}/bun/bin/bun",
-      "#{real_home}/.local/share/bun/bin/bun",
-      "/opt/homebrew/bin/bun",
-      "/usr/local/bin/bun",
-      "/usr/bin/bun",
-    ].compact
-    candidates.find { |p| File.executable?(p) }
+  on_macos do
+    if Hardware::CPU.arm?
+      url "https://github.com/damsleth/teaminal/releases/download/v#{version}/teaminal-#{version}-darwin-arm64.tar.gz"
+      sha256 "649d7b781595db53f0751ade11786a1f60ba12584ad2bbe72b8dfb604076067e"
+    else
+      url "https://github.com/damsleth/teaminal/releases/download/v#{version}/teaminal-#{version}-darwin-x64.tar.gz"
+      sha256 "55f964e5fd8b4fca9c9525def80afd23bcaf687f81d02e74f512c29b0fb4eac3"
+    end
+  end
+
+  on_linux do
+    if Hardware::CPU.arm?
+      url "https://github.com/damsleth/teaminal/releases/download/v#{version}/teaminal-#{version}-linux-arm64.tar.gz"
+      sha256 "6c9360de403c3c52a1fc9c56fe29ffc0abc10ff0bfdc6f439d60deca75134691"
+    else
+      url "https://github.com/damsleth/teaminal/releases/download/v#{version}/teaminal-#{version}-linux-x64.tar.gz"
+      sha256 "cb359f66f6d57a5661d044f523fb4cc0910bff52a61fcf7605383ce6c7f331e7"
+    end
   end
 
   def install
-    bun = find_bun
-    odie <<~EOS unless bun
-      teaminal needs the Bun runtime, which is not distributed via Homebrew.
-      Install it once with:
-
-        curl -fsSL https://bun.com/install | bash
-
-      Then re-run: brew install damsleth/tap/teaminal
-    EOS
-
-    ENV.prepend_path "PATH", File.dirname(bun)
-    ENV["TARGET"] = Hardware::CPU.arm? ? "bun-darwin-arm64" : "bun-darwin-x64"
-
-    system "bun", "install", "--frozen-lockfile"
-    system "bun", "run", "build"
-
-    bin.install "dist/teaminal"
+    bin.install "teaminal"
   end
 
   test do
