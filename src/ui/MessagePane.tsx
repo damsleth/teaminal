@@ -100,6 +100,12 @@ export function MessagePane(props: {
   const inlineImageMaxRows = useAppState((s) => s.settings.inlineImageMaxRows)
   const statusBarHidden = useAppState((s) => s.settings.statusBarPosition === 'hidden')
   const reactionPickerOpen = useAppState((s) => s.modal?.kind === 'reaction-picker')
+  // Any open modal renders as a centred overlay on top of this pane. Kitty
+  // images are written out-of-band at a positive z-index, so they composite
+  // above all terminal text - including the overlay - and would paint over the
+  // modal. Suppress inline images while a modal is open so the overlay stays
+  // in front; they redraw when it closes.
+  const modalOpen = useAppState((s) => s.modal != null)
   const theme = useTheme()
 
   const listPaneWidth = props.listPaneWidth ?? LIST_PANE_WIDTH_DEFAULT
@@ -220,6 +226,13 @@ export function MessagePane(props: {
   // re-renders once an image transitions from loading → ready.
   useEffect(() => {
     if (!kittyEnabled) return
+    // While a modal overlay covers the pane, clear any drawn images and skip
+    // re-drawing so the overlay is not painted over by out-of-band Kitty
+    // graphics. They redraw on the next render once the modal closes.
+    if (modalOpen) {
+      if (stdout) clearKittyImages(stdout)
+      return
+    }
     const profile = getActiveProfile()
 
     for (const row of rows) {
