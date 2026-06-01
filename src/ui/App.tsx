@@ -46,6 +46,7 @@ import { MenuModal } from './MenuModal'
 import { MessagePane } from './MessagePane'
 import { NetworkModal } from './NetworkModal'
 import { NewChatPrompt } from './NewChatPrompt'
+import { ThemeEditorModal } from './ThemeEditorModal'
 import { ReactionPickerModal } from './ReactionPickerModal'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
 import { EditReactionsModal } from './EditReactionsModal'
@@ -449,6 +450,7 @@ export function App() {
   //
   const overlayModalKind:
     | 'menu'
+    | 'theme-editor'
     | 'accounts'
     | 'keybinds'
     | 'diagnostics'
@@ -526,6 +528,8 @@ export function App() {
                 >
                   {overlayModalKind === 'menu' ? (
                     <MenuModal />
+                  ) : overlayModalKind === 'theme-editor' ? (
+                    <ThemeEditorModal />
                   ) : overlayModalKind === 'accounts' ? (
                     <AccountsModal />
                   ) : overlayModalKind === 'keybinds' ? (
