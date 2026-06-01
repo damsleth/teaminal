@@ -188,6 +188,19 @@ export type BorderStyleName =
   | 'doubleSingle'
   | 'arrow'
 export type ReactionDisplayMode = 'off' | 'current' | 'all'
+
+// Toggleable HeaderBar segments (the app name is always shown). The keys are
+// also the HEADER_ELEMENT order used by the menu submenu.
+export type HeaderElementVisibility = {
+  user: boolean
+  presence: boolean
+  graph: boolean
+  chats: boolean
+  unread: boolean
+  push: boolean
+  updated: boolean
+}
+
 export type ThemePresenceKey =
   | 'Available'
   | 'AvailableIdle'
@@ -336,6 +349,13 @@ export type Settings = {
   //              information the status bar would have shown.
   // 'top' renders the same bar as the first row of the layout instead.
   statusBarPosition: 'bottom' | 'top' | 'hidden'
+  // Which optional HeaderBar segments are shown. The app name is always
+  // rendered (identity anchor); everything else can be hidden to trim the
+  // top row. All default true.
+  headerElements: HeaderElementVisibility
+  // When false, the status bar drops its keyboard-shortcut hints and is used
+  // only to surface the focused link/image context action. Default true.
+  statusBarShowKeyHints: boolean
   // Per-account chat routing mode, keyed by profile/account name. Controls
   // both which owa-piggy token audience is minted for default Graph calls
   // and whether chat message reads/sends use graph.microsoft.com or the
@@ -440,6 +460,16 @@ export const defaultSettings: Settings = {
   inlineImages: 'auto',
   inlineImageMaxRows: 10,
   statusBarPosition: 'bottom',
+  headerElements: {
+    user: true,
+    presence: true,
+    graph: true,
+    chats: true,
+    unread: true,
+    push: true,
+    updated: true,
+  },
+  statusBarShowKeyHints: true,
   chatRoutingByAccount: {},
   chatListWidth: null,
   composerHeight: null,

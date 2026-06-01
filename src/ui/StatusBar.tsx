@@ -12,6 +12,7 @@ export function StatusBar() {
   const filter = useAppState((s) => s.filter)
   const chatListWidthSetting = useAppState((s) => s.settings.chatListWidth)
   const composerHeightSetting = useAppState((s) => s.settings.composerHeight)
+  const showKeyHints = useAppState((s) => s.settings.statusBarShowKeyHints)
   // Description of the currently-focused attachment (image / link), or null
   // when focus is on a message body. Returns a primitive so the selector is
   // stable across unrelated store updates.
@@ -37,6 +38,11 @@ export function StatusBar() {
       attachmentHint ??
       'j/k msg · u/d half · u/k older top · l bottom · h back · Tab compose · r refresh'
   }
+
+  // When key hints are turned off the status bar is reserved for the focused
+  // link/image context action only: show that when present, otherwise leave
+  // the row empty (the filter indicator below still appends when filtering).
+  if (!showKeyHints) hint = attachmentHint ?? ''
 
   return (
     <Box paddingX={theme.layout.panePaddingX}>
