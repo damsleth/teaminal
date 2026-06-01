@@ -184,6 +184,7 @@ describe('ROOT_MENU shape', () => {
       // Appearance
       'theme',
       'statusBarPosition',
+      'statusBarShowKeyHints',
       // Chat list
       'chatListDensity',
       'chatListShortNames',

@@ -150,6 +150,16 @@ export function MenuModal() {
         })
         return
       }
+      case 'toggle-header-element': {
+        const key = item.action.key
+        const cur = store.get().settings.headerElements
+        const nextElements = { ...cur, [key]: !cur[key] }
+        store.set((s) => ({ settings: { ...s.settings, headerElements: nextElements } }))
+        void updateSettings({ headerElements: nextElements }).catch((err) => {
+          warn(`config: failed to persist headerElements.${key}:`, errMessage(err))
+        })
+        return
+      }
       case 'cycle-quiet-hours': {
         const cur = store.get().settings
         const next = cycleQuietHoursPreset({
@@ -282,6 +292,9 @@ function formatValueSuffix(item: MenuItem, settings: Settings): string {
   }
   if (item.action.kind === 'cycle-quiet-hours') {
     return ` : ${renderQuietHoursValue(settings.quietHoursStart, settings.quietHoursEnd)}`
+  }
+  if (item.action.kind === 'toggle-header-element') {
+    return ` : ${settings.headerElements[item.action.key] ? 'on' : 'off'}`
   }
   return ''
 }

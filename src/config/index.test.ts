@@ -329,6 +329,16 @@ describe('Settings ↔ config.json parity', () => {
     inlineImages: 'off',
     inlineImageMaxRows: 7,
     statusBarPosition: 'hidden',
+    headerElements: {
+      user: false,
+      presence: false,
+      graph: false,
+      chats: false,
+      unread: false,
+      push: false,
+      updated: false,
+    },
+    statusBarShowKeyHints: !defaultSettings.statusBarShowKeyHints,
     chatRoutingByAccount: { 'profile-a': 'ic3-only', 'profile-b': 'graph+ic3' },
     chatListWidth: 36,
     composerHeight: 5,
@@ -348,6 +358,23 @@ describe('Settings ↔ config.json parity', () => {
     const config = settingsToConfig(MUTATED)
     const roundtripped = configToSettings(config as Record<string, unknown>, [])
     expect(roundtripped).toEqual(MUTATED)
+  })
+
+  test('headerElements merges over defaults and drops bad entries', () => {
+    const warnings: string[] = []
+    const settings = configToSettings(
+      { headerElements: { presence: false, bogus: true, updated: 'no' } } as Record<
+        string,
+        unknown
+      >,
+      warnings,
+    )
+    // Valid key applied, others keep their default (all true), bad keys dropped.
+    expect(settings.headerElements.presence).toBe(false)
+    expect(settings.headerElements.graph).toBe(true)
+    expect(settings.headerElements).not.toHaveProperty('bogus')
+    expect(warnings.some((w) => w.includes('bogus'))).toBe(true)
+    expect(warnings.some((w) => w.includes('updated'))).toBe(true)
   })
 
   test('chatRoutingByAccount drops invalid modes with a warning', () => {

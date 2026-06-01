@@ -1,5 +1,5 @@
 import { Box, Text } from 'ink'
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { getActiveProfile } from '../graph/client'
 import { chatLabel } from '../state/selectables'
 import {
@@ -82,6 +82,7 @@ export function HeaderBar() {
   const unreadByChatId = useAppState((s) => s.unreadByChatId)
   const unreadMentionCount = useAppState((s) => s.unreadMentionCount)
   const realtimeState = useAppState((s) => s.realtimeState)
+  const show = useAppState((s) => s.settings.headerElements)
   const theme = useTheme()
 
   const [now, setNow] = useState(() => Date.now())
@@ -113,13 +114,17 @@ export function HeaderBar() {
   const updated = formatRelative(lastListPollAt, now)
   const unreadText = formatUnread(unreadByChatId, chats, me?.id, nameByUserId)
 
-  return (
-    <Box paddingX={theme.layout.panePaddingX}>
-      <Text bold={theme.emphasis.sectionHeadingBold}>teaminal</Text>
-      <Text color="gray">{' · '}</Text>
-      <Text color="gray">{userDisplay}</Text>
-      <Text color="gray">{' · '}</Text>
-      {presenceUnavailable ? (
+  // Build the visible segments, then interleave ` · ` separators so hiding
+  // any element never leaves a dangling separator. The app name always leads.
+  const segments: ReactNode[] = [
+    <Text key="app" bold={theme.emphasis.sectionHeadingBold}>
+      teaminal
+    </Text>,
+  ]
+  if (show.user) segments.push(<Text color="gray">{userDisplay}</Text>)
+  if (show.presence) {
+    segments.push(
+      presenceUnavailable ? (
         <Text color="gray">presence n/a</Text>
       ) : (
         <>
@@ -127,25 +132,48 @@ export function HeaderBar() {
           <Text color={presenceColor(theme, myPresence?.availability)}>{DOT}</Text>
           <Text color="gray">{` ${(myPresence?.availability ?? '?').toLowerCase()}`}</Text>
         </>
-      )}
-      <Text color="gray">{' · '}</Text>
-      <Text color="gray">{'graph '}</Text>
-      <Text color={connColor(conn)}>{DOT}</Text>
-      <Text color="gray">{` ${conn}`}</Text>
-      <Text color="gray">{` · ${chats.length} chats`}</Text>
-      {unreadText && <Text color={theme.unread}>{` · ${unreadText.toLowerCase()}`}</Text>}
-      {unreadMentionCount > 0 && <Text color={theme.unread}>{` · @${unreadMentionCount}`}</Text>}
-      {realtimeState !== 'off' && (
-        <>
-          <Text color="gray">{' · push '}</Text>
-          <Text color={realtimeColor(realtimeState)}>{DOT}</Text>
-          <Text color="gray">{` ${realtimeState}`}</Text>
-        </>
-      )}
-      {updated && <Text color="gray">{` · upd ${updated}`}</Text>}
-      {hints.length > 0 && !presenceUnavailable && (
-        <Text color="gray">{` · ${hints.join(', ')}`}</Text>
-      )}
+      ),
+    )
+  }
+  if (show.graph) {
+    segments.push(
+      <>
+        <Text color="gray">{'graph '}</Text>
+        <Text color={connColor(conn)}>{DOT}</Text>
+        <Text color="gray">{` ${conn}`}</Text>
+      </>,
+    )
+  }
+  if (show.chats) segments.push(<Text color="gray">{`${chats.length} chats`}</Text>)
+  if (show.unread && unreadText) {
+    segments.push(<Text color={theme.unread}>{unreadText.toLowerCase()}</Text>)
+  }
+  if (show.unread && unreadMentionCount > 0) {
+    segments.push(<Text color={theme.unread}>{`@${unreadMentionCount}`}</Text>)
+  }
+  if (show.push && realtimeState !== 'off') {
+    segments.push(
+      <>
+        <Text color="gray">{'push '}</Text>
+        <Text color={realtimeColor(realtimeState)}>{DOT}</Text>
+        <Text color="gray">{` ${realtimeState}`}</Text>
+      </>,
+    )
+  }
+  if (show.updated && updated) segments.push(<Text color="gray">{`upd ${updated}`}</Text>)
+  // Capability warnings are not vanity chrome, so they're always shown.
+  if (hints.length > 0 && !presenceUnavailable) {
+    segments.push(<Text color="gray">{hints.join(', ')}</Text>)
+  }
+
+  return (
+    <Box paddingX={theme.layout.panePaddingX}>
+      {segments.map((seg, i) => (
+        <Fragment key={i}>
+          {i > 0 && <Text color="gray">{' · '}</Text>}
+          {seg}
+        </Fragment>
+      ))}
     </Box>
   )
 }
