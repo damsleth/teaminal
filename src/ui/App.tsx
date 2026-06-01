@@ -24,6 +24,7 @@
 import { Box, useApp, useInput, useStdin, useStdout } from 'ink'
 import { useEffect, useRef, useState } from 'react'
 import { createOneOnOneChat, materializeChat, resolveFederatedChatId } from '../state/chatActions'
+import { indexNameFromDirectoryUser } from '../state/nameIndex'
 import { clampCursor } from '../state/selectables'
 import {
   focusKey,
@@ -272,7 +273,12 @@ export function App() {
     const existing = findExistingOneOnOne(store.get().chats, user.id, selfId)
     if (existing) {
       setNewChatPrompt(null)
-      store.set({ focus: { kind: 'chat', chatId: existing.id }, inputZone: 'list', filter: '' })
+      store.set((s) => ({
+        nameByUserId: indexNameFromDirectoryUser(s.nameByUserId, user),
+        focus: { kind: 'chat', chatId: existing.id },
+        inputZone: 'list',
+        filter: '',
+      }))
       pollerRef.current?.refresh()
       return
     }
@@ -290,6 +296,7 @@ export function App() {
       setNewChatPrompt(null)
       store.set((s) => ({
         chats: [chat, ...s.chats.filter((c) => c.id !== chat.id)],
+        nameByUserId: indexNameFromDirectoryUser(s.nameByUserId, user),
         focus: { kind: 'chat', chatId: chat.id },
         inputZone: 'list',
         filter: '',
@@ -301,6 +308,7 @@ export function App() {
     setNewChatPrompt(null)
     store.set((s) => ({
       chats: [chat, ...s.chats.filter((c) => c.id !== chat.id)],
+      nameByUserId: indexNameFromDirectoryUser(s.nameByUserId, user),
       focus: { kind: 'chat', chatId: chat.id },
       inputZone: 'list',
       filter: '',

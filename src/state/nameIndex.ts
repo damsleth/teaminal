@@ -15,7 +15,7 @@
 // prefer it over a missing-or-email roster name. The index is persisted
 // alongside the message / list caches (see nameCachePersistence.ts).
 
-import type { Chat, ChatMember, ChatMessage, IdentitySet } from '../types'
+import type { Chat, ChatMember, ChatMessage, DirectoryUser, IdentitySet } from '../types'
 
 // A display name that is really just an email / UPN. We treat these as
 // "not a real name" so a resolved name from the index can replace them.
@@ -78,6 +78,21 @@ export function indexNamesFromChats(
     for (const m of c.members ?? []) put(m.userId, m.displayName)
   }
   return next
+}
+
+// Fold a directory user's resolved name into the index. Used when a chat is
+// created from the people picker: the picked DirectoryUser carries a real
+// displayName, but the freshly-created chat's roster often comes back with a
+// null / email-shaped member name and no lastMessagePreview, so without this
+// the new chat would render as email / "(unknown)" until the first message
+// arrives. Returns the same reference when nothing changed.
+export function indexNameFromDirectoryUser(
+  existing: Record<string, string>,
+  user: DirectoryUser,
+): Record<string, string> {
+  const name = usableName(user.displayName)
+  if (!user.id || !name || existing[user.id] === name) return existing
+  return { ...existing, [user.id]: name }
 }
 
 // Best display name for a chat member, preferring (1) a usable roster
