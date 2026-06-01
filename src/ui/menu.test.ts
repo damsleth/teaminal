@@ -101,6 +101,12 @@ describe('cycleSetting', () => {
     expect(cycleSetting('chatListDensity', 'compact')).toBe('cozy')
   })
 
+  test('cycles status bar position bottom → top → hidden → bottom', () => {
+    expect(cycleSetting('statusBarPosition', 'bottom')).toBe('top')
+    expect(cycleSetting('statusBarPosition', 'top')).toBe('hidden')
+    expect(cycleSetting('statusBarPosition', 'hidden')).toBe('bottom')
+  })
+
   test('negates booleans', () => {
     expect(cycleSetting('showPresenceInList', true)).toBe(false)
     expect(cycleSetting('showPresenceInList', false)).toBe(true)
