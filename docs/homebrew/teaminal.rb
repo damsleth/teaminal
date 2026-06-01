@@ -1,7 +1,7 @@
 class Teaminal < Formula
   desc "Lightweight terminal Microsoft Teams client"
   homepage "https://github.com/damsleth/teaminal"
-  version "0.18.0"
+  version "0.19.0"
   license "MIT"
 
   depends_on "damsleth/tap/owa-piggy" => :recommended
@@ -9,20 +9,20 @@ class Teaminal < Formula
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/damsleth/teaminal/releases/download/v#{version}/teaminal-#{version}-darwin-arm64.tar.gz"
-      sha256 "649d7b781595db53f0751ade11786a1f60ba12584ad2bbe72b8dfb604076067e"
+      sha256 "4b0e5700c0d16bec0f87736fbd782484c8973ec6e6e2ba9f55958139fbcca224"
     else
       url "https://github.com/damsleth/teaminal/releases/download/v#{version}/teaminal-#{version}-darwin-x64.tar.gz"
-      sha256 "55f964e5fd8b4fca9c9525def80afd23bcaf687f81d02e74f512c29b0fb4eac3"
+      sha256 "d7fbd93b87372a2feda756acce48e0fdb5752a97feef041d7bf2a40a0e912bbd"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
       url "https://github.com/damsleth/teaminal/releases/download/v#{version}/teaminal-#{version}-linux-arm64.tar.gz"
-      sha256 "6c9360de403c3c52a1fc9c56fe29ffc0abc10ff0bfdc6f439d60deca75134691"
+      sha256 "ced5a74ce3b14ee52bfa0cc5d25da78e58787a3fd2b6e12cf977f9f31c66b6bc"
     else
       url "https://github.com/damsleth/teaminal/releases/download/v#{version}/teaminal-#{version}-linux-x64.tar.gz"
-      sha256 "cb359f66f6d57a5661d044f523fb4cc0910bff52a61fcf7605383ce6c7f331e7"
+      sha256 "331c5ccf491e9a80454268ee49aa58d4080be5d5d779327a9d194663d5500ebc"
     end
   end
 
