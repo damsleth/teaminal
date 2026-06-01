@@ -41,6 +41,8 @@ import {
 } from './kittyGraphics'
 import { ensureImageFetched, getImageData } from '../state/imageCache'
 import { getActiveProfile } from '../graph/client'
+import { messageFocusables } from './messageFocusables'
+import { splitBodyLinkSpans } from './bodySpans'
 import { pickerAnchorCol } from './pickerAnchor'
 
 export { effectiveSenderName, isRenderableMessage } from './renderableMessage'
@@ -106,6 +108,10 @@ export function MessagePane(props: {
   // modal. Suppress inline images while a modal is open so the overlay stays
   // in front; they redraw when it closes.
   const modalOpen = useAppState((s) => s.modal != null)
+  // Which focusable (image / link) inside the focused message the per-message
+  // focus ring currently points at, so the focused link/image can get the
+  // strong highlight. 0 = the message body itself (no attachment focused).
+  const focusedAttachmentIndex = useAppState((s) => s.focusedAttachmentIndex)
   const theme = useTheme()
 
   const listPaneWidth = props.listPaneWidth ?? LIST_PANE_WIDTH_DEFAULT
@@ -421,6 +427,7 @@ export function MessagePane(props: {
                 }
                 focusIndicatorChar={focusIndicatorChar}
                 focusedMessageId={props.focusedMessageId}
+                focusedAttachmentIndex={focusedAttachmentIndex}
                 myUserId={me?.id}
                 reactionDisplayMode={reactionDisplayMode}
                 readReceipts={readReceiptsByConvo[conv]}
@@ -451,6 +458,7 @@ function TimelineRow(props: {
   focused: boolean
   focusIndicatorChar: string
   focusedMessageId?: string | null
+  focusedAttachmentIndex?: number
   myUserId?: string
   reactionDisplayMode: 'off' | 'current' | 'all'
   readReceipts?: Record<string, ReadReceipt>
@@ -491,6 +499,7 @@ function TimelineRow(props: {
       focused={props.focused}
       focusIndicatorChar={props.focusIndicatorChar}
       focusedMessageId={props.focusedMessageId}
+      focusedAttachmentIndex={props.focusedAttachmentIndex}
       myUserId={props.myUserId}
       reactionDisplayMode={props.reactionDisplayMode}
       readReceipts={props.readReceipts}
@@ -511,6 +520,7 @@ function MessageRow(props: {
   focused: boolean
   focusIndicatorChar: string
   focusedMessageId?: string | null
+  focusedAttachmentIndex?: number
   myUserId?: string
   reactionDisplayMode: 'off' | 'current' | 'all'
   readReceipts?: Record<string, ReadReceipt>
@@ -547,6 +557,17 @@ function MessageRow(props: {
       : null
 
   const bodyText = previewBody(m)
+  // Resolve which attachment the focus ring points at, but only for the
+  // focused message — every other row leaves its links/images at the subtle
+  // (unfocused) treatment. Index 0 is the body, so >0 selects an attachment.
+  let focusedLinkHref: string | null = null
+  let focusedImageKey: string | null = null
+  if (props.focused && props.focusedAttachmentIndex && props.focusedAttachmentIndex > 0) {
+    const fa = messageFocusables(m)[props.focusedAttachmentIndex]
+    if (fa?.kind === 'link') focusedLinkHref = fa.ref.href
+    else if (fa?.kind === 'image') focusedImageKey = fa.ref.cacheKey
+  }
+  const bodySpans = splitBodyLinkSpans(bodyText, focusedLinkHref)
   const isDeleted = isMessageDeleted(m)
   const isEdited = !isDeleted && isMessageEdited(m)
   const reactionLine = shouldShowReactionRow(
@@ -637,7 +658,25 @@ function MessageRow(props: {
             bold={props.focused && !isDeleted}
             wrap="wrap"
           >
-            {bodyText}
+            {bodySpans.map((span, i) =>
+              span.kind === 'text' ? (
+                <Text key={i}>{span.text}</Text>
+              ) : (
+                <Text
+                  key={i}
+                  color={theme.selected}
+                  underline
+                  bold={span.kind === 'link-focused'}
+                  backgroundColor={
+                    span.kind === 'link-focused'
+                      ? (theme.selectedRowBackground ?? undefined)
+                      : undefined
+                  }
+                >
+                  {span.text}
+                </Text>
+              ),
+            )}
             {isEdited && <Text color={theme.mutedText}> (edited)</Text>}
             {reactionLine && <Text color={theme.mutedText}> {`(${reactionLine})`}</Text>}
           </Text>
@@ -687,6 +726,7 @@ function MessageRow(props: {
             imgCols={props.imgCols}
             maxRows={props.inlineImageMaxRows}
             label={ref.name}
+            focused={focusedImageKey === ref.cacheKey}
             senderColWidth={senderColWidth}
             showTimestamp={props.showTimestamp}
             statusWidth={statusWidth}
@@ -742,16 +782,34 @@ function ImageRows(props: {
   imgCols: number
   maxRows: number
   label: string
+  focused?: boolean
   senderColWidth: number
   showTimestamp: boolean
   statusWidth: number
   theme: Theme
 }) {
+  // A left-edge bar marks the image's vertical extent in lieu of a full box
+  // border: the picture is painted out-of-band by the Kitty layer into rows
+  // whose count/offset is computed precisely elsewhere, so wrapping it in a
+  // bordered Box (which adds rows/columns) would desync that placement. The
+  // bar is subtle for every image and strong (heavy + highlighted) for the
+  // one the focus ring points at - the analogue of the focused chat bar.
+  const gutter = (
+    <Box width={1} flexShrink={0}>
+      <Text
+        color={props.focused ? props.theme.selected : props.theme.border}
+        bold={props.focused}
+        backgroundColor={props.focused ? (props.theme.selectedRowBackground ?? undefined) : undefined}
+      >
+        {props.focused ? '┃' : '│'}
+      </Text>
+    </Box>
+  )
   const reservedRows = inlineImageReservedRows(props.cacheKey, props.imgCols, props.maxRows)
   if (reservedRows === null) {
     return (
       <Box flexDirection="row">
-        <Box width={1} flexShrink={0} />
+        {gutter}
         {props.showTimestamp && <Box width={props.statusWidth} flexShrink={0} />}
         <Box width={props.senderColWidth + 1} flexShrink={0} />
         <Box flexGrow={1} flexShrink={1} minWidth={0}>
@@ -766,7 +824,7 @@ function ImageRows(props: {
     <>
       {Array.from({ length: reservedRows }, (_, i) => (
         <Box key={`img-space-${i}`} flexDirection="row">
-          <Box width={1} flexShrink={0} />
+          {gutter}
           {props.showTimestamp && <Box width={props.statusWidth} flexShrink={0} />}
           <Box width={props.senderColWidth + 1} flexShrink={0} />
           <Box flexGrow={1} flexShrink={1} minWidth={0}>
