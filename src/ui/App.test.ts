@@ -12,6 +12,7 @@ describe('shouldShowTailPanels', () => {
     expect(shouldShowTailPanels({ kind: 'events' })).toBe(false)
     expect(shouldShowTailPanels({ kind: 'diagnostics' })).toBe(false)
     expect(shouldShowTailPanels({ kind: 'menu', path: [], cursor: 0 })).toBe(false)
+    expect(shouldShowTailPanels({ kind: 'theme-editor', cursor: 0 })).toBe(false)
     expect(shouldShowTailPanels({ kind: 'accounts', mode: 'list', cursor: 0, accounts: [] })).toBe(
       false,
     )
