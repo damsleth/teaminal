@@ -7,6 +7,7 @@ import {
   __resetForTests,
   __setTransportForTests,
   listChannelMessagesViaChatsvc,
+  listChannelRepliesViaChatsvc,
   listChatMessagesViaChatsvc,
   parseFrom,
   parseReactions,
@@ -331,6 +332,34 @@ describe('listChannelMessagesViaChatsvc', () => {
     expect(chatsvcCalls).toBe(2)
     expect(tokensSeen).toEqual(['token-A', 'token-B'])
     expect(authzCalls).toBe(2)
+  })
+})
+
+describe('listChannelRepliesViaChatsvc', () => {
+  test('hits the ;messageid= sub-conversation door, returns root + replies chronologically', async () => {
+    primeAuth()
+    let seenUrl = ''
+    __setTransportForTests(async (url) => {
+      seenUrl = url
+      return jsonResponse({
+        messages: [
+          // newest-first on the wire: two replies, then the root.
+          { id: '3', messagetype: 'Text', rootMessageId: '1' },
+          { id: '2', messagetype: 'Text', rootMessageId: '1' },
+          { id: '1', messagetype: 'Text', rootMessageId: '1', properties: { subject: 'Topic' } },
+        ],
+        _metadata: { backwardLink: 'https://teams.microsoft.com/x?startTime=9&pageSize=20' },
+      })
+    })
+    const page = await listChannelRepliesViaChatsvc('19:abc@thread.tacv2', '1')
+    expect(seenUrl).toContain('/conversations/')
+    expect(seenUrl).toContain(';messageid=1/messages')
+    expect(seenUrl).toContain('view=msnp24')
+    // Reversed to chronological: root first, then its replies.
+    expect(page.messages.map((m) => m.id)).toEqual(['1', '2', '3'])
+    expect(page.messages.find((m) => m.id === '1')?.subject).toBe('Topic')
+    expect(page.messages.find((m) => m.id === '2')?.replyToId).toBe('1')
+    expect(page.backwardLink).toContain('startTime=9')
   })
 })
 

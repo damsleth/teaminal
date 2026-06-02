@@ -6,7 +6,8 @@
 // Esc to return to chat list. Tab to composer is handled by the
 // shared App-level dispatcher because it is identical across zones.
 
-import type { AppState, Focus, Store } from '../../state/store'
+import { emptyMessageCache, focusKey, type AppState, type Focus, type Store } from '../../state/store'
+import { groupChannelThreads } from '../../state/channelThreads'
 import type { ChatMessage } from '../../types'
 import { htmlToText } from '../../text/html'
 import { openMenu } from '../MenuModal'
@@ -135,15 +136,32 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
     jumpMessageBottom()
     return 'handled'
   }
-  // 't' opens the thread overlay when a channel root is focused.
+  // 't' opens the thread overlay when a channel root is focused. Seed the
+  // thread from the already-loaded channel stream so it shows instantly; the
+  // active loop then refreshes/completes it via the chatsvc sub-conversation
+  // door. Both write the same threadConv, so render + cursor stay consistent.
   if (ch === 't' && ctx.focus.kind === 'channel' && ctx.focusedMessageId) {
-    store.set({
-      focus: {
-        kind: 'thread',
-        teamId: ctx.focus.teamId,
-        channelId: ctx.focus.channelId,
-        rootId: ctx.focusedMessageId,
-      },
+    const { teamId, channelId } = ctx.focus
+    const rootId = ctx.focusedMessageId
+    const nextFocus: Focus = { kind: 'thread', teamId, channelId, rootId }
+    const threadConv = focusKey(nextFocus)
+    const channelConv = focusKey(ctx.focus)
+    store.set((s) => {
+      // Don't clobber a thread already loaded from a previous open; let the
+      // active loop refresh it instead.
+      if (!threadConv || s.messageCacheByConvo[threadConv]) return { focus: nextFocus }
+      const stream = channelConv ? (s.messagesByConvo[channelConv] ?? []) : []
+      const { repliesByRoot } = groupChannelThreads(stream)
+      const seeded = [
+        ...(ctx.focusedMessage ? [ctx.focusedMessage] : []),
+        ...(repliesByRoot[rootId] ?? []),
+      ]
+      if (seeded.length === 0) return { focus: nextFocus }
+      return {
+        focus: nextFocus,
+        messagesByConvo: { ...s.messagesByConvo, [threadConv]: seeded },
+        messageCacheByConvo: { ...s.messageCacheByConvo, [threadConv]: emptyMessageCache(seeded) },
+      }
     })
     return 'handled'
   }
