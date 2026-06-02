@@ -6,6 +6,27 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-06-02
+
+### Fixed
+
+- **Channel replies no longer show up as separate top-level posts.** Threading
+  now follows each message's thread root, so replies group under the post they
+  answer instead of flattening into the timeline. (Previously broke in tenants
+  where the reply's parent id wasn't populated on the wire.)
+- **Channel reply-count badges now appear.** The `╰─ N replies` count is read
+  from the already-loaded conversation instead of a Graph endpoint the Teams
+  web-app token can't call, so badges populate where they were silently absent.
+- **Opening a channel thread (`t`) now shows the conversation.** Threads load
+  over the Teams chat service (the Graph replies endpoint is walled for the
+  delegated token), showing the root post and its replies — and render
+  instantly from already-loaded messages while the latest replies refresh.
+
+### Added
+
+- **@mentions inside channel replies now notify**, not just mentions on
+  top-level channel posts.
+
 ## [0.19.0] - 2026-06-01
 
 ### Added
