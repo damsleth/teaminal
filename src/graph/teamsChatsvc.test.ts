@@ -239,7 +239,7 @@ describe('listChannelMessagesViaChatsvc', () => {
     expect(page.backwardLink).toContain('startTime=1234')
   })
 
-  test('filters out replies via parentmessageid (tenants that send it)', async () => {
+  test('returns the full stream incl. replies; tags replyToId from parentmessageid', async () => {
     primeAuth()
     __setTransportForTests(async () =>
       jsonResponse({
@@ -250,10 +250,13 @@ describe('listChannelMessagesViaChatsvc', () => {
       }),
     )
     const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2')
-    expect(page.messages.map((m) => m.id)).toEqual(['1'])
+    // Reversed to chronological; both root and reply retained - the view
+    // layer (channelThreads) groups roots/replies, the reader drops nothing.
+    expect(page.messages.map((m) => m.id)).toEqual(['1', '2'])
+    expect(page.messages.find((m) => m.id === '2')?.replyToId).toBe('1')
   })
 
-  test('filters out replies via rootMessageId when parentmessageid is absent (crayon/emea)', async () => {
+  test('returns the full stream incl. replies; tags replyToId from rootMessageId (crayon/emea)', async () => {
     primeAuth()
     __setTransportForTests(async () =>
       jsonResponse({
@@ -266,9 +269,13 @@ describe('listChannelMessagesViaChatsvc', () => {
       }),
     )
     const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2')
-    expect(page.messages.map((m) => m.id)).toEqual(['1'])
-    expect(page.messages[0]?.subject).toBe('Topic')
-    expect(page.messages[0]?.rootMessageId).toBe('1')
+    expect(page.messages.map((m) => m.id)).toEqual(['1', '2'])
+    const root = page.messages.find((m) => m.id === '1')
+    const reply = page.messages.find((m) => m.id === '2')
+    expect(root?.subject).toBe('Topic')
+    expect(root?.replyToId).toBeUndefined()
+    expect(reply?.replyToId).toBe('1')
+    expect(reply?.rootMessageId).toBe('1')
   })
 
   test('listChatMessagesViaChatsvc keeps all messages (chats are flat, no reply filter)', async () => {

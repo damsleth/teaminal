@@ -314,9 +314,10 @@ export function skypeToChannelMessage(raw: SkypeMessage): ChatMessage {
 // to match listChannelMessagesPage in src/graph/teams.ts.
 //
 // The Skype endpoint returns messages newest-first; we reverse before
-// returning so the caller can append in render order. Only thread ROOTS
-// are returned (rootMessageId === id, i.e. no derived replyToId); replies
-// are reconstructed from the full stream separately.
+// returning so the caller can append in render order. The FULL stream is
+// returned (roots + replies interleaved); the view layer groups it on
+// rootMessageId/replyToId (src/state/channelThreads.ts) to render roots
+// with reply counts and to reconstruct each thread.
 // Latched when we've already logged a "successful but empty/unparsed
 // chatsvc response" diagnostic for the current session, so the network
 // panel doesn't fill up with one event per active poll.
@@ -347,15 +348,6 @@ export function __resetChatsvcDiagnosticsForTests(): void {
   emptyResponseLogged.clear()
 }
 
-// A channel message is a thread ROOT when it has no reply linkage. replyToId
-// is derived in skypeToChannelMessage from rootMessageId (or parentmessageid),
-// so this single test identifies roots regardless of which signal the tenant
-// uses - including crayon/emea, where parentmessageid is null and only
-// rootMessageId carries the linkage. Replies are reconstructed separately.
-export function isChannelRoot(m: ChatMessage): boolean {
-  return !m.replyToId
-}
-
 export async function listChannelMessagesViaChatsvc(
   threadId: string,
   opts?: ChatsvcOpts & { pageSize?: number },
@@ -377,7 +369,6 @@ export async function listChannelMessagesViaChatsvc(
     const mapped = raw
       .map(skypeToChannelMessage)
       .filter((m) => m.id.length > 0)
-      .filter(isChannelRoot)
       .reverse()
     if (mapped.length === 0) {
       diagnoseEmptyResponse(threadId, res.status, res.body, res.text)
@@ -407,7 +398,6 @@ export async function listChannelMessagesViaChatsvcNextPage(
     const mapped = raw
       .map(skypeToChannelMessage)
       .filter((m) => m.id.length > 0)
-      .filter(isChannelRoot)
       .reverse()
     return {
       messages: mapped,
@@ -418,10 +408,11 @@ export async function listChannelMessagesViaChatsvcNextPage(
 
 // Read messages for a 1:1 / group CHAT thread via chatsvc. Same endpoint
 // as the channel reader, but chats are flat: there are no thread-root vs
-// reply distinctions, so we keep every message (channel reads keep only
-// roots via isChannelRoot; their replies are reconstructed separately).
-// Used as the fallback when graph /chats/{id}/messages is Conditional-Access
-// gated. Auth is the skype token (default owa-piggy client mints it).
+// reply distinctions, so callers render every message as-is. (The channel
+// reader returns the same full stream now; the channel VIEW groups
+// roots/replies via src/state/channelThreads.ts.) Used as the fallback when
+// graph /chats/{id}/messages is Conditional-Access gated. Auth is the skype
+// token (default owa-piggy client mints it).
 export async function listChatMessagesViaChatsvc(
   threadId: string,
   opts?: ChatsvcOpts & { pageSize?: number },

@@ -187,7 +187,7 @@ export function App() {
 
   const activeConv = focusKey(focus)
   const activeMessages = activeConv ? (messagesByConvo[activeConv] ?? []) : []
-  const activeNavigationMessages = messagesForTimelineNavigation(activeMessages)
+  const activeNavigationMessages = messagesForTimelineNavigation(activeMessages, focus)
   const activeCache = activeConv ? messageCacheByConvo[activeConv] : undefined
   const activeMessageCursor =
     activeConv && activeNavigationMessages.length > 0

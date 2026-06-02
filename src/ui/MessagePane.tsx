@@ -9,7 +9,12 @@
 import { Box, Text, useStdout } from 'ink'
 import { useEffect, useRef, useState } from 'react'
 import { chatLabel, shortName } from '../state/selectables'
-import { focusKey, type ReadReceipt, type ThreadMeta, type TypingIndicator } from '../state/store'
+import { focusKey, type ReadReceipt, type TypingIndicator } from '../state/store'
+import {
+  groupChannelThreads,
+  replyCountForRoot,
+  type ChannelThreads,
+} from '../state/channelThreads'
 import type { Chat, ChatMessage, Channel, Team } from '../types'
 import { htmlToText } from '../text/html'
 import { extractFileAttachments, formatBytes } from '../text/fileAttachments'
@@ -17,7 +22,11 @@ import { extractInlineImages, type InlineImageRef } from '../text/inlineImages'
 import { reactionsSummary } from './reactions'
 import { describeSystemEvent } from './systemEvent'
 import { searchMessages } from './messageSearch'
-import { effectiveSenderName, getQuotedReply, isRenderableMessage } from './renderableMessage'
+import {
+  effectiveSenderName,
+  getQuotedReply,
+  messagesForTimelineNavigation,
+} from './renderableMessage'
 import {
   buildMessageRows,
   chooseMessageRowsWindowStart,
@@ -97,7 +106,6 @@ export function MessagePane(props: {
   const selfMessagesOnRight = useAppState((s) => s.settings.selfMessagesOnRight)
   const typingByConvo = useAppState((s) => s.typingByConvo)
   const readReceiptsByConvo = useAppState((s) => s.readReceiptsByConvo)
-  const threadMetaByRoot = useAppState((s) => s.threadMetaByRoot)
   const inlineImages = useAppState((s) => s.settings.inlineImages)
   const inlineImageMaxRows = useAppState((s) => s.settings.inlineImageMaxRows)
   // True when no status bar occupies the bottom row (hidden, or moved to the
@@ -143,14 +151,16 @@ export function MessagePane(props: {
   const isListFocus = focus.kind === 'list'
   const conv = focusKey(focus) ?? ''
   const rawMessages = messagesByConvo[conv] ?? []
-  // Drop system-event rows we can't render usefully. This covers two
-  // shapes Graph returns:
-  //   1. messageType === 'systemEventMessage' with eventDetail we
-  //      couldn't decode (or no eventDetail at all)
-  //   2. messageType undefined / 'message' but with no sender and no
-  //      body content - same outcome on the wire, blank "(system)" row.
-  // In either case we'd rather show nothing than a meaningless line.
-  const messages = rawMessages.filter((m) => isRenderableMessage(m))
+  // The navigable/rendered timeline: unrenderable system rows dropped (blank
+  // "(system)" rows and undecodable events), and for a CHANNEL focus reduced
+  // to thread roots — replies are reached via the thread view. This is the
+  // same helper the cursor index space uses (App / messageFocusables /
+  // useClampMessageCursor), so render and navigation stay in lockstep.
+  const messages = messagesForTimelineNavigation(rawMessages, focus)
+  // Channel reply-count badges come from grouping the full loaded stream
+  // (roots + replies are both in rawMessages) — no Graph /replies fetch.
+  const channelThreads: ChannelThreads | null =
+    focus.kind === 'channel' ? groupChannelThreads(rawMessages) : null
   const senderColWidth = computeSenderColWidth(messages, shortNames)
   const cache = messageCacheByConvo[conv]
   const headerLabel = isListFocus
@@ -442,8 +452,8 @@ export function MessagePane(props: {
                 showTimestamp={showTimestamps}
                 theme={theme}
                 threadMeta={
-                  focus.kind === 'channel' && row.kind === 'message'
-                    ? threadMetaByRoot[row.message.id]
+                  channelThreads && row.kind === 'message'
+                    ? replyBadgeFor(channelThreads, row.message.id)
                     : undefined
                 }
               />
@@ -472,7 +482,7 @@ function TimelineRow(props: {
   shortNames: boolean
   showTimestamp: boolean
   theme: Theme
-  threadMeta?: ThreadMeta
+  threadMeta?: ReplyBadge
 }) {
   if (props.row.kind === 'date') {
     return (
@@ -534,7 +544,7 @@ function MessageRow(props: {
   shortNames: boolean
   showTimestamp: boolean
   theme: Theme
-  threadMeta?: ThreadMeta
+  threadMeta?: ReplyBadge
 }) {
   const { theme, senderColWidth } = props
   const m = props.message
@@ -925,7 +935,18 @@ export function computeSenderColWidth(messages: ChatMessage[], shortNames = true
   return max
 }
 
-export function formatReplyCount(meta: ThreadMeta): string {
+// Locally-derived reply-count badge for a channel root message. `count` is
+// the number of replies present in the loaded stream; `more` is reserved for
+// a future window-gap signal (see the rootMessageId rebuild plan, step 3) and
+// is false for now — the badge reflects what's loaded.
+export type ReplyBadge = { count: number; more: boolean }
+
+function replyBadgeFor(threads: ChannelThreads, rootId: string): ReplyBadge | undefined {
+  const count = replyCountForRoot(threads, rootId)
+  return count > 0 ? { count, more: false } : undefined
+}
+
+export function formatReplyCount(meta: ReplyBadge): string {
   if (meta.count <= 0) return ''
   const suffix = meta.count === 1 ? 'reply' : 'replies'
   return meta.more ? `${meta.count}+ ${suffix}` : `${meta.count} ${suffix}`
