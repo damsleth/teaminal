@@ -406,6 +406,42 @@ export async function listChannelMessagesViaChatsvcNextPage(
   }, opts)
 }
 
+// Read a single channel THREAD (its root + replies) via the chatsvc
+// sub-conversation door:
+//
+//   GET …/conversations/{channelId};messageid={rootId}/messages
+//
+// The server's own `conversationLink` uses this exact `;messageid=` form (the
+// channelId + rootId are percent-encoded, the `;messageid=` literal). This
+// replaces the FOCI-walled Graph /replies door (which 403s under owa-piggy).
+// Returns the root AND its replies in chronological order; the thread view
+// renders the root at the top. Verified live 2026-06-02 (200, root + replies).
+export async function listChannelRepliesViaChatsvc(
+  channelId: string,
+  rootId: string,
+  opts?: ChatsvcOpts & { pageSize?: number },
+): Promise<ChatsvcChannelMessagesPage> {
+  return withSkypeAuth(async () => {
+    const pageSize = opts?.pageSize ?? DEFAULT_PAGE_SIZE
+    const r = await region(opts)
+    const conv = `${encodeURIComponent(channelId)};messageid=${encodeURIComponent(rootId)}`
+    const url = `${TEAMS_ORIGIN}/api/chatsvc/${r}/v1/users/ME/conversations/${conv}/messages?pageSize=${pageSize}&startTime=1&view=msnp24`
+    const res = await chatsvcGet<SkypeMessagesResponse>(url, opts)
+    if (res.status < 200 || res.status >= 300) {
+      throw new TeamsChatsvcError(
+        res.status,
+        `teams chatsvc replies ${res.status}: ${res.text || 'request failed'}`,
+      )
+    }
+    const raw = res.body?.messages ?? []
+    const mapped = raw
+      .map(skypeToChannelMessage)
+      .filter((m) => m.id.length > 0)
+      .reverse()
+    return { messages: mapped, backwardLink: res.body?._metadata?.backwardLink }
+  }, opts)
+}
+
 // Read messages for a 1:1 / group CHAT thread via chatsvc. Same endpoint
 // as the channel reader, but chats are flat: there are no thread-root vs
 // reply distinctions, so callers render every message as-is. (The channel
