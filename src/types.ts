@@ -182,6 +182,13 @@ export type ChatMessage = {
   attachments?: MessageAttachment[]
   reactions?: Reaction[]
   replyToId?: string | null
+  // chatsvc top-level thread linkage. `rootMessageId` is the id of the
+  // thread's root message (a root carries rootMessageId === id; a reply
+  // points at its root). `sequenceId` is the stream's monotonic ordering
+  // number - a stable tiebreaker and window-gap signal. Both are absent on
+  // Graph-shaped messages; only the chatsvc normalizer sets them.
+  rootMessageId?: string
+  sequenceId?: number
   subject?: string | null
   eventDetail?: SystemEventDetail | null
   // Local-only fields used by the optimistic-send flow. Underscore prefix
