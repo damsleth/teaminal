@@ -137,6 +137,46 @@ describe('skypeToChannelMessage', () => {
     })
     expect(out.replyToId).toBe('1')
   })
+
+  test('derives replyToId + rootMessageId + sequenceId from the top-level wire fields', () => {
+    // crayon/emea shape: parentmessageid is absent; rootMessageId carries the
+    // linkage. A reply points at its root; a root has rootMessageId === id.
+    const reply = skypeToChannelMessage({
+      id: '2',
+      sequenceId: 9,
+      rootMessageId: '1',
+      messagetype: 'Text',
+      content: 'reply',
+    })
+    expect(reply.replyToId).toBe('1')
+    expect(reply.rootMessageId).toBe('1')
+    expect(reply.sequenceId).toBe(9)
+
+    const root = skypeToChannelMessage({
+      id: '1',
+      sequenceId: 8,
+      rootMessageId: '1',
+      messagetype: 'Text',
+      content: 'root',
+      properties: { subject: 'Topic' },
+    })
+    expect(root.replyToId).toBeUndefined()
+    expect(root.rootMessageId).toBe('1')
+    expect(root.sequenceId).toBe(8)
+    expect(root.subject).toBe('Topic')
+  })
+
+  test('prefers parentmessageid over rootMessageId when a tenant sends both', () => {
+    const out = skypeToChannelMessage({
+      id: '3',
+      rootMessageId: '1',
+      messagetype: 'Text',
+      content: 'reply',
+      properties: { parentmessageid: '2' },
+    })
+    expect(out.replyToId).toBe('2')
+    expect(out.rootMessageId).toBe('1')
+  })
 })
 
 describe('listChannelMessagesViaChatsvc', () => {
@@ -199,7 +239,7 @@ describe('listChannelMessagesViaChatsvc', () => {
     expect(page.backwardLink).toContain('startTime=1234')
   })
 
-  test('filters out replies (parentmessageid != id)', async () => {
+  test('filters out replies via parentmessageid (tenants that send it)', async () => {
     primeAuth()
     __setTransportForTests(async () =>
       jsonResponse({
@@ -211,6 +251,24 @@ describe('listChannelMessagesViaChatsvc', () => {
     )
     const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2')
     expect(page.messages.map((m) => m.id)).toEqual(['1'])
+  })
+
+  test('filters out replies via rootMessageId when parentmessageid is absent (crayon/emea)', async () => {
+    primeAuth()
+    __setTransportForTests(async () =>
+      jsonResponse({
+        messages: [
+          // newest-first on the wire: a reply, then its root. parentmessageid
+          // is null throughout - only rootMessageId distinguishes them.
+          { id: '2', messagetype: 'Text', rootMessageId: '1' },
+          { id: '1', messagetype: 'Text', rootMessageId: '1', properties: { subject: 'Topic' } },
+        ],
+      }),
+    )
+    const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2')
+    expect(page.messages.map((m) => m.id)).toEqual(['1'])
+    expect(page.messages[0]?.subject).toBe('Topic')
+    expect(page.messages[0]?.rootMessageId).toBe('1')
   })
 
   test('listChatMessagesViaChatsvc keeps all messages (chats are flat, no reply filter)', async () => {

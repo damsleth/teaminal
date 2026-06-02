@@ -134,6 +134,15 @@ type SkypeEmotion = {
 
 type SkypeMessage = {
   id?: string
+  // Thread root id, present top-level on every channel message in the
+  // msnp24 stream. A root has rootMessageId === id; a reply points at its
+  // root. This is the authoritative threading key - properties.parentmessageid
+  // is null in many tenants (verified live: crayon/emea), so we cannot rely
+  // on it alone. See scripts/chatsvc-dump.ts for the field probe.
+  rootMessageId?: string
+  // Monotonic per-conversation sequence number (top-level). Stable ordering
+  // tiebreaker and a signal for detecting gaps between loaded pages.
+  sequenceId?: number
   originalarrivaltime?: string
   composetime?: string
   type?: string
@@ -235,9 +244,10 @@ export function parseReactions(emotions: SkypeEmotion[] | undefined): Reaction[]
 // Map a Skype-shaped message into the ChannelMessage shape the UI
 // already consumes. Covers id, body (text/html), createdDateTime,
 // edits (lastModifiedDateTime), deletes (deletedDateTime), sender
-// (from.user.id + displayName), reply parent (replyToId), reactions,
-// and a small set of system-event subtypes. Attachments and mentions
-// are intentionally left empty - the existing renderer ignores them.
+// (from.user.id + displayName), thread linkage (rootMessageId +
+// sequenceId, with replyToId derived from them), reactions, and a small
+// set of system-event subtypes. Attachments and mentions are
+// intentionally left empty - the existing renderer ignores them.
 export function skypeToChannelMessage(raw: SkypeMessage): ChatMessage {
   const created =
     toIsoFromAny(raw.originalarrivaltime) ??
@@ -248,10 +258,25 @@ export function skypeToChannelMessage(raw: SkypeMessage): ChatMessage {
   const isHtml = (raw.messagetype ?? '').toLowerCase().includes('html')
   const isSystem = !!raw.messagetype && SKYPE_SYSTEM_TYPES.has(raw.messagetype)
   const { userId } = parseFrom(raw.from)
-  const replyToRaw = raw.properties?.parentmessageid
+  // Thread linkage. Channels are 2-level (root + flat replies), so a reply's
+  // root IS its effective parent. Prefer an explicit properties.parentmessageid
+  // when a tenant sends one; otherwise fall back to the top-level rootMessageId
+  // (the only signal in tenants like crayon/emea, where parentmessageid is null
+  // on every message). A root has no reply linkage (rootMessageId === id).
+  const rootRaw =
+    typeof raw.rootMessageId === 'string' && raw.rootMessageId.length > 0
+      ? raw.rootMessageId
+      : undefined
+  const parentRaw = raw.properties?.parentmessageid
   const replyToId =
-    typeof replyToRaw === 'string' && replyToRaw.length > 0 && replyToRaw !== raw.id
-      ? replyToRaw
+    typeof parentRaw === 'string' && parentRaw.length > 0 && parentRaw !== raw.id
+      ? parentRaw
+      : rootRaw && rootRaw !== raw.id
+        ? rootRaw
+        : undefined
+  const sequenceId =
+    typeof raw.sequenceId === 'number' && Number.isFinite(raw.sequenceId)
+      ? raw.sequenceId
       : undefined
   const reactions = parseReactions(raw.properties?.emotions)
 
@@ -277,6 +302,10 @@ export function skypeToChannelMessage(raw: SkypeMessage): ChatMessage {
         }
       : {}),
     ...(replyToId ? { replyToId } : {}),
+    // Keep rootMessageId on every message (roots included, where it === id)
+    // so the channel view can reconstruct threads by grouping on it.
+    ...(rootRaw ? { rootMessageId: rootRaw } : {}),
+    ...(sequenceId !== undefined ? { sequenceId } : {}),
     ...(raw.properties?.subject ? { subject: String(raw.properties.subject) } : {}),
   }
 }
@@ -285,9 +314,9 @@ export function skypeToChannelMessage(raw: SkypeMessage): ChatMessage {
 // to match listChannelMessagesPage in src/graph/teams.ts.
 //
 // The Skype endpoint returns messages newest-first; we reverse before
-// returning so the caller can append in render order. Replies are
-// filtered out at the chatsvc layer too (the UI fetches replies via a
-// separate path).
+// returning so the caller can append in render order. Only thread ROOTS
+// are returned (rootMessageId === id, i.e. no derived replyToId); replies
+// are reconstructed from the full stream separately.
 // Latched when we've already logged a "successful but empty/unparsed
 // chatsvc response" diagnostic for the current session, so the network
 // panel doesn't fill up with one event per active poll.
@@ -318,6 +347,15 @@ export function __resetChatsvcDiagnosticsForTests(): void {
   emptyResponseLogged.clear()
 }
 
+// A channel message is a thread ROOT when it has no reply linkage. replyToId
+// is derived in skypeToChannelMessage from rootMessageId (or parentmessageid),
+// so this single test identifies roots regardless of which signal the tenant
+// uses - including crayon/emea, where parentmessageid is null and only
+// rootMessageId carries the linkage. Replies are reconstructed separately.
+export function isChannelRoot(m: ChatMessage): boolean {
+  return !m.replyToId
+}
+
 export async function listChannelMessagesViaChatsvc(
   threadId: string,
   opts?: ChatsvcOpts & { pageSize?: number },
@@ -337,9 +375,9 @@ export async function listChannelMessagesViaChatsvc(
     }
     const raw = res.body?.messages ?? []
     const mapped = raw
-      .filter((m) => !m.properties?.parentmessageid || m.properties.parentmessageid === m.id)
       .map(skypeToChannelMessage)
       .filter((m) => m.id.length > 0)
+      .filter(isChannelRoot)
       .reverse()
     if (mapped.length === 0) {
       diagnoseEmptyResponse(threadId, res.status, res.body, res.text)
@@ -367,9 +405,9 @@ export async function listChannelMessagesViaChatsvcNextPage(
     }
     const raw = res.body?.messages ?? []
     const mapped = raw
-      .filter((m) => !m.properties?.parentmessageid || m.properties.parentmessageid === m.id)
       .map(skypeToChannelMessage)
       .filter((m) => m.id.length > 0)
+      .filter(isChannelRoot)
       .reverse()
     return {
       messages: mapped,
@@ -380,9 +418,9 @@ export async function listChannelMessagesViaChatsvcNextPage(
 
 // Read messages for a 1:1 / group CHAT thread via chatsvc. Same endpoint
 // as the channel reader, but chats are flat: there are no thread-root vs
-// reply distinctions, so we keep every message (channel reads filter
-// replies out because the UI fetches channel replies separately). Used as
-// the fallback when graph /chats/{id}/messages is Conditional-Access
+// reply distinctions, so we keep every message (channel reads keep only
+// roots via isChannelRoot; their replies are reconstructed separately).
+// Used as the fallback when graph /chats/{id}/messages is Conditional-Access
 // gated. Auth is the skype token (default owa-piggy client mints it).
 export async function listChatMessagesViaChatsvc(
   threadId: string,
