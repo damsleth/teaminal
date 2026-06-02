@@ -15,6 +15,7 @@ import { graph, paginate } from './client'
 import {
   listChannelMessagesViaChatsvc,
   listChannelMessagesViaChatsvcNextPage,
+  listChannelRepliesViaChatsvc,
   sendChannelMessageViaChatsvc,
 } from './teamsChatsvc'
 import type { Channel, ChannelMessage, Team } from '../types'
@@ -150,11 +151,11 @@ export async function sendChannelMessage(
 
 // --- Channel replies (threaded messages) ---
 //
-// Each root message in a channel may have replies hanging off it. The
-// list endpoint supports $top and pagination via @odata.nextLink, but
-// orderBy/filter shapes are limited under delegated auth. Replies arrive
-// in the same descending order as root messages; we reverse for render
-// parity with listChannelMessagesPage.
+// A thread is read via the chatsvc sub-conversation door
+// (…/conversations/{channelId};messageid={rootId}/messages), NOT Graph
+// /replies - the latter needs ChannelMessage.Read.All, which owa-piggy/FOCI
+// never issues (403). The chatsvc door returns the root + its replies in
+// chronological order; pagination follows the Skype backwardLink.
 
 export type ListChannelRepliesOpts = {
   top?: number
@@ -178,38 +179,26 @@ export async function listChannelReplies(
 }
 
 export async function listChannelRepliesPage(
-  teamId: string,
+  _teamId: string,
   channelId: string,
   rootId: string,
   opts?: ListChannelRepliesOpts,
 ): Promise<ChannelRepliesPage> {
-  const res = await graph<CollectionResponse<ChannelMessage>>({
-    method: 'GET',
-    path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(rootId)}/replies`,
-    query: { $top: opts?.top ?? CHANNEL_REPLIES_TOP_DEFAULT },
-    scope: CHANNEL_MESSAGE_READ_SCOPE,
+  const page = await listChannelRepliesViaChatsvc(channelId, rootId, {
+    pageSize: opts?.top ?? CHANNEL_REPLIES_TOP_DEFAULT,
     signal: opts?.signal,
   })
-  return {
-    messages: res.value.slice().reverse(),
-    nextLink: res['@odata.nextLink'],
-  }
+  return { messages: page.messages, nextLink: page.backwardLink }
 }
 
 export async function listChannelRepliesNextPage(
   nextLink: string,
   opts?: { signal?: AbortSignal },
 ): Promise<ChannelRepliesPage> {
-  const res = await graph<CollectionResponse<ChannelMessage>>({
-    method: 'GET',
-    path: nextLink,
-    scope: CHANNEL_MESSAGE_READ_SCOPE,
-    signal: opts?.signal,
-  })
-  return {
-    messages: res.value.slice().reverse(),
-    nextLink: res['@odata.nextLink'],
-  }
+  // The Skype backwardLink is absolute; the generic chatsvc follower handles
+  // both channel and thread (sub-conversation) pages.
+  const page = await listChannelMessagesViaChatsvcNextPage(nextLink, { signal: opts?.signal })
+  return { messages: page.messages, nextLink: page.backwardLink }
 }
 
 /**

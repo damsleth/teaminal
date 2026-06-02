@@ -216,6 +216,37 @@ describe('handleChatKeys', () => {
     expect(handleChatKeys({ input: 't', key: makeKey() }, ctx)).toBe('pass')
   })
 
+  test('t seeds the thread instantly from the loaded channel stream', () => {
+    const { ctx, store } = makeCtx({ kind: 'channel', teamId: 't1', channelId: 'ch1' })
+    const root = {
+      id: 'r1',
+      createdDateTime: '2026-06-01T00:00:00.000Z',
+      body: { contentType: 'text' as const, content: 'root' },
+      rootMessageId: 'r1',
+    }
+    const reply = {
+      id: 'a1',
+      createdDateTime: '2026-06-01T00:01:00.000Z',
+      body: { contentType: 'text' as const, content: 'reply' },
+      replyToId: 'r1',
+      rootMessageId: 'r1',
+    }
+    // A stray reply to a different root must NOT bleed into this thread.
+    const other = {
+      id: 'b1',
+      createdDateTime: '2026-06-01T00:02:00.000Z',
+      body: { contentType: 'text' as const, content: 'other' },
+      replyToId: 'r2',
+      rootMessageId: 'r2',
+    }
+    store.set({ messagesByConvo: { 'channel:t1:ch1': [root, reply, other] } })
+    ctx.focusedMessageId = 'r1'
+    ctx.focusedMessage = root
+    expect(handleChatKeys({ input: 't', key: makeKey() }, ctx)).toBe('handled')
+    expect(store.get().focus).toEqual({ kind: 'thread', teamId: 't1', channelId: 'ch1', rootId: 'r1' })
+    expect(store.get().messagesByConvo['thread:t1:ch1:r1']?.map((m) => m.id)).toEqual(['r1', 'a1'])
+  })
+
   test('h in thread returns to parent channel, not to list', () => {
     const { ctx, store } = makeCtx({
       kind: 'thread',
