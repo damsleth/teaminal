@@ -691,16 +691,6 @@ export function setMessageCursor(
   }
 }
 
-// Per-root metadata for channel reply badging. Populated opportunistically
-// by the active-loop after a channel page lands. count is the number of
-// replies actually returned by the replies endpoint; if more pages exist,
-// `more` is true (we cap fetches at one page to keep the cost bounded).
-export type ThreadMeta = {
-  count: number
-  more: boolean
-  checkedAt: number
-}
-
 // Real-time transport connection state, shown in the header bar.
 export type RealtimeState = 'off' | 'connecting' | 'connected' | 'reconnecting' | 'error'
 
@@ -780,10 +770,6 @@ export type AppState = {
   // tell us what message each user has read up to; rendering code maps
   // those positions to "seen by N" lines under matching self messages.
   readReceiptsByConvo: Record<ConvKey, Record<string, ReadReceipt>>
-  // Reply-count metadata for channel root messages, keyed by root id.
-  // Populated opportunistically when the user has a channel focused;
-  // missing entries simply render no badge.
-  threadMetaByRoot: Record<string, ThreadMeta>
   // Active modal overlay (e.g. pause menu). null = no modal.
   modal: ModalState | null
   // Id of the chat message currently being edited in the composer, or null
@@ -850,7 +836,6 @@ export function initialAppState(): AppState {
     focusReportingHealthy: false,
     typingByConvo: {},
     readReceiptsByConvo: {},
-    threadMetaByRoot: {},
     modal: null,
     editingMessageId: null,
     customTheme: null,

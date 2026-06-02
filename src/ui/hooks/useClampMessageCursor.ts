@@ -7,6 +7,7 @@
 import { useEffect } from 'react'
 import { clampCursor } from '../../state/selectables'
 import { focusKey, type AppState, type Focus, type Store } from '../../state/store'
+import { messagesForTimelineNavigation } from '../renderableMessage'
 
 export function useClampMessageCursor(
   focus: Focus,
@@ -16,7 +17,9 @@ export function useClampMessageCursor(
   useEffect(() => {
     const conv = focusKey(focus)
     if (!conv) return
-    const count = messagesByConvo[conv]?.length ?? 0
+    // Clamp against the NAVIGABLE list (roots-only for channels), matching
+    // the cursor index space the message pane actually renders.
+    const count = messagesForTimelineNavigation(messagesByConvo[conv] ?? [], focus).length
     if (count === 0) return
     store.set((s) => {
       const existing = s.messageCursorByConvo[conv]

@@ -1,5 +1,7 @@
 import type { ChatMessage } from '../types'
 import { parseMessageReference } from '../types'
+import { channelRoots } from '../state/channelThreads'
+import type { Focus } from '../state/store'
 import { describeSystemEvent } from './systemEvent'
 import { htmlToText } from '../text/html'
 import { extractInlineImages } from '../text/inlineImages'
@@ -28,8 +30,17 @@ export function isRenderableMessage(m: ChatMessage): boolean {
   return hasBody
 }
 
-export function messagesForTimelineNavigation(messages: ChatMessage[]): ChatMessage[] {
-  return messages.filter((m) => isRenderableMessage(m))
+// Messages eligible for cursor navigation + rendering, given the current
+// focus. Always drops unrenderable system rows. For a CHANNEL focus it
+// additionally reduces to thread roots: the flat timeline shows roots only
+// (replies are reached via the thread view), so the cursor index space and
+// the rendered list stay in lockstep across every consumer that calls this.
+export function messagesForTimelineNavigation(
+  messages: ChatMessage[],
+  focus?: Focus,
+): ChatMessage[] {
+  const renderable = messages.filter((m) => isRenderableMessage(m))
+  return focus?.kind === 'channel' ? channelRoots(renderable) : renderable
 }
 
 // Best display name we can produce for a non-system message, or null
