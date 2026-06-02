@@ -33,7 +33,7 @@ export function messageFocusables(message: ChatMessage | undefined): Focusable[]
 export function focusedNavigationMessage(state: AppState): ChatMessage | undefined {
   const conv = focusKey(state.focus)
   if (!conv) return undefined
-  const nav = messagesForTimelineNavigation(state.messagesByConvo[conv] ?? [])
+  const nav = messagesForTimelineNavigation(state.messagesByConvo[conv] ?? [], state.focus)
   if (nav.length === 0) return undefined
   const cursor = clampCursor(state.messageCursorByConvo[conv] ?? nav.length - 1, nav.length)
   return nav[cursor]
