@@ -6,6 +6,36 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-06-03
+
+### Added
+
+- **Chat list sorting and grouping.** A new `chatListSort` setting orders the
+  sidebar by recency (default, server order) or alphabetically, and a
+  `chatListGroupByType` toggle sections it into Direct / Groups / Meetings.
+  Keyboard navigation follows whatever order is on screen.
+- **Header bar app name is now toggleable** like every other header element,
+  and a new `headerUserFormat` setting picks between "Name (tenant)" and just
+  the tenant, so the top row can be trimmed all the way down.
+
+### Changed
+
+- **Message layout reworked: sender names get their own line.** The fixed
+  sender column is gone — each message group renders the full sender name and
+  timestamp on a line above the body, with the body indented via the theme's
+  "Message body indent" knob and groups separated by the "Message gap" knob
+  (both live-editable in the theme editor). Timestamps default to a
+  near-background muted color so they recede until you look for them.
+
+### Fixed
+
+- **The header bar no longer wraps onto multiple rows in narrow terminals.**
+  It renders as a single truncating line, so the bordered header stays one
+  row tall and stops jumping as dynamic segments (push, updated) change.
+- **Long Settings submenus no longer clip off-screen.** Menu overlays window
+  their items to the terminal height with `⋯` overflow markers, and submenus
+  drop the logo block to free rows for items.
+
 ## [0.20.0] - 2026-06-02
 
 ### Fixed
@@ -1028,7 +1058,9 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/damsleth/teaminal/compare/v0.20.0...v0.21.0
+[0.20.0]: https://github.com/damsleth/teaminal/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/damsleth/teaminal/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/damsleth/teaminal/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/damsleth/teaminal/compare/v0.17.1...v0.18.0
