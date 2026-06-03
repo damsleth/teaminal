@@ -7,7 +7,7 @@
 // Rebuilt on each render that needs it; cheap because the underlying lists
 // are small (typically <100 chats, <30 teams * <20 channels).
 
-import type { AppState } from './store'
+import type { AppState, Settings } from './store'
 import { resolveMemberName } from './nameIndex'
 import type { Channel, Chat, Team } from '../types'
 
@@ -16,19 +16,34 @@ export type SelectableItem =
   | { kind: 'team'; team: Team }
   | { kind: 'channel'; team: Team; channel: Channel; label: string }
 
+type ChatItem = Extract<SelectableItem, { kind: 'chat' }>
+
 export type SelectableInput = Pick<AppState, 'chats' | 'teams' | 'channelsByTeam' | 'me'> & {
   nameByUserId?: Record<string, string>
+  // Ordering knobs. Optional so existing callers/tests get the default
+  // 'recent', ungrouped order (identical to the previous behavior).
+  settings?: Pick<Settings, 'chatListSort' | 'chatListGroupByType'>
+}
+
+// Section order when grouping by chat type. Anything unrecognised sorts last.
+const CHAT_TYPE_RANK: Record<string, number> = { oneOnOne: 0, group: 1, meeting: 2 }
+
+export function chatTypeRank(chatType: string): number {
+  return CHAT_TYPE_RANK[chatType] ?? 3
 }
 
 export function buildSelectableList(state: SelectableInput): SelectableItem[] {
-  const items: SelectableItem[] = []
-  for (const chat of state.chats) {
-    items.push({
-      kind: 'chat',
-      chat,
-      label: chatLabel(chat, state.me?.id, { nameByUserId: state.nameByUserId }),
-    })
-  }
+  const sort = state.settings?.chatListSort ?? 'recent'
+  const groupByType = state.settings?.chatListGroupByType ?? false
+
+  let chatItems: ChatItem[] = state.chats.map((chat) => ({
+    kind: 'chat',
+    chat,
+    label: chatLabel(chat, state.me?.id, { nameByUserId: state.nameByUserId }),
+  }))
+  chatItems = orderChats(chatItems, sort, groupByType)
+
+  const items: SelectableItem[] = [...chatItems]
   for (const team of state.teams) {
     items.push({ kind: 'team', team })
     const channels = state.channelsByTeam[team.id] ?? []
@@ -38,6 +53,27 @@ export function buildSelectableList(state: SelectableInput): SelectableItem[] {
     }
   }
   return items
+}
+
+// Apply the chat-list sort, then (optionally) a stable group-by-type pass.
+// 'recent' preserves the incoming server order; 'alphabetical' sorts by label.
+// Array.prototype.sort is stable, so grouping keeps each section in the order
+// the sort produced.
+function orderChats(
+  items: ChatItem[],
+  sort: Settings['chatListSort'],
+  groupByType: boolean,
+): ChatItem[] {
+  let out = items
+  if (sort === 'alphabetical') {
+    out = [...items].sort((a, b) =>
+      a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }),
+    )
+  }
+  if (groupByType) {
+    out = [...out].sort((a, b) => chatTypeRank(a.chat.chatType) - chatTypeRank(b.chat.chatType))
+  }
+  return out
 }
 
 // Compute a friendly display label for a chat:

@@ -54,6 +54,60 @@ describe('buildSelectableList', () => {
     const list = buildSelectableList(state)
     expect(list.filter((i) => i.kind === 'channel')).toHaveLength(1)
   })
+
+  test('default sort preserves the incoming (recency) chat order', () => {
+    const state = {
+      ...initialAppState(),
+      chats: [chat('c1', { topic: 'Zoe' }), chat('c2', { topic: 'Amy' })],
+    }
+    const labels = buildSelectableList(state).map((i) => (i.kind === 'chat' ? i.label : null))
+    expect(labels).toEqual(['Zoe', 'Amy'])
+  })
+
+  test('alphabetical sort orders chats by label', () => {
+    const state = {
+      ...initialAppState(),
+      chats: [
+        chat('c1', { topic: 'Zoe' }),
+        chat('c2', { topic: 'amy' }),
+        chat('c3', { topic: 'Bob' }),
+      ],
+      settings: { chatListSort: 'alphabetical' as const, chatListGroupByType: false },
+    }
+    const labels = buildSelectableList(state).map((i) => (i.kind === 'chat' ? i.label : null))
+    expect(labels).toEqual(['amy', 'Bob', 'Zoe'])
+  })
+
+  test('group-by-type orders 1:1 → group → meeting, preserving order within a group', () => {
+    const state = {
+      ...initialAppState(),
+      chats: [
+        chat('m1', { topic: 'Standup', chatType: 'meeting' }),
+        chat('g1', { topic: 'Eng', chatType: 'group' }),
+        chat('d1', { topic: 'Ada', chatType: 'oneOnOne' }),
+        chat('g2', { topic: 'Design', chatType: 'group' }),
+      ],
+      settings: { chatListSort: 'recent' as const, chatListGroupByType: true },
+    }
+    const labels = buildSelectableList(state).map((i) => (i.kind === 'chat' ? i.label : null))
+    // 1:1 first, then groups (Eng before Design — recency preserved), then meeting.
+    expect(labels).toEqual(['Ada', 'Eng', 'Design', 'Standup'])
+  })
+
+  test('group-by-type with alphabetical sorts within each section', () => {
+    const state = {
+      ...initialAppState(),
+      chats: [
+        chat('g1', { topic: 'Zeta', chatType: 'group' }),
+        chat('g2', { topic: 'Alpha', chatType: 'group' }),
+        chat('d1', { topic: 'Bo', chatType: 'oneOnOne' }),
+        chat('d2', { topic: 'Ann', chatType: 'oneOnOne' }),
+      ],
+      settings: { chatListSort: 'alphabetical' as const, chatListGroupByType: true },
+    }
+    const labels = buildSelectableList(state).map((i) => (i.kind === 'chat' ? i.label : null))
+    expect(labels).toEqual(['Ann', 'Bo', 'Alpha', 'Zeta'])
+  })
 })
 
 describe('chatLabel', () => {

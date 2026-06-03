@@ -34,6 +34,9 @@ import type {
 export type ToggleKey =
   | 'theme'
   | 'chatListDensity'
+  | 'chatListSort'
+  | 'chatListGroupByType'
+  | 'headerUserFormat'
   | 'chatListShortNames'
   | 'showMessagePreviews'
   | 'messagePaneShortNames'
@@ -152,9 +155,19 @@ export const ROOT_MENU: MenuItem[] = [
         action: { kind: 'submenu' },
         children: [
           {
+            id: 'header-app',
+            label: 'App name',
+            action: { kind: 'toggle-header-element', key: 'app' },
+          },
+          {
             id: 'header-user',
             label: 'User / tenant',
             action: { kind: 'toggle-header-element', key: 'user' },
+          },
+          {
+            id: 'header-user-format',
+            label: 'User shows',
+            action: { kind: 'toggle-setting', key: 'headerUserFormat' },
           },
           {
             id: 'header-presence',
@@ -193,6 +206,17 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'chatListDensity',
         label: 'Chat list density',
         action: { kind: 'toggle-setting', key: 'chatListDensity' },
+      },
+      {
+        id: 'chatListSort',
+        label: 'Chat list sort',
+        action: { kind: 'toggle-setting', key: 'chatListSort' },
+      },
+      {
+        id: 'chatListGroupByType',
+        label: 'Group chats by type',
+        action: { kind: 'toggle-setting', key: 'chatListGroupByType' },
+        hint: '1:1 / group / meeting',
       },
       {
         id: 'chatListShortNames',
@@ -346,6 +370,20 @@ export function resolveMenuPath(root: MenuItem[], path: string[]): MenuItem[] | 
   return level
 }
 
+// Slice of items to show so a long submenu (e.g. Settings) doesn't overflow
+// the centered MenuModal overlay and clip rows off-screen. The window follows
+// the cursor, keeping it roughly centered, clamped to the list ends.
+export function menuItemWindow(
+  count: number,
+  cursor: number,
+  maxVisible: number,
+): { start: number; end: number } {
+  if (maxVisible >= count) return { start: 0, end: count }
+  let start = cursor - Math.floor(maxVisible / 2)
+  start = Math.max(0, Math.min(start, count - maxVisible))
+  return { start, end: start + maxVisible }
+}
+
 // First selectable index in items, -1 if all disabled.
 export function firstSelectable(items: MenuItem[]): number {
   for (let i = 0; i < items.length; i++) {
@@ -396,12 +434,17 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     }
     case 'chatListDensity':
       return (current === 'cozy' ? 'compact' : 'cozy') as Settings[K]
+    case 'chatListSort':
+      return (current === 'recent' ? 'alphabetical' : 'recent') as Settings[K]
+    case 'headerUserFormat':
+      return (current === 'full' ? 'tenant' : 'full') as Settings[K]
     case 'statusBarPosition':
       return (current === 'bottom' ? 'top' : current === 'top' ? 'hidden' : 'bottom') as Settings[K]
     case 'inlineImages':
       return (current === 'auto' ? 'off' : 'auto') as Settings[K]
     case 'showReactions':
       return cycleReactionDisplayMode(current as Settings['showReactions']) as Settings[K]
+    case 'chatListGroupByType':
     case 'chatListShortNames':
     case 'showMessagePreviews':
     case 'messagePaneShortNames':
@@ -449,9 +492,13 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
       return value === 'auto' ? 'inline' : 'as links'
     case 'theme':
     case 'chatListDensity':
+    case 'chatListSort':
     case 'showReactions':
     case 'statusBarPosition':
       return String(value)
+    case 'headerUserFormat':
+      return value === 'tenant' ? 'tenant only' : 'name + tenant'
+    case 'chatListGroupByType':
     case 'chatListShortNames':
     case 'showMessagePreviews':
     case 'messagePaneShortNames':

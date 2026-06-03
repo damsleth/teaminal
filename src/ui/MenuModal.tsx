@@ -24,6 +24,7 @@ import {
   firstSelectable,
   nextSelectable,
   renderQuietHoursValue,
+  menuItemWindow,
   renderSettingValue,
   resolveMenuPath,
   ROOT_MENU,
@@ -33,6 +34,7 @@ import {
 } from './menu'
 import type { Settings } from '../state/store'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
+import { useTerminalRows } from './hooks/useTerminalRows'
 import { useSessionApi } from './SessionContext'
 import { openThemeEditor } from './ThemeEditorModal'
 import { clearProfileCaches } from '../state/cacheClear'
@@ -86,6 +88,7 @@ export function MenuModal() {
   const modal = useAppState((s) => s.modal)
   const settings = useAppState((s) => s.settings)
   const theme = useTheme()
+  const terminalRows = useTerminalRows()
   const isOpen = modal?.kind === 'menu'
 
   useInput(
@@ -220,7 +223,25 @@ export function MenuModal() {
   if (!isOpen || !modal || modal.kind !== 'menu') return null
 
   const items = resolveMenuPath(ROOT_MENU, modal.path) ?? ROOT_MENU
-  const breadcrumb = modal.path.length > 0 ? modal.path.join(' / ') : null
+  const atRoot = modal.path.length === 0
+  const breadcrumb = !atRoot ? modal.path.join(' / ') : null
+
+  // Each menu row visually consumes ~2 terminal rows in this layout, and the
+  // modal is centered inside the message pane. Window the items so a long
+  // submenu (Settings) fits without clipping the top/bottom off-screen.
+  const PER_ITEM_ROWS = 2
+  const reservedRows =
+    8 /* outer header + composer + status + frame */ +
+    (atRoot ? LOGO.length + 3 : 0) /* logo + version + repo + blank (root only) */ +
+    (breadcrumb ? 2 : 0) +
+    4 /* trailing blank + footer + ⋯ headroom */ +
+    theme.layout.modalPaddingY * 2 +
+    2 /* modal border */
+  const maxVisible = Math.max(4, Math.floor((terminalRows - reservedRows) / PER_ITEM_ROWS))
+  const { start, end } = menuItemWindow(items.length, modal.cursor, maxVisible)
+  const moreAbove = start > 0
+  const moreBelow = end < items.length
+  const visibleItems = items.slice(start, end).map((item, i) => ({ item, idx: start + i }))
 
   return (
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
@@ -232,20 +253,28 @@ export function MenuModal() {
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
       >
-        <Box flexDirection="column">
-          {LOGO.map((line, i) => (
-            <Text key={i} color="cyan" backgroundColor={theme.background}>
-              {pad(line)}
+        {/* The ASCII logo + version/repo is branding for the root menu only.
+            Submenus (especially the long Settings list) drop it so more rows
+            are available for items — otherwise the centered overlay overflows
+            and clips the top entries off-screen. */}
+        {atRoot ? (
+          <>
+            <Box flexDirection="column">
+              {LOGO.map((line, i) => (
+                <Text key={i} color="cyan" backgroundColor={theme.background}>
+                  {pad(line)}
+                </Text>
+              ))}
+            </Box>
+            <Text color="gray" backgroundColor={theme.background}>
+              {pad(`teaminal ${VERSION}`)}
             </Text>
-          ))}
-        </Box>
-        <Text color="gray" backgroundColor={theme.background}>
-          {pad(`teaminal ${VERSION}`)}
-        </Text>
-        <Text color="gray" backgroundColor={theme.background}>
-          {pad(REPOSITORY_URL)}
-        </Text>
-        <Text backgroundColor={theme.background}>{pad('')}</Text>
+            <Text color="gray" backgroundColor={theme.background}>
+              {pad(REPOSITORY_URL)}
+            </Text>
+            <Text backgroundColor={theme.background}>{pad('')}</Text>
+          </>
+        ) : null}
         {breadcrumb && (
           <>
             <Text color="gray" backgroundColor={theme.background}>
@@ -255,7 +284,12 @@ export function MenuModal() {
           </>
         )}
         <Box flexDirection="column">
-          {items.map((item, idx) => {
+          {moreAbove && (
+            <Text color="gray" backgroundColor={theme.background}>
+              {pad('  ⋯')}
+            </Text>
+          )}
+          {visibleItems.map(({ item, idx }) => {
             const selected = idx === modal.cursor
             const marker = selected && !item.disabled ? '> ' : '  '
             // Use theme.text (not the terminal default fg) so rows stay
@@ -275,6 +309,11 @@ export function MenuModal() {
               </Text>
             )
           })}
+          {moreBelow && (
+            <Text color="gray" backgroundColor={theme.background}>
+              {pad('  ⋯')}
+            </Text>
+          )}
         </Box>
         <Text backgroundColor={theme.background}>{pad('')}</Text>
         <Text color="gray" backgroundColor={theme.background}>

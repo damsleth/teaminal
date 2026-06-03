@@ -60,19 +60,46 @@ function visualLines(text: string, contentWidth: number): number {
   return Math.max(1, Math.ceil(text.length / contentWidth))
 }
 
+// Section label for a chat when grouping by type is on. Matches the
+// ordering ranks in selectables.ts (Direct → Groups → Meetings → Other).
+function chatTypeSectionLabel(chatType: string): string {
+  switch (chatType) {
+    case 'oneOnOne':
+      return 'Direct'
+    case 'group':
+      return 'Groups'
+    case 'meeting':
+      return 'Meetings'
+    default:
+      return 'Other'
+  }
+}
+
 function buildRows(
   items: SelectableItem[],
   density: ChatListDensity,
   syntheticNewChatQuery: string | null,
+  groupByType: boolean,
 ): Row[] {
   const rows: Row[] = []
   let firstChatEmitted = false
+  let lastChatSection: string | null = null
   let firstTeamEmitted = false
   let lastTeamId: string | null = null
   for (let i = 0; i < items.length; i++) {
     const it = items[i]!
-    if (it.kind === 'chat' && !firstChatEmitted && density === 'cozy') {
-      rows.push({ kind: 'header', label: 'Chats' })
+    if (it.kind === 'chat') {
+      if (groupByType) {
+        // Per-type section headers, emitted at each group boundary (the chats
+        // are already ordered by type in buildSelectableList).
+        const section = chatTypeSectionLabel(it.chat.chatType)
+        if (section !== lastChatSection) {
+          rows.push({ kind: 'header', label: section })
+          lastChatSection = section
+        }
+      } else if (!firstChatEmitted && density === 'cozy') {
+        rows.push({ kind: 'header', label: 'Chats' })
+      }
       firstChatEmitted = true
     }
     if (it.kind === 'team') {
@@ -197,6 +224,8 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const filter = useAppState((s) => s.filter)
   const inputZone = useAppState((s) => s.inputZone)
   const density = useAppState((s) => s.settings.chatListDensity)
+  const chatListSort = useAppState((s) => s.settings.chatListSort)
+  const chatListGroupByType = useAppState((s) => s.settings.chatListGroupByType)
   const shortNames = useAppState((s) => s.settings.chatListShortNames)
   const showMessagePreviews = useAppState((s) => s.settings.showMessagePreviews)
   const showPresence = useAppState((s) => s.settings.showPresenceInList)
@@ -222,14 +251,21 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   // the data we actually depend on. (useAppState's selectors guarantee
   // referential stability of the store, not derived data, so we recompute
   // on every render - cheap given the list sizes.)
-  const all = buildSelectableList({ me, chats, teams, channelsByTeam, nameByUserId })
+  const all = buildSelectableList({
+    me,
+    chats,
+    teams,
+    channelsByTeam,
+    nameByUserId,
+    settings: { chatListSort, chatListGroupByType },
+  })
   const items = filter ? all.filter((i) => itemMatchesFilter(i, filter)) : all
   const syntheticNewChatQuery =
     filter && items.length === 0 && isNewChatQueryCandidate(filter) ? filter.trim() : null
 
   const selectableCount = items.length + (syntheticNewChatQuery ? 1 : 0)
   const safeCursor = clampCursor(cursor, selectableCount)
-  const rows = buildRows(items, density, syntheticNewChatQuery)
+  const rows = buildRows(items, density, syntheticNewChatQuery, chatListGroupByType)
 
   // Visual height per logical row. Long chat names wrap onto multiple
   // visual lines, and unread previews add another line in cozy density;

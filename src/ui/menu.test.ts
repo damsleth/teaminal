@@ -3,6 +3,7 @@ import {
   cycleQuietHoursPreset,
   cycleSetting,
   firstSelectable,
+  menuItemWindow,
   nextSelectable,
   QUIET_HOURS_PRESETS,
   renderQuietHoursValue,
@@ -113,6 +114,14 @@ describe('cycleSetting', () => {
     expect(cycleSetting('showTimestampsInPane', true)).toBe(false)
     expect(cycleSetting('messageFocusIndicatorEnabled', true)).toBe(false)
     expect(cycleSetting('realtimeEnabled', false)).toBe(true)
+    expect(cycleSetting('chatListGroupByType', false)).toBe(true)
+  })
+
+  test('flips chat list sort and header user format', () => {
+    expect(cycleSetting('chatListSort', 'recent')).toBe('alphabetical')
+    expect(cycleSetting('chatListSort', 'alphabetical')).toBe('recent')
+    expect(cycleSetting('headerUserFormat', 'full')).toBe('tenant')
+    expect(cycleSetting('headerUserFormat', 'tenant')).toBe('full')
   })
 
   test('cycles focused-message marker chars through presets', () => {
@@ -139,7 +148,13 @@ describe('renderSettingValue', () => {
   test('renders enum values verbatim', () => {
     expect(renderSettingValue('theme', 'dark')).toBe('dark')
     expect(renderSettingValue('chatListDensity', 'compact')).toBe('compact')
+    expect(renderSettingValue('chatListSort', 'alphabetical')).toBe('alphabetical')
     expect(renderSettingValue('showReactions', 'current')).toBe('current')
+  })
+
+  test('renders header user format descriptively', () => {
+    expect(renderSettingValue('headerUserFormat', 'full')).toBe('name + tenant')
+    expect(renderSettingValue('headerUserFormat', 'tenant')).toBe('tenant only')
   })
 
   test('renders booleans as on/off', () => {
@@ -147,6 +162,7 @@ describe('renderSettingValue', () => {
     expect(renderSettingValue('showPresenceInList', false)).toBe('off')
     expect(renderSettingValue('messageFocusIndicatorEnabled', false)).toBe('off')
     expect(renderSettingValue('realtimeEnabled', true)).toBe('on')
+    expect(renderSettingValue('chatListGroupByType', true)).toBe('on')
   })
 
   test('renders focused-message marker char', () => {
@@ -187,6 +203,8 @@ describe('ROOT_MENU shape', () => {
       'statusBarShowKeyHints',
       // Chat list
       'chatListDensity',
+      'chatListSort',
+      'chatListGroupByType',
       'chatListShortNames',
       'showMessagePreviews',
       'showPresenceInList',
@@ -253,6 +271,29 @@ describe('cycleQuietHoursPreset', () => {
 
   test('non-preset values jump to off then advance', () => {
     expect(cycleQuietHoursPreset({ start: '01:00', end: '02:00' })).toEqual(QUIET_HOURS_PRESETS[0]!)
+  })
+})
+
+describe('menuItemWindow', () => {
+  test('shows everything when the list fits', () => {
+    expect(menuItemWindow(5, 0, 10)).toEqual({ start: 0, end: 5 })
+    expect(menuItemWindow(5, 4, 5)).toEqual({ start: 0, end: 5 })
+  })
+
+  test('keeps the cursor centered when scrolled into the middle', () => {
+    // 28 items, window of 6, cursor at 15 → start = 15 - 3 = 12.
+    expect(menuItemWindow(28, 15, 6)).toEqual({ start: 12, end: 18 })
+  })
+
+  test('clamps to the top so the first items stay visible', () => {
+    // Cursor on the first item → window anchored at 0 (Theme + Theme editor
+    // visible right after opening a long submenu).
+    expect(menuItemWindow(28, 0, 6)).toEqual({ start: 0, end: 6 })
+    expect(menuItemWindow(28, 1, 6)).toEqual({ start: 0, end: 6 })
+  })
+
+  test('clamps to the bottom so the last item stays visible', () => {
+    expect(menuItemWindow(28, 27, 6)).toEqual({ start: 22, end: 28 })
   })
 })
 

@@ -49,20 +49,21 @@ describe('readMessagePageState', () => {
 
 describe('message row viewport budgeting', () => {
   test('counts send-error continuations as physical rows; inline reactions stay on one row', () => {
-    expect(messageRenderRowHeight({ kind: 'message', key: 'a', message: msg('a') })).toBe(1)
+    // Each normal message is a sender-header line plus its body line.
+    expect(messageRenderRowHeight({ kind: 'message', key: 'a', message: msg('a') })).toBe(2)
     const reactedRow: MessageRenderRow = {
       kind: 'message',
       key: 'b',
       message: { ...msg('b'), reactions: [{ reactionType: 'like' }] },
     }
-    expect(messageRenderRowHeight(reactedRow)).toBe(1)
+    expect(messageRenderRowHeight(reactedRow)).toBe(2)
     expect(
       messageRenderRowHeight({
         kind: 'message',
         key: 'c',
         message: { ...msg('c'), _sendError: 'failed' },
       }),
-    ).toBe(2)
+    ).toBe(3)
   })
 
   test('adds +1 row for chat-pane quoted replies', () => {
@@ -80,7 +81,7 @@ describe('message row viewport budgeting', () => {
         },
       ],
     }
-    expect(messageRenderRowHeight({ kind: 'message', key: 'reply', message: replyMsg })).toBe(2)
+    expect(messageRenderRowHeight({ kind: 'message', key: 'reply', message: replyMsg })).toBe(3)
   })
 
   test('counts inline image fallback rows', () => {
@@ -96,8 +97,8 @@ describe('message row viewport budgeting', () => {
       },
     }
 
-    expect(messageRenderRowHeight(row)).toBe(2)
-    expect(messageRenderRowHeight(row, { inlineImageRows: 4 })).toBe(6)
+    expect(messageRenderRowHeight(row)).toBe(3)
+    expect(messageRenderRowHeight(row, { inlineImageRows: 4 })).toBe(7)
   })
 
   test('imageRowsForMessage resolver overrides the static image reservation', () => {
@@ -112,10 +113,10 @@ describe('message row viewport budgeting', () => {
         from: { user: { id: 'u1', displayName: 'User' } },
       },
     }
-    // body(1) + resolver(3). The static inlineImageRows is ignored when a
-    // resolver is supplied (the loaded image's fitted height is dynamic).
+    // header(1) + body(1) + resolver(3). The static inlineImageRows is ignored
+    // when a resolver is supplied (the loaded image's fitted height is dynamic).
     expect(messageRenderRowHeight(row, { inlineImageRows: 4, imageRowsForMessage: () => 3 })).toBe(
-      4,
+      5,
     )
   })
 
@@ -129,7 +130,8 @@ describe('message row viewport budgeting', () => {
         },
         { messageTextColumns: 5 },
       ),
-    ).toBe(3)
+      // header(1) + 3 wrapped body lines (12 chars / 5 cols).
+    ).toBe(4)
   })
 
   test('keeps the bottom rows within the physical row budget', () => {
@@ -139,17 +141,18 @@ describe('message row viewport budgeting', () => {
       { ...msg('new', '2026-05-05T10:01:00Z'), reactions: [{ reactionType: 'like' }] },
     ])
 
-    const visible = sliceMessageRowsToBudget(rows, { rowBudget: 3 })
+    // Budget 5 = date row (1) + two height-2 messages.
+    const visible = sliceMessageRowsToBudget(rows, { rowBudget: 5 })
 
     expect(visible.map(rowKey)).toEqual(['date-2026-05-05', 'mid', 'new'])
-    expect(visible.reduce((sum, row) => sum + messageRenderRowHeight(row), 0)).toBe(3)
+    expect(visible.reduce((sum, row) => sum + messageRenderRowHeight(row), 0)).toBe(5)
   })
 
   test('keeps the existing window while the focused message remains visible', () => {
     const rows = buildMessageRows([msg('a'), msg('b'), msg('c'), msg('d')])
 
     const visible = sliceMessageRowsToBudget(rows, {
-      rowBudget: 2,
+      rowBudget: 4,
       focusedMessageId: 'b',
       focusActive: true,
       previousStart: 1,
@@ -162,7 +165,7 @@ describe('message row viewport budgeting', () => {
     const rows = buildMessageRows([msg('a'), msg('b'), msg('c'), msg('d')])
 
     const visible = sliceMessageRowsToBudget(rows, {
-      rowBudget: 2,
+      rowBudget: 4,
       focusedMessageId: 'a',
       focusActive: true,
       previousStart: 2,
@@ -174,13 +177,13 @@ describe('message row viewport budgeting', () => {
   test('scrolls down only when the focused message moves below the window', () => {
     const rows = buildMessageRows([msg('a'), msg('b'), msg('c'), msg('d')])
     const start = chooseMessageRowsWindowStart(rows, {
-      rowBudget: 2,
+      rowBudget: 4,
       focusedMessageId: 'd',
       focusActive: true,
       previousStart: 1,
     })
     const end = messageRowsWindowEnd(rows, start, {
-      rowBudget: 2,
+      rowBudget: 4,
       focusedMessageId: 'd',
     })
 

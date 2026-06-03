@@ -7,7 +7,7 @@
 // <a>, and entity refs render correctly.
 
 import { Box, Text, useStdout } from 'ink'
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { chatLabel, shortName } from '../state/selectables'
 import { focusKey, type ReadReceipt, type TypingIndicator } from '../state/store'
 import {
@@ -67,15 +67,6 @@ const TYPING_DOT = '…'
 const CHROME_RESERVED_ROWS = 10
 const COZY_HEADER_ROWS = 2
 const MIN_VISIBLE_ROWS = 5
-// Sender column width is computed per render from the longest first
-// name in the conversation, so short-name conversations stay tight and
-// long-name conversations don't truncate. Capped on both ends:
-//   - SENDER_COL_MIN keeps the column readable even for empty / system
-//     rows.
-//   - SENDER_COL_MAX prevents a single long-handle outlier (e.g. an
-//     external bot account) from pushing every body row absurdly right.
-const SENDER_COL_MIN = 4
-const SENDER_COL_MAX = 16
 // Fallback for LIST_PANE_WIDTH when no prop is provided. Kept to avoid
 // breaking isolated renders; App.tsx always passes the resolved width.
 const LIST_PANE_WIDTH_DEFAULT = 30
@@ -161,7 +152,10 @@ export function MessagePane(props: {
   // (roots + replies are both in rawMessages) — no Graph /replies fetch.
   const channelThreads: ChannelThreads | null =
     focus.kind === 'channel' ? groupChannelThreads(rawMessages) : null
-  const senderColWidth = computeSenderColWidth(messages, shortNames)
+  // Repurposed theme.layout knobs: left indent of the sender-name/body block,
+  // and the blank rows inserted after each message group.
+  const bodyIndent = theme.layout.paneHeaderPaddingLeft
+  const messageGap = theme.layout.paneHeaderMarginBottom
   const cache = messageCacheByConvo[conv]
   const headerLabel = isListFocus
     ? ''
@@ -192,7 +186,10 @@ export function MessagePane(props: {
     MIN_VISIBLE_ROWS,
     terminalSize.rows - chromeRows - cozyRows - reservedDynamic,
   )
-  const messageTextColumns = Math.max(12, terminalSize.columns - 60)
+  // Body wrap width estimate for the viewport budget: pane content (terminal
+  // minus the chat-list pane and its border) minus the body indent. Bodies now
+  // start near the left edge instead of after a deep sender column.
+  const messageTextColumns = Math.max(12, terminalSize.columns - listPaneWidth - 2 - bodyIndent)
   // Cell budget for an inline image (message pane minus the gutter columns).
   const imgCols = Math.max(12, terminalSize.columns - listPaneWidth - 20)
   // Rows a message's inline images occupy: each loaded image takes its fitted
@@ -215,6 +212,7 @@ export function MessagePane(props: {
     focusActive: props.focusIndicatorActive === true || reactionPickerOpen,
     imageRowsForMessage,
     messageTextColumns,
+    messageGap,
     reactionDisplayMode,
     rowBudget,
     previousStart: windowStartRef.current,
@@ -224,6 +222,7 @@ export function MessagePane(props: {
     focusedMessageId: props.focusedMessageId,
     imageRowsForMessage,
     messageTextColumns,
+    messageGap,
     reactionDisplayMode,
     rowBudget,
   })
@@ -283,16 +282,13 @@ export function MessagePane(props: {
       below += messageRenderRowHeight(rows[i]!, {
         imageRowsForMessage,
         messageTextColumns,
+        messageGap,
         reactionDisplayMode,
       })
     }
 
     clearKittyImages(stdout)
-    const imageColumn = messageBodyTerminalColumn({
-      senderColWidth,
-      showTimestamps,
-      listPaneWidth,
-    })
+    const imageColumn = messageBodyTerminalColumn({ bodyIndent, listPaneWidth })
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
       const row = rows[rowIndex]!
       if (row.kind !== 'message') continue
@@ -312,13 +308,13 @@ export function MessagePane(props: {
         const apc = buildKittyAPC(imgData, placement)
         // Rows below this image's top, within its own message: the rest of
         // this image, then later images' blocks (fitted rows or a label
-        // row each), then file-attachment rows.
+        // row each), then file-attachment rows, then the trailing group gap.
         let belowWithinMessage = reservedRows - 1
         for (let j = imageIndex + 1; j < refs.length; j++) {
           const r = reserved[j]
           belowWithinMessage += r === null || r === undefined ? 1 : r
         }
-        belowWithinMessage += fileRows
+        belowWithinMessage += fileRows + messageGap
         const rowsFromBottom =
           rowsAfter[rowIndex]! + belowWithinMessage + bottomChromeRows(statusBarHidden) + 1
         writeKittyImageAtOffset(stdout, apc, rowsFromBottom, reservedRows, imageColumn)
@@ -344,15 +340,17 @@ export function MessagePane(props: {
       (r) => r.kind === 'message' && r.message.id === props.focusedMessageId,
     )
     if (idx < 0) return
-    const heightOpts = { imageRowsForMessage, messageTextColumns, reactionDisplayMode }
+    const heightOpts = { imageRowsForMessage, messageTextColumns, messageGap, reactionDisplayMode }
     let rowsBefore = 0
     for (let i = 0; i < idx; i++) rowsBefore += messageRenderRowHeight(rows[i]!, heightOpts)
     // Chrome above the pane content: header bar (3) + message-pane top border
     // (1); pane content then starts on the next row. Add the in-pane prelude
-    // (cozy header, search bar, loading-older line) that pushes messages down.
+    // (cozy header, search bar, loading-older line) that pushes messages down,
+    // plus the focused message's own sender-header line so the anchor lands on
+    // the body rather than the name.
     const preludeRows =
       cozyRows + (searchActive ? 1 : 0) + (isLoadingOlder && !showingHistoryTop ? 1 : 0)
-    const row = 4 + 1 + preludeRows + rowsBefore
+    const row = 4 + 1 + preludeRows + rowsBefore + 1
     // Compute the column at the end of the focused message body's last wrapped
     // line. `messageBodyTerminalColumn` gives the 1-based terminal column where
     // the body text begins; `pickerAnchorCol` adds the display width of the
@@ -360,11 +358,7 @@ export function MessagePane(props: {
     const focusedRow = rows[idx]
     const focusedMsg = focusedRow?.kind === 'message' ? focusedRow.message : null
     const bodyText = focusedMsg ? previewBody(focusedMsg) : ''
-    const bodyStartCol = messageBodyTerminalColumn({
-      senderColWidth,
-      showTimestamps,
-      listPaneWidth,
-    })
+    const bodyStartCol = messageBodyTerminalColumn({ bodyIndent, listPaneWidth })
     const fallbackCol = listPaneWidth + 3
     const col = pickerAnchorCol({
       bodyText,
@@ -394,11 +388,7 @@ export function MessagePane(props: {
       paddingX={0}
     >
       {density === 'cozy' && (
-        <Box
-          paddingLeft={theme.layout.paneHeaderPaddingLeft}
-          marginBottom={theme.layout.paneHeaderMarginBottom}
-          flexShrink={0}
-        >
+        <Box paddingLeft={bodyIndent} marginBottom={1} flexShrink={0}>
           <Text bold={theme.emphasis.sectionHeadingBold}>{headerLabel}</Text>
         </Box>
       )}
@@ -447,7 +437,8 @@ export function MessagePane(props: {
                 imgCols={imgCols}
                 inlineImageMaxRows={inlineImageMaxRows}
                 selfMessagesOnRight={selfMessagesOnRight}
-                senderColWidth={senderColWidth}
+                bodyIndent={bodyIndent}
+                messageGap={messageGap}
                 shortNames={shortNames}
                 showTimestamp={showTimestamps}
                 theme={theme}
@@ -478,7 +469,8 @@ function TimelineRow(props: {
   imgCols: number
   inlineImageMaxRows: number
   selfMessagesOnRight: boolean
-  senderColWidth: number
+  bodyIndent: number
+  messageGap: number
   shortNames: boolean
   showTimestamp: boolean
   theme: Theme
@@ -519,7 +511,8 @@ function TimelineRow(props: {
       imgCols={props.imgCols}
       inlineImageMaxRows={props.inlineImageMaxRows}
       selfMessagesOnRight={props.selfMessagesOnRight}
-      senderColWidth={props.senderColWidth}
+      bodyIndent={props.bodyIndent}
+      messageGap={props.messageGap}
       shortNames={props.shortNames}
       showTimestamp={props.showTimestamp}
       theme={props.theme}
@@ -540,28 +533,24 @@ function MessageRow(props: {
   imgCols: number
   inlineImageMaxRows: number
   selfMessagesOnRight: boolean
-  senderColWidth: number
+  bodyIndent: number
+  messageGap: number
   shortNames: boolean
   showTimestamp: boolean
   theme: Theme
   threadMeta?: ReplyBadge
 }) {
-  const { theme, senderColWidth } = props
+  const { theme } = props
   const m = props.message
   const isSelf = !!props.myUserId && m.from?.user?.id === props.myUserId
-  const flipRow = props.selfMessagesOnRight && isSelf
+  const flip = props.selfMessagesOnRight && isSelf
   const time = m.createdDateTime.slice(11, 16)
   const isSystem = m.messageType === 'systemEventMessage'
-  // Sender label resolution: system rows leave the sender column blank
-  // and put the decoded subtype in the body. Other rows fall through to
-  // the best available display name from from.user/application/device;
-  // upstream filter guarantees non-null for non-system rows.
+  // The sender name now gets its own line above the body, so it is shown in
+  // full (the header line truncates only if it overruns the pane). System
+  // rows have no sender; their text occupies the single line.
   const senderRaw = isSystem ? '' : (effectiveSenderName(m) ?? '')
-  const senderDisplay = senderRaw ? (props.shortNames ? shortName(senderRaw) : senderRaw) : ''
-  const senderTrimmed =
-    senderDisplay.length > senderColWidth
-      ? senderDisplay.slice(0, senderColWidth - 1) + '…'
-      : senderDisplay
+  const senderName = senderRaw ? (props.shortNames ? shortName(senderRaw) : senderRaw) : ''
   const isSending = m._sending === true
   const sendError = m._sendError
   const readReceiptLine =
@@ -598,139 +587,135 @@ function MessageRow(props: {
   else if (isSystem) color = theme.systemEvent
   else if (isSelf) color = theme.selfMessage
 
-  // The indicator column carries the focus arrow when this row is
-  // focused; otherwise it carries any send-status glyph (failed / sending).
-  // Focus wins over send-state because focus is user-driven and errors
-  // are server-driven — they rarely coincide, and when they do, seeing
-  // the cursor matters more.
+  // The marker column carries the focus arrow when this row is focused;
+  // otherwise the send-status glyph (failed / sending). It is as wide as the
+  // body indent so the sender name lines up directly above the body.
   const sendStatusGlyph = sendError ? '✗' : isSending ? '…' : ' '
   const indicator = props.focused ? props.focusIndicatorChar.slice(0, 1) || '>' : sendStatusGlyph
-  // Timestamp column hosts "HH:MM " - five chars plus a trailing space so
-  // the time doesn't butt up against the sender/message. The status glyph
-  // lives in the indicator column above. When timestamps are off the column
-  // collapses entirely.
-  const TIMESTAMP_WIDTH = 6
-  const statusWidth = props.showTimestamp ? TIMESTAMP_WIDTH : 0
+  const indent = Math.max(0, props.bodyIndent)
+  const markerWidth = Math.max(1, indent)
+  const align = flip ? 'flex-end' : undefined
 
-  const rowDir = flipRow ? 'row-reverse' : 'row'
+  const marker = (
+    <Box width={markerWidth} flexShrink={0}>
+      <Text
+        color={props.focused ? theme.messageFocusIndicator : undefined}
+        backgroundColor={props.focused ? (theme.messageFocusBackground ?? undefined) : undefined}
+      >
+        {indicator}
+      </Text>
+    </Box>
+  )
 
-  // Quoted-reply preview (chat-pane only). Channel threads represent
-  // replies via the existing thread tree; double-decorating both
-  // would be visual noise.
+  // An indented content row (body, quoted reply, thread/receipt/error lines):
+  // the indent spacer plus a grown content box, mirrored to the right in flip
+  // mode so the whole block hugs the right edge.
+  const contentRow = (key: string, node: ReactNode) => (
+    <Box key={key} flexDirection="row">
+      {!flip && indent > 0 && <Box width={indent} flexShrink={0} />}
+      <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
+        {node}
+      </Box>
+      {flip && indent > 0 && <Box width={indent} flexShrink={0} />}
+    </Box>
+  )
+
+  const bodyNode = (
+    <Text
+      color={isDeleted ? theme.mutedText : props.focused ? theme.messageFocusIndicator : color}
+      italic={isDeleted}
+      bold={props.focused && !isDeleted}
+      wrap="wrap"
+    >
+      {bodySpans.map((span, i) =>
+        span.kind === 'text' ? (
+          <Text key={i}>{span.text}</Text>
+        ) : (
+          <Text
+            key={i}
+            color={theme.selected}
+            underline
+            bold={span.kind === 'link-focused'}
+            backgroundColor={
+              span.kind === 'link-focused' ? (theme.selectedRowBackground ?? undefined) : undefined
+            }
+          >
+            {span.text}
+          </Text>
+        ),
+      )}
+      {isEdited && <Text color={theme.mutedText}> (edited)</Text>}
+      {reactionLine && <Text color={theme.mutedText}> {`(${reactionLine})`}</Text>}
+    </Text>
+  )
+
+  // System and deleted rows have no sender header — the marker line carries
+  // their single line of text directly.
+  const hasHeader = !isSystem && !isDeleted
+  // Quoted-reply preview (chat-pane only). Channel threads represent replies
+  // via the existing thread tree; double-decorating both would be visual noise.
   const quotedReply = !isSystem ? getQuotedReply(m) : null
 
   return (
     <>
-      {quotedReply && (
-        <Box flexDirection={rowDir}>
-          <Box width={1} flexShrink={0} />
-          {props.showTimestamp && <Box width={statusWidth} flexShrink={0} />}
-          <Box width={senderColWidth + 1} flexShrink={0} />
-          <Box flexGrow={1} flexShrink={1} minWidth={0}>
-            <Text color={theme.mutedText} wrap="truncate-end">
-              {`↳ replying to ${quotedReply.senderName}${
-                quotedReply.preview ? `: "${quotedReply.preview}"` : ''
-              }`}
+      {hasHeader ? (
+        <Box flexDirection="row">
+          {!flip && marker}
+          <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
+            <Text wrap="truncate-end">
+              <Text color={color} bold={senderName.length > 0 && theme.emphasis.senderBold}>
+                {senderName}
+              </Text>
+              {props.showTimestamp && <Text color={theme.timestamp}>{`  ${time}`}</Text>}
             </Text>
           </Box>
+          {flip && marker}
+        </Box>
+      ) : (
+        <Box flexDirection="row">
+          {!flip && marker}
+          <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
+            {bodyNode}
+          </Box>
+          {flip && marker}
         </Box>
       )}
-      <Box flexDirection={rowDir}>
-        <Box width={1} flexShrink={0}>
-          <Text
-            color={props.focused ? theme.messageFocusIndicator : undefined}
-            backgroundColor={
-              props.focused ? (theme.messageFocusBackground ?? undefined) : undefined
-            }
-          >
-            {indicator}
-          </Text>
-        </Box>
-        {props.showTimestamp && (
-          <Box width={statusWidth} flexShrink={0}>
-            <Text color={theme.timestamp} wrap="truncate-end">
-              {`${time} `}
-            </Text>
-          </Box>
+      {quotedReply &&
+        contentRow(
+          'quoted',
+          <Text color={theme.mutedText} wrap="truncate-end">
+            {`↳ replying to ${quotedReply.senderName}${
+              quotedReply.preview ? `: "${quotedReply.preview}"` : ''
+            }`}
+          </Text>,
         )}
-        <Box width={senderColWidth + 1} flexShrink={0}>
-          <Text
-            color={color}
-            bold={!isSystem && senderTrimmed.length > 0 && theme.emphasis.senderBold}
-            wrap="truncate-end"
-          >
-            {`${senderTrimmed.padEnd(senderColWidth)} `}
-          </Text>
-        </Box>
-        <Box flexGrow={1} flexShrink={1} minWidth={0}>
-          <Text
-            color={
-              isDeleted ? theme.mutedText : props.focused ? theme.messageFocusIndicator : color
-            }
-            italic={isDeleted}
-            bold={props.focused && !isDeleted}
-            wrap="wrap"
-          >
-            {bodySpans.map((span, i) =>
-              span.kind === 'text' ? (
-                <Text key={i}>{span.text}</Text>
-              ) : (
-                <Text
-                  key={i}
-                  color={theme.selected}
-                  underline
-                  bold={span.kind === 'link-focused'}
-                  backgroundColor={
-                    span.kind === 'link-focused'
-                      ? (theme.selectedRowBackground ?? undefined)
-                      : undefined
-                  }
-                >
-                  {span.text}
-                </Text>
-              ),
-            )}
-            {isEdited && <Text color={theme.mutedText}> (edited)</Text>}
-            {reactionLine && <Text color={theme.mutedText}> {`(${reactionLine})`}</Text>}
-          </Text>
-        </Box>
-      </Box>
-      {props.threadMeta && props.threadMeta.count > 0 && (
-        <Box flexDirection={rowDir}>
-          <Box width={1} flexShrink={0} />
-          {props.showTimestamp && <Box width={statusWidth} flexShrink={0} />}
-          <Box width={senderColWidth + 1} flexShrink={0} />
-          <Box flexGrow={1} flexShrink={1} minWidth={0}>
-            <Text color={theme.mutedText} wrap="truncate-end">
-              {`╰─ ${formatReplyCount(props.threadMeta)}`}
-            </Text>
-          </Box>
-        </Box>
-      )}
-      {readReceiptLine && (
-        <Box flexDirection={rowDir}>
-          <Box width={1} flexShrink={0} />
-          {props.showTimestamp && <Box width={statusWidth} flexShrink={0} />}
-          <Box width={senderColWidth + 1} flexShrink={0} />
-          <Box flexGrow={1} flexShrink={1} minWidth={0}>
-            <Text color={theme.mutedText} wrap="truncate-end">
-              {readReceiptLine}
-            </Text>
-          </Box>
-        </Box>
-      )}
-      {sendError && (
-        <Box flexDirection={rowDir}>
-          <Box width={1} flexShrink={0} />
-          {props.showTimestamp && <Box width={statusWidth} flexShrink={0} />}
-          <Box width={senderColWidth + 1} flexShrink={0} />
-          <Box flexGrow={1} flexShrink={1} minWidth={0}>
-            <Text color={theme.warnText} wrap="truncate-end">
-              {`send failed: ${sendError.slice(0, 120)}`}
-            </Text>
-          </Box>
-        </Box>
-      )}
+      {hasHeader && contentRow('body', bodyNode)}
+      {props.threadMeta &&
+        props.threadMeta.count > 0 &&
+        contentRow(
+          'thread',
+          <Text color={theme.mutedText} wrap="truncate-end">
+            {`╰─ ${formatReplyCount(props.threadMeta)}`}
+          </Text>,
+        )}
+      {readReceiptLine &&
+        contentRow(
+          'receipt',
+          <Text color={theme.mutedText} wrap="truncate-end">
+            {readReceiptLine}
+          </Text>,
+        )}
+      {sendError &&
+        contentRow(
+          'error',
+          <Text color={theme.warnText} wrap="truncate-end">
+            {`send failed: ${sendError.slice(0, 120)}`}
+          </Text>,
+        )}
+      {/* Inline images are not mirrored in flip mode: the picture is painted
+          out-of-band by the Kitty layer at a fixed column derived from the left
+          edge (messageBodyTerminalColumn), so flipping only the reserved rows
+          would desync the painting from its label. They share the body indent. */}
       {!isDeleted &&
         extractInlineImages(m).map((ref: InlineImageRef) => (
           <ImageRows
@@ -740,9 +725,7 @@ function MessageRow(props: {
             maxRows={props.inlineImageMaxRows}
             label={ref.name}
             focused={focusedImageKey === ref.cacheKey}
-            senderColWidth={senderColWidth}
-            showTimestamp={props.showTimestamp}
-            statusWidth={statusWidth}
+            bodyIndent={indent}
             theme={theme}
           />
         ))}
@@ -752,12 +735,16 @@ function MessageRow(props: {
             key={`file-${file.id}`}
             label={file.name}
             sizeText={formatBytes(file.sizeBytes)}
-            senderColWidth={senderColWidth}
-            showTimestamp={props.showTimestamp}
-            statusWidth={statusWidth}
+            flip={flip}
+            bodyIndent={indent}
             theme={theme}
           />
         ))}
+      {Array.from({ length: Math.max(0, props.messageGap) }, (_, i) => (
+        <Box key={`gap-${i}`}>
+          <Text> </Text>
+        </Box>
+      ))}
     </>
   )
 }
@@ -765,22 +752,26 @@ function MessageRow(props: {
 function FileAttachmentRow(props: {
   label: string
   sizeText: string
-  senderColWidth: number
-  showTimestamp: boolean
-  statusWidth: number
+  flip?: boolean
+  bodyIndent: number
   theme: Theme
 }) {
   const suffix = props.sizeText ? ` (${props.sizeText})` : ''
+  const indent = Math.max(0, props.bodyIndent)
   return (
     <Box flexDirection="row">
-      <Box width={1} flexShrink={0} />
-      {props.showTimestamp && <Box width={props.statusWidth} flexShrink={0} />}
-      <Box width={props.senderColWidth + 1} flexShrink={0} />
-      <Box flexGrow={1} flexShrink={1} minWidth={0}>
+      {!props.flip && indent > 0 && <Box width={indent} flexShrink={0} />}
+      <Box
+        flexGrow={1}
+        flexShrink={1}
+        minWidth={0}
+        justifyContent={props.flip ? 'flex-end' : undefined}
+      >
         <Text color={props.theme.mutedText} wrap="truncate-end">
           {`📎 ${props.label}${suffix}`}
         </Text>
       </Box>
+      {props.flip && indent > 0 && <Box width={indent} flexShrink={0} />}
     </Box>
   )
 }
@@ -796,23 +787,25 @@ function ImageRows(props: {
   maxRows: number
   label: string
   focused?: boolean
-  senderColWidth: number
-  showTimestamp: boolean
-  statusWidth: number
+  bodyIndent: number
   theme: Theme
 }) {
-  // A left-edge bar marks the image's vertical extent in lieu of a full box
-  // border: the picture is painted out-of-band by the Kitty layer into rows
-  // whose count/offset is computed precisely elsewhere, so wrapping it in a
-  // bordered Box (which adds rows/columns) would desync that placement. The
-  // bar is subtle for every image and strong (heavy + highlighted) for the
-  // one the focus ring points at - the analogue of the focused chat bar.
+  const indent = Math.max(0, props.bodyIndent)
+  // A bar marks the image's vertical extent in lieu of a full box border: the
+  // picture is painted out-of-band by the Kitty layer into rows whose
+  // count/offset is computed precisely elsewhere, so wrapping it in a bordered
+  // Box (which adds rows/columns) would desync that placement. The bar sits
+  // just left of the image, occupying the last indent column; it is subtle for
+  // every image and strong (heavy + highlighted) for the focused one.
+  const lead = indent > 1 ? <Box width={indent - 1} flexShrink={0} /> : null
   const gutter = (
     <Box width={1} flexShrink={0}>
       <Text
         color={props.focused ? props.theme.selected : props.theme.border}
         bold={props.focused}
-        backgroundColor={props.focused ? (props.theme.selectedRowBackground ?? undefined) : undefined}
+        backgroundColor={
+          props.focused ? (props.theme.selectedRowBackground ?? undefined) : undefined
+        }
       >
         {props.focused ? '┃' : '│'}
       </Text>
@@ -820,13 +813,22 @@ function ImageRows(props: {
   )
   const reservedRows = inlineImageReservedRows(props.cacheKey, props.imgCols, props.maxRows)
   if (reservedRows === null) {
+    // Label placeholder ([img] name) for a still-loading or non-paintable
+    // image. When focused, the whole label is highlighted to match the bar —
+    // not just the bar itself.
     return (
       <Box flexDirection="row">
+        {lead}
         {gutter}
-        {props.showTimestamp && <Box width={props.statusWidth} flexShrink={0} />}
-        <Box width={props.senderColWidth + 1} flexShrink={0} />
         <Box flexGrow={1} flexShrink={1} minWidth={0}>
-          <Text color={props.theme.mutedText} wrap="truncate-end">
+          <Text
+            color={props.focused ? props.theme.selected : props.theme.mutedText}
+            bold={props.focused}
+            backgroundColor={
+              props.focused ? (props.theme.selectedRowBackground ?? undefined) : undefined
+            }
+            wrap="truncate-end"
+          >
             {inlineImagePlaceholder(props.cacheKey, props.label)}
           </Text>
         </Box>
@@ -837,9 +839,8 @@ function ImageRows(props: {
     <>
       {Array.from({ length: reservedRows }, (_, i) => (
         <Box key={`img-space-${i}`} flexDirection="row">
+          {lead}
           {gutter}
-          {props.showTimestamp && <Box width={props.statusWidth} flexShrink={0} />}
-          <Box width={props.senderColWidth + 1} flexShrink={0} />
           <Box flexGrow={1} flexShrink={1} minWidth={0}>
             <Text> </Text>
           </Box>
@@ -855,17 +856,11 @@ function bottomChromeRows(statusBarHidden: boolean): number {
   return 4 - (statusBarHidden ? 1 : 0)
 }
 
-function messageBodyTerminalColumn(opts: {
-  senderColWidth: number
-  showTimestamps: boolean
-  listPaneWidth: number
-}) {
-  const messagePaneContentStart = opts.listPaneWidth + 2
-  const indicatorWidth = 1
-  // Matches TIMESTAMP_WIDTH (HH:MM + trailing space).
-  const timestampWidth = opts.showTimestamps ? 6 : 0
-  const senderWidth = opts.senderColWidth + 1
-  return messagePaneContentStart + indicatorWidth + timestampWidth + senderWidth
+function messageBodyTerminalColumn(opts: { bodyIndent: number; listPaneWidth: number }) {
+  // Pane content begins after the chat-list pane + its 2-column border; the
+  // body (and the inline-image painting that aligns with it) is indented from
+  // there by the configured amount.
+  return opts.listPaneWidth + 2 + opts.bodyIndent
 }
 
 // Fitted picture rows for a loaded inline image, or null when it hasn't
@@ -915,24 +910,6 @@ function previewBody(m: ChatMessage): string {
   // (unknown tag) but leaves the preceding whitespace; trim again so
   // the new message body starts at column 0.
   return htmlToText(raw).trim()
-}
-
-// Sender column auto-sizes to the longest first name in the visible
-// conversation. Empty / system rows are ignored. The result is clamped
-// between SENDER_COL_MIN and SENDER_COL_MAX.
-export function computeSenderColWidth(messages: ChatMessage[], shortNames = true): number {
-  let max = 0
-  for (const m of messages) {
-    if (m.messageType === 'systemEventMessage') continue
-    const raw = effectiveSenderName(m) ?? ''
-    if (!raw) continue
-    const len = (shortNames ? shortName(raw) : raw).length
-    if (len > max) max = len
-  }
-  if (max === 0) return SENDER_COL_MIN
-  if (max < SENDER_COL_MIN) return SENDER_COL_MIN
-  if (max > SENDER_COL_MAX) return SENDER_COL_MAX
-  return max
 }
 
 // Locally-derived reply-count badge for a channel root message. `count` is
