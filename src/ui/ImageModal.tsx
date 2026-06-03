@@ -26,8 +26,17 @@ function readPngDimensions(buf: Buffer): { width: number; height: number } | nul
   return { width, height }
 }
 
-function isOpenableSource(sourcePath: string, isExternal: boolean): boolean {
-  return isExternal && /^https?:\/\//i.test(sourcePath)
+// Browser-openable URL for an image ref: the preserved original URL (e.g. a
+// SharePoint contentUrl whose sourcePath was rewritten to a Graph /shares
+// path), else an external sourcePath. Graph-relative paths aren't openable.
+function openableUrl(ref: {
+  sourcePath: string
+  isExternal: boolean
+  openUrl?: string
+}): string | null {
+  if (ref.openUrl) return ref.openUrl
+  if (ref.isExternal && /^https?:\/\//i.test(ref.sourcePath)) return ref.sourcePath
+  return null
 }
 
 export function ImageModal() {
@@ -67,9 +76,12 @@ export function ImageModal() {
         store.set({ modal: null, inputZone: 'list' })
         return
       }
-      if (input.toLowerCase() === 'o' && ref && isOpenableSource(ref.sourcePath, ref.isExternal)) {
-        openExternal(ref.sourcePath)
-        store.set({ modal: null, inputZone: 'list' })
+      if (input.toLowerCase() === 'o' && ref) {
+        const url = openableUrl(ref)
+        if (url) {
+          openExternal(url)
+          store.set({ modal: null, inputZone: 'list' })
+        }
       }
     },
     { isActive: isOpen },
@@ -80,7 +92,7 @@ export function ImageModal() {
   const data = getImageData(ref.cacheKey)
   const format = data ? detectImageFormat(data) : null
   const dims = data ? readPngDimensions(data) : null
-  const canOpen = isOpenableSource(ref.sourcePath, ref.isExternal)
+  const canOpen = openableUrl(ref) !== null
 
   return (
     <Box
