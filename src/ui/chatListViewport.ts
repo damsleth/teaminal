@@ -5,8 +5,18 @@
 // slice of rows to render.
 //
 // Invariant: the cursor row is always inside [viewStart, visibleEnd).
-// If the cursor would be clipped, the window advances so the cursor
-// stays on screen - this is what `j` / `k` users expect.
+// The window only moves when the cursor would leave it: moving past the
+// bottom scrolls down minimally (cursor lands on the last visible row),
+// moving above the top scrolls up minimally (cursor lands on the first
+// visible row). While the cursor is inside the window, the window stays
+// put and the cursor moves within it - this is what `j` / `k` users
+// expect.
+//
+// `scrolloff` (vim-style) keeps up to that many context rows visible
+// beyond the cursor: scrolling down keeps `scrolloff` rows below it,
+// scrolling up keeps `scrolloff` rows above it. The margin shrinks at
+// the list ends and on tiny budgets - the cursor row itself always
+// wins. Default 0 preserves the edge-riding behavior.
 
 export type Viewport = { viewStart: number; visibleEnd: number }
 
@@ -15,38 +25,80 @@ export function computeChatListViewport(
   cursorRowIdx: number,
   rowsVisible: number,
   previousStart: number,
+  scrolloff = 0,
 ): Viewport {
   if (heights.length === 0) return { viewStart: 0, visibleEnd: 0 }
   const budget = Math.max(1, rowsVisible)
   const cur =
     cursorRowIdx < 0 ? 0 : cursorRowIdx >= heights.length ? heights.length - 1 : cursorRowIdx
-  let start = cur
-  let end = cur + 1
-  let consumed = heights[cur] ?? 1
+  const off = Math.max(0, scrolloff)
+  const hasPrev = previousStart >= 0 && previousStart < heights.length
 
-  // Sticky scroll: prefer to keep `previousStart` if the cursor is
-  // already inside it (and the cumulative budget still fits).
-  if (previousStart >= 0 && previousStart <= cur && previousStart < heights.length) {
-    let trial = consumed
-    let trialStart = cur
-    while (trialStart > previousStart) {
-      const h = heights[trialStart - 1] ?? 1
-      if (trial + h > budget) break
-      trialStart--
-      trial += h
-    }
-    if (trialStart === previousStart) {
-      start = previousStart
-      consumed = trial
-    }
-  }
+  let start: number
+  let end: number
+  let consumed: number
 
-  // Backward fill: include older rows while budget allows.
-  while (start > 0) {
-    const h = heights[start - 1] ?? 1
-    if (consumed + h > budget) break
-    start--
-    consumed += h
+  // Topmost row the cursor wants visible above it (list top clamps it).
+  const wantTop = Math.max(0, cur - off)
+
+  if (hasPrev && wantTop < previousStart) {
+    // Cursor moved above the window or into its top margin: scroll up
+    // minimally so `off` rows of context sit above the cursor. Forward
+    // fill below does the rest.
+    start = wantTop
+    end = cur + 1
+    consumed = 0
+    for (let i = start; i <= cur; i++) consumed += heights[i] ?? 1
+    // Tiny budget: shed above-context rows until the cursor fits.
+    while (start < cur && consumed > budget) {
+      consumed -= heights[start] ?? 1
+      start++
+    }
+  } else {
+    // Anchor block: the cursor plus up to `off` context rows below it,
+    // trimmed until it fits the budget.
+    let anchorEnd = Math.min(cur + off, heights.length - 1)
+    consumed = 0
+    for (let i = cur; i <= anchorEnd; i++) consumed += heights[i] ?? 1
+    while (anchorEnd > cur && consumed > budget) {
+      consumed -= heights[anchorEnd] ?? 1
+      anchorEnd--
+    }
+    start = cur
+    end = anchorEnd + 1
+
+    // Sticky scroll: keep `previousStart` if the anchor block still fits
+    // inside the window it implies (the cumulative budget from
+    // previousStart through the anchor block fits). The window stays
+    // fixed; the cursor moves within.
+    let stuck = false
+    if (hasPrev && previousStart <= cur) {
+      let trial = consumed
+      let trialStart = cur
+      while (trialStart > previousStart) {
+        const h = heights[trialStart - 1] ?? 1
+        if (trial + h > budget) break
+        trialStart--
+        trial += h
+      }
+      if (trialStart === previousStart) {
+        start = previousStart
+        consumed = trial
+        stuck = true
+      }
+    }
+
+    // Anchor block moved below the window (or no usable previous start):
+    // scroll down minimally so the anchor block ends on the last visible
+    // row.
+    if (!stuck) {
+      while (start > 0) {
+        const h = heights[start - 1] ?? 1
+        if (consumed + h > budget) break
+        start--
+        consumed += h
+      }
+    }
   }
 
   // Forward fill: top off the budget with newer rows.
@@ -55,6 +107,16 @@ export function computeChatListViewport(
     if (consumed + h > budget) break
     consumed += h
     end++
+  }
+
+  // Backward top-up: only spends budget left over after forward fill hit
+  // the end of the list (short lists, terminal grew) - it never shifts a
+  // budget-full window.
+  while (start > 0) {
+    const h = heights[start - 1] ?? 1
+    if (consumed + h > budget) break
+    start--
+    consumed += h
   }
 
   return { viewStart: start, visibleEnd: end }

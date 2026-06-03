@@ -81,6 +81,53 @@ describe('computeChatListViewport', () => {
     expect(second.visibleEnd).toBe(5)
   })
 
+  test('regression: scrolling up from the bottom keeps the window fixed until the cursor hits the top edge', () => {
+    // The reported bug: after scrolling to the bottom, moving back up
+    // dragged the window along with the cursor, pinning the cursor to
+    // the bottom row on every keypress. The window must stay put while
+    // the cursor moves within it, and only scroll once the cursor is
+    // the topmost visible row.
+    const heights = uniformHeights(20)
+    const budget = 6
+    let prev = 0
+    for (let c = 0; c < heights.length; c++) {
+      prev = computeChatListViewport(heights, c, budget, prev).viewStart
+    }
+    expect(prev).toBe(14)
+
+    // Walk back up: while the cursor is inside [14, 20) the window is
+    // unchanged...
+    for (let c = 19; c >= 14; c--) {
+      const v = computeChatListViewport(heights, c, budget, prev)
+      expect(v).toEqual({ viewStart: 14, visibleEnd: 20 })
+      prev = v.viewStart
+    }
+    // ...and past the top edge it scrolls minimally, cursor staying on
+    // the first visible row.
+    for (let c = 13; c >= 0; c--) {
+      const v = computeChatListViewport(heights, c, budget, prev)
+      expect(v.viewStart).toBe(c)
+      expect(v.visibleEnd).toBe(c + budget)
+      prev = v.viewStart
+    }
+  })
+
+  test('cursor jumping above the window lands on the top row, not the bottom', () => {
+    const heights = uniformHeights(20)
+    // Window at [10, 16), cursor jumps to 3 (e.g. filter or gg-style jump).
+    const v = computeChatListViewport(heights, 3, 6, 10)
+    expect(v).toEqual({ viewStart: 3, visibleEnd: 9 })
+  })
+
+  test('budget left over after hitting the end of the list back-fills older rows', () => {
+    // Window anchored near the end, terminal grew: forward fill runs out
+    // of rows, so the extra budget pulls in rows above instead of
+    // rendering a short list.
+    const heights = uniformHeights(10)
+    const v = computeChatListViewport(heights, 8, 6, 7)
+    expect(v).toEqual({ viewStart: 4, visibleEnd: 10 })
+  })
+
   test('handles wrapped rows (heights > 1) without overshooting budget', () => {
     // Rows 0..4 each take 2 visual lines. budget=4 -> at most 2 rows fit.
     const heights = uniformHeights(5, 2)
@@ -94,6 +141,81 @@ describe('computeChatListViewport', () => {
     const heights = uniformHeights(3)
     expect(computeChatListViewport(heights, -1, 10, 0)).toEqual({ viewStart: 0, visibleEnd: 3 })
     expect(computeChatListViewport(heights, 99, 10, 0)).toEqual({ viewStart: 0, visibleEnd: 3 })
+  })
+
+  describe('scrolloff', () => {
+    test('scrolling down keeps context rows visible below the cursor', () => {
+      // budget=6, off=2: the window scrolls once the cursor reaches the
+      // 4th visible row (index start+3), keeping 2 rows below it.
+      const heights = uniformHeights(20)
+      let prev = 0
+      for (let c = 0; c < heights.length; c++) {
+        const v = computeChatListViewport(heights, c, 6, prev, 2)
+        expect(c).toBeGreaterThanOrEqual(v.viewStart)
+        expect(c).toBeLessThan(v.visibleEnd)
+        // 2 rows of context below the cursor, except near the list end.
+        expect(v.visibleEnd).toBeGreaterThanOrEqual(Math.min(c + 3, heights.length))
+        prev = v.viewStart
+      }
+      // Cursor on the last row: window ends at the list end.
+      expect(prev).toBe(14)
+    })
+
+    test('scrolling up keeps context rows visible above the cursor', () => {
+      const heights = uniformHeights(20)
+      // Start from the bottom.
+      let prev = computeChatListViewport(heights, 19, 6, 14, 2).viewStart
+      for (let c = 19; c >= 0; c--) {
+        const v = computeChatListViewport(heights, c, 6, prev, 2)
+        expect(c).toBeGreaterThanOrEqual(v.viewStart)
+        expect(c).toBeLessThan(v.visibleEnd)
+        // 2 rows of context above the cursor, except near the list top.
+        expect(v.viewStart).toBeLessThanOrEqual(Math.max(c - 2, 0))
+        prev = v.viewStart
+      }
+      expect(prev).toBe(0)
+    })
+
+    test('window stays put while the cursor moves between the margins', () => {
+      const heights = uniformHeights(20)
+      // Window [5, 11), off=2: cursor can move between rows 7 and 8
+      // without the window budging.
+      for (const c of [7, 8]) {
+        const v = computeChatListViewport(heights, c, 6, 5, 2)
+        expect(v).toEqual({ viewStart: 5, visibleEnd: 11 })
+      }
+      // Row 9 is inside the bottom margin: the window scrolls down one.
+      expect(computeChatListViewport(heights, 9, 6, 5, 2)).toEqual({ viewStart: 6, visibleEnd: 12 })
+      // Row 6 is inside the top margin: the window scrolls up one.
+      expect(computeChatListViewport(heights, 6, 6, 5, 2)).toEqual({ viewStart: 4, visibleEnd: 10 })
+    })
+
+    test('margin shrinks at the list ends instead of pinning the cursor away from them', () => {
+      const heights = uniformHeights(10)
+      // Cursor on the first row: window starts at 0.
+      expect(computeChatListViewport(heights, 0, 4, 5, 2)).toEqual({ viewStart: 0, visibleEnd: 4 })
+      // Cursor on the last row: window ends at the list end.
+      expect(computeChatListViewport(heights, 9, 4, 0, 2)).toEqual({ viewStart: 6, visibleEnd: 10 })
+    })
+
+    test('tiny budget degrades to cursor-only without violating the invariant', () => {
+      const heights = uniformHeights(10)
+      for (let c = 0; c < heights.length; c++) {
+        const v = computeChatListViewport(heights, c, 1, Math.max(0, c - 1), 2)
+        expect(c).toBeGreaterThanOrEqual(v.viewStart)
+        expect(c).toBeLessThan(v.visibleEnd)
+      }
+    })
+
+    test('wrapped rows (heights > 1) count rows, not lines, for the margin', () => {
+      // Rows of height 2, budget 8 -> 4 rows visible, off=1.
+      const heights = uniformHeights(10, 2)
+      // Cursor at 5 entering the bottom margin of window [2, 6): scrolls
+      // so one context row stays below.
+      const v = computeChatListViewport(heights, 5, 8, 2, 1)
+      expect(v.visibleEnd).toBeGreaterThanOrEqual(7)
+      expect(v.viewStart).toBeLessThanOrEqual(5)
+    })
   })
 })
 

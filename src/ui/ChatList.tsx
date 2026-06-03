@@ -32,6 +32,10 @@ import type { PresenceColorKey, Theme } from './theme'
 // width — but kept as a safe default so isolated renders don't crash.
 const LIST_PANE_WIDTH_DEFAULT = 30
 
+// Vim-style scrolloff: rows of context kept visible beyond the cursor
+// while scrolling, so held-down j/k doesn't ride the pane edge.
+const SCROLLOFF = 2
+
 type Row =
   | { kind: 'header'; label: string }
   | { kind: 'item'; item: SelectableItem; index: number }
@@ -305,6 +309,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     cursorRowIdx,
     rowsVisible,
     viewportRef.current,
+    SCROLLOFF,
   )
   viewportRef.current = viewStart
   const visible = rows.slice(viewStart, visibleEnd)
