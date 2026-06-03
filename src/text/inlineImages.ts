@@ -280,11 +280,13 @@ export function extractInlineImages(message: ChatMessage): InlineImageRef[] {
     if (isEmojiOnly(img.alt)) continue
     const objectId = asmObjectId(img.itemid, img.src)
     const region = asmObjectRegion(img.itemid, img.src)
-    // Prefer itemid: it's the hostedContents id. If absent, mine the src.
-    let contentId = img.itemid
-    if (!contentId && img.src) {
-      contentId = hostedContentIdFromUrl(img.src)
-    }
+    // Prefer the id embedded in a Graph $value src URL: it's the
+    // authoritative hostedContents id. In cross-tenant 1:1 chats itemid is
+    // the raw asm object id (e.g. "0-nch-d3-..."), which the Graph endpoint
+    // 404s on, while the src carries the real (base64) id. Fall back to
+    // itemid for bodies without a Graph src.
+    let contentId = img.src ? hostedContentIdFromUrl(img.src) : null
+    if (!contentId) contentId = img.itemid
     if (!contentId) {
       if (img.src && isObjectStoreUrl(img.src)) {
         // asm.skype.com / asyncgw object URL embedded directly in the body.
