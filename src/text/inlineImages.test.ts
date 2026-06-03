@@ -47,6 +47,52 @@ describe('extractInlineImages', () => {
     expect(refs[0]!.name).toBe('screenshot.png')
   })
 
+  it('routes SharePoint reference attachments through the Graph shares API', () => {
+    const contentUrl =
+      'https://softwareone-my.sharepoint.com/personal/user_example_com/Documents/Microsoft%20Teams%20Chat%20Files/Screenshot%202026-05-27%20at%2012.40.30.png'
+    const m = msg({
+      attachments: [
+        {
+          id: 'att-sp',
+          contentType: 'reference',
+          contentUrl,
+          name: 'Screenshot 2026-05-27 at 12.40.30.png',
+        },
+      ],
+    })
+    const refs = extractInlineImages(m)
+    expect(refs.length).toBe(1)
+    // Never the unauthenticated external path — SharePoint 403s without auth.
+    expect(refs[0]!.isExternal).toBe(false)
+    // Graph "encoded sharing URL" share id: u! + base64url of the contentUrl.
+    const b64 = Buffer.from(contentUrl, 'utf8')
+      .toString('base64')
+      .replace(/=+$/, '')
+      .replace(/\//g, '_')
+      .replace(/\+/g, '-')
+    expect(refs[0]!.sourcePath).toBe(`/shares/u!${b64}/driveItem/content`)
+    // Original URL preserved for open-in-browser (the only route when the
+    // Graph fetch 403s on cross-tenant federated chats).
+    expect(refs[0]!.openUrl).toBe(contentUrl)
+    expect(refs[0]!.name).toBe('Screenshot 2026-05-27 at 12.40.30.png')
+  })
+
+  it('infers the name from the SharePoint URL when the attachment has none', () => {
+    const m = msg({
+      attachments: [
+        {
+          id: 'att-sp2',
+          contentType: 'reference',
+          contentUrl: 'https://contoso-my.sharepoint.com/personal/u/Documents/pic.png',
+          name: null,
+        },
+      ],
+    })
+    const refs = extractInlineImages(m)
+    expect(refs.length).toBe(1)
+    expect(refs[0]!.name).toBe('pic.png')
+  })
+
   it('extracts GIF from external contentUrl (gif picker)', () => {
     const m = msg({
       attachments: [
