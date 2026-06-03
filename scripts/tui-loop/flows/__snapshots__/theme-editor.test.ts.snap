@@ -12,8 +12,8 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 ││ ready for review.        ││  │   >   Pane padding X        1 (0–6)                            │  ││
 ││    Design Sync          ││  │       Modal padding X       3                                  │  ││
 ││Nina: Nina shared two     ││  │       Modal padding Y       1                                  │  ││
-││compact layout options.   ││  │       Pane header pad L     1                                  │  ││
-││    Ops Channel          ││  │       Pane header gap B     1                                  │  ││
+││compact layout options.   ││  │       Message body indent   2                                  │  ││
+││    Ops Channel          ││  │       Message gap           1                                  │  ││
 ││Mina: Deploy is green in  ││  │       Tail strip gap        1                                  │  ││
 ││the EU region.            ││  │       Chat list pad R       1                                  │  ││
 ││                          ││  │   ── Colors                                                    │  ││
@@ -892,8 +892,8 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "bold": 0
   },
   "62,19": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
+    "fgColorMode": 33554432,
+    "fgColor": 234
   },
   "67,19": {
     "fgColorMode": 0,

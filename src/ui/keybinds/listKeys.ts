@@ -11,6 +11,7 @@ import {
   toggleChatUnread,
   type AppState,
   type Focus,
+  type Settings,
   type Store,
 } from '../../state/store'
 import {
@@ -34,6 +35,10 @@ export type ListKeysCtx = {
   chats: Chat[]
   teams: Team[]
   channelsByTeam: Record<string, Channel[]>
+  // Passed through to buildSelectableList so navigation order/labels match
+  // exactly what ChatList renders (matters once chatListSort reorders rows).
+  nameByUserId?: Record<string, string>
+  settings: Pick<Settings, 'chatListSort' | 'chatListGroupByType'>
   filter: string
   cursor: number
   focus: Focus

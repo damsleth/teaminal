@@ -25,6 +25,10 @@ export type MessageRowHeightOpts = {
   inlineImageRows?: number
   reactionDisplayMode?: ReactionDisplayMode
   messageTextColumns?: number
+  // Blank rows rendered after each message group (theme.layout message gap).
+  // Counted here so the viewport budget and the out-of-band Kitty image
+  // offsets agree with what's actually painted.
+  messageGap?: number
   // Total rows the message's inline images occupy, resolved dynamically from
   // the loaded image's fitted height (loaded → fitted rows, no label;
   // pending → one `[img]` label row). When omitted, falls back to the static
@@ -109,20 +113,30 @@ export function shouldShowReactionRow(
 
 export function messageRenderRowHeight(row: MessageRenderRow, opts?: MessageRowHeightOpts): number {
   if (row.kind !== 'message') return 1
-  let height = estimateWrappedRows(messageTextForHeight(row, opts), opts?.messageTextColumns)
-  if (row.message._sendError) height++
+  const message = row.message
+  // Normal messages render the sender name + timestamp on their own line
+  // above the body. System and deleted rows have no sender header — their
+  // single line carries the whole text.
+  const isSystem = message.messageType === 'systemEventMessage'
+  const hasSenderHeader = !isSystem && !message.deletedDateTime
+  let height =
+    (hasSenderHeader ? 1 : 0) +
+    estimateWrappedRows(messageTextForHeight(row, opts), opts?.messageTextColumns)
+  if (message._sendError) height++
   // Reply preview row (only present for chat-pane quoted replies).
-  if (getQuotedReply(row.message)) height++
-  if (!row.message.deletedDateTime) {
+  if (getQuotedReply(message)) height++
+  if (!message.deletedDateTime) {
     if (opts?.imageRowsForMessage) {
-      height += opts.imageRowsForMessage(row.message)
+      height += opts.imageRowsForMessage(message)
     } else {
       const imageRows = Math.max(0, opts?.inlineImageRows ?? 0)
-      height += extractInlineImages(row.message).length * (1 + imageRows)
+      height += extractInlineImages(message).length * (1 + imageRows)
     }
     // File attachments render one row each below the body.
-    height += extractFileAttachments(row.message).length
+    height += extractFileAttachments(message).length
   }
+  // Trailing blank rows separating this group from the next.
+  height += Math.max(0, opts?.messageGap ?? 0)
   return height
 }
 

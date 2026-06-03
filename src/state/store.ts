@@ -193,9 +193,11 @@ export type BorderStyleName =
   | 'arrow'
 export type ReactionDisplayMode = 'off' | 'current' | 'all'
 
-// Toggleable HeaderBar segments (the app name is always shown). The keys are
-// also the HEADER_ELEMENT order used by the menu submenu.
+// Toggleable HeaderBar segments. The keys are also the HEADER_ELEMENT order
+// used by the menu submenu. `app` controls the leading "teaminal" label; it
+// used to be unconditional but is now toggleable like the rest.
 export type HeaderElementVisibility = {
+  app: boolean
   user: boolean
   presence: boolean
   graph: boolean
@@ -204,6 +206,14 @@ export type HeaderElementVisibility = {
   push: boolean
   updated: boolean
 }
+
+// Chat-list ordering. 'recent' keeps the server order (chats arrive sorted by
+// last-message time, newest first); 'alphabetical' sorts by display label.
+export type ChatListSort = 'recent' | 'alphabetical'
+
+// How the HeaderBar renders the active identity when the user segment is
+// shown. 'full' → "Name (tenant)"; 'tenant' → just the tenant (or profile).
+export type HeaderUserFormat = 'full' | 'tenant'
 
 export type ThemePresenceKey =
   | 'Available'
@@ -267,6 +277,13 @@ export type Settings = {
   accounts: string[]
   activeAccount: string | null
   chatListDensity: ChatListDensity
+  // Order chats appear in the sidebar. 'recent' (default) preserves the
+  // server's last-message ordering; 'alphabetical' sorts by display label.
+  chatListSort: ChatListSort
+  // When true, chats are grouped into Direct / Groups / Meetings sections
+  // (each with a non-selectable header) instead of one flat list. Ordering
+  // within each section still follows chatListSort. Default false.
+  chatListGroupByType: boolean
   // When true, sidebar chat rows render the first name only ("Finn",
   // "Anna, Bjorn, +1") instead of the full corporate-AD form
   // ("Nordling, Finn Saethre"). The MessagePane header always uses the
@@ -353,10 +370,12 @@ export type Settings = {
   //              information the status bar would have shown.
   // 'top' renders the same bar as the first row of the layout instead.
   statusBarPosition: 'bottom' | 'top' | 'hidden'
-  // Which optional HeaderBar segments are shown. The app name is always
-  // rendered (identity anchor); everything else can be hidden to trim the
-  // top row. All default true.
+  // Which optional HeaderBar segments are shown — including the leading app
+  // name. Anything can be hidden to trim the top row. All default true.
   headerElements: HeaderElementVisibility
+  // How the HeaderBar renders the active identity when headerElements.user is
+  // shown. 'full' (default) → "Name (tenant)"; 'tenant' → just the tenant.
+  headerUserFormat: HeaderUserFormat
   // When false, the status bar drops its keyboard-shortcut hints and is used
   // only to surface the focused link/image context action. Default true.
   statusBarShowKeyHints: boolean
@@ -439,6 +458,8 @@ export const defaultSettings: Settings = {
   accounts: [],
   activeAccount: null,
   chatListDensity: 'cozy',
+  chatListSort: 'recent',
+  chatListGroupByType: false,
   chatListShortNames: false,
   showMessagePreviews: true,
   messagePaneShortNames: true,
@@ -465,6 +486,7 @@ export const defaultSettings: Settings = {
   inlineImageMaxRows: 10,
   statusBarPosition: 'bottom',
   headerElements: {
+    app: true,
     user: true,
     presence: true,
     graph: true,
@@ -473,6 +495,7 @@ export const defaultSettings: Settings = {
     push: true,
     updated: true,
   },
+  headerUserFormat: 'full',
   statusBarShowKeyHints: true,
   chatRoutingByAccount: {},
   chatListWidth: null,

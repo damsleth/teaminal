@@ -240,6 +240,8 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     accounts: [...settings.accounts],
     activeAccount: settings.activeAccount,
     chatListDensity: settings.chatListDensity,
+    chatListSort: settings.chatListSort,
+    chatListGroupByType: settings.chatListGroupByType,
     chatListShortNames: settings.chatListShortNames,
     showMessagePreviews: settings.showMessagePreviews,
     messagePaneShortNames: settings.messagePaneShortNames,
@@ -266,6 +268,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     inlineImageMaxRows: settings.inlineImageMaxRows,
     statusBarPosition: settings.statusBarPosition,
     headerElements: { ...settings.headerElements },
+    headerUserFormat: settings.headerUserFormat,
     statusBarShowKeyHints: settings.statusBarShowKeyHints,
     chatRoutingByAccount: { ...settings.chatRoutingByAccount },
     chatListWidth: settings.chatListWidth,
@@ -430,6 +433,21 @@ function validateAndAssign(
       }
       warnings.push('config: "chatListDensity" must be "cozy" or "compact"')
       return false
+    case 'chatListSort':
+      if (value === 'recent' || value === 'alphabetical') {
+        out.chatListSort = value
+        return true
+      }
+      warnings.push('config: "chatListSort" must be "recent" or "alphabetical"')
+      return false
+    case 'headerUserFormat':
+      if (value === 'full' || value === 'tenant') {
+        out.headerUserFormat = value
+        return true
+      }
+      warnings.push('config: "headerUserFormat" must be "full" or "tenant"')
+      return false
+    case 'chatListGroupByType':
     case 'chatListShortNames':
     case 'showMessagePreviews':
     case 'messagePaneShortNames':
@@ -568,6 +586,7 @@ function validateAndAssign(
 }
 
 const HEADER_ELEMENT_KEYS: (keyof HeaderElementVisibility)[] = [
+  'app',
   'user',
   'presence',
   'graph',

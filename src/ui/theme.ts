@@ -34,8 +34,11 @@ export type ThemeLayout = {
   // paddingX/paddingY on every modal frame and the new-chat prompt.
   modalPaddingX: number
   modalPaddingY: number
-  // MessagePane cozy header offset.
+  // MessagePane: left indent of message bodies (and the cozy chat-name
+  // header, which aligns with them). Sender name + body share this indent.
   paneHeaderPaddingLeft: number
+  // MessagePane: blank rows inserted after each message group, separating
+  // one sender's name+body block from the next.
   paneHeaderMarginBottom: number
   // Horizontal gap between TailPanels strips.
   tailGap: number
@@ -110,7 +113,8 @@ const LAYOUT_DEFAULT: ThemeLayout = {
   panePaddingX: 1,
   modalPaddingX: 3,
   modalPaddingY: 1,
-  paneHeaderPaddingLeft: 1,
+  // Message body indent (cols) and gap between message groups (rows).
+  paneHeaderPaddingLeft: 2,
   paneHeaderMarginBottom: 1,
   tailGap: 1,
   chatListPaddingRight: 1,
@@ -146,7 +150,9 @@ const DARK: Theme = {
   selectedRow: 'cyan',
   unread: 'yellow',
   unreadRow: 'yellow',
-  timestamp: 'gray',
+  // Very muted by default: timestamps sit beside the sender name and should
+  // recede almost into the background until you look for them.
+  timestamp: '#1c1c1c',
   sender: 'white',
   selfMessage: 'blue',
   systemEvent: 'gray',
@@ -179,7 +185,8 @@ const LIGHT: Theme = {
   selectedRow: 'blue',
   unread: 'magenta',
   unreadRow: 'magenta',
-  timestamp: 'gray',
+  // Very muted: near-background gray that recedes against the light theme.
+  timestamp: '#e6e6e6',
   sender: '#1c1c1c',
   selfMessage: 'blue',
   systemEvent: 'gray',

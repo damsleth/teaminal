@@ -16,20 +16,25 @@
  * Trace: enabled so failures can be replayed.
  */
 
-import { defineConfig } from "@microsoft/tui-test";
+import { defineConfig } from '@microsoft/tui-test'
+import { ensureIsolatedConfig, TUI_ENV } from './scripts/tui-loop/isolatedConfig.js'
 
-const isCI = Boolean(process.env.CI || process.env.TEAMINAL_CI);
+const isCI = Boolean(process.env.CI || process.env.TEAMINAL_CI)
+
+// Isolate the seeded app's config from the developer's real ~/.config so
+// snapshots are reproducible (see scripts/tui-loop/isolatedConfig.ts).
+ensureIsolatedConfig()
 
 export default defineConfig({
   // Discover both the flow tests (Phase 2+) and the spike probes (Phase 0).
-  testMatch: "{scripts/tui-loop/flows,scripts/spike}/**/*.test.ts",
+  testMatch: '{scripts/tui-loop/flows,scripts/spike}/**/*.test.ts',
 
   // Default viewport + seeded real-app program applied to all tests unless
   // overridden with test.use(). Matches the legacy tui.config.mjs viewport:
   // 100 columns × 30 rows.
   use: {
-    program: { file: "bun", args: ["run", "bin/teaminal.tsx"] },
-    env: { TEAMINAL_SEED: "fixtures" },
+    program: { file: 'bun', args: ['run', 'bin/teaminal.tsx'] },
+    env: { ...TUI_ENV },
     rows: 30,
     columns: 100,
   },
@@ -49,12 +54,12 @@ export default defineConfig({
   // test.use() to override program / rows / columns.
   projects: [
     {
-      name: "seeded-real-app",
-      testMatch: "{scripts/tui-loop/flows,scripts/spike}/**/*.test.ts",
-      program: { file: "bun", args: ["run", "bin/teaminal.tsx"] },
-      env: { TEAMINAL_SEED: "fixtures" },
+      name: 'seeded-real-app',
+      testMatch: '{scripts/tui-loop/flows,scripts/spike}/**/*.test.ts',
+      program: { file: 'bun', args: ['run', 'bin/teaminal.tsx'] },
+      env: { ...TUI_ENV },
       rows: 30,
       columns: 100,
     },
   ],
-});
+})

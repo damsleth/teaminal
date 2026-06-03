@@ -53,6 +53,7 @@ function makeCtx(opts?: Partial<ListKeysCtx>): {
     chats: [chat('a'), chat('b'), chat('c')],
     teams: [],
     channelsByTeam: {},
+    settings: { chatListSort: 'recent', chatListGroupByType: false },
     filter: '',
     cursor: 0,
     focus: { kind: 'list' },
