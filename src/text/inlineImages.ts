@@ -49,6 +49,11 @@ export type InlineImageRef = {
   // Teams object-store region (`emea`, `amer`, `apac`, `ind`) when derivable
   // from an asm.skype.com / asyncgw URL or encoded hostedContents id.
   region?: string
+  // Browser-openable URL when it differs from sourcePath. Set for SharePoint
+  // file uploads, where sourcePath is a Graph /shares path but the original
+  // contentUrl is what a browser (with its own auth) can open — the only
+  // route for cross-tenant federated chats, where the Graph fetch 403s.
+  openUrl?: string
 }
 
 // Widen-by-content-type list for shapes the basic isImageAttachment misses.
@@ -220,6 +225,33 @@ function parseBodyImages(html: string): BodyImageRef[] {
   return out
 }
 
+// File uploads (contentType "reference") live in the uploader's OneDrive;
+// their contentUrl is a SharePoint document URL that 403s without auth, so
+// it must never go through the plain external-fetch path.
+function isSharePointUrl(url: string | null | undefined): boolean {
+  if (!url) return false
+  let host: string
+  try {
+    host = new URL(url).hostname.toLowerCase()
+  } catch {
+    return false
+  }
+  return host.endsWith('.sharepoint.com')
+}
+
+// Graph shares-API path for a SharePoint document URL: base64url-encode the
+// URL into a "u!" share id (the Graph "encoded sharing URL" format). The
+// /content segment 302-redirects to a pre-authenticated download URL, which
+// fetch() follows.
+function sharesGraphPath(url: string): string {
+  const b64 = Buffer.from(url, 'utf8')
+    .toString('base64')
+    .replace(/=+$/, '')
+    .replace(/\//g, '_')
+    .replace(/\+/g, '-')
+  return `/shares/u!${b64}/driveItem/content`
+}
+
 function attachmentSourcePath(
   a: MessageAttachment,
   chatId: string,
@@ -227,8 +259,16 @@ function attachmentSourcePath(
 ): {
   path: string
   isExternal: boolean
+  openUrl?: string
 } {
   const url = a.contentUrl ?? ''
+  if (isSharePointUrl(url)) {
+    // Uploaded file in the sender's OneDrive. Fetch via the Graph shares
+    // API (the unauthenticated external fetch 403s); keep the original URL
+    // so open-in-browser still works when the Graph fetch can't (the
+    // cross-tenant federated case).
+    return { path: sharesGraphPath(url), isExternal: false, openUrl: url }
+  }
   if (isExternalUrl(url)) {
     return { path: url, isExternal: true }
   }
@@ -251,14 +291,15 @@ export function extractInlineImages(message: ChatMessage): InlineImageRef[] {
   // 1. attachments[] - widen for GIF picker shapes.
   for (const att of message.attachments ?? []) {
     if (!isImageLikeAttachment(att)) continue
-    const { path, isExternal } = attachmentSourcePath(att, chatId, messageId)
+    const { path, isExternal, openUrl } = attachmentSourcePath(att, chatId, messageId)
     const objectId = asmObjectId(att.id, att.contentUrl ?? null)
     const region = asmObjectRegion(att.id, att.contentUrl ?? null)
     const cacheKey = `${messageId}::${att.id}`
     if (seen.has(cacheKey)) continue
     seen.add(cacheKey)
+    const nameUrl = openUrl ?? (isExternal ? path : null)
     const name =
-      att.name && att.name.length > 0 ? att.name : isExternal ? inferNameFromUrl(path) : 'image'
+      att.name && att.name.length > 0 ? att.name : nameUrl ? inferNameFromUrl(nameUrl) : 'image'
     out.push({
       cacheKey,
       sourcePath: path,
@@ -267,6 +308,7 @@ export function extractInlineImages(message: ChatMessage): InlineImageRef[] {
       contentType: att.contentType,
       ...(objectId ? { objectId } : {}),
       ...(region ? { region } : {}),
+      ...(openUrl ? { openUrl } : {}),
     })
   }
 
