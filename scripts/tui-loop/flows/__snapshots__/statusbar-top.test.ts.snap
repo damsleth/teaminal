@@ -1,0 +1,940 @@
+// TUI Test Snapshot v1
+
+exports[`statusbar-top narrow › narrow header truncates to one row instead of wrapping/jumping | 1`] = String.raw`
+╭──────────────────────────────────────────────────╮
+│ j/k move · l/Enter open · / filter · n new chat… │
+│╭────────────────────────────────────────────────╮│
+││  teaminal · You (example.com) · presence ● ?…  ││
+│╰────────────────────────────────────────────────╯│
+│╭──────────╮╭────────────────────────────────────╮│
+││Chats     ││Select a chat or channel · Enter to ││
+││ ◯ > Ada  ││open · q to quit                    ││
+││     Byro ││                                    ││
+││     n    ││                                    ││
+││Ada: The  ││                                    ││
+││launch n… ││                                    ││
+││    Desi ││                                    ││
+││     gn   ││                                    ││
+││     Sync ││                                    ││
+││Anna:     ││                                    ││
+││Anna      ││                                    ││
+││shared…   ││                                    ││
+││    Ops  ││                                    ││
+││     Chan ││                                    ││
+││     nel  ││                                    ││
+││Mina:     ││                                    ││
+││Deploy is ││                                    ││
+││ g…       ││                                    ││
+││          ││                                    ││
+││          ││                                    ││
+││          ││                                    ││
+│╰──────────╯╰────────────────────────────────────╯│
+│╭────────────────────────────────────────────────╮│
+││ open a chat to compose                         ││
+│╰────────────────────────────────────────────────╯│
+╰──────────────────────────────────────────────────╯
+{
+  "0,0": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 0,
+    "fgColor": -1,
+    "blink": 0,
+    "bold": 0,
+    "dim": 0,
+    "inverse": 0,
+    "invisible": 0,
+    "italic": 0,
+    "overline": 0,
+    "strike": 0,
+    "underline": 0
+  },
+  "1,0": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "49,0": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "0,1": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,2": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "3,2": {
+    "bold": 134217728
+  },
+  "11,2": {
+    "fgColorMode": 16777216,
+    "fgColor": 8,
+    "bold": 0
+  },
+  "47,2": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,2": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,5": {
+    "fgColorMode": 0,
+    "fgColor": -1,
+    "bold": 134217728
+  },
+  "6,5": {
+    "bold": 0
+  },
+  "11,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,6": {
+    "bgColorMode": 33554432,
+    "bgColor": 235
+  },
+  "4,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "6,6": {
+    "bold": 134217728
+  },
+  "10,6": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 0,
+    "fgColor": -1,
+    "bold": 0
+  },
+  "11,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,6": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,7": {
+    "bgColorMode": 33554432,
+    "bgColor": 235,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "6,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 6,
+    "bold": 134217728
+  },
+  "10,7": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 0,
+    "fgColor": -1,
+    "bold": 0
+  },
+  "11,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,7": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,8": {
+    "bgColorMode": 33554432,
+    "bgColor": 235,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "6,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 6,
+    "bold": 134217728
+  },
+  "7,8": {
+    "fgColorMode": 0,
+    "fgColor": -1,
+    "bold": 0
+  },
+  "10,8": {
+    "bgColorMode": 0,
+    "bgColor": -1
+  },
+  "11,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,8": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "10,9": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,9": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "10,10": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,10": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "3,11": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,11": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,12": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,12": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,13": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,13": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "7,14": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,14": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "6,15": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,15": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "8,16": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,16": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "3,17": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,17": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,18": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,18": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,18": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,18": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,19": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,19": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "7,20": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,20": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "10,21": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,21": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "4,22": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,22": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,23": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,23": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,24": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,24": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,25": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "11,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,25": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,28": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "2,28": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "24,28": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "49,28": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  }
+}
+`;
+
+exports[`statusbar-top wide › status bar renders at the top, header is a single bordered row | 1`] = String.raw`
+╭────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ j/k move · l/Enter open · / filter · n new chat · ? help · q quit                                  │
+│╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
+││  teaminal · You (example.com) · presence ● ? · graph ● online · 3 chats                          ││
+│╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
+│╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
+││Chats                     ││Select a chat or channel · Enter to open · q to quit                  ││
+││ ◯ > Ada Byron            ││                                                                      ││
+││Ada: The launch notes are ││                                                                      ││
+││ ready for review.        ││                                                                      ││
+││    Design Sync          ││                                                                      ││
+││Anna: Anna shared two     ││                                                                      ││
+││compact layout options.   ││                                                                      ││
+││    Ops Channel          ││                                                                      ││
+││Mina: Deploy is green in  ││                                                                      ││
+││the EU region.            ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+│╰──────────────────────────╯╰──────────────────────────────────────────────────────────────────────╯│
+│╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
+││ open a chat to compose                                                                           ││
+│╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
+╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
+{
+  "0,0": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 0,
+    "fgColor": -1,
+    "blink": 0,
+    "bold": 0,
+    "dim": 0,
+    "inverse": 0,
+    "invisible": 0,
+    "italic": 0,
+    "overline": 0,
+    "strike": 0,
+    "underline": 0
+  },
+  "1,0": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "66,0": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "0,1": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,2": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "3,2": {
+    "bold": 134217728
+  },
+  "11,2": {
+    "fgColorMode": 16777216,
+    "fgColor": 8,
+    "bold": 0
+  },
+  "55,2": {
+    "fgColorMode": 16777216,
+    "fgColor": 2
+  },
+  "56,2": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "73,2": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,2": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,5": {
+    "fgColorMode": 0,
+    "fgColor": -1,
+    "bold": 134217728
+  },
+  "6,5": {
+    "bold": 0
+  },
+  "27,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "81,5": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,6": {
+    "bgColorMode": 33554432,
+    "bgColor": 235
+  },
+  "4,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "6,6": {
+    "bold": 134217728
+  },
+  "26,6": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 0,
+    "fgColor": -1,
+    "bold": 0
+  },
+  "27,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,6": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "26,7": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,7": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "19,8": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,8": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "3,9": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,9": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "23,10": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,10": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "24,11": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,11": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "3,12": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,12": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "26,13": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,13": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "15,14": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,14": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,15": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,15": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,16": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,16": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,17": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,17": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,18": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,18": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,18": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,18": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,19": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,19": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,20": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,20": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,21": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,21": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,22": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,22": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,23": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,23": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,24": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,24": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,25": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,25": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,28": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "2,28": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "24,28": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,28": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  }
+}
+`;
+

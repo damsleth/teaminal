@@ -139,6 +139,40 @@ describe('mergeSettings', () => {
     expect(w.some((m) => /"realtimeEnabled" must be a boolean/.test(m))).toBe(true)
   })
 
+  test('validates chatListSort enum', () => {
+    const w: string[] = []
+    expect(mergeSettings({ chatListSort: 'alphabetical' }, w).chatListSort).toBe('alphabetical')
+    expect(mergeSettings({ chatListSort: 'sideways' }, w).chatListSort).toBe(
+      defaultSettings.chatListSort,
+    )
+    expect(w.some((m) => /"chatListSort" must be/.test(m))).toBe(true)
+  })
+
+  test('validates chatListGroupByType as a boolean', () => {
+    const w: string[] = []
+    expect(mergeSettings({ chatListGroupByType: true }, w).chatListGroupByType).toBe(true)
+    expect(mergeSettings({ chatListGroupByType: 'yes' }, w).chatListGroupByType).toBe(false)
+    expect(w.some((m) => /"chatListGroupByType" must be a boolean/.test(m))).toBe(true)
+  })
+
+  test('validates headerUserFormat enum', () => {
+    const w: string[] = []
+    expect(mergeSettings({ headerUserFormat: 'tenant' }, w).headerUserFormat).toBe('tenant')
+    expect(mergeSettings({ headerUserFormat: 'initials' }, w).headerUserFormat).toBe(
+      defaultSettings.headerUserFormat,
+    )
+    expect(w.some((m) => /"headerUserFormat" must be/.test(m))).toBe(true)
+  })
+
+  test('accepts the headerElements.app toggle', () => {
+    const w: string[] = []
+    const out = mergeSettings({ headerElements: { app: false } }, w)
+    expect(out.headerElements.app).toBe(false)
+    // Untouched segments keep their default (true).
+    expect(out.headerElements.user).toBe(true)
+    expect(w).toEqual([])
+  })
+
   test('silently ignores legacy windowHeight', () => {
     const w: string[] = []
     expect(mergeSettings({ windowHeight: 30 }, w)).toEqual(defaultSettings)
@@ -352,6 +386,8 @@ describe('Settings ↔ config.json parity', () => {
     accounts: ['profile-a', 'profile-b'],
     activeAccount: 'profile-a',
     chatListDensity: 'compact',
+    chatListSort: 'alphabetical',
+    chatListGroupByType: !defaultSettings.chatListGroupByType,
     chatListShortNames: !defaultSettings.chatListShortNames,
     showMessagePreviews: !defaultSettings.showMessagePreviews,
     messagePaneShortNames: !defaultSettings.messagePaneShortNames,
@@ -378,6 +414,7 @@ describe('Settings ↔ config.json parity', () => {
     inlineImageMaxRows: 7,
     statusBarPosition: 'hidden',
     headerElements: {
+      app: false,
       user: false,
       presence: false,
       graph: false,
@@ -386,6 +423,7 @@ describe('Settings ↔ config.json parity', () => {
       push: false,
       updated: false,
     },
+    headerUserFormat: 'tenant',
     statusBarShowKeyHints: !defaultSettings.statusBarShowKeyHints,
     chatRoutingByAccount: { 'profile-a': 'ic3-only', 'profile-b': 'graph+ic3' },
     chatListWidth: 36,

@@ -146,8 +146,8 @@ export const FIELDS: readonly EditableField[] = [
   num('layout', 'panePaddingX', 'Pane padding X', 'Spacing / Layout', 0, 6),
   num('layout', 'modalPaddingX', 'Modal padding X', 'Spacing / Layout', 0, 8),
   num('layout', 'modalPaddingY', 'Modal padding Y', 'Spacing / Layout', 0, 4),
-  num('layout', 'paneHeaderPaddingLeft', 'Pane header pad L', 'Spacing / Layout', 0, 6),
-  num('layout', 'paneHeaderMarginBottom', 'Pane header gap B', 'Spacing / Layout', 0, 4),
+  num('layout', 'paneHeaderPaddingLeft', 'Message body indent', 'Spacing / Layout', 0, 6),
+  num('layout', 'paneHeaderMarginBottom', 'Message gap', 'Spacing / Layout', 0, 4),
   num('layout', 'tailGap', 'Tail strip gap', 'Spacing / Layout', 0, 6),
   num('layout', 'chatListPaddingRight', 'Chat list pad R', 'Spacing / Layout', 0, 6),
   // — Colors —

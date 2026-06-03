@@ -83,6 +83,7 @@ export function HeaderBar() {
   const unreadMentionCount = useAppState((s) => s.unreadMentionCount)
   const realtimeState = useAppState((s) => s.realtimeState)
   const show = useAppState((s) => s.settings.headerElements)
+  const userFormat = useAppState((s) => s.settings.headerUserFormat)
   const theme = useTheme()
 
   const [now, setNow] = useState(() => Date.now())
@@ -94,11 +95,16 @@ export function HeaderBar() {
   const profile = getActiveProfile()
   const userName = me?.displayName ?? '...'
   const tenant = tenantFromUpn(me?.userPrincipalName)
-  const userDisplay = tenant
-    ? `${userName} (${tenant})`
-    : profile
-      ? `${userName} (${profile})`
-      : userName
+  // 'tenant' format collapses to just the tenant (falling back to the profile
+  // alias, then the name) so the top row stays short; 'full' shows both.
+  const userDisplay =
+    userFormat === 'tenant'
+      ? (tenant ?? profile ?? userName)
+      : tenant
+        ? `${userName} (${tenant})`
+        : profile
+          ? `${userName} (${profile})`
+          : userName
 
   const presenceUnavailable =
     capabilities?.presence.ok === false && capabilities.presence.reason === 'unavailable'
@@ -115,12 +121,15 @@ export function HeaderBar() {
   const unreadText = formatUnread(unreadByChatId, chats, me?.id, nameByUserId)
 
   // Build the visible segments, then interleave ` · ` separators so hiding
-  // any element never leaves a dangling separator. The app name always leads.
-  const segments: ReactNode[] = [
-    <Text key="app" bold={theme.emphasis.sectionHeadingBold}>
-      teaminal
-    </Text>,
-  ]
+  // any element never leaves a dangling separator. The app name leads when
+  // shown.
+  const segments: ReactNode[] = []
+  if (show.app)
+    segments.push(
+      <Text key="app" bold={theme.emphasis.sectionHeadingBold}>
+        teaminal
+      </Text>,
+    )
   if (show.user) segments.push(<Text color="gray">{userDisplay}</Text>)
   if (show.presence) {
     segments.push(
@@ -166,14 +175,21 @@ export function HeaderBar() {
     segments.push(<Text color="gray">{hints.join(', ')}</Text>)
   }
 
+  // Render the whole bar as a single truncating line. Without this the
+  // individual segment <Text> nodes wrap independently when the terminal is
+  // narrow, ballooning the bordered header box to several rows (and making it
+  // jump as dynamic segments like push/updated change). truncate-end keeps it
+  // to exactly one row no matter the width or content.
   return (
     <Box paddingX={theme.layout.panePaddingX}>
-      {segments.map((seg, i) => (
-        <Fragment key={i}>
-          {i > 0 && <Text color="gray">{' · '}</Text>}
-          {seg}
-        </Fragment>
-      ))}
+      <Text wrap="truncate-end">
+        {segments.map((seg, i) => (
+          <Fragment key={i}>
+            {i > 0 && <Text color="gray">{' · '}</Text>}
+            {seg}
+          </Fragment>
+        ))}
+      </Text>
     </Box>
   )
 }

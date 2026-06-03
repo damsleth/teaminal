@@ -132,6 +132,9 @@ export function App() {
   const statusBarPosition = useAppState((s) => s.settings.statusBarPosition)
   const chatListWidthSetting = useAppState((s) => s.settings.chatListWidth)
   const composerHeightSetting = useAppState((s) => s.settings.composerHeight)
+  const chatListSort = useAppState((s) => s.settings.chatListSort)
+  const chatListGroupByType = useAppState((s) => s.settings.chatListGroupByType)
+  const nameByUserId = useAppState((s) => s.nameByUserId)
   const draftsByConvo = useAppState((s) => s.draftsByConvo)
 
   const [newChatPrompt, setNewChatPrompt] = useState<string | null>(null)
@@ -376,6 +379,8 @@ export function App() {
         chats,
         teams,
         channelsByTeam,
+        nameByUserId,
+        settings: { chatListSort, chatListGroupByType },
         filter,
         cursor,
         focus,
