@@ -119,8 +119,11 @@ function isGraphFetchable(path: string): boolean {
 // Fetch a hosted-content image, routing between the Graph hostedContents
 // endpoint and the asyncgw object store per the account's routing mode
 // (getAudiencePreference). ic3 accounts go to asyncgw (the Graph endpoint is
-// CA-gated); graph accounts use Graph and fall back to asyncgw on a 401 when
-// the object id is known and fallback is enabled.
+// CA-gated); graph accounts use Graph and fall back to asyncgw when the
+// object id is known: on 401 when audience fallback is enabled, and on 404
+// always — cross-tenant 1:1 chats home the hosted content in the other
+// tenant, so our tenant's Graph 404s while the asyncgw object store serves
+// it (chat membership is in the object ACL).
 async function fetchHostedContent(path: string, opts?: FetchImageOpts): Promise<Uint8Array> {
   const { audience, fallback } = getAudiencePreference()
   const objectId = opts?.objectId
@@ -148,8 +151,12 @@ async function fetchHostedContent(path: string, opts?: FetchImageOpts): Promise<
     try {
       return await viaGraph()
     } catch (err) {
-      if (fallback && objectId && err instanceof GraphError && err.status === 401) {
-        return viaAsyncGw()
+      if (objectId && err instanceof GraphError) {
+        // 401: CA-gated account — only when audience fallback is opted in.
+        // 404: cross-tenant hosted content Graph can't serve — always try.
+        if ((fallback && err.status === 401) || err.status === 404) {
+          return viaAsyncGw()
+        }
       }
       throw err
     }

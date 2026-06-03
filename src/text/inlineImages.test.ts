@@ -176,6 +176,31 @@ describe('extractInlineImages', () => {
     expect(refs[0]!.isExternal).toBe(false)
   })
 
+  it('regression: prefers the src hostedContents id over a raw-asm-id itemid (cross-tenant 1:1)', () => {
+    // Real shape from an external 1:1 chat: itemid is the raw asm object id,
+    // while the src URL carries the actual (base64, x_-prefixed) hostedContents
+    // id. Building the Graph path from the itemid 404s; the src id is
+    // authoritative.
+    const rawId = '0-nch-d3-213cc7419f173ab899d8a806b77f85ed'
+    const b64 = Buffer.from(
+      `id=x_${rawId},type=1,url=https://eu-api.asm.skype.com/v1/objects/${rawId}/views/imgo`,
+    ).toString('base64')
+    const m = msg({
+      body: {
+        contentType: 'html',
+        content: `<p><img src="https://graph.microsoft.com/v1.0/chats/chat-1/messages/msg-1/hostedContents/${encodeURIComponent(b64)}/$value" width="534" height="176" alt="image" itemid="${rawId}"></p>`,
+      },
+    })
+    const refs = extractInlineImages(m)
+    expect(refs.length).toBe(1)
+    expect(refs[0]!.sourcePath).toContain(`/hostedContents/${encodeURIComponent(b64)}/$value`)
+    expect(refs[0]!.sourcePath).not.toContain(`/hostedContents/${rawId}/`)
+    expect(refs[0]!.cacheKey).toBe(`msg-1::${b64}`)
+    // The raw object id still rides along for the asyncgw fallback.
+    expect(refs[0]!.objectId).toBe(rawId)
+    expect(refs[0]!.region).toBe('emea')
+  })
+
   it('still yields an asyncgw-fetchable ref when chatId is empty but an object id is present', () => {
     const m = msg({
       chatId: undefined,
