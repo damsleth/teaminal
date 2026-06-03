@@ -306,6 +306,10 @@ const ink = render(
       </PollerProvider>
     </StoreProvider>
   </ErrorBoundary>,
+  // Ink defaults to maxFps 30; fast OS key-repeat (50-90Hz on tuned
+  // macOS setups) then coalesces 2-3 cursor steps into one paint and
+  // list scrolling visibly jumps. 60fps keeps one paint per step.
+  { maxFps: 60 },
 )
 
 // Safety net: a stray rejected promise from a fire-and-forget action (e.g. a
