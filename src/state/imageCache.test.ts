@@ -163,7 +163,7 @@ describe('fetchAndCacheImage isExternal branch', () => {
   })
 })
 
-describe('fetchAndCacheImage hosted-content routing (ic3)', () => {
+describe('fetchAndCacheImage hosted-content routing', () => {
   const realXdg = process.env.XDG_CACHE_HOME
   const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
   let cacheRoot: string
@@ -230,5 +230,55 @@ describe('fetchAndCacheImage hosted-content routing (ic3)', () => {
     expect(buf!.byteLength).toBe(5)
     expect(objectUrl).toContain('https://na-prod.asyncgw.teams.microsoft.com/')
     expect(objectUrl).toContain('/objects/0-na-d2-eb96/views/imgpsh_fullsize')
+  })
+
+  it('falls back to asyncgw when Graph 404s a cross-tenant hosted content', async () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-xtenant`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    // Default graph audience, audience fallback OFF — the 404 fallback must
+    // not depend on it (cross-tenant chats happen on plain accounts).
+    setAudiencePreference('graph', { fallback: false })
+    setAuthRunner(async () => ({
+      stdout: makeJwt({ exp: FAR_FUTURE, oid: 'oid-self' }),
+      stderr: '',
+      exitCode: 0,
+    }))
+    __setRegionForTests(undefined, 'emea')
+    setFederationTransport(
+      async () =>
+        new Response(JSON.stringify({ tokens: { skypeToken: 'skype-test', expiresIn: 3600 } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    )
+    // Graph 404s the hosted content: cross-tenant 1:1 chat, the content is
+    // homed in the other tenant.
+    let graphCalls = 0
+    setClientTransport(async () => {
+      graphCalls += 1
+      return new Response(JSON.stringify({ error: { message: 'NotFound' } }), { status: 404 })
+    })
+    let objectUrl = ''
+    setAsyncGwTransport(async (url) => {
+      if (url.endsWith('/skypetokenauth')) {
+        return new Response(null, { status: 200, headers: { 'set-cookie': 'AGW=s1' } })
+      }
+      objectUrl = url
+      return new Response(new Uint8Array([9, 8, 7]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      })
+    })
+
+    const buf = await fetchAndCacheImage(
+      '/chats/chat-x/messages/msg-x/hostedContents/0-nch-d4-8efd/$value',
+      `xtenant-test-${Date.now()}`,
+      { contentType: '', name: 'image' },
+      { profile: '__xtenant_test__', objectId: '0-nch-d4-8efd' },
+    )
+    expect(buf).not.toBeNull()
+    expect(buf!.byteLength).toBe(3)
+    expect(graphCalls).toBe(1)
+    expect(objectUrl).toContain('/objects/0-nch-d4-8efd/views/imgpsh_fullsize')
   })
 })
