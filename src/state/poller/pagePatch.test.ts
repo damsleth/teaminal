@@ -16,6 +16,17 @@ function appStateWith(overrides?: Partial<AppState>): AppState {
   return { ...initialAppState(), ...overrides }
 }
 
+/**
+ * Messages for `conv` after applying the patch, read the way the app reads
+ * them. The patch omits keys that did not change (so a no-op poll notifies
+ * nothing), which means assertions about content must look at the merged
+ * state rather than at patch shape.
+ */
+function messagesAfter(state: AppState, patch: Partial<AppState>, key: ConvKey): ChatMessage[] {
+  const next = { ...state, ...patch }
+  return next.messageCacheByConvo[key]?.messages ?? next.messagesByConvo[key] ?? []
+}
+
 describe('mergeActivePagePatch', () => {
   const conv: ConvKey = 'chat:c1'
   const focus: Focus = { kind: 'chat', chatId: 'c1' }
@@ -90,7 +101,9 @@ describe('mergeActivePagePatch', () => {
     const cacheMerged = patch.messageCacheByConvo?.[conv]?.messages ?? []
     expect(cacheMerged.map((m) => m.id)).toEqual(['m1', 'temp-ui'])
     expect(cacheMerged[1]?._sending).toBe(true)
-    const legacyMerged = patch.messagesByConvo?.[conv] ?? []
+    // The legacy mirror already held the rescued row, so the patch correctly
+    // omits messagesByConvo; assert on the merged state instead of the patch.
+    const legacyMerged = { ...state, ...patch }.messagesByConvo[conv] ?? []
     expect(legacyMerged.map((m) => m.id)).toEqual(['m1', 'temp-ui'])
   })
 
@@ -117,7 +130,7 @@ describe('mergeActivePagePatch', () => {
       messages: [message('m1', '2026-01-01T00:00:00Z')],
     }
     const patch = mergeActivePagePatch(state, conv, page, focus)
-    const merged = patch.messageCacheByConvo?.[conv]?.messages ?? []
+    const merged = messagesAfter(state, patch, conv)
     expect(merged.map((m) => m.id)).toEqual(['m1', 'temp-err'])
     expect(merged[1]?._sendError).toBe('boom')
   })
@@ -142,9 +155,104 @@ describe('mergeActivePagePatch', () => {
       messages: [message('m1', '2026-01-01T00:00:00Z')],
     }
     const patch = mergeActivePagePatch(state, conv, page, focus)
-    const merged = patch.messageCacheByConvo?.[conv]?.messages ?? []
+    const merged = messagesAfter(state, patch, conv)
     expect(merged.map((m) => m.id)).toEqual(['m1', 'temp-1'])
     expect(merged[1]?._sending).toBe(true)
+  })
+
+  // -------------------------------------------------------------------------
+  // No-op polls must not notify. Store.set compares by reference, so any key
+  // present in the patch wakes every useAppState subscriber and re-reconciles
+  // the message pane. Before this guard the active loop did that every 5s.
+  // -------------------------------------------------------------------------
+  test('a poll returning identical messages produces an empty patch', () => {
+    const messages = [message('m1', '2026-01-01T00:00:00Z'), message('m2', '2026-01-01T00:00:01Z')]
+    const state = appStateWith({
+      messageCacheByConvo: {
+        [conv]: { messages, loadingOlder: false, fullyLoaded: true },
+      },
+      messagesByConvo: { [conv]: messages },
+      messageCursorByConvo: { [conv]: 1 },
+      nameByUserId: {},
+      unreadByChatId: { c1: { unreadCount: 0, mentionCount: 0, lastSeenPreviewId: 'm2' } },
+    })
+    // Fresh objects, same content — exactly what a real poll returns.
+    const page: MessagesPage = {
+      messages: [message('m1', '2026-01-01T00:00:00Z'), message('m2', '2026-01-01T00:00:01Z')],
+    }
+    const patch = mergeActivePagePatch(state, conv, page, focus)
+    expect(Object.keys(patch)).toEqual([])
+  })
+
+  test('an identical poll preserves array identity for the message list', () => {
+    const messages = [message('m1', '2026-01-01T00:00:00Z')]
+    const state = appStateWith({
+      messageCacheByConvo: {
+        [conv]: { messages, loadingOlder: false, fullyLoaded: true },
+      },
+      messagesByConvo: { [conv]: messages },
+      messageCursorByConvo: { [conv]: 0 },
+      unreadByChatId: { c1: { unreadCount: 0, mentionCount: 0, lastSeenPreviewId: 'm1' } },
+    })
+    const page: MessagesPage = { messages: [message('m1', '2026-01-01T00:00:00Z')] }
+    const next = { ...state, ...mergeActivePagePatch(state, conv, page, focus) }
+    expect(next.messageCacheByConvo[conv]?.messages).toBe(messages)
+    expect(next.messagesByConvo[conv]).toBe(messages)
+  })
+
+  test('a genuinely new message still produces a patch', () => {
+    const messages = [message('m1', '2026-01-01T00:00:00Z')]
+    const state = appStateWith({
+      messageCacheByConvo: {
+        [conv]: { messages, loadingOlder: false, fullyLoaded: true },
+      },
+      messagesByConvo: { [conv]: messages },
+      messageCursorByConvo: { [conv]: 0 },
+    })
+    const page: MessagesPage = {
+      messages: [message('m1', '2026-01-01T00:00:00Z'), message('m2', '2026-01-01T00:00:01Z')],
+    }
+    const patch = mergeActivePagePatch(state, conv, page, focus)
+    expect(patch.messageCacheByConvo?.[conv]?.messages.map((m) => m.id)).toEqual(['m1', 'm2'])
+  })
+
+  test('an edit to an existing message still produces a patch', () => {
+    const messages = [message('m1', '2026-01-01T00:00:00Z')]
+    const state = appStateWith({
+      messageCacheByConvo: {
+        [conv]: { messages, loadingOlder: false, fullyLoaded: true },
+      },
+      messagesByConvo: { [conv]: messages },
+      messageCursorByConvo: { [conv]: 0 },
+    })
+    const page: MessagesPage = {
+      messages: [
+        message('m1', '2026-01-01T00:00:00Z', {
+          lastModifiedDateTime: '2026-01-01T00:05:00Z',
+          body: { contentType: 'text', content: 'edited' },
+        }),
+      ],
+    }
+    const patch = mergeActivePagePatch(state, conv, page, focus)
+    expect(patch.messageCacheByConvo?.[conv]?.messages[0]?.body.content).toBe('edited')
+  })
+
+  test('a new reaction on an otherwise identical message produces a patch', () => {
+    const messages = [message('m1', '2026-01-01T00:00:00Z')]
+    const state = appStateWith({
+      messageCacheByConvo: {
+        [conv]: { messages, loadingOlder: false, fullyLoaded: true },
+      },
+      messagesByConvo: { [conv]: messages },
+      messageCursorByConvo: { [conv]: 0 },
+    })
+    const page: MessagesPage = {
+      messages: [message('m1', '2026-01-01T00:00:00Z', { reactions: [{ reactionType: 'like' }] })],
+    }
+    const patch = mergeActivePagePatch(state, conv, page, focus)
+    expect(patch.messageCacheByConvo?.[conv]?.messages[0]?.reactions?.[0]?.reactionType).toBe(
+      'like',
+    )
   })
 
   test('clamps an out-of-bounds existing cursor', () => {

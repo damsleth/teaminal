@@ -2,7 +2,7 @@
 // path. No store, no fetch — just chronological merging that preserves
 // optimistic-send messages.
 
-import type { ChatMessage } from '../../types'
+import type { ChatMessage, Reaction } from '../../types'
 
 function messageTime(msg: ChatMessage): number {
   const parsed = Date.parse(msg.createdDateTime)
@@ -93,4 +93,78 @@ export function countNewMessages(existing: ChatMessage[], incoming: ChatMessage[
 /** Newest message id in a chronologically-sorted list, or undefined. */
 export function newestMessageId(messages: ChatMessage[]): string | undefined {
   return messages[messages.length - 1]?.id
+}
+
+// ---------------------------------------------------------------------------
+// Render-equivalence checks
+//
+// mergeChronological always allocates a fresh array, and the messages inside
+// it are the freshly-parsed server objects, so a poll that returns identical
+// data still produces new references everywhere. Store.set compares by
+// reference, so that woke every useAppState subscriber and re-reconciled the
+// whole message pane on a 5s timer for no reason.
+//
+// These helpers let the caller detect "nothing the UI shows actually changed"
+// and keep the previous references, following the same identity-preserving
+// pattern as indexNamesFromMessages.
+// ---------------------------------------------------------------------------
+
+function sameReactions(a: Reaction[] | undefined, b: Reaction[] | undefined): boolean {
+  const al = a?.length ?? 0
+  const bl = b?.length ?? 0
+  if (al !== bl) return false
+  if (al === 0) return true
+  for (let i = 0; i < al; i++) {
+    const x = a?.[i]
+    const y = b?.[i]
+    if (x?.reactionType !== y?.reactionType) return false
+    if (x?.user?.user?.id !== y?.user?.user?.id) return false
+  }
+  return true
+}
+
+/**
+ * True when two messages are equivalent for everything the UI renders.
+ *
+ * Deliberately field-by-field rather than a deep compare: it must be cheap
+ * enough to run on every poll, and it must not claim equality for anything
+ * visible. Any field the message pane reads belongs here — if a renderer
+ * starts showing a new field, add it.
+ */
+export function sameMessage(a: ChatMessage, b: ChatMessage): boolean {
+  if (a === b) return true
+  return (
+    a.id === b.id &&
+    a.createdDateTime === b.createdDateTime &&
+    a.lastModifiedDateTime === b.lastModifiedDateTime &&
+    a.deletedDateTime === b.deletedDateTime &&
+    a.messageType === b.messageType &&
+    a.subject === b.subject &&
+    a.importance === b.importance &&
+    a.replyToId === b.replyToId &&
+    a.rootMessageId === b.rootMessageId &&
+    a.sequenceId === b.sequenceId &&
+    a.body.content === b.body.content &&
+    a.body.contentType === b.body.contentType &&
+    a.from?.user?.id === b.from?.user?.id &&
+    a.from?.user?.displayName === b.from?.user?.displayName &&
+    (a.attachments?.length ?? 0) === (b.attachments?.length ?? 0) &&
+    (a.mentions?.length ?? 0) === (b.mentions?.length ?? 0) &&
+    a._sending === b._sending &&
+    a._sendError === b._sendError &&
+    a._tempId === b._tempId &&
+    sameReactions(a.reactions, b.reactions)
+  )
+}
+
+/** True when two message lists are render-equivalent, element for element. */
+export function sameMessageList(a: readonly ChatMessage[], b: readonly ChatMessage[]): boolean {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i]
+    const y = b[i]
+    if (!x || !y || !sameMessage(x, y)) return false
+  }
+  return true
 }

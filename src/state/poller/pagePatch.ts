@@ -5,7 +5,7 @@
 import type { ChatMessage } from '../../types'
 import { indexNamesFromMessages } from '../nameIndex'
 import { type AppState, type ConvKey, type Focus, emptyMessageCache, markChatRead } from '../store'
-import { mergeWithOptimistic, newestMessageId } from './merge'
+import { mergeWithOptimistic, newestMessageId, sameMessageList } from './merge'
 
 export type MessagesPage = {
   messages: ChatMessage[]
@@ -41,7 +41,16 @@ export function mergeActivePagePatch(
     ? legacyMessages.filter((m) => (m._sending || m._sendError) && !cachedIds.has(m.id))
     : []
   const existing = cache ? [...cachedMessages, ...orphanOptimistic] : legacyMessages
-  const merged = mergeWithOptimistic(existing, page.messages)
+  const mergedFresh = mergeWithOptimistic(existing, page.messages)
+  // A poll that returns the same messages must not produce a new array, or
+  // every subscriber re-renders on a 5s timer. Prefer the list already in the
+  // store (cache first, then the legacy mirror) whenever it is
+  // render-equivalent, so the reference survives.
+  const merged = sameMessageList(cachedMessages, mergedFresh)
+    ? cachedMessages
+    : sameMessageList(legacyMessages, mergedFresh)
+      ? legacyMessages
+      : mergedFresh
 
   const incomingIds = new Set(page.messages.map((m) => m.id))
   const hasCachedOlderMessages = existing.some(
@@ -52,36 +61,53 @@ export function mergeActivePagePatch(
   const fullyLoaded = preserveOlderPaging
     ? (cache?.fullyLoaded ?? false)
     : page.nextLink === undefined
-  const nextCaches = {
-    ...state.messageCacheByConvo,
-    [conv]: {
-      ...(cache ?? emptyMessageCache()),
-      messages: merged,
-      nextLink,
-      loadingOlder: false,
-      fullyLoaded,
-      error: undefined,
-    },
-  }
   const prevCursor = state.messageCursorByConvo[conv]
   const nextCursor =
     prevCursor === undefined
       ? Math.max(0, merged.length - 1)
       : Math.min(prevCursor, Math.max(0, merged.length - 1))
-  const patch: Partial<AppState> = {
-    messageCacheByConvo: nextCaches,
-    messagesByConvo: {
-      ...state.messagesByConvo,
-      [conv]: merged,
-    },
-    messageCursorByConvo: {
-      ...state.messageCursorByConvo,
-      [conv]: nextCursor,
-    },
-    nameByUserId: indexNamesFromMessages(state.nameByUserId, merged),
+
+  // Build the patch key by key, omitting anything that did not actually
+  // change. Store.set compares by reference, so an unconditional spread here
+  // reads as a change and notifies every listener even on an identical poll.
+  const patch: Partial<AppState> = {}
+
+  const cacheUnchanged =
+    cache !== undefined &&
+    cache.messages === merged &&
+    cache.nextLink === nextLink &&
+    cache.loadingOlder === false &&
+    cache.fullyLoaded === fullyLoaded &&
+    cache.error === undefined
+  if (!cacheUnchanged) {
+    patch.messageCacheByConvo = {
+      ...state.messageCacheByConvo,
+      [conv]: {
+        ...(cache ?? emptyMessageCache()),
+        messages: merged,
+        nextLink,
+        loadingOlder: false,
+        fullyLoaded,
+        error: undefined,
+      },
+    }
   }
+
+  if (state.messagesByConvo[conv] !== merged) {
+    patch.messagesByConvo = { ...state.messagesByConvo, [conv]: merged }
+  }
+
+  if (prevCursor !== nextCursor) {
+    patch.messageCursorByConvo = { ...state.messageCursorByConvo, [conv]: nextCursor }
+  }
+
+  // Already identity-preserving on a no-op.
+  const nextNames = indexNamesFromMessages(state.nameByUserId, merged)
+  if (nextNames !== state.nameByUserId) patch.nameByUserId = nextNames
+
   if (focus.kind === 'chat') {
-    patch.unreadByChatId = markChatRead(state.unreadByChatId, focus.chatId, newestMessageId(merged))
+    const nextUnread = markChatRead(state.unreadByChatId, focus.chatId, newestMessageId(merged))
+    if (nextUnread !== state.unreadByChatId) patch.unreadByChatId = nextUnread
   }
   return patch
 }

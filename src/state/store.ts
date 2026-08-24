@@ -589,11 +589,23 @@ export function markChatRead(
   lastSeenPreviewId?: string,
 ): Record<string, ChatUnreadActivity> {
   const prev = activityByChatId[chatId]
+  const nextSeen = lastSeenPreviewId ?? prev?.lastSeenPreviewId
+  // Identity-preserving on a no-op: the active loop calls this on every poll
+  // of a focused chat, so returning a fresh object would notify every store
+  // subscriber even when the chat was already read at this preview id.
+  if (
+    prev &&
+    prev.unreadCount === 0 &&
+    prev.mentionCount === 0 &&
+    prev.lastSeenPreviewId === nextSeen
+  ) {
+    return activityByChatId
+  }
   return {
     ...activityByChatId,
     [chatId]: {
       ...(prev ?? { unreadCount: 0, mentionCount: 0 }),
-      lastSeenPreviewId: lastSeenPreviewId ?? prev?.lastSeenPreviewId,
+      lastSeenPreviewId: nextSeen,
       unreadCount: 0,
       mentionCount: 0,
     },
