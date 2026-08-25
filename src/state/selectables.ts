@@ -15,6 +15,9 @@ export type SelectableItem =
   | { kind: 'chat'; chat: Chat; label: string }
   | { kind: 'team'; team: Team }
   | { kind: 'channel'; team: Team; channel: Channel; label: string }
+  // Overflow row shown when a grouped chat section exceeds CHAT_SECTION_CAP.
+  // Selectable: Enter/l expands the section it belongs to.
+  | { kind: 'more'; section: ChatSection; hidden: number }
 
 type ChatItem = Extract<SelectableItem, { kind: 'chat' }>
 
@@ -23,13 +26,44 @@ export type SelectableInput = Pick<AppState, 'chats' | 'teams' | 'channelsByTeam
   // Ordering knobs. Optional so existing callers/tests get the default
   // 'recent', ungrouped order (identical to the previous behavior).
   settings?: Pick<Settings, 'chatListSort' | 'chatListGroupByType'>
+  // A non-empty filter must be able to reach chats hidden behind a section
+  // cap, so capping is skipped while filtering.
+  filter?: string
+  // Sections the user expanded past the cap via the `… N more` row.
+  expandedChatSections?: Record<string, boolean>
 }
 
-// Section order when grouping by chat type. Anything unrecognised sorts last.
-const CHAT_TYPE_RANK: Record<string, number> = { oneOnOne: 0, group: 1, meeting: 2 }
+// Section identity when grouping by chat type. Anything unrecognised lands
+// in 'other', which sorts last. One source of truth for the sort rank, the
+// rendered header label, and the per-section cap.
+export type ChatSection = 'oneOnOne' | 'group' | 'meeting' | 'other'
+
+const CHAT_SECTIONS: ChatSection[] = ['oneOnOne', 'group', 'meeting', 'other']
+
+// Rows shown per section before the `… N more` row takes over. Without a cap
+// a long Direct list pushes Meetings and the team/channel rows off the pane.
+export const CHAT_SECTION_CAP = 10
+
+export function chatSection(chatType: string): ChatSection {
+  const s = chatType as ChatSection
+  return CHAT_SECTIONS.includes(s) ? s : 'other'
+}
+
+export function chatSectionLabel(section: ChatSection): string {
+  switch (section) {
+    case 'oneOnOne':
+      return 'Direct'
+    case 'group':
+      return 'Groups'
+    case 'meeting':
+      return 'Meetings'
+    default:
+      return 'Other'
+  }
+}
 
 export function chatTypeRank(chatType: string): number {
-  return CHAT_TYPE_RANK[chatType] ?? 3
+  return CHAT_SECTIONS.indexOf(chatSection(chatType))
 }
 
 export function buildSelectableList(state: SelectableInput): SelectableItem[] {
@@ -43,7 +77,10 @@ export function buildSelectableList(state: SelectableInput): SelectableItem[] {
   }))
   chatItems = orderChats(chatItems, sort, groupByType)
 
-  const items: SelectableItem[] = [...chatItems]
+  const items: SelectableItem[] =
+    groupByType && !state.filter
+      ? capChatSections(chatItems, state.expandedChatSections ?? {})
+      : [...chatItems]
   for (const team of state.teams) {
     items.push({ kind: 'team', team })
     const channels = state.channelsByTeam[team.id] ?? []
@@ -72,6 +109,28 @@ function orderChats(
   }
   if (groupByType) {
     out = [...out].sort((a, b) => chatTypeRank(a.chat.chatType) - chatTypeRank(b.chat.chatType))
+  }
+  return out
+}
+
+// Trim each chat-type section to CHAT_SECTION_CAP rows, appending a selectable
+// `… N more` row that expands that section. Relies on orderChats having made
+// each section contiguous.
+function capChatSections(items: ChatItem[], expanded: Record<string, boolean>): SelectableItem[] {
+  const out: SelectableItem[] = []
+  let i = 0
+  while (i < items.length) {
+    const section = chatSection(items[i]!.chat.chatType)
+    let end = i
+    while (end < items.length && chatSection(items[end]!.chat.chatType) === section) end++
+    const run = items.slice(i, end)
+    if (expanded[section] || run.length <= CHAT_SECTION_CAP) {
+      out.push(...run)
+    } else {
+      out.push(...run.slice(0, CHAT_SECTION_CAP))
+      out.push({ kind: 'more', section, hidden: run.length - CHAT_SECTION_CAP })
+    }
+    i = end
   }
   return out
 }
@@ -180,5 +239,8 @@ export function itemMatchesFilter(item: SelectableItem, filter: string): boolean
   const needle = filter.toLowerCase()
   if (item.kind === 'chat') return item.label.toLowerCase().includes(needle)
   if (item.kind === 'team') return item.team.displayName.toLowerCase().includes(needle)
+  // Section caps are lifted while filtering, so a `… N more` row never
+  // coexists with a filter — and it has no label to match anyway.
+  if (item.kind === 'more') return false
   return item.channel.displayName.toLowerCase().includes(needle)
 }

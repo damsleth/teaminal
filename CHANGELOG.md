@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Grouped chat sections are capped at 10 rows.** With "group by type" enabled,
+  a long Direct list no longer pushes Groups, Meetings, and the team/channel rows
+  off the bottom of the sidebar. Each type caps independently and gets a
+  selectable `… N more` row that expands the section in place (Enter/l). Filtering
+  lifts the cap so a hidden chat is still reachable by name.
+
 ## [0.21.1] - 2026-08-25
 
 ### Fixed

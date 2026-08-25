@@ -55,6 +55,7 @@ function makeCtx(opts?: Partial<ListKeysCtx>): {
     channelsByTeam: {},
     settings: { chatListSort: 'recent', chatListGroupByType: false },
     filter: '',
+    expandedChatSections: {},
     cursor: 0,
     focus: { kind: 'list' },
     exit: () => {
@@ -208,5 +209,18 @@ describe('handleListKeys', () => {
     const a = makeCtx({ filter: 'Carl', chats: [], cursor: 0 })
     handleListKeys({ input: '', key: makeKey({ return: true }) }, a.ctx)
     expect(a.newChats).toEqual(['Carl'])
+  })
+
+  test('l on the `… N more` row expands that chat section', () => {
+    const many = Array.from({ length: 12 }, (_, i) => chat(`d${i}`))
+    const a = makeCtx({
+      chats: many,
+      settings: { chatListSort: 'recent', chatListGroupByType: true },
+      cursor: 10, // the `… 2 more` row sits right after the 10 capped rows
+    })
+    expect(handleListKeys({ input: 'l', key: makeKey() }, a.ctx)).toBe('handled')
+    expect(a.store.get().expandedChatSections).toEqual({ oneOnOne: true })
+    // Expanding must not also open a conversation.
+    expect(a.store.get().focus).toEqual({ kind: 'list' })
   })
 })

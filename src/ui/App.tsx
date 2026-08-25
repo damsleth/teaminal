@@ -134,6 +134,7 @@ export function App() {
   const composerHeightSetting = useAppState((s) => s.settings.composerHeight)
   const chatListSort = useAppState((s) => s.settings.chatListSort)
   const chatListGroupByType = useAppState((s) => s.settings.chatListGroupByType)
+  const expandedChatSections = useAppState((s) => s.expandedChatSections)
   const nameByUserId = useAppState((s) => s.nameByUserId)
   const draftsByConvo = useAppState((s) => s.draftsByConvo)
 
@@ -382,6 +383,7 @@ export function App() {
         nameByUserId,
         settings: { chatListSort, chatListGroupByType },
         filter,
+        expandedChatSections,
         cursor,
         focus,
         exit,
