@@ -8,6 +8,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Inline images no longer flood the terminal with redundant image data.**
+  Every repaint deleted and re-sent each visible image's full base64 payload,
+  because the delete used the form that frees the pixel data. Images are now
+  transmitted once and re-placed by id afterwards (~40 bytes instead of
+  ~1.2 MB), and a repaint whose image layout is unchanged is skipped entirely,
+  so an idle session paints once and stays quiet. Measured over the same
+  scripted runs: scrolling ten rows through a chat with two screenshots went
+  from 19.15 MB of image traffic to 1.65 MB, and 25 s idle from 4.79 MB to
+  1.57 MB with a single paint instead of fifteen.
+
 - **The image modal shows the image instead of claiming it's already inline.**
   Opening a focused image told you it was "shown inline in the message pane"
   even with inline images off, and offered no way to see it unless the source
