@@ -4,7 +4,8 @@ import {
   buildSelectableList,
   CHAT_SECTION_CAP,
   isSelectable,
-  parentHeaderIndex,
+  headerIndexForKey,
+  parentCollapseKey,
   chatLabel,
   clampCursor,
   firstSelectableIndex,
@@ -221,7 +222,7 @@ describe('buildSelectableList', () => {
     expect(list.filter((i) => itemMatchesFilter(i, 'eng'))).toHaveLength(1)
   })
 
-  test('parentHeaderIndex finds the header a row belongs to', () => {
+  test('parentCollapseKey derives the section from the row itself', () => {
     const state = {
       ...initialAppState(),
       chats: [chat('d1', { topic: 'Ada' }), chat('g1', { topic: 'Eng', chatType: 'group' })],
@@ -231,10 +232,30 @@ describe('buildSelectableList', () => {
     }
     const list = buildSelectableList(state)
     // [section Direct, Ada, section Groups, Eng, team Crayon, # General]
-    expect(parentHeaderIndex(list, 1)).toBe(0)
-    expect(parentHeaderIndex(list, 3)).toBe(2)
-    expect(parentHeaderIndex(list, 5)).toBe(4) // channel → its team
-    expect(parentHeaderIndex(list, 0)).toBeNull() // a header has no parent
+    expect(parentCollapseKey(list[1]!, true)).toBe('oneOnOne')
+    expect(parentCollapseKey(list[3]!, true)).toBe('group')
+    expect(parentCollapseKey(list[5]!, true)).toBe('team:t1') // channel → its team
+    expect(parentCollapseKey(list[0]!, true)).toBeNull() // a header has no parent
+    // Ungrouped lists render no chat-type headers, so a chat has nothing to
+    // collapse into; a channel still belongs to its team.
+    expect(parentCollapseKey(list[1]!, false)).toBeNull()
+    expect(parentCollapseKey(list[5]!, false)).toBe('team:t1')
+  })
+
+  test('a filtered view resolves a channel to its own team, not a nearer header', () => {
+    // Team A matches the filter by name; a channel under team B matches too.
+    // Scanning backwards for the nearest header would blame team A.
+    const state = {
+      ...initialAppState(),
+      teams: [team('ta', 'Alpha'), team('tb', 'Beta')],
+      channelsByTeam: { ta: [channel('ca', 'Random')], tb: [channel('cb', 'Alpha talk')] },
+      filter: 'alpha',
+    }
+    const visible = buildSelectableList(state).filter((i) => itemMatchesFilter(i, 'alpha'))
+    // [team Alpha, # Alpha talk] — the matching channel's own team is absent.
+    const channelRow = visible.find((i) => i.kind === 'channel')!
+    expect(parentCollapseKey(channelRow, false)).toBe('team:tb')
+    expect(headerIndexForKey(visible, 'team:tb')).toBeNull()
   })
 
   test('ungrouped lists are never capped', () => {
