@@ -1,12 +1,17 @@
-import { describe, expect, it } from 'bun:test'
+import { beforeEach, describe, expect, it } from 'bun:test'
 import {
   TEAMINAL_KITTY_Z,
+  __resetKittyImageIdsForTests,
   buildKittyAPC,
+  buildKittyImageEscape,
+  buildKittyPlaceById,
   clearKittyImages,
   detectImageFormat,
   fitKittyPlacement,
+  freeKittyImages,
   isKittyCapable,
   isKittyRenderable,
+  kittyImageId,
   writeKittyImageAtOffset,
 } from './kittyGraphics'
 
@@ -172,10 +177,17 @@ describe('writeKittyImageAtOffset', () => {
 })
 
 describe('clearKittyImages', () => {
-  it('deletes Teaminal-owned placements by z-index', () => {
+  it('deletes Teaminal-owned placements by z-index, keeping the pixel data', () => {
     const writes: string[] = []
     const stdout = { write: (value: string) => writes.push(value) } as unknown as NodeJS.WriteStream
     clearKittyImages(stdout)
+    expect(writes.join('')).toBe(`\x1b_Ga=d,d=z,z=${TEAMINAL_KITTY_Z},q=2\x1b\\`)
+  })
+
+  it('freeKittyImages uses the data-freeing form', () => {
+    const writes: string[] = []
+    const stdout = { write: (value: string) => writes.push(value) } as unknown as NodeJS.WriteStream
+    freeKittyImages(stdout)
     expect(writes.join('')).toBe(`\x1b_Ga=d,d=Z,z=${TEAMINAL_KITTY_Z},q=2\x1b\\`)
   })
 })
@@ -217,3 +229,70 @@ function pngBlob(size: number): Buffer {
   buf.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0)
   return buf
 }
+
+describe('transmit once, place many', () => {
+  const PNG_HEADER = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  // Sized like a real screenshot blob so the transmit-vs-place ratio below
+  // reflects what actually goes over the wire.
+  const png = (w: number, h: number, bytes = 256 * 1024) => {
+    const buf = Buffer.alloc(Math.max(24, bytes))
+    PNG_HEADER.copy(buf, 0)
+    buf.writeUInt32BE(w, 16)
+    buf.writeUInt32BE(h, 20)
+    return buf
+  }
+
+  beforeEach(() => {
+    __resetKittyImageIdsForTests()
+  })
+
+  it('transmits the pixels once, then places by id', () => {
+    const data = png(400, 400)
+    const placement = { rows: 6, reservedRows: 6 }
+
+    const first = buildKittyImageEscape('key-a', data, placement)
+    expect(first).toContain('a=T') // transmit-and-display
+    expect(first).toContain(`i=${kittyImageId('key-a')},`)
+
+    const second = buildKittyImageEscape('key-a', data, placement)
+    expect(second).toContain('a=p') // place only
+    expect(second).not.toContain('a=T')
+    // The whole point: no pixels on the wire the second time. A 256KB blob
+    // costs ~350KB of base64 to transmit and ~40 bytes to re-place.
+    expect(second.length).toBeLessThan(80)
+    expect(first.length).toBeGreaterThan(300_000)
+    expect(second.length * 1000).toBeLessThan(first.length)
+  })
+
+  it('gives each blob its own stable id', () => {
+    expect(kittyImageId('a')).toBe(kittyImageId('a'))
+    expect(kittyImageId('a')).not.toBe(kittyImageId('b'))
+  })
+
+  it('clearing removes placements but keeps the data cached', () => {
+    const writes: string[] = []
+    const out = { write: (c: string) => writes.push(c) } as unknown as NodeJS.WriteStream
+    clearKittyImages(out)
+    // Lowercase d=z: placements only. Uppercase would free the pixels and
+    // force a full re-transmit on the next paint.
+    expect(writes[0]).toContain('d=z,')
+    expect(writes[0]).not.toContain('d=Z')
+  })
+
+  it('freeing drops the data and forgets the ids so the next paint re-transmits', () => {
+    const data = png(400, 400)
+    const placement = { rows: 6, reservedRows: 6 }
+    buildKittyImageEscape('key-a', data, placement)
+
+    const writes: string[] = []
+    const out = { write: (c: string) => writes.push(c) } as unknown as NodeJS.WriteStream
+    freeKittyImages(out)
+    expect(writes[0]).toContain('d=Z')
+
+    expect(buildKittyImageEscape('key-a', data, placement)).toContain('a=T')
+  })
+
+  it('place-by-id needs a dimension to place into', () => {
+    expect(buildKittyPlaceById(1, { reservedRows: 3 })).toBe('')
+  })
+})

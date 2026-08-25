@@ -6,7 +6,7 @@
 // one thing that must survive on screen, and a piped run has no screen to
 // clear.
 
-import { clearKittyImages } from './kittyGraphics'
+import { freeKittyImages } from './kittyGraphics'
 
 /**
  * Restore the terminal after a clean exit. Returns true when it actually
@@ -19,8 +19,10 @@ import { clearKittyImages } from './kittyGraphics'
 export function renderCleanExit(stdout: NodeJS.WriteStream = process.stdout): boolean {
   if (!stdout.isTTY) return false
   // Kitty placements are graphics objects, not cells: a screen clear does not
-  // touch them, so delete ours before wiping the text underneath.
-  clearKittyImages(stdout)
+  // touch them, so delete ours before wiping the text underneath. Free the
+  // pixel data too — during a session it is kept deliberately so repaints can
+  // re-place instead of re-transmit, but on exit it is just terminal memory.
+  freeKittyImages(stdout)
   // Show cursor, reset SGR, clear the visible screen, home the cursor.
   // Deliberately no \x1b[3J — the scrollback above teaminal is the user's
   // shell history, not ours to erase.

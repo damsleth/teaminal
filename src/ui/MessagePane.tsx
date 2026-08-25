@@ -44,7 +44,7 @@ import {
   isKittyCapable,
   isKittyRenderable,
   detectImageFormat,
-  buildKittyAPC,
+  buildKittyImageEscape,
   clearKittyImages,
   fitKittyPlacement,
   writeKittyImageAtOffset,
@@ -261,26 +261,17 @@ export function MessagePane(props: {
   const searchActive = inputZone === 'message-search'
   const hits = searchActive ? searchMessages(messages, searchQuery) : []
 
-  // Trigger image fetches for visible messages and write Kitty sequences
-  // for the focused message after each render. The imageRevision counter
-  // is bumped by ensureImageFetched's onChange callback so the component
-  // re-renders once an image transitions from loading → ready.
+  // Trigger image fetches for every visible message. Cheap and idempotent:
+  // ensureImageFetched short-circuits on any key already loading/ready, so
+  // running this on each render costs a map lookup per image. The
+  // imageRevision counter is bumped by its onChange callback so the component
+  // re-renders once an image transitions loading → ready.
   useEffect(() => {
     if (!kittyEnabled) return
-    // While a modal overlay covers the pane, clear any drawn images and skip
-    // re-drawing so the overlay is not painted over by out-of-band Kitty
-    // graphics. They redraw on the next render once the modal closes.
-    if (modalOpen) {
-      if (stdout) clearKittyImages(stdout)
-      return
-    }
     const profile = getActiveProfile()
-
     for (const row of rows) {
       if (row.kind !== 'message') continue
-      const m = row.message
-      const refs = extractInlineImages(m)
-      for (const ref of refs) {
+      for (const ref of extractInlineImages(row.message)) {
         ensureImageFetched(
           ref.sourcePath,
           ref.cacheKey,
@@ -295,9 +286,18 @@ export function MessagePane(props: {
         )
       }
     }
+  })
 
-    if (!stdout) return
-
+  // The inline-image paint plan: which blob goes how far up from the bottom of
+  // the frame, and how many rows it occupies. Derived during render so the
+  // paint effect can key off it — see the effect below.
+  //
+  // Empty while a modal is open: modals render as a centred overlay, and Kitty
+  // images composite above all terminal text, so leaving them painted would
+  // cover the overlay.
+  const imageColumn = messageBodyTerminalColumn({ bodyIndent, listPaneWidth })
+  const imagePaintPlan: Array<{ cacheKey: string; rowsFromBottom: number; rows: number }> = []
+  if (kittyEnabled && !modalOpen) {
     const rowsAfter = new Array(rows.length).fill(0) as number[]
     let below = 0
     for (let i = rows.length - 1; i >= 0; i--) {
@@ -309,9 +309,6 @@ export function MessagePane(props: {
         reactionDisplayMode,
       })
     }
-
-    clearKittyImages(stdout)
-    const imageColumn = messageBodyTerminalColumn({ bodyIndent, listPaneWidth })
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
       const row = rows[rowIndex]!
       if (row.kind !== 'message') continue
@@ -327,8 +324,6 @@ export function MessagePane(props: {
         if (reservedRows === null || reservedRows === undefined) continue
         const imgData = getImageData(ref.cacheKey)
         if (!imgData) continue
-        const placement = fitKittyPlacement(imgData, imgCols, inlineImageMaxRows)
-        const apc = buildKittyAPC(imgData, placement)
         // Rows below this image's top, within its own message: the rest of
         // this image, then later images' blocks (fitted rows or a label
         // row each), then file-attachment rows, then the trailing group gap.
@@ -338,18 +333,50 @@ export function MessagePane(props: {
           belowWithinMessage += r === null || r === undefined ? 1 : r
         }
         belowWithinMessage += fileRows + messageGap
-        const rowsFromBottom =
-          rowsAfter[rowIndex]! +
-          belowWithinMessage +
-          bottomChromeRows({ statusBarHidden, composerRows, tailRows })
-        writeKittyImageAtOffset(stdout, apc, rowsFromBottom, reservedRows, imageColumn)
+        imagePaintPlan.push({
+          cacheKey: ref.cacheKey,
+          rowsFromBottom:
+            rowsAfter[rowIndex]! +
+            belowWithinMessage +
+            bottomChromeRows({ statusBarHidden, composerRows, tailRows }),
+          rows: reservedRows,
+        })
       }
     }
+  }
 
+  // The plan serialized. Every input to the paint is folded into it — the
+  // column, and each image's blob, offset, and height (rowsFromBottom already
+  // folds in the window, terminal size, gaps and chrome). So an unchanged
+  // signature means the pixels on screen are already correct, and using it as
+  // this effect's dependency is what keeps an idle session from re-clearing
+  // and re-placing images on every poll-driven render.
+  const paintSignature = imagePaintPlan
+    .map((p) => `${p.cacheKey}@${p.rowsFromBottom}x${p.rows}`)
+    .join(',')
+
+  useEffect(() => {
+    if (!stdout || imagePaintPlan.length === 0) return
+    clearKittyImages(stdout)
+    for (const p of imagePaintPlan) {
+      const data = getImageData(p.cacheKey)
+      if (!data) continue
+      // First paint of a blob transmits its pixels; later paints place the
+      // copy the terminal kept, ~40 bytes instead of ~1.2MB of base64.
+      const apc = buildKittyImageEscape(p.cacheKey, data, {
+        rows: p.rows,
+        reservedRows: p.rows,
+      })
+      writeKittyImageAtOffset(stdout, apc, p.rowsFromBottom, p.rows, imageColumn)
+    }
     return () => {
+      // Placements only — the transmitted pixels stay cached in the terminal so
+      // the next paint is cheap. They are freed on exit by freeKittyImages().
       clearKittyImages(stdout)
     }
-  })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- paintSignature
+    // folds in every input to the plan; see its definition above.
+  }, [paintSignature, imageColumn, stdout])
 
   // While the reaction picker is open we delegate to the macOS Character
   // Viewer, which anchors to the terminal's text cursor (after an Ink render

@@ -130,10 +130,55 @@ export function fitKittyPlacement(
   return { rows, reservedRows: rows }
 }
 
+// Kitty image ids we own. Based well away from 0 so a placement can't collide
+// with another program's image in the same terminal.
+const KITTY_ID_BASE = 1_704_200
+let nextKittyId = KITTY_ID_BASE
+const idByCacheKey = new Map<string, number>()
+const transmitted = new Set<number>()
+
+// Stable terminal-side id for a cached blob, assigned on first use.
+export function kittyImageId(cacheKey: string): number {
+  let id = idByCacheKey.get(cacheKey)
+  if (id === undefined) {
+    id = nextKittyId++
+    idByCacheKey.set(cacheKey, id)
+  }
+  return id
+}
+
+/**
+ * Escape sequence that displays a blob at `placement`.
+ *
+ * The first time a blob is shown this transmits the pixels (~1.2MB of base64
+ * for a screenshot). Every later paint places the copy the terminal already
+ * holds, which is about 40 bytes — so scrolling past an image re-places it
+ * instead of re-sending it. Relies on clearKittyImages() deleting placements
+ * only (`d=z`) and never the data (`d=Z`).
+ */
+export function buildKittyImageEscape(
+  cacheKey: string,
+  png: Buffer,
+  placement: KittyPlacement,
+): string {
+  const id = kittyImageId(cacheKey)
+  if (transmitted.has(id)) return buildKittyPlaceById(id, placement)
+  const apc = buildKittyAPC(png, placement, id)
+  if (apc) transmitted.add(id)
+  return apc
+}
+
+// Place an already-transmitted image by id, without resending its pixels.
+export function buildKittyPlaceById(imageId: number, placement: KittyPlacement): string {
+  const dimensions = kittyDimensions(placement)
+  if (!dimensions) return ''
+  return `\x1b_Ga=p,i=${imageId},${dimensions},C=1,z=${TEAMINAL_KITTY_Z},q=2\x1b\\`
+}
+
 // Returns the APC escape sequence string for an image blob.
 // Placement uses either cols or rows, not both, so terminals preserve
 // aspect ratio instead of stretching to an arbitrary cell rectangle.
-export function buildKittyAPC(png: Buffer, placement: KittyPlacement): string {
+export function buildKittyAPC(png: Buffer, placement: KittyPlacement, imageId?: number): string {
   // f=100 is the PNG transmit path; non-PNG blobs would be dropped by the
   // terminal, so refuse to emit a malformed escape for them.
   if (!isKittyRenderable(png)) return ''
@@ -148,12 +193,16 @@ export function buildKittyAPC(png: Buffer, placement: KittyPlacement): string {
     chunks.push(b64.slice(i, i + MAX_B64_CHUNK))
   }
 
+  // `i=` names the image so later paints can place it without the pixels.
+  const idKey = imageId === undefined ? '' : `i=${imageId},`
   if (chunks.length === 1) {
-    return `\x1b_Ga=T,f=100,${dimensions},C=1,z=${TEAMINAL_KITTY_Z},q=2,m=0;${chunks[0]}\x1b\\`
+    return `\x1b_Ga=T,f=100,${idKey}${dimensions},C=1,z=${TEAMINAL_KITTY_Z},q=2,m=0;${chunks[0]}\x1b\\`
   }
 
   const parts: string[] = []
-  parts.push(`\x1b_Ga=T,f=100,${dimensions},C=1,z=${TEAMINAL_KITTY_Z},q=2,m=1;${chunks[0]}\x1b\\`)
+  parts.push(
+    `\x1b_Ga=T,f=100,${idKey}${dimensions},C=1,z=${TEAMINAL_KITTY_Z},q=2,m=1;${chunks[0]}\x1b\\`,
+  )
   for (let i = 1; i < chunks.length - 1; i++) {
     parts.push(`\x1b_Gm=1;${chunks[i]}\x1b\\`)
   }
@@ -178,8 +227,25 @@ export function writeKittyImageAtOffset(
   stdout.write(`\x1b7\x1b[${rowsFromBottom}A\x1b[${column}G${apc}\x1b[${imageRows}B\x1b8`)
 }
 
+// Remove our placements but KEEP the transmitted pixels in the terminal, so
+// the next paint is a cheap place-by-id. Lowercase `d=z` deletes placements;
+// uppercase `d=Z` would free the data and force a full resend every repaint.
 export function clearKittyImages(stdout: NodeJS.WriteStream): void {
+  stdout.write(`\x1b_Ga=d,d=z,z=${TEAMINAL_KITTY_Z},q=2\x1b\\`)
+}
+
+// Free the pixel data too, and forget our ids. Teardown only — during normal
+// operation the cached data is exactly what makes re-placement cheap.
+export function freeKittyImages(stdout: NodeJS.WriteStream): void {
   stdout.write(`\x1b_Ga=d,d=Z,z=${TEAMINAL_KITTY_Z},q=2\x1b\\`)
+  idByCacheKey.clear()
+  transmitted.clear()
+}
+
+export function __resetKittyImageIdsForTests(): void {
+  idByCacheKey.clear()
+  transmitted.clear()
+  nextKittyId = KITTY_ID_BASE
 }
 
 function kittyDimensions(placement: KittyPlacement): string | null {
