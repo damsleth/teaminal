@@ -8,6 +8,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **No more blank gaps where an image is only a link.** With
+  `inlineImages: "off"` — and in any terminal without Kitty graphics — the pane
+  still reserved a picture-sized block of empty rows that nothing ever painted
+  into. Each image now renders exactly one focusable `[img] name` row in those
+  modes, and Space opens it in the image modal. The mode/capability decision
+  lives in one place, so the height math, the reserved rows, and the paint pass
+  cannot disagree.
+
 - **Inline images no longer paint over other messages.** Two causes. The image
   anchor counted a fixed 4 rows of chrome below the message pane, ignoring the
   tail-panel strip (9 rows) and the real composer height — so with the event /
