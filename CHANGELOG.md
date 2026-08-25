@@ -8,6 +8,15 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The image modal shows the image instead of claiming it's already inline.**
+  Opening a focused image told you it was "shown inline in the message pane"
+  even with inline images off, and offered no way to see it unless the source
+  happened to be an http(s) URL. `o` now opens the picture at full resolution
+  in the platform image viewer — the cached blob is written to a private,
+  owner-only temp file that is removed on exit — while an http(s) source still
+  opens in the browser. The modal also no longer sticks on "loading…" once the
+  blob arrives from the on-disk cache.
+
 - **No more blank gaps where an image is only a link.** With
   `inlineImages: "off"` — and in any terminal without Kitty graphics — the pane
   still reserved a picture-sized block of empty rows that nothing ever painted

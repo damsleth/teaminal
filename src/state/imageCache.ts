@@ -266,6 +266,11 @@ export function ensureImageFetched(
   if (disk) {
     fetchStatus.set(key, 'ready')
     imageDataCache.set(key, disk.data)
+    // Notify like the network path does: a caller that rendered a "loading…"
+    // state before this ran would otherwise never learn the blob is available.
+    // Safe against a render loop — the 'ready' guard above makes every later
+    // call for this key return before reaching here.
+    opts.onChange()
     return
   }
 

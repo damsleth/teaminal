@@ -1,20 +1,29 @@
 // Full-size view for a focused inline image.
 //
-// Opened with Space on a focused image in the message pane. Inline images
-// already render in the pane via the Kitty graphics layer; doing a second,
-// larger out-of-band Kitty placement inside this centred sub-region overlay
-// is fragile (a wrong row/col offset paints the picture in the wrong place),
-// so the modal instead shows the image's details and offers to open the
-// original at full resolution in the system browser / image viewer when the
-// source is an openable URL (external GIFs, http(s)-hosted images).
+// Opened with Space on a focused image in the message pane, and the primary
+// way to see an image when inline rendering is off or the terminal has no
+// Kitty graphics support.
 //
-// Keys: o = open original externally (when available), Space / Esc = close.
+// `o` shows the picture at full resolution in the platform image viewer: the
+// cached blob is written to a private temp file (see openImageFile.ts) and
+// handed to the OS. That beats a second out-of-band Kitty placement inside
+// this centred overlay — the offset math there is fragile, and a 3600x2014
+// screenshot is unreadable at a dozen terminal rows anyway. An http(s) source
+// still opens in the browser instead, so the user gets the original URL.
+//
+// ponytail: no in-terminal picture here. If a Kitty lightbox is wanted, give
+// the modal deterministic geometry first (replace the pane like
+// AuthExpiredModal rather than centring inside it), then reuse
+// writeKittyImageAtOffset with the pane's bottom chrome.
+//
+// Keys: o = open the image, Space / Esc = close.
 
 import { Box, Text, useApp, useInput } from 'ink'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { getActiveProfile } from '../graph/client'
 import { ensureImageFetched, getImageData } from '../state/imageCache'
 import { detectImageFormat } from './kittyGraphics'
+import { materializeImage, openImageFile } from './openImageFile'
 import { openExternal } from './openExternal'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
@@ -47,8 +56,14 @@ export function ImageModal() {
   const isOpen = modal?.kind === 'image'
   const ref = isOpen ? modal.ref : null
 
-  // Make sure the blob is on disk / in memory so we can report format and
-  // dimensions. Cheap when already cached (the pane usually fetched it).
+  // Fetch-on-demand counter. With inline images off the pane never prefetches,
+  // so this modal is what pulls the blob — and it has to re-render when it
+  // lands. A store patch can't do that job here: every selector would see an
+  // unchanged value and nothing would re-render.
+  const [, setRevision] = useState(0)
+
+  // Make sure the blob is in memory so we can report format/dimensions and
+  // hand it to the viewer. Cheap when already cached (auto mode prefetches).
   useEffect(() => {
     if (!ref) return
     ensureImageFetched(
@@ -60,7 +75,7 @@ export function ImageModal() {
         isExternal: ref.isExternal,
         ...(ref.objectId ? { objectId: ref.objectId } : {}),
         ...(ref.region ? { region: ref.region } : {}),
-        onChange: () => store.set((s) => ({ ...s })),
+        onChange: () => setRevision((r) => r + 1),
       },
     )
   }, [ref?.cacheKey])
@@ -77,9 +92,18 @@ export function ImageModal() {
         return
       }
       if (input.toLowerCase() === 'o' && ref) {
+        // Prefer the original URL when there is one — the user gets the real
+        // source. Otherwise show the cached blob in the platform viewer.
         const url = openableUrl(ref)
         if (url) {
           openExternal(url)
+          store.set({ modal: null, inputZone: 'list' })
+          return
+        }
+        const data = getImageData(ref.cacheKey)
+        if (!data) return
+        const path = materializeImage(ref.cacheKey, data)
+        if (path && openImageFile(path)) {
           store.set({ modal: null, inputZone: 'list' })
         }
       }
@@ -92,7 +116,8 @@ export function ImageModal() {
   const data = getImageData(ref.cacheKey)
   const format = data ? detectImageFormat(data) : null
   const dims = data ? readPngDimensions(data) : null
-  const canOpen = openableUrl(ref) !== null
+  // Openable either as its original URL or as the cached blob, once fetched.
+  const canOpen = openableUrl(ref) !== null || data !== null
 
   return (
     <Box
@@ -112,13 +137,14 @@ export function ImageModal() {
         <Text color={theme.mutedText}>
           {ref.isExternal ? 'source: external' : 'source: Teams hosted content'}
         </Text>
-        {format === 'png' && (
-          <Text color={theme.mutedText}>shown inline in the message pane (Kitty terminals)</Text>
-        )}
       </Box>
       <Box marginTop={1}>
         <Text color={theme.mutedText}>
-          {canOpen ? 'o open original in browser · ' : ''}
+          {canOpen
+            ? `o open image${openableUrl(ref) ? ' in browser' : ''} · `
+            : data
+              ? ''
+              : 'loading… · '}
           space/esc close
         </Text>
       </Box>

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, mock } from 'bun:test'
-import { existsSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { isImageAttachment, attachmentGraphPath } from '../types'
@@ -22,7 +23,14 @@ import {
   __resetForTests as resetAuth,
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
-import { fetchAndCacheImage, imageCacheKey as cacheKey, readCachedImage } from './imageCache'
+import {
+  ensureImageFetched,
+  fetchAndCacheImage,
+  getImageCacheDir,
+  getImageData,
+  imageCacheKey as cacheKey,
+  readCachedImage,
+} from './imageCache'
 
 describe('imageCacheKey', () => {
   it('combines messageId and attachmentId with ::', () => {
@@ -330,5 +338,50 @@ describe('fetchAndCacheImage hosted-content routing', () => {
     expect(buf!.byteLength).toBe(3)
     expect(graphCalls).toBe(1)
     expect(objectUrl).toContain('/objects/0-csea-d9-cb8e/views/imgpsh_fullsize')
+  })
+})
+
+describe('ensureImageFetched disk-cache notification', () => {
+  it('a disk hit notifies, so a caller showing "loading…" re-renders', async () => {
+    // The modal fetches on demand and renders a placeholder first; without a
+    // notification on the disk-hit path it would stay on that placeholder
+    // forever even though the blob is already in hand.
+    const key = `disk-hit-${Date.now()}`
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(16),
+    ])
+    // Seed the on-disk cache the way the writer lays it out: sha1(key).bin
+    // alongside sha1(key).meta.json.
+    const dir = getImageCacheDir()
+    mkdirSync(dir, { recursive: true })
+    const hash = createHash('sha1').update(key).digest('hex')
+    writeFileSync(join(dir, `${hash}.bin`), png)
+    writeFileSync(
+      join(dir, `${hash}.meta.json`),
+      JSON.stringify({
+        contentType: 'image/png',
+        name: 'x.png',
+      }),
+    )
+
+    let notified = 0
+    ensureImageFetched(
+      'ignored',
+      key,
+      { contentType: 'image/png', name: 'x.png' },
+      { onChange: () => notified++ },
+    )
+    expect(notified).toBe(1)
+    expect(getImageData(key)).toEqual(png)
+
+    // The 'ready' guard means a repeat call is a no-op — no render loop.
+    ensureImageFetched(
+      'ignored',
+      key,
+      { contentType: 'image/png', name: 'x.png' },
+      { onChange: () => notified++ },
+    )
+    expect(notified).toBe(1)
   })
 })
