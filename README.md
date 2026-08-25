@@ -109,6 +109,8 @@ warnings and fall back to defaults.
   "tailNetwork": false,
   "tailDiagnostics": false,
   "selfMessagesOnRight": false,
+  "chatListSort": "recent",
+  "chatListGroupByType": false,
   "inlineImages": "auto",
   "inlineImageMaxRows": 10,
   "statusBarPosition": "bottom",
@@ -148,10 +150,15 @@ warnings and fall back to defaults.
 | `tailNetwork`                  | boolean              | `false` | Show an always-on network-log tail panel above the composer.                             |
 | `tailDiagnostics`              | boolean              | `false` | Show an always-on diagnostics tail panel above the composer.                             |
 | `selfMessagesOnRight`          | boolean              | `false` | When `true`, your own messages are right-aligned in the message pane (body on the right, sender/timestamp on the left of the body). Other users' messages remain left-aligned. |
-| `inlineImages`                 | `auto`, `off`        |  `auto` | In Kitty-compatible terminals, render message images inline; otherwise show text rows.   |
+| `inlineImages`                 | `auto`, `off`        |  `auto` | `auto` renders message images inline in Kitty-compatible terminals, bounded to `inlineImageMaxRows` tall and the width of the message pane, so an image never overlaps neighbouring messages. `off` — and any terminal without Kitty graphics — renders one focusable `[img] name` row per image instead, reserving no picture rows. Space opens the focused image either way. |
 | `inlineImageMaxRows`           | integer 1-50         |    `10` | Maximum terminal rows reserved for a single inline image.                                |
 | `statusBarPosition`            | `bottom`, `hidden`   | `bottom` | Where the status bar renders. `hidden` suppresses it entirely, freeing one row of vertical space in the message pane. |
 | `chatRoutingByAccount`         | object               |    `{}` | Per-account chat transport mode: `graph+ic3`, `ic3+graph`, `ic3-only`, or `graph-only`. |
+| `chatListSort`                 | `recent`, `alphabetical` | `recent` | Order of chat rows in the sidebar. `recent` follows last-message time; `alphabetical` sorts by the displayed name. |
+| `chatListGroupByType`          | boolean              | `false` | Group sidebar chats under `Direct` / `Groups` / `Meetings` / `Other` headings. Each group shows at most 10 chats, with a `… N more` row to reveal the rest, so one busy type can't push teams and channels off the pane. Headings are collapsible with `h` / `l`. |
+| `headerElements`               | object               | all `true` | Per-segment visibility for the header bar. Keys: `app`, `user`, `presence`, `graph`, `chats`, `unread`, `push`, `updated`. Omitted keys keep their default. |
+| `headerUserFormat`             | `full`, `tenant`     |  `full` | Header identity format: `full` shows `user (tenant)`, `tenant` shows the tenant only. |
+| `statusBarShowKeyHints`        | boolean              |  `true` | Show the keybinding hints line in the status bar. |
 | `chatListCollapsedSections`    | object               |    `{}` | Collapsed sidebar headers, keyed by chat section (`oneOnOne`, `group`, `meeting`, `other`) or `team:<id>`. Maintained by `h`/`l` in the list; a collapsed header hides its rows and shows `▸` plus the hidden count. |
 | `chatListWidth`                | integer or null      |  `null` | Explicit chat-list panel width in columns. `null` = automatic (~28% of terminal, clamped 18–60). Adjusted interactively with Ctrl-X resize mode. |
 | `composerHeight`               | integer or null      |  `null` | Explicit composer height in rows. `null` = automatic (from draft line count, clamped 3–10). Adjusted interactively with Ctrl-X resize mode. |

@@ -29,7 +29,7 @@ teaminal is a lightweight terminal Microsoft Teams client written in TypeScript.
 After every meaningful set of changes (new feature, bug fix that affects users, breaking change, security fix):
 
 1. **Update `CHANGELOG.md`** under the `## [Unreleased]` section. Follow the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format with `Added` / `Changed` / `Fixed` / `Removed` / `Security` subsections. Internal refactors with no user-facing impact don't need an entry.
-2. **Bump the version** in both `package.json` (`"version"`) and `bin/teaminal.tsx` (`const VERSION`) following [Semantic Versioning](https://semver.org/):
+2. **Bump the version** in both `package.json` (`"version"`) and `src/version.ts` (`export const VERSION`) following [Semantic Versioning](https://semver.org/):
    - `MAJOR` for breaking CLI / config / behavior changes
    - `MINOR` for new user-facing features
    - `PATCH` for bug fixes and tightening

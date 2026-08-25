@@ -48,6 +48,14 @@ shaped by that boundary:
   type-only imports are caught at compile time.
 - The single-binary build (`bun build --compile`) bundles the runtime
   module graph at compile time; runtime resolution is constrained.
+- Opening links is restricted to `http(s):` / `mailto:` URLs, so a hostile
+  message body cannot smuggle a local path or a shell argument into the
+  platform opener.
+- An image handed to the platform viewer is written to a per-process
+  directory (mode `0700`) as a mode-`0600` file whose name is a SHA-256 of
+  the internal cache key - no sender-supplied filename ever reaches the
+  filesystem - and the directory is removed on exit. The image-file opener
+  refuses any path outside that directory.
 
 ## What is **not** in scope
 
