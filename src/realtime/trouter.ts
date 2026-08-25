@@ -49,6 +49,75 @@ const TROUTER_REGISTER_URL = 'https://go.trouter.teams.microsoft.com/v4/a'
 const TEAMS_REGISTRAR_URL = 'https://teams.microsoft.com/registrar/prod/V2/registrations'
 const TROUTER_CLIENT_VERSION = '2026.12.01.1'
 
+// Resolve the optional Skype token for a trouter session.
+//
+// Registrar authorizes on the IC3 Bearer token — that is what the Teams web
+// client sends — so the Skype token is a bonus, not a prerequisite. Tenants
+// where authsvc answers get it; tenants where the endpoint is walled off for
+// non-first-party client ids (410 ApiRestricted) connect without it. Never
+// throws: aborting the connect here would take push down for no reason.
+export async function resolveSkypeAuth(
+  mint: () => Promise<string>,
+): Promise<{ skypeToken: string | null; unavailable: boolean }> {
+  try {
+    return { skypeToken: await mint(), unavailable: false }
+  } catch (err) {
+    // Mirror the per-source diagnostic event the local flow used to emit so the
+    // trouter section of the events panel still surfaces the failure even
+    // though the underlying request logs under the 'graph' source. Warn, not
+    // error: push still works without it.
+    recordEvent(
+      'trouter',
+      'warn',
+      `trouter authz unavailable, continuing without a skype token: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    )
+    return { skypeToken: null, unavailable: true }
+  }
+}
+
+// Build the registrar POST that points trouter at this session's endpoint.
+// Authorization is the IC3-audience AAD token; `x-skypetoken` rides along only
+// when the authsvc exchange actually succeeded.
+export function buildRegistrarRequest(opts: {
+  path: string
+  registrationId: string
+  ic3Token: string
+  skypeToken: string | null
+}): { url: string; init: RequestInit } {
+  return {
+    url: TEAMS_REGISTRAR_URL,
+    init: {
+      method: 'POST',
+      headers: {
+        accept: 'application/json, text/javascript',
+        'content-type': 'application/json',
+        origin: 'https://teams.microsoft.com',
+        referer: 'https://teams.microsoft.com/v2/',
+        authorization: `Bearer ${opts.ic3Token}`,
+        ...(opts.skypeToken ? { 'x-skypetoken': opts.skypeToken } : {}),
+        'x-ms-migration': 'True',
+      },
+      body: JSON.stringify({
+        clientDescription: {
+          appId: 'SkypeSpacesWeb',
+          aesKey: '',
+          languageId: 'en-US',
+          platform: 'edgeChromium',
+          templateKey: 'SkypeSpacesWeb_2.6',
+          platformUIVersion: '0.0.0',
+        },
+        registrationId: opts.registrationId,
+        nodeId: '',
+        transports: {
+          TROUTER: [{ context: '', path: opts.path, ttl: 3600 }],
+        },
+      }),
+    },
+  }
+}
+
 // Trouter registration responses have varied per region/version. Look
 // for the WS endpoint under all known keys, including nested ones.
 export function pickWsUrl(data: Record<string, unknown>): string | null {
@@ -228,6 +297,11 @@ export class TrouterTransport implements RealtimeTransport {
 
   private ws: WebSocket | null = null
   private skypeToken: string | null = null
+  // Set once authsvc refuses this client outright (410 ApiRestricted — the
+  // endpoint is walled off for non-first-party client ids). The Skype token is
+  // optional for push, so there is no point re-running a doomed exchange on
+  // every reconnect; latched per session like the Graph 401 fallbacks.
+  private skypeTokenUnavailable = false
   // Registration endpoint URL (POST target) returned by Teams authsvc
   // under regionGtms.trouter. Falls back to the global default when the
   // region payload is absent. Stays valid as long as the skype token
@@ -301,23 +375,21 @@ export class TrouterTransport implements RealtimeTransport {
   // regional trouter URL (also surfaced by authsvc under regionGtms.trouter)
   // is read from teamsRegion's cache, which is populated as a side effect
   // of the same authsvc call.
+  //
+  // Best-effort: registrar authorizes on the IC3 Bearer token (that is what
+  // the Teams web client sends), so a failed exchange must not abort the
+  // connect. Tenants where authsvc still answers get the `x-skypetoken`
+  // header as well; the rest connect without it.
   private async ensureSkypeToken(): Promise<void> {
-    try {
-      this.skypeToken = await getSkypeToken({ profile: this.profile })
-    } catch (err) {
-      // Mirror the per-source diagnostic event the local flow used to
-      // emit so the trouter section of the events panel still surfaces
-      // the failure even though the underlying request now logs under
-      // the 'graph' source.
-      recordEvent(
-        'trouter',
-        'error',
-        `trouter authz delegated failure: ${err instanceof Error ? err.message : String(err)}`,
+    if (!this.skypeTokenUnavailable) {
+      const { skypeToken, unavailable } = await resolveSkypeAuth(() =>
+        getSkypeToken({ profile: this.profile }),
       )
-      throw err
+      this.skypeToken = skypeToken
+      this.skypeTokenUnavailable = unavailable
+      if (skypeToken) debug('trouter: obtained skype token via shared store')
     }
     this.trouterUrl = getCachedTrouterUrl({ profile: this.profile }) ?? TROUTER_REGISTER_URL
-    debug('trouter: obtained skype token via shared store')
   }
 
   // --- WebSocket ---
@@ -471,34 +543,14 @@ export class TrouterTransport implements RealtimeTransport {
     const registrationId = this.registrationId
     if (!registrationId) throw new Error('missing trouter registrationId')
 
-    const body = {
-      clientDescription: {
-        appId: 'SkypeSpacesWeb',
-        aesKey: '',
-        languageId: 'en-US',
-        platform: 'edgeChromium',
-        templateKey: 'SkypeSpacesWeb_2.6',
-        platformUIVersion: '0.0.0',
-      },
+    const ic3Token = await this.getIc3Token()
+    const { url, init } = buildRegistrarRequest({
+      path,
       registrationId,
-      nodeId: '',
-      transports: {
-        TROUTER: [{ context: '', path, ttl: 3600 }],
-      },
-    }
-
-    const res = await fetch(TEAMS_REGISTRAR_URL, {
-      method: 'POST',
-      headers: {
-        accept: 'application/json, text/javascript',
-        'content-type': 'application/json',
-        origin: 'https://teams.microsoft.com',
-        referer: 'https://teams.microsoft.com/v2/',
-        ...(this.skypeToken ? { 'x-skypetoken': this.skypeToken } : {}),
-        'x-ms-migration': 'True',
-      },
-      body: JSON.stringify(body),
+      ic3Token,
+      skypeToken: this.skypeToken,
     })
+    const res = await fetch(url, init)
 
     if (!res.ok) {
       const text = await res.text().catch(() => '')
