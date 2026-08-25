@@ -8,6 +8,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **The terminal is cleared when you quit.** A clean exit now deletes teaminal's
+  Kitty image placements, restores the cursor, and wipes the visible screen, so
+  the shell prompt comes back without a dead copy of the UI above it. Scrollback
+  is left alone, and a fatal or auth-failure exit still leaves its error on
+  screen — as does a non-TTY (piped) run.
+
 - **Collapsible sidebar sections.** `h` / Left on a chat row collapses its type
   section (Direct / Groups / Meetings / Other); on a channel it collapses the
   channel's team. The header shows `▸` plus the hidden row count and becomes the
