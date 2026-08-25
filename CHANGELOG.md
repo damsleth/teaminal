@@ -8,6 +8,18 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Inline images no longer paint over other messages.** Two causes. The image
+  anchor counted a fixed 4 rows of chrome below the message pane, ignoring the
+  tail-panel strip (9 rows) and the real composer height — so with the event /
+  network tails enabled every image painted exactly 9 rows too low, on top of
+  the following messages. And a wide image was placed by columns alone, which
+  lets the terminal derive the height from its own cell metrics and overrun the
+  rows the layout had reserved. Images are now always placed by rows, so the
+  painted height is exactly the reserved height whatever the terminal's cell
+  aspect, with the row count traded down to keep the aspect-preserved width
+  inside the pane. Small images (stickers, inline icons) scale down instead of
+  ballooning to the full display height.
+
 - **Real-time push works again.** Teams' `authsvc` token exchange now answers
   `410 ApiRestricted` for non-first-party client ids, and trouter treated that
   Skype token as a prerequisite — so push never connected and retried in a loop.

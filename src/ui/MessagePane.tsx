@@ -39,6 +39,7 @@ import {
 } from './messageRows'
 import type { Theme } from './theme'
 import { useAppState, useTheme } from './StoreContext'
+import { TAIL_PANEL_ROWS } from './TailPanels'
 import {
   isKittyCapable,
   isKittyRenderable,
@@ -70,6 +71,8 @@ const MIN_VISIBLE_ROWS = 5
 // Fallback for LIST_PANE_WIDTH when no prop is provided. Kept to avoid
 // breaking isolated renders; App.tsx always passes the resolved width.
 const LIST_PANE_WIDTH_DEFAULT = 30
+// Fallback composer height for isolated renders; App passes the resolved one.
+const DEFAULT_COMPOSER_ROWS = 3
 
 export function MessagePane(props: {
   focusedMessageId?: string | null
@@ -77,6 +80,11 @@ export function MessagePane(props: {
   loadOlderState?: LoadMoreState
   /** Resolved chat-list pane width, used for Kitty cursor placement. */
   listPaneWidth?: number
+  /**
+   * Resolved composer box height. Part of the chrome below the pane, so it
+   * feeds the inline-image anchor — a stale guess shifts every image.
+   */
+  composerRows?: number
 }) {
   const focus = useAppState((s) => s.focus)
   const messagesByConvo = useAppState((s) => s.messagesByConvo)
@@ -117,6 +125,16 @@ export function MessagePane(props: {
   const theme = useTheme()
 
   const listPaneWidth = props.listPaneWidth ?? LIST_PANE_WIDTH_DEFAULT
+  const composerRows = props.composerRows ?? DEFAULT_COMPOSER_ROWS
+  // The tail strip sits between this pane and the composer, so its rows count
+  // toward the image anchor. It renders only when a tail is enabled — and is
+  // hidden entirely while a modal is open, which is also when image painting
+  // is suppressed, so enabled == visible for anchoring purposes.
+  const tailRows = useAppState(
+    (s) => s.settings.tailEvents || s.settings.tailNetwork || s.settings.tailDiagnostics,
+  )
+    ? TAIL_PANEL_ROWS
+    : 0
 
   const [, setImageRevision] = useState(0)
   const kittyEnabled = inlineImages === 'auto' && isKittyCapable()
@@ -316,7 +334,9 @@ export function MessagePane(props: {
         }
         belowWithinMessage += fileRows + messageGap
         const rowsFromBottom =
-          rowsAfter[rowIndex]! + belowWithinMessage + bottomChromeRows(statusBarHidden) + 1
+          rowsAfter[rowIndex]! +
+          belowWithinMessage +
+          bottomChromeRows({ statusBarHidden, composerRows, tailRows })
         writeKittyImageAtOffset(stdout, apc, rowsFromBottom, reservedRows, imageColumn)
       }
     }
@@ -850,10 +870,18 @@ function ImageRows(props: {
   )
 }
 
-function bottomChromeRows(statusBarHidden: boolean): number {
-  // Composer (2) + status bar (1) + safety pad (1). Subtracts 1 when
-  // the status bar is hidden so images anchor one row lower.
-  return 4 - (statusBarHidden ? 1 : 0)
+// Rows Ink paints below the last message row. Inline images are placed by
+// moving the cursor UP from the bottom of the frame, so this total is the
+// image anchor: undercount it by k and every image paints k rows too low,
+// straight over the following messages. Measured against a real frame:
+// pane bottom border (1) + tail-panel strip (9 when any tail is enabled) +
+// composer box + status bar.
+export function bottomChromeRows(opts: {
+  statusBarHidden: boolean
+  composerRows: number
+  tailRows: number
+}): number {
+  return 1 + opts.tailRows + opts.composerRows + (opts.statusBarHidden ? 0 : 1)
 }
 
 function messageBodyTerminalColumn(opts: { bodyIndent: number; listPaneWidth: number }) {
