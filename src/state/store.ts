@@ -773,6 +773,9 @@ export type AppState = {
   // Case-insensitive substring filter applied to the chat list. Empty
   // string means no filter.
   filter: string
+  // Grouped chat sections the user expanded past CHAT_SECTION_CAP via the
+  // `… N more` row. Ephemeral: a fresh session starts capped again.
+  expandedChatSections: Record<string, boolean>
   // In-conversation message search (S1). Empty query closes the bar.
   // focusedHitMessageId tracks the message the search bar last jumped
   // to so n can step relative to it across re-renders.
@@ -862,6 +865,7 @@ export function initialAppState(): AppState {
     cursor: 0,
     focusedAttachmentIndex: 0,
     filter: '',
+    expandedChatSections: {},
     messageSearchQuery: '',
     messageSearchFocusedId: null,
     memberPresence: {},

@@ -14,6 +14,8 @@ import { useRef } from 'react'
 import {
   buildSelectableList,
   chatLabel,
+  chatSection,
+  chatSectionLabel,
   clampCursor,
   itemMatchesFilter,
   shortName,
@@ -64,21 +66,6 @@ function visualLines(text: string, contentWidth: number): number {
   return Math.max(1, Math.ceil(text.length / contentWidth))
 }
 
-// Section label for a chat when grouping by type is on. Matches the
-// ordering ranks in selectables.ts (Direct → Groups → Meetings → Other).
-function chatTypeSectionLabel(chatType: string): string {
-  switch (chatType) {
-    case 'oneOnOne':
-      return 'Direct'
-    case 'group':
-      return 'Groups'
-    case 'meeting':
-      return 'Meetings'
-    default:
-      return 'Other'
-  }
-}
-
 function buildRows(
   items: SelectableItem[],
   density: ChatListDensity,
@@ -96,7 +83,7 @@ function buildRows(
       if (groupByType) {
         // Per-type section headers, emitted at each group boundary (the chats
         // are already ordered by type in buildSelectableList).
-        const section = chatTypeSectionLabel(it.chat.chatType)
+        const section = chatSectionLabel(chatSection(it.chat.chatType))
         if (section !== lastChatSection) {
           rows.push({ kind: 'header', label: section })
           lastChatSection = section
@@ -147,6 +134,7 @@ function rowLabel(
   if (item.kind === 'chat')
     return chatLabel(item.chat, myUserId, { compact: shortNames, nameByUserId })
   if (item.kind === 'team') return item.team.displayName
+  if (item.kind === 'more') return `… ${item.hidden} more`
   return `# ${item.label}`
 }
 
@@ -226,6 +214,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const me = useAppState((s) => s.me)
   const conn = useAppState((s) => s.conn)
   const filter = useAppState((s) => s.filter)
+  const expandedChatSections = useAppState((s) => s.expandedChatSections)
   const inputZone = useAppState((s) => s.inputZone)
   const density = useAppState((s) => s.settings.chatListDensity)
   const chatListSort = useAppState((s) => s.settings.chatListSort)
@@ -262,6 +251,8 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     channelsByTeam,
     nameByUserId,
     settings: { chatListSort, chatListGroupByType },
+    filter,
+    expandedChatSections,
   })
   const items = filter ? all.filter((i) => itemMatchesFilter(i, filter)) : all
   const syntheticNewChatQuery =

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { Chat, Team, Channel } from '../types'
 import {
   buildSelectableList,
+  CHAT_SECTION_CAP,
   chatLabel,
   clampCursor,
   firstSelectableIndex,
@@ -107,6 +108,59 @@ describe('buildSelectableList', () => {
     }
     const labels = buildSelectableList(state).map((i) => (i.kind === 'chat' ? i.label : null))
     expect(labels).toEqual(['Ann', 'Bo', 'Alpha', 'Zeta'])
+  })
+
+  test('caps each grouped chat section and appends a `more` row', () => {
+    const many = (prefix: string, chatType: Chat['chatType'], n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        chat(`${prefix}${i}`, { topic: `${prefix}${i}`, chatType }),
+      )
+    const state = {
+      ...initialAppState(),
+      chats: [...many('d', 'oneOnOne', 12), ...many('g', 'group', 11), ...many('m', 'meeting', 3)],
+      settings: { chatListSort: 'recent' as const, chatListGroupByType: true },
+    }
+    const list = buildSelectableList(state)
+    // Each cap is independent, and the under-cap section keeps every row.
+    expect(list.filter((i) => i.kind === 'chat')).toHaveLength(CHAT_SECTION_CAP * 2 + 3)
+    expect(list.filter((i) => i.kind === 'more')).toEqual([
+      { kind: 'more', section: 'oneOnOne', hidden: 2 },
+      { kind: 'more', section: 'group', hidden: 1 },
+    ])
+    // The `more` row sits at the end of its own section, not after all chats.
+    expect(list[CHAT_SECTION_CAP]).toEqual({ kind: 'more', section: 'oneOnOne', hidden: 2 })
+  })
+
+  test('an expanded section shows every row and drops its `more` row', () => {
+    const state = {
+      ...initialAppState(),
+      chats: Array.from({ length: 12 }, (_, i) => chat(`d${i}`, { topic: `d${i}` })),
+      settings: { chatListSort: 'recent' as const, chatListGroupByType: true },
+      expandedChatSections: { oneOnOne: true },
+    }
+    const list = buildSelectableList(state)
+    expect(list).toHaveLength(12)
+    expect(list.some((i) => i.kind === 'more')).toBe(false)
+  })
+
+  test('an active filter lifts the cap so hidden chats stay reachable', () => {
+    const state = {
+      ...initialAppState(),
+      chats: Array.from({ length: 12 }, (_, i) => chat(`d${i}`, { topic: `d${i}` })),
+      settings: { chatListSort: 'recent' as const, chatListGroupByType: true },
+      filter: 'd11',
+    }
+    const list = buildSelectableList(state)
+    expect(list.filter((i) => itemMatchesFilter(i, 'd11'))).toHaveLength(1)
+  })
+
+  test('ungrouped lists are never capped', () => {
+    const state = {
+      ...initialAppState(),
+      chats: Array.from({ length: 12 }, (_, i) => chat(`d${i}`, { topic: `d${i}` })),
+      settings: { chatListSort: 'recent' as const, chatListGroupByType: false },
+    }
+    expect(buildSelectableList(state)).toHaveLength(12)
   })
 })
 

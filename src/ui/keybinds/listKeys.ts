@@ -40,6 +40,7 @@ export type ListKeysCtx = {
   nameByUserId?: Record<string, string>
   settings: Pick<Settings, 'chatListSort' | 'chatListGroupByType'>
   filter: string
+  expandedChatSections: Record<string, boolean>
   cursor: number
   focus: Focus
   exit: () => void
@@ -190,6 +191,15 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       }
       const it = visible[safe]
       if (!it) return 'handled'
+      if (it.kind === 'more') {
+        // Expanding replaces the `… N more` row with the first hidden chat,
+        // so the cursor stays where it is and lands on real content.
+        const section = it.section
+        store.set((s) => ({
+          expandedChatSections: { ...s.expandedChatSections, [section]: true },
+        }))
+        return 'handled'
+      }
       if (it.kind === 'chat') {
         store.set({ focus: { kind: 'chat', chatId: it.chat.id } })
       } else if (it.kind === 'channel') {
@@ -207,28 +217,6 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
   }
 
   return 'pass'
-}
-
-/**
- * For convenience, expose a "selectable count" calculator the App can
- * use when it needs to short-circuit before invoking the dispatcher.
- * Pure, no side effects.
- */
-export function listSelectableCount(
-  ctx: Omit<ListKeysCtx, 'exit' | 'refresh' | 'hardRefresh' | 'openNewChatPrompt'>,
-): {
-  visible: ReturnType<typeof buildSelectableList>
-  selectableCount: number
-  syntheticNewChatQuery: string | null
-} {
-  const items = buildSelectableList(ctx)
-  const visible = ctx.filter ? items.filter((it) => itemMatchesFilter(it, ctx.filter)) : items
-  const syntheticNewChatQuery =
-    ctx.filter && visible.length === 0 && isNewChatQueryCandidate(ctx.filter)
-      ? ctx.filter.trim()
-      : null
-  const selectableCount = visible.length + (syntheticNewChatQuery ? 1 : 0)
-  return { visible, selectableCount, syntheticNewChatQuery }
 }
 
 // Re-export so consumers can derive focusKey without re-importing the store.
