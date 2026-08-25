@@ -216,7 +216,12 @@ export function MessagePane(props: {
   // reserved blank rows, and the Kitty placement all agree.
   const imageRowsForMessage = (message: ChatMessage): number =>
     extractInlineImages(message).reduce((sum, ref) => {
-      const reserved = inlineImageReservedRows(ref.cacheKey, imgCols, inlineImageMaxRows)
+      const reserved = inlineImageReservedRows(
+        ref.cacheKey,
+        imgCols,
+        inlineImageMaxRows,
+        kittyEnabled,
+      )
       return sum + (reserved === null ? 1 : reserved)
     }, 0)
   const allRows = buildMessageRows(messages, {
@@ -313,7 +318,7 @@ export function MessagePane(props: {
       const refs = extractInlineImages(row.message)
       // Per-image fitted rows (null = not yet loaded → renders a label row).
       const reserved = refs.map((ref) =>
-        inlineImageReservedRows(ref.cacheKey, imgCols, inlineImageMaxRows),
+        inlineImageReservedRows(ref.cacheKey, imgCols, inlineImageMaxRows, kittyEnabled),
       )
       const fileRows = extractFileAttachments(row.message).length
       for (let imageIndex = 0; imageIndex < refs.length; imageIndex++) {
@@ -456,6 +461,7 @@ export function MessagePane(props: {
                 readReceipts={readReceiptsByConvo[conv]}
                 imgCols={imgCols}
                 inlineImageMaxRows={inlineImageMaxRows}
+                inlineImagesPainted={kittyEnabled}
                 selfMessagesOnRight={selfMessagesOnRight}
                 bodyIndent={bodyIndent}
                 messageGap={messageGap}
@@ -488,6 +494,7 @@ function TimelineRow(props: {
   readReceipts?: Record<string, ReadReceipt>
   imgCols: number
   inlineImageMaxRows: number
+  inlineImagesPainted: boolean
   selfMessagesOnRight: boolean
   bodyIndent: number
   messageGap: number
@@ -530,6 +537,7 @@ function TimelineRow(props: {
       readReceipts={props.readReceipts}
       imgCols={props.imgCols}
       inlineImageMaxRows={props.inlineImageMaxRows}
+      inlineImagesPainted={props.inlineImagesPainted}
       selfMessagesOnRight={props.selfMessagesOnRight}
       bodyIndent={props.bodyIndent}
       messageGap={props.messageGap}
@@ -552,6 +560,7 @@ function MessageRow(props: {
   readReceipts?: Record<string, ReadReceipt>
   imgCols: number
   inlineImageMaxRows: number
+  inlineImagesPainted: boolean
   selfMessagesOnRight: boolean
   bodyIndent: number
   messageGap: number
@@ -743,6 +752,7 @@ function MessageRow(props: {
             cacheKey={ref.cacheKey}
             imgCols={props.imgCols}
             maxRows={props.inlineImageMaxRows}
+            painted={props.inlineImagesPainted}
             label={ref.name}
             focused={focusedImageKey === ref.cacheKey}
             bodyIndent={indent}
@@ -805,6 +815,8 @@ function ImageRows(props: {
   cacheKey: string
   imgCols: number
   maxRows: number
+  /** Whether the Kitty layer actually paints pictures in this mode/terminal. */
+  painted: boolean
   label: string
   focused?: boolean
   bodyIndent: number
@@ -831,7 +843,12 @@ function ImageRows(props: {
       </Text>
     </Box>
   )
-  const reservedRows = inlineImageReservedRows(props.cacheKey, props.imgCols, props.maxRows)
+  const reservedRows = inlineImageReservedRows(
+    props.cacheKey,
+    props.imgCols,
+    props.maxRows,
+    props.painted,
+  )
   if (reservedRows === null) {
     // Label placeholder ([img] name) for a still-loading or non-paintable
     // image. When focused, the whole label is highlighted to match the bar —
@@ -899,7 +916,15 @@ function inlineImageReservedRows(
   cacheKey: string,
   imgCols: number,
   maxRows: number,
+  painted: boolean,
 ): number | null {
+  // Nothing is painted when inline images are off, or in a terminal without
+  // the Kitty graphics protocol. Reserving blank rows then leaves a phantom
+  // gap where no picture ever arrives — the row renders its `[img]` link
+  // label instead, and Space opens it in the image modal. One gate for the
+  // height math, the reserved rows, and the paint effect so they can't
+  // disagree.
+  if (!painted) return null
   const data = getImageData(cacheKey)
   if (!data) return null
   // Only PNG can actually be painted by the Kitty layer. Returning null for
