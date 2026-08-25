@@ -14,8 +14,6 @@ import { useRef } from 'react'
 import {
   buildSelectableList,
   chatLabel,
-  chatSection,
-  chatSectionLabel,
   clampCursor,
   itemMatchesFilter,
   shortName,
@@ -37,6 +35,11 @@ const LIST_PANE_WIDTH_DEFAULT = 30
 // Vim-style scrolloff: rows of context kept visible beyond the cursor
 // while scrolling, so held-down j/k doesn't ride the pane edge.
 const SCROLLOFF = 2
+
+// Collapsed / expanded state marker on a section or team header. A collapsed
+// header also shows its hidden row count so the section isn't invisible.
+const COLLAPSED_GLYPH = '▸'
+const EXPANDED_GLYPH = '▾'
 
 type Row =
   | { kind: 'header'; label: string }
@@ -74,21 +77,14 @@ function buildRows(
 ): Row[] {
   const rows: Row[] = []
   let firstChatEmitted = false
-  let lastChatSection: string | null = null
   let firstTeamEmitted = false
   let lastTeamId: string | null = null
   for (let i = 0; i < items.length; i++) {
     const it = items[i]!
     if (it.kind === 'chat') {
-      if (groupByType) {
-        // Per-type section headers, emitted at each group boundary (the chats
-        // are already ordered by type in buildSelectableList).
-        const section = chatSectionLabel(chatSection(it.chat.chatType))
-        if (section !== lastChatSection) {
-          rows.push({ kind: 'header', label: section })
-          lastChatSection = section
-        }
-      } else if (!firstChatEmitted && density === 'cozy') {
+      // Grouped lists carry their own selectable per-type headers from
+      // buildSelectableList; only the ungrouped list needs a synthetic one.
+      if (!groupByType && !firstChatEmitted && density === 'cozy') {
         rows.push({ kind: 'header', label: 'Chats' })
       }
       firstChatEmitted = true
@@ -133,7 +129,14 @@ function rowLabel(
   // full form regardless.
   if (item.kind === 'chat')
     return chatLabel(item.chat, myUserId, { compact: shortNames, nameByUserId })
-  if (item.kind === 'team') return item.team.displayName
+  if (item.kind === 'section')
+    return item.collapsed
+      ? `${COLLAPSED_GLYPH} ${item.label} (${item.count})`
+      : `${EXPANDED_GLYPH} ${item.label}`
+  if (item.kind === 'team')
+    return item.collapsed
+      ? `${COLLAPSED_GLYPH} ${item.team.displayName}`
+      : `${EXPANDED_GLYPH} ${item.team.displayName}`
   if (item.kind === 'more') return `… ${item.hidden} more`
   return `# ${item.label}`
 }
@@ -219,6 +222,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const density = useAppState((s) => s.settings.chatListDensity)
   const chatListSort = useAppState((s) => s.settings.chatListSort)
   const chatListGroupByType = useAppState((s) => s.settings.chatListGroupByType)
+  const chatListCollapsedSections = useAppState((s) => s.settings.chatListCollapsedSections)
   const shortNames = useAppState((s) => s.settings.chatListShortNames)
   const showMessagePreviews = useAppState((s) => s.settings.showMessagePreviews)
   const showPresence = useAppState((s) => s.settings.showPresenceInList)
@@ -250,7 +254,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     teams,
     channelsByTeam,
     nameByUserId,
-    settings: { chatListSort, chatListGroupByType },
+    settings: { chatListSort, chatListGroupByType, chatListCollapsedSections },
     filter,
     expandedChatSections,
   })
@@ -377,18 +381,21 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
           )
         }
 
-        // Teams render as non-selectable bold headers (no presence dot,
-        // no selector gutter, no `#` prefix, no unread badge). Navigation
-        // skips them via nextSelectableIndex in listKeys.ts.
-        if (row.item.kind === 'team') {
+        // Section / team headers render as bold rows with no presence dot,
+        // selector gutter, `#` prefix, or unread badge. Navigation skips them
+        // while expanded; a collapsed one is a cursor stop (see isSelectable)
+        // and takes the selected color so it's clear what l/Enter reopens.
+        if (row.item.kind === 'team' || row.item.kind === 'section') {
+          const isSelected = row.index === safeCursor
+          const restColor = row.item.kind === 'team' ? theme.mutedText : undefined
           return (
-            <Box key={`team-${row.index}`} flexDirection="row" flexShrink={0}>
+            <Box key={`hdr-${row.index}`} flexDirection="row" flexShrink={0}>
               <Text
                 bold={theme.emphasis.sectionHeadingBold}
-                color={theme.mutedText}
+                color={isSelected ? theme.selected : restColor}
                 wrap="truncate-end"
               >
-                {row.item.team.displayName}
+                {rowLabel(row.item)}
               </Text>
             </Box>
           )

@@ -13,7 +13,9 @@ import type { Channel, Chat, Team } from '../types'
 
 export type SelectableItem =
   | { kind: 'chat'; chat: Chat; label: string }
-  | { kind: 'team'; team: Team }
+  // Chat-type header. Selectable only while collapsed — see isSelectable.
+  | { kind: 'section'; section: ChatSection; label: string; collapsed: boolean; count: number }
+  | { kind: 'team'; team: Team; collapsed: boolean }
   | { kind: 'channel'; team: Team; channel: Channel; label: string }
   // Overflow row shown when a grouped chat section exceeds CHAT_SECTION_CAP.
   // Selectable: Enter/l expands the section it belongs to.
@@ -25,12 +27,51 @@ export type SelectableInput = Pick<AppState, 'chats' | 'teams' | 'channelsByTeam
   nameByUserId?: Record<string, string>
   // Ordering knobs. Optional so existing callers/tests get the default
   // 'recent', ungrouped order (identical to the previous behavior).
-  settings?: Pick<Settings, 'chatListSort' | 'chatListGroupByType'>
+  // Partial so callers and tests can supply just the knobs they care about;
+  // every field falls back to its default below.
+  settings?: Partial<
+    Pick<Settings, 'chatListSort' | 'chatListGroupByType' | 'chatListCollapsedSections'>
+  >
   // A non-empty filter must be able to reach chats hidden behind a section
   // cap, so capping is skipped while filtering.
   filter?: string
   // Sections the user expanded past the cap via the `… N more` row.
   expandedChatSections?: Record<string, boolean>
+}
+
+// Collapsed-state key for a team. Chat sections key on their ChatSection name,
+// so teams are prefixed to keep one flat map collision-free.
+export function teamCollapseKey(teamId: string): string {
+  return `team:${teamId}`
+}
+
+// The collapsed-state key a header row toggles, or null for a non-header.
+export function collapseKeyFor(item: SelectableItem): string | null {
+  if (item.kind === 'section') return item.section
+  if (item.kind === 'team') return teamCollapseKey(item.team.id)
+  return null
+}
+
+// Header rows are cursor stops only while collapsed. An expanded header's
+// children are reachable on their own, so j/k glides past it the way team
+// headers always have; a collapsed header must be focusable or its section
+// could never be restored from the keyboard.
+export function isSelectable(item: SelectableItem): boolean {
+  if (item.kind === 'section' || item.kind === 'team') return item.collapsed
+  return true
+}
+
+// Index of the collapsible header the row at `from` belongs to, or null when
+// it has none (an ungrouped chat) or is itself a header — a focused collapsed
+// header has nothing further to collapse into.
+export function parentHeaderIndex(items: SelectableItem[], from: number): number | null {
+  const it = items[from]
+  if (!it || it.kind === 'section' || it.kind === 'team') return null
+  for (let i = from - 1; i >= 0; i--) {
+    const kind = items[i]!.kind
+    if (kind === 'section' || kind === 'team') return i
+  }
+  return null
 }
 
 // Section identity when grouping by chat type. Anything unrecognised lands
@@ -69,6 +110,10 @@ export function chatTypeRank(chatType: string): number {
 export function buildSelectableList(state: SelectableInput): SelectableItem[] {
   const sort = state.settings?.chatListSort ?? 'recent'
   const groupByType = state.settings?.chatListGroupByType ?? false
+  // A filter has to reach rows hidden behind a section cap or a collapsed
+  // header, so both are lifted (and headers dropped) while filtering.
+  const filtering = !!state.filter
+  const collapsed = filtering ? {} : (state.settings?.chatListCollapsedSections ?? {})
 
   let chatItems: ChatItem[] = state.chats.map((chat) => ({
     kind: 'chat',
@@ -78,11 +123,13 @@ export function buildSelectableList(state: SelectableInput): SelectableItem[] {
   chatItems = orderChats(chatItems, sort, groupByType)
 
   const items: SelectableItem[] =
-    groupByType && !state.filter
-      ? capChatSections(chatItems, state.expandedChatSections ?? {})
+    groupByType && !filtering
+      ? sectionedChats(chatItems, collapsed, state.expandedChatSections ?? {})
       : [...chatItems]
   for (const team of state.teams) {
-    items.push({ kind: 'team', team })
+    const teamCollapsed = !!collapsed[teamCollapseKey(team.id)]
+    items.push({ kind: 'team', team, collapsed: teamCollapsed })
+    if (teamCollapsed) continue
     const channels = state.channelsByTeam[team.id] ?? []
     for (const channel of channels) {
       if (channel.isArchived) continue
@@ -113,10 +160,14 @@ function orderChats(
   return out
 }
 
-// Trim each chat-type section to CHAT_SECTION_CAP rows, appending a selectable
-// `… N more` row that expands that section. Relies on orderChats having made
-// each section contiguous.
-function capChatSections(items: ChatItem[], expanded: Record<string, boolean>): SelectableItem[] {
+// One header per chat type, followed by that section's rows: omitted entirely
+// while collapsed, trimmed to CHAT_SECTION_CAP with a `… N more` row otherwise.
+// Relies on orderChats having made each section contiguous.
+function sectionedChats(
+  items: ChatItem[],
+  collapsed: Record<string, boolean>,
+  expanded: Record<string, boolean>,
+): SelectableItem[] {
   const out: SelectableItem[] = []
   let i = 0
   while (i < items.length) {
@@ -124,6 +175,18 @@ function capChatSections(items: ChatItem[], expanded: Record<string, boolean>): 
     let end = i
     while (end < items.length && chatSection(items[end]!.chat.chatType) === section) end++
     const run = items.slice(i, end)
+    const isCollapsed = !!collapsed[section]
+    out.push({
+      kind: 'section',
+      section,
+      label: chatSectionLabel(section),
+      collapsed: isCollapsed,
+      count: run.length,
+    })
+    if (isCollapsed) {
+      i = end
+      continue
+    }
     if (expanded[section] || run.length <= CHAT_SECTION_CAP) {
       out.push(...run)
     } else {
@@ -182,24 +245,24 @@ export function clampCursor(cursor: number, listLength: number): number {
   return cursor
 }
 
-// Teams render as non-selectable section headers; the cursor jumps over
+// Expanded headers render as non-selectable rows; the cursor jumps over
 // them. Walks `items` from `from + dir` in steps of `dir` looking for
-// the next item that is not a team. Returns the original index when no
-// movable target exists in that direction so the cursor stays put.
+// the next selectable item. Returns the original index when no movable
+// target exists in that direction so the cursor stays put.
 export function nextSelectableIndex(items: SelectableItem[], from: number, dir: 1 | -1): number {
   let i = from + dir
   while (i >= 0 && i < items.length) {
-    if (items[i]!.kind !== 'team') return i
+    if (isSelectable(items[i]!)) return i
     i += dir
   }
   return from
 }
 
-// First non-team index, scanning forward from 0. Returns 0 when no item
-// (or only team items) exists - clampCursor handles the empty case.
+// First selectable index, scanning forward from 0. Returns 0 when no
+// selectable item exists - clampCursor handles the empty case.
 export function firstSelectableIndex(items: SelectableItem[]): number {
   for (let i = 0; i < items.length; i++) {
-    if (items[i]!.kind !== 'team') return i
+    if (isSelectable(items[i]!)) return i
   }
   return 0
 }
@@ -239,8 +302,8 @@ export function itemMatchesFilter(item: SelectableItem, filter: string): boolean
   const needle = filter.toLowerCase()
   if (item.kind === 'chat') return item.label.toLowerCase().includes(needle)
   if (item.kind === 'team') return item.team.displayName.toLowerCase().includes(needle)
-  // Section caps are lifted while filtering, so a `… N more` row never
-  // coexists with a filter — and it has no label to match anyway.
-  if (item.kind === 'more') return false
+  // Caps and headers are both dropped while filtering, so neither a
+  // `… N more` row nor a section header ever coexists with a filter.
+  if (item.kind === 'more' || item.kind === 'section') return false
   return item.channel.displayName.toLowerCase().includes(needle)
 }
