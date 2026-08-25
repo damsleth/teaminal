@@ -243,7 +243,12 @@ describe('handleChatKeys', () => {
     ctx.focusedMessageId = 'r1'
     ctx.focusedMessage = root
     expect(handleChatKeys({ input: 't', key: makeKey() }, ctx)).toBe('handled')
-    expect(store.get().focus).toEqual({ kind: 'thread', teamId: 't1', channelId: 'ch1', rootId: 'r1' })
+    expect(store.get().focus).toEqual({
+      kind: 'thread',
+      teamId: 't1',
+      channelId: 'ch1',
+      rootId: 'r1',
+    })
     expect(store.get().messagesByConvo['thread:t1:ch1:r1']?.map((m) => m.id)).toEqual(['r1', 'a1'])
   })
 

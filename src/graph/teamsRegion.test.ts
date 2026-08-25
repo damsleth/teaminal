@@ -89,12 +89,12 @@ describe('pickRegionFromGtms', () => {
 
 describe('partitionFromMiddleTier', () => {
   test('extracts the partition path segment from a middleTier URL', () => {
-    expect(
-      partitionFromMiddleTier('https://teams.microsoft.com/api/mt/part/emea-02'),
-    ).toBe('emea-02')
-    expect(
-      partitionFromMiddleTier('https://teams.microsoft.com/api/mt/part/amer-05/'),
-    ).toBe('amer-05')
+    expect(partitionFromMiddleTier('https://teams.microsoft.com/api/mt/part/emea-02')).toBe(
+      'emea-02',
+    )
+    expect(partitionFromMiddleTier('https://teams.microsoft.com/api/mt/part/amer-05/')).toBe(
+      'amer-05',
+    )
   })
 
   test('returns null for non-matching input', () => {

@@ -101,7 +101,9 @@ describe('indexNameFromDirectoryUser', () => {
 
   test('returns the same reference when the name is already indexed', () => {
     const base = { 'u-a': 'Anna Aas' }
-    expect(indexNameFromDirectoryUser(base, user({ id: 'u-a', displayName: 'Anna Aas' }))).toBe(base)
+    expect(indexNameFromDirectoryUser(base, user({ id: 'u-a', displayName: 'Anna Aas' }))).toBe(
+      base,
+    )
   })
 
   test('does not overwrite with a worse name (email skipped, keeps existing)', () => {

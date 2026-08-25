@@ -18,13 +18,7 @@ function msg(id: string, replyToId?: string): ChatMessage {
 
 // Stream order = chronological, as the chatsvc reader emits it: a root
 // followed by its replies, interleaved across threads.
-const stream: ChatMessage[] = [
-  msg('r1'),
-  msg('a', 'r1'),
-  msg('b', 'r1'),
-  msg('r2'),
-  msg('c', 'r2'),
-]
+const stream: ChatMessage[] = [msg('r1'), msg('a', 'r1'), msg('b', 'r1'), msg('r2'), msg('c', 'r2')]
 
 describe('isChannelRoot / channelRoots', () => {
   test('a message with no replyToId is a root', () => {

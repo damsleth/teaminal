@@ -39,14 +39,30 @@ export const ANSI_COLORS: Record<number, string> = {
 
 // The 16 base colors of the 256-color palette, aligned with ANSI_COLORS above.
 const ANSI_256_BASE = [
-  '#111111', '#cc3333', '#3a944a', '#b58b00', '#3971ed', '#a36ac7', '#2f8f9d', '#d6d6d6',
-  '#777777', '#ff6666', '#66c56f', '#e0b84b', '#6b9cff', '#c792ea', '#55c1d1', '#ffffff',
+  '#111111',
+  '#cc3333',
+  '#3a944a',
+  '#b58b00',
+  '#3971ed',
+  '#a36ac7',
+  '#2f8f9d',
+  '#d6d6d6',
+  '#777777',
+  '#ff6666',
+  '#66c56f',
+  '#e0b84b',
+  '#6b9cff',
+  '#c792ea',
+  '#55c1d1',
+  '#ffffff',
 ]
 
 /** Format r/g/b channel values (0-255) as a CSS hex string. */
 export function rgbHexDecode(r: number, g: number, b: number): string {
   const channel = (value: number) =>
-    Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, '0')
+    Math.max(0, Math.min(255, Math.round(value)))
+      .toString(16)
+      .padStart(2, '0')
   return `#${channel(r)}${channel(g)}${channel(b)}`
 }
 
@@ -57,7 +73,11 @@ export function color256Decode(index: number): string | null {
   if (index < 232) {
     const offset = index - 16
     const level = (value: number) => (value === 0 ? 0 : 55 + value * 40)
-    return rgbHexDecode(level(Math.floor(offset / 36)), level(Math.floor((offset % 36) / 6)), level(offset % 6))
+    return rgbHexDecode(
+      level(Math.floor(offset / 36)),
+      level(Math.floor((offset % 36) / 6)),
+      level(offset % 6),
+    )
   }
   const gray = 8 + (index - 232) * 10
   return rgbHexDecode(gray, gray, gray)
