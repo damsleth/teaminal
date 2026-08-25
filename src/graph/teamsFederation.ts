@@ -16,6 +16,7 @@ import { getActiveProfile } from './client'
 import {
   __resetForTests as resetRegionCacheForTests,
   ingestAuthzData,
+  resolveMiddleTierBase,
   resolveRegion,
 } from './teamsRegion'
 
@@ -387,8 +388,8 @@ export async function fetchFederatedUsers(
   opts?: TeamsFederationOpts,
 ): Promise<unknown[]> {
   if (userOids.length === 0) return []
-  const r = await region(opts)
-  const url = `${TEAMS_ORIGIN}/api/mt/part/${r}/beta/users/fetchFederated?edEnabled=false&includeDisabledAccounts=true`
+  const base = await resolveMiddleTierBase({ profile: opts?.profile, signal: opts?.signal })
+  const url = `${base}/beta/users/fetchFederated?edEnabled=false&includeDisabledAccounts=true`
   const mris = userOids.map(userMriFromOid)
   const res = await requestTeams<unknown[]>('POST', url, mris, opts)
   if (res.status === 404) {

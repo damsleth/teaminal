@@ -17,6 +17,7 @@ import {
   partitionFromMiddleTier,
   pickRegionFromGtms,
   regionFromHost,
+  resolveMiddleTierBase,
   resolveRegion,
 } from './teamsRegion'
 
@@ -143,6 +144,37 @@ describe('ingestAuthzData', () => {
   })
 })
 
+describe('ingestAuthzData with a real authsvc payload', () => {
+  // Shape captured from a HAR of the Teams client embedded in OWA for a
+  // Norway-partitioned tenant: the region is two letters (which the
+  // regionGtms host regex cannot express) and middleTier carries no
+  // `part` segment at all.
+  const norwayAuthz = {
+    region: 'no',
+    partition: 'no01',
+    regionGtms: {
+      chatService: 'https://no.ng.msg.teams.microsoft.com',
+      middleTier: 'https://teams.microsoft.com/api/mt/emea',
+    },
+  }
+
+  test('takes the stated region and the middleTier base verbatim', async () => {
+    ingestAuthzData('norway', norwayAuthz)
+    expect(getCachedRegion({ profile: 'norway' })).toBe('no')
+    expect(getCachedEndpoints({ profile: 'norway' })?.partition).toBe('no01')
+    await expect(resolveMiddleTierBase({ profile: 'norway' })).resolves.toBe(
+      'https://teams.microsoft.com/api/mt/emea',
+    )
+  })
+
+  test('falls back to the part/{region} shape when authsvc never answered', async () => {
+    __setRegionForTests('nogtms', 'emea')
+    await expect(resolveMiddleTierBase({ profile: 'nogtms' })).resolves.toBe(
+      'https://teams.microsoft.com/api/mt/part/emea',
+    )
+  })
+})
+
 describe('resolveRegion', () => {
   test('returns the cached region without firing authsvc', async () => {
     __setRegionForTests('demo', 'apac')
@@ -174,5 +206,22 @@ describe('resolveRegion', () => {
   test('falls back to FALLBACK_REGION when authsvc fails', async () => {
     setFederationTransport(async () => jsonResponse({ error: 'nope' }, { status: 500 }))
     await expect(resolveRegion({ profile: 'broken' })).resolves.toBe(FALLBACK_REGION)
+  })
+
+  test('a 500 stays retryable but a 410 pins the fallback', async () => {
+    let calls = 0
+    let status = 500
+    setFederationTransport(async () => {
+      calls += 1
+      return jsonResponse({ errorCode: 'ApiRestricted' }, { status })
+    })
+    await expect(resolveRegion({ profile: 'gone' })).resolves.toBe(FALLBACK_REGION)
+    await expect(resolveRegion({ profile: 'gone' })).resolves.toBe(FALLBACK_REGION)
+    expect(calls).toBe(2)
+    status = 410
+    await expect(resolveRegion({ profile: 'gone' })).resolves.toBe(FALLBACK_REGION)
+    expect(calls).toBe(3)
+    await expect(resolveRegion({ profile: 'gone' })).resolves.toBe(FALLBACK_REGION)
+    expect(calls).toBe(3)
   })
 })
