@@ -6,6 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-08-25
+
+### Fixed
+
+- **Channel images now load instead of falling back to a text placeholder.**
+  Hosted content in team channels (`thread.v2`) is 403'd by Graph even for
+  members; the asyncgw object store serves it because membership lives in the
+  object ACL. The image fetcher now falls back to asyncgw on 403 the same way
+  it already did on 404, regardless of the audience-fallback setting.
+
+### Changed
+
+- **No-op polls no longer re-render the whole app.** Background refreshes that
+  bring back identical data now patch the store in place instead of replacing
+  chat/message pages, so an idle session stays quiet and scrolling is
+  noticeably smoother.
+
 ## [0.21.0] - 2026-06-03
 
 ### Added
@@ -107,7 +124,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - **Multiple reactions per user per message.** Picking a new emoji now
-  *adds* a reaction instead of replacing the existing one, matching Teams'
+  _adds_ a reaction instead of replacing the existing one, matching Teams'
   behaviour where a user can react several times to the same message.
 - **System emoji picker anchors to the end of the focused message body**
   (where reactions hang off the message) instead of the far-left of the
@@ -1058,7 +1075,8 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.21.1...HEAD
+[0.21.1]: https://github.com/damsleth/teaminal/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/damsleth/teaminal/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/damsleth/teaminal/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/damsleth/teaminal/compare/v0.18.1...v0.19.0
