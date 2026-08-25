@@ -19,10 +19,11 @@ import {
   clampCursor,
   collapseKeyFor,
   firstSelectableIndex,
+  headerIndexForKey,
   isSelectable,
   itemMatchesFilter,
   nextSelectableIndex,
-  parentHeaderIndex,
+  parentCollapseKey,
 } from '../../state/selectables'
 import { updateSettings } from '../../config/index'
 import { isNewChatQueryCandidate } from '../ChatList'
@@ -202,16 +203,22 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       return 'handled'
     }
     if (ch === 'h' || key.leftArrow) {
-      // Collapse the focused row's parent header (chat type, or team for a
-      // channel) and put the cursor on that header — collapsed headers are
-      // selectable, so the section can be reopened with l/Enter. A focused
-      // header, or a row with no header (ungrouped chat), stays put: the list
-      // is the leftmost pane, so h must not fall through to the filter buffer.
-      const parent = parentHeaderIndex(visible, safe)
-      const collapseKey = parent === null ? null : collapseKeyFor(visible[parent]!)
-      if (parent !== null && collapseKey) {
+      // Collapse the section the focused row belongs to (its chat type, or its
+      // team for a channel) and put the cursor on that header — collapsed
+      // headers are selectable, so the section can be reopened with l/Enter.
+      // A focused header, or a row with no section (ungrouped chat), stays
+      // put: the list is the leftmost pane, so h must not fall through to the
+      // filter buffer.
+      const focused = visible[safe]
+      const collapseKey = focused
+        ? parentCollapseKey(focused, ctx.settings.chatListGroupByType)
+        : null
+      if (collapseKey) {
         setSectionCollapsed(store, collapseKey, true)
-        store.set({ cursor: parent })
+        // The header may be filtered out of the current view; then there is
+        // nothing to move the cursor onto.
+        const header = headerIndexForKey(visible, collapseKey)
+        if (header !== null) store.set({ cursor: header })
       }
       return 'handled'
     }

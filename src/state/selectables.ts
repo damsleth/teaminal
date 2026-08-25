@@ -61,15 +61,27 @@ export function isSelectable(item: SelectableItem): boolean {
   return true
 }
 
-// Index of the collapsible header the row at `from` belongs to, or null when
-// it has none (an ungrouped chat) or is itself a header — a focused collapsed
-// header has nothing further to collapse into.
-export function parentHeaderIndex(items: SelectableItem[], from: number): number | null {
-  const it = items[from]
-  if (!it || it.kind === 'section' || it.kind === 'team') return null
-  for (let i = from - 1; i >= 0; i--) {
-    const kind = items[i]!.kind
-    if (kind === 'section' || kind === 'team') return i
+// The collapsed-state key of the section a row belongs to, or null when it has
+// none (an ungrouped chat) or is itself a header — a focused collapsed header
+// has nothing further to collapse into.
+//
+// Derived from the row itself, never by scanning backwards for the nearest
+// header: under a filter the preceding header can belong to an unrelated
+// section (team A's name matches, a channel of team B matches), and scanning
+// would collapse the wrong one.
+export function parentCollapseKey(item: SelectableItem, groupByType: boolean): string | null {
+  if (item.kind === 'channel') return teamCollapseKey(item.team.id)
+  // Ungrouped lists have no chat-type headers, so there is nothing to collapse.
+  if (item.kind === 'chat') return groupByType ? chatSection(item.chat.chatType) : null
+  if (item.kind === 'more') return item.section
+  return null
+}
+
+// Index of the header row owning `key`, or null when that header isn't in
+// `items` (filtered out). Callers use it only to move the cursor.
+export function headerIndexForKey(items: SelectableItem[], key: string): number | null {
+  for (let i = 0; i < items.length; i++) {
+    if (collapseKeyFor(items[i]!) === key) return i
   }
   return null
 }
