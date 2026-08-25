@@ -271,6 +271,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     headerUserFormat: settings.headerUserFormat,
     statusBarShowKeyHints: settings.statusBarShowKeyHints,
     chatRoutingByAccount: { ...settings.chatRoutingByAccount },
+    chatListCollapsedSections: { ...settings.chatListCollapsedSections },
     chatListWidth: settings.chatListWidth,
     composerHeight: settings.composerHeight,
   }
@@ -370,6 +371,7 @@ function cloneSettings(settings: Settings): Settings {
     themeOverrides: cloneThemeOverrides(settings.themeOverrides),
     headerElements: { ...settings.headerElements },
     chatRoutingByAccount: { ...settings.chatRoutingByAccount },
+    chatListCollapsedSections: { ...settings.chatListCollapsedSections },
   }
 }
 
@@ -559,6 +561,25 @@ function validateAndAssign(
         return true
       }
       return false
+    }
+    case 'chatListCollapsedSections': {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        warnings.push('config: "chatListCollapsedSections" must be a JSON object')
+        return false
+      }
+      const out2: Record<string, boolean> = {}
+      for (const [section, flag] of Object.entries(value)) {
+        if (typeof flag !== 'boolean') {
+          warnings.push(
+            `config: chatListCollapsedSections["${section}"] must be a boolean — ignored`,
+          )
+          continue
+        }
+        // Only collapsed entries are worth keeping; `false` is the default.
+        if (flag) out2[section] = true
+      }
+      out.chatListCollapsedSections = out2
+      return true
     }
     case 'chatListWidth':
       if (value === null) {

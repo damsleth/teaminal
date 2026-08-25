@@ -3,6 +3,8 @@ import type { Chat, Team, Channel } from '../types'
 import {
   buildSelectableList,
   CHAT_SECTION_CAP,
+  isSelectable,
+  parentHeaderIndex,
   chatLabel,
   clampCursor,
   firstSelectableIndex,
@@ -90,7 +92,9 @@ describe('buildSelectableList', () => {
       ],
       settings: { chatListSort: 'recent' as const, chatListGroupByType: true },
     }
-    const labels = buildSelectableList(state).map((i) => (i.kind === 'chat' ? i.label : null))
+    const labels = buildSelectableList(state)
+      .filter((i) => i.kind === 'chat')
+      .map((i) => (i.kind === 'chat' ? i.label : null))
     // 1:1 first, then groups (Eng before Design — recency preserved), then meeting.
     expect(labels).toEqual(['Ada', 'Eng', 'Design', 'Standup'])
   })
@@ -106,7 +110,9 @@ describe('buildSelectableList', () => {
       ],
       settings: { chatListSort: 'alphabetical' as const, chatListGroupByType: true },
     }
-    const labels = buildSelectableList(state).map((i) => (i.kind === 'chat' ? i.label : null))
+    const labels = buildSelectableList(state)
+      .filter((i) => i.kind === 'chat')
+      .map((i) => (i.kind === 'chat' ? i.label : null))
     expect(labels).toEqual(['Ann', 'Bo', 'Alpha', 'Zeta'])
   })
 
@@ -127,8 +133,9 @@ describe('buildSelectableList', () => {
       { kind: 'more', section: 'oneOnOne', hidden: 2 },
       { kind: 'more', section: 'group', hidden: 1 },
     ])
-    // The `more` row sits at the end of its own section, not after all chats.
-    expect(list[CHAT_SECTION_CAP]).toEqual({ kind: 'more', section: 'oneOnOne', hidden: 2 })
+    // The `more` row sits at the end of its own section (after the header and
+    // the capped rows), not after all chats.
+    expect(list[CHAT_SECTION_CAP + 1]).toEqual({ kind: 'more', section: 'oneOnOne', hidden: 2 })
   })
 
   test('an expanded section shows every row and drops its `more` row', () => {
@@ -139,7 +146,7 @@ describe('buildSelectableList', () => {
       expandedChatSections: { oneOnOne: true },
     }
     const list = buildSelectableList(state)
-    expect(list).toHaveLength(12)
+    expect(list.filter((i) => i.kind === 'chat')).toHaveLength(12)
     expect(list.some((i) => i.kind === 'more')).toBe(false)
   })
 
@@ -154,13 +161,89 @@ describe('buildSelectableList', () => {
     expect(list.filter((i) => itemMatchesFilter(i, 'd11'))).toHaveLength(1)
   })
 
+  test('a collapsed chat section keeps its header and hides its rows', () => {
+    const state = {
+      ...initialAppState(),
+      chats: [
+        chat('d1', { topic: 'Ada' }),
+        chat('g1', { topic: 'Eng', chatType: 'group' }),
+        chat('g2', { topic: 'Design', chatType: 'group' }),
+      ],
+      settings: {
+        chatListSort: 'recent' as const,
+        chatListGroupByType: true,
+        chatListCollapsedSections: { group: true },
+      },
+    }
+    const list = buildSelectableList(state)
+    expect(list.map((i) => i.kind)).toEqual(['section', 'chat', 'section'])
+    const collapsedHeader = list[2]!
+    expect(collapsedHeader).toEqual({
+      kind: 'section',
+      section: 'group',
+      label: 'Groups',
+      collapsed: true,
+      count: 2,
+    })
+    // Only the collapsed header is a cursor stop; the expanded one is skipped.
+    expect(isSelectable(list[0]!)).toBe(false)
+    expect(isSelectable(collapsedHeader)).toBe(true)
+  })
+
+  test('a collapsed team hides its channels but keeps a selectable header', () => {
+    const state = {
+      ...initialAppState(),
+      teams: [team('t1', 'Crayon'), team('t2', 'Other')],
+      channelsByTeam: {
+        t1: [channel('ch-a', 'General')],
+        t2: [channel('ch-c', 'Standup')],
+      },
+      settings: { chatListCollapsedSections: { 'team:t1': true } },
+    }
+    const list = buildSelectableList(state)
+    expect(list.map((i) => i.kind)).toEqual(['team', 'team', 'channel'])
+    expect(isSelectable(list[0]!)).toBe(true) // collapsed
+    expect(isSelectable(list[1]!)).toBe(false) // expanded
+  })
+
+  test('a filter reaches children of a collapsed section', () => {
+    const state = {
+      ...initialAppState(),
+      chats: [chat('d1', { topic: 'Ada' }), chat('g1', { topic: 'Eng', chatType: 'group' })],
+      settings: {
+        chatListSort: 'recent' as const,
+        chatListGroupByType: true,
+        chatListCollapsedSections: { group: true },
+      },
+      filter: 'eng',
+    }
+    const list = buildSelectableList(state)
+    expect(list.filter((i) => itemMatchesFilter(i, 'eng'))).toHaveLength(1)
+  })
+
+  test('parentHeaderIndex finds the header a row belongs to', () => {
+    const state = {
+      ...initialAppState(),
+      chats: [chat('d1', { topic: 'Ada' }), chat('g1', { topic: 'Eng', chatType: 'group' })],
+      teams: [team('t1', 'Crayon')],
+      channelsByTeam: { t1: [channel('ch-a', 'General')] },
+      settings: { chatListSort: 'recent' as const, chatListGroupByType: true },
+    }
+    const list = buildSelectableList(state)
+    // [section Direct, Ada, section Groups, Eng, team Crayon, # General]
+    expect(parentHeaderIndex(list, 1)).toBe(0)
+    expect(parentHeaderIndex(list, 3)).toBe(2)
+    expect(parentHeaderIndex(list, 5)).toBe(4) // channel → its team
+    expect(parentHeaderIndex(list, 0)).toBeNull() // a header has no parent
+  })
+
   test('ungrouped lists are never capped', () => {
     const state = {
       ...initialAppState(),
       chats: Array.from({ length: 12 }, (_, i) => chat(`d${i}`, { topic: `d${i}` })),
       settings: { chatListSort: 'recent' as const, chatListGroupByType: false },
     }
-    expect(buildSelectableList(state)).toHaveLength(12)
+    expect(buildSelectableList(state)).toHaveLength(12) // no headers when ungrouped
   })
 })
 
@@ -302,7 +385,7 @@ describe('itemMatchesFilter', () => {
   })
 
   test('matches team displayName', () => {
-    const item = { kind: 'team' as const, team: team('t', 'Crayon Eng') }
+    const item = { kind: 'team' as const, collapsed: false, team: team('t', 'Crayon Eng') }
     expect(itemMatchesFilter(item, 'cray')).toBe(true)
     expect(itemMatchesFilter(item, 'design')).toBe(false)
   })
@@ -360,7 +443,7 @@ describe('nextSelectableIndex', () => {
     chat: chat(id),
     label: id,
   })
-  const t = (id: string): SelectableItem => ({ kind: 'team', team: team(id, id) })
+  const t = (id: string): SelectableItem => ({ kind: 'team', collapsed: false, team: team(id, id) })
   const ch = (id: string): SelectableItem => ({
     kind: 'channel',
     team: team('T', 'T'),

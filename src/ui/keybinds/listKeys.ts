@@ -17,10 +17,14 @@ import {
 import {
   buildSelectableList,
   clampCursor,
+  collapseKeyFor,
   firstSelectableIndex,
+  isSelectable,
   itemMatchesFilter,
   nextSelectableIndex,
+  parentHeaderIndex,
 } from '../../state/selectables'
+import { updateSettings } from '../../config/index'
 import { isNewChatQueryCandidate } from '../ChatList'
 import { openKeybinds } from '../KeybindsModal'
 import { openMenu } from '../MenuModal'
@@ -38,7 +42,9 @@ export type ListKeysCtx = {
   // Passed through to buildSelectableList so navigation order/labels match
   // exactly what ChatList renders (matters once chatListSort reorders rows).
   nameByUserId?: Record<string, string>
-  settings: Pick<Settings, 'chatListSort' | 'chatListGroupByType'>
+  settings: Pick<Settings, 'chatListSort' | 'chatListGroupByType'> & {
+    chatListCollapsedSections?: Record<string, boolean>
+  }
   filter: string
   expandedChatSections: Record<string, boolean>
   cursor: number
@@ -47,6 +53,21 @@ export type ListKeysCtx = {
   refresh: () => void
   hardRefresh: () => void
   openNewChatPrompt: (initialQuery?: string) => void
+}
+
+// Collapsed sections are a persisted setting: patch the store for the current
+// render and write through to config.json. Persistence is fire-and-forget —
+// a failed write costs the user a collapsed section across restarts, nothing
+// more, and must not break the keypress.
+function setSectionCollapsed(store: Store<AppState>, key: string, collapsed: boolean): void {
+  let next: Record<string, boolean> = {}
+  store.set((s) => {
+    next = { ...s.settings.chatListCollapsedSections }
+    if (collapsed) next[key] = true
+    else delete next[key]
+    return { settings: { ...s.settings, chatListCollapsedSections: next } }
+  })
+  void updateSettings({ chatListCollapsedSections: next }).catch(() => undefined)
 }
 
 export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyResult {
@@ -140,9 +161,9 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
     // filter change reordered the list), advance forward to the next
     // selectable item first.
     let safe = clampCursor(ctx.cursor, selectableCount)
-    if (safe < visible.length && visible[safe]!.kind === 'team') {
+    if (safe < visible.length && !isSelectable(visible[safe]!)) {
       safe = nextSelectableIndex(visible, safe, +1)
-      if (safe < visible.length && visible[safe]!.kind === 'team') {
+      if (safe < visible.length && !isSelectable(visible[safe]!)) {
         safe = firstSelectableIndex(visible)
       }
     }
@@ -159,18 +180,19 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
     }
     if (ch === 'u' || (key as typeof key & { pageUp?: boolean }).pageUp) {
       let target = clampCursor(safe - HALF_PAGE, selectableCount)
-      if (target < visible.length && visible[target]!.kind === 'team') {
+      if (target < visible.length && !isSelectable(visible[target]!)) {
         target = nextSelectableIndex(visible, target, -1)
-        if (visible[target]?.kind === 'team') target = firstSelectableIndex(visible)
+        const at = visible[target]
+        if (at && !isSelectable(at)) target = firstSelectableIndex(visible)
       }
       store.set({ cursor: clampCursor(target, selectableCount) })
       return 'handled'
     }
     if (ch === 'd' || (key as typeof key & { pageDown?: boolean }).pageDown) {
       let target = clampCursor(safe + HALF_PAGE, selectableCount)
-      if (target < visible.length && visible[target]!.kind === 'team') {
+      if (target < visible.length && !isSelectable(visible[target]!)) {
         target = nextSelectableIndex(visible, target, +1)
-        if (target < visible.length && visible[target]!.kind === 'team') {
+        if (target < visible.length && !isSelectable(visible[target]!)) {
           // No non-team rows after the original target — fall back to last
           // selectable.
           target = nextSelectableIndex(visible, target, -1)
@@ -180,8 +202,17 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       return 'handled'
     }
     if (ch === 'h' || key.leftArrow) {
-      // List is already the leftmost pane; no-op so we don't fall
-      // through into the filter buffer.
+      // Collapse the focused row's parent header (chat type, or team for a
+      // channel) and put the cursor on that header — collapsed headers are
+      // selectable, so the section can be reopened with l/Enter. A focused
+      // header, or a row with no header (ungrouped chat), stays put: the list
+      // is the leftmost pane, so h must not fall through to the filter buffer.
+      const parent = parentHeaderIndex(visible, safe)
+      const collapseKey = parent === null ? null : collapseKeyFor(visible[parent]!)
+      if (parent !== null && collapseKey) {
+        setSectionCollapsed(store, collapseKey, true)
+        store.set({ cursor: parent })
+      }
       return 'handled'
     }
     if (key.return || ch === 'l' || key.rightArrow) {
@@ -191,6 +222,14 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       }
       const it = visible[safe]
       if (!it) return 'handled'
+      const headerKey = collapseKeyFor(it)
+      if (headerKey) {
+        // Only collapsed headers are focusable, so this always expands. The
+        // first child lands right after the header the cursor is on.
+        setSectionCollapsed(store, headerKey, false)
+        store.set({ cursor: safe + 1 })
+        return 'handled'
+      }
       if (it.kind === 'more') {
         // Expanding replaces the `… N more` row with the first hidden chat,
         // so the cursor stays where it is and lands on real content.

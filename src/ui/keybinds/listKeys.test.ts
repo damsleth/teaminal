@@ -1,8 +1,14 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, mock, test } from 'bun:test'
 import type { Key } from 'ink'
 import { handleListKeys, type ListKeysCtx } from './listKeys'
 import { createAppStore } from '../../state/store'
 import type { Chat } from '../../types'
+
+// Collapsing a section persists to config.json; keep the fire-and-forget
+// write off the real config in tests. The store update is what matters here.
+mock.module('../../config/index', () => ({
+  updateSettings: () => Promise.resolve({}),
+}))
 
 function makeKey(overrides: Partial<Key> = {}): Key {
   return {
@@ -216,10 +222,67 @@ describe('handleListKeys', () => {
     const a = makeCtx({
       chats: many,
       settings: { chatListSort: 'recent', chatListGroupByType: true },
-      cursor: 10, // the `… 2 more` row sits right after the 10 capped rows
+      cursor: 11, // section header (0) + 10 capped rows, then the `… 2 more` row
     })
     expect(handleListKeys({ input: 'l', key: makeKey() }, a.ctx)).toBe('handled')
     expect(a.store.get().expandedChatSections).toEqual({ oneOnOne: true })
+    // Expanding must not also open a conversation.
+    expect(a.store.get().focus).toEqual({ kind: 'list' })
+  })
+
+  test("h collapses the focused chat row's section and lands on its header", () => {
+    const a = makeCtx({
+      chats: [chat('a'), chat('b')],
+      settings: {
+        chatListSort: 'recent',
+        chatListGroupByType: true,
+        chatListCollapsedSections: {},
+      },
+      cursor: 1, // section header at 0, first chat at 1
+    })
+    expect(handleListKeys({ input: 'h', key: makeKey() }, a.ctx)).toBe('handled')
+    expect(a.store.get().settings.chatListCollapsedSections).toEqual({ oneOnOne: true })
+    expect(a.store.get().cursor).toBe(0)
+  })
+
+  test('h on a header stays put rather than collapsing the section above', () => {
+    const a = makeCtx({
+      chats: [chat('a')],
+      settings: {
+        chatListSort: 'recent',
+        chatListGroupByType: true,
+        chatListCollapsedSections: { oneOnOne: true },
+      },
+      cursor: 0,
+    })
+    // ctx carries the list-shaping settings; the handler reads and writes the
+    // store's copy, so seed both.
+    a.store.set((st) => ({
+      settings: { ...st.settings, chatListCollapsedSections: { oneOnOne: true } },
+    }))
+    expect(handleListKeys({ input: 'h', key: makeKey() }, a.ctx)).toBe('handled')
+    expect(a.store.get().settings.chatListCollapsedSections).toEqual({ oneOnOne: true })
+    expect(a.store.get().cursor).toBe(0)
+  })
+
+  test('l on a collapsed header expands it and steps onto the first child', () => {
+    const a = makeCtx({
+      chats: [chat('a'), chat('b')],
+      settings: {
+        chatListSort: 'recent',
+        chatListGroupByType: true,
+        chatListCollapsedSections: { oneOnOne: true },
+      },
+      cursor: 0,
+    })
+    // ctx carries the list-shaping settings; the handler reads and writes the
+    // store's copy, so seed both.
+    a.store.set((st) => ({
+      settings: { ...st.settings, chatListCollapsedSections: { oneOnOne: true } },
+    }))
+    expect(handleListKeys({ input: 'l', key: makeKey() }, a.ctx)).toBe('handled')
+    expect(a.store.get().settings.chatListCollapsedSections).toEqual({})
+    expect(a.store.get().cursor).toBe(1)
     // Expanding must not also open a conversation.
     expect(a.store.get().focus).toEqual({ kind: 'list' })
   })

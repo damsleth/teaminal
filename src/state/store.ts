@@ -284,6 +284,10 @@ export type Settings = {
   // (each with a non-selectable header) instead of one flat list. Ordering
   // within each section still follows chatListSort. Default false.
   chatListGroupByType: boolean
+  // Collapsed sidebar headers, keyed by chat-section name ('oneOnOne',
+  // 'group', 'meeting', 'other') or `team:<id>`. A collapsed header hides
+  // its children and becomes the cursor stop that restores them.
+  chatListCollapsedSections: Record<string, boolean>
   // When true, sidebar chat rows render the first name only ("Finn",
   // "Anna, Bjorn, +1") instead of the full corporate-AD form
   // ("Nordling, Finn Saethre"). The MessagePane header always uses the
@@ -460,6 +464,7 @@ export const defaultSettings: Settings = {
   chatListDensity: 'cozy',
   chatListSort: 'recent',
   chatListGroupByType: false,
+  chatListCollapsedSections: {},
   chatListShortNames: false,
   showMessagePreviews: true,
   messagePaneShortNames: true,

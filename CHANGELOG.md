@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Collapsible sidebar sections.** `h` / Left on a chat row collapses its type
+  section (Direct / Groups / Meetings / Other); on a channel it collapses the
+  channel's team. The header shows `▸` plus the hidden row count and becomes the
+  cursor stop that reopens it with `l` / Right / Enter — expanded headers are
+  still skipped by `j`/`k`, so normal navigation is unchanged. Collapsed state
+  persists in `chatListCollapsedSections`; filtering temporarily reveals matching
+  rows without clearing it.
+
 ### Changed
 
 - **Grouped chat sections are capped at 10 rows.** With "group by type" enabled,

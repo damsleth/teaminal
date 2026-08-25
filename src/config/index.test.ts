@@ -426,6 +426,7 @@ describe('Settings ↔ config.json parity', () => {
     headerUserFormat: 'tenant',
     statusBarShowKeyHints: !defaultSettings.statusBarShowKeyHints,
     chatRoutingByAccount: { 'profile-a': 'ic3-only', 'profile-b': 'graph+ic3' },
+    chatListCollapsedSections: { meeting: true, 'team:t1': true },
     chatListWidth: 36,
     composerHeight: 5,
   }
