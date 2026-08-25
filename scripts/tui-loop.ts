@@ -158,7 +158,12 @@ function discoverFlowFiles(): string[] {
 
 /** Flow id from a flow test file path (basename without .test.ts). */
 function flowId(filePath: string): string {
-  return filePath.replace(/\.test\.ts$/, '').split('/').pop() ?? filePath
+  return (
+    filePath
+      .replace(/\.test\.ts$/, '')
+      .split('/')
+      .pop() ?? filePath
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -273,10 +278,7 @@ function detectSnapshotDiff(
  * Build a manifest by correlating shot artifacts with known flow test files and
  * the runner output. Emits one entry per (flow, shot-step) pair found on disk.
  */
-function buildManifest(
-  runnerResult: RunnerResult,
-  runAt: string,
-): TuiLoopManifest {
+function buildManifest(runnerResult: RunnerResult, runAt: string): TuiLoopManifest {
   mkdirSync(ARTIFACTS_DIR, { recursive: true })
   const shots = collectShots()
   const entries: ManifestEntry[] = []
@@ -384,8 +386,7 @@ async function cmdShots(update: boolean, trace: boolean): Promise<void> {
       if (e.svg) process.stdout.write(`    svg: ${e.svg}\n`)
     }
     process.stdout.write(
-      '\nTo update snapshots: bun run tui:update\n' +
-        'To record a trace:   bun run tui:trace\n',
+      '\nTo update snapshots: bun run tui:update\n' + 'To record a trace:   bun run tui:trace\n',
     )
   }
 

@@ -69,7 +69,8 @@ export function parseSearchResponse(json: unknown): ChatMessageSearchHit[] {
         const resource = hit?.resource
         const messageId = resource?.id
         if (!messageId) continue
-        const snippet = (hit.summary ? cleanSummary(hit.summary) : '') || bodyToText(resource?.body?.content)
+        const snippet =
+          (hit.summary ? cleanSummary(hit.summary) : '') || bodyToText(resource?.body?.content)
         out.push({
           messageId,
           chatId: resource?.chatId ?? null,

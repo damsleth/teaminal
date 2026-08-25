@@ -6,7 +6,13 @@
 // Esc to return to chat list. Tab to composer is handled by the
 // shared App-level dispatcher because it is identical across zones.
 
-import { emptyMessageCache, focusKey, type AppState, type Focus, type Store } from '../../state/store'
+import {
+  emptyMessageCache,
+  focusKey,
+  type AppState,
+  type Focus,
+  type Store,
+} from '../../state/store'
 import { groupChannelThreads } from '../../state/channelThreads'
 import type { ChatMessage } from '../../types'
 import { htmlToText } from '../../text/html'

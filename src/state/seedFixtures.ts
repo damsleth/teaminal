@@ -11,12 +11,7 @@
 import type { Me } from '../graph/me'
 import type { Capabilities } from '../graph/capabilities'
 import type { Chat, ChatMessage } from '../types'
-import {
-  emptyMessageCache,
-  messagesFromCaches,
-  type AppState,
-  type Store,
-} from './store'
+import { emptyMessageCache, messagesFromCaches, type AppState, type Store } from './store'
 
 // ---------------------------------------------------------------------------
 // Fixed identity

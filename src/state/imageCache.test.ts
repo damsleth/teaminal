@@ -281,4 +281,54 @@ describe('fetchAndCacheImage hosted-content routing', () => {
     expect(graphCalls).toBe(1)
     expect(objectUrl).toContain('/objects/0-nch-d4-8efd/views/imgpsh_fullsize')
   })
+
+  it('falls back to asyncgw when Graph 403s a channel hosted content', async () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-channel`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    // Default graph audience, audience fallback OFF — the 403 fallback must
+    // not depend on it (channel images 403 on plain graph accounts).
+    setAudiencePreference('graph', { fallback: false })
+    setAuthRunner(async () => ({
+      stdout: makeJwt({ exp: FAR_FUTURE, oid: 'oid-self' }),
+      stderr: '',
+      exitCode: 0,
+    }))
+    __setRegionForTests(undefined, 'emea')
+    setFederationTransport(
+      async () =>
+        new Response(JSON.stringify({ tokens: { skypeToken: 'skype-test', expiresIn: 3600 } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    )
+    // Graph 403s the hosted content: channel (thread.v2) content Graph won't
+    // serve, but the asyncgw object store does.
+    let graphCalls = 0
+    setClientTransport(async () => {
+      graphCalls += 1
+      return new Response(JSON.stringify({ error: { message: 'Forbidden' } }), { status: 403 })
+    })
+    let objectUrl = ''
+    setAsyncGwTransport(async (url) => {
+      if (url.endsWith('/skypetokenauth')) {
+        return new Response(null, { status: 200, headers: { 'set-cookie': 'AGW=s1' } })
+      }
+      objectUrl = url
+      return new Response(new Uint8Array([9, 8, 7]), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      })
+    })
+
+    const buf = await fetchAndCacheImage(
+      '/chats/chat-c/messages/msg-c/hostedContents/0-csea-d9-cb8e/$value',
+      `channel-test-${Date.now()}`,
+      { contentType: '', name: 'image' },
+      { profile: '__channel_test__', objectId: '0-csea-d9-cb8e' },
+    )
+    expect(buf).not.toBeNull()
+    expect(buf!.byteLength).toBe(3)
+    expect(graphCalls).toBe(1)
+    expect(objectUrl).toContain('/objects/0-csea-d9-cb8e/views/imgpsh_fullsize')
+  })
 })

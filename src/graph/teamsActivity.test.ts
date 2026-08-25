@@ -95,9 +95,9 @@ describe('parseActivityItem', () => {
   test('treats numeric / string / alternate-key read flags as read', () => {
     expect(parseActivityItem({ id: 'a', activityType: 'mention', isRead: 1 })!.isRead).toBe(true)
     expect(parseActivityItem({ id: 'b', activityType: 'mention', read: 'true' })!.isRead).toBe(true)
-    expect(
-      parseActivityItem({ id: 'c', activityType: 'mention', readState: 'read' })!.isRead,
-    ).toBe(true)
+    expect(parseActivityItem({ id: 'c', activityType: 'mention', readState: 'read' })!.isRead).toBe(
+      true,
+    )
     expect(parseActivityItem({ id: 'd', activityType: 'mention', seen: true })!.isRead).toBe(true)
   })
 

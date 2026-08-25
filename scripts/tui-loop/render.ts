@@ -37,9 +37,7 @@ export function readCells(terminal: unknown, rows: number, cols: number): Cell[]
   const activeBuf = (xterm as Record<string, unknown>).buffer as {
     active: {
       getLine(row: number): {
-        getCell(
-          col: number,
-        ): {
+        getCell(col: number): {
           getChars(): string
           getFgColor(): number
           getFgColorMode(): number

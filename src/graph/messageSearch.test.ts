@@ -39,7 +39,9 @@ describe('parseSearchResponse', () => {
   it('falls back to the body when no summary is present', () => {
     const json = {
       value: [
-        { hitsContainers: [{ hits: [{ resource: { id: 'm2', body: { content: '<b>hi</b>' } } }] }] },
+        {
+          hitsContainers: [{ hits: [{ resource: { id: 'm2', body: { content: '<b>hi</b>' } } }] }],
+        },
       ],
     }
     const hits = parseSearchResponse(json)

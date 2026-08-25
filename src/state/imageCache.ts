@@ -154,7 +154,9 @@ async function fetchHostedContent(path: string, opts?: FetchImageOpts): Promise<
       if (objectId && err instanceof GraphError) {
         // 401: CA-gated account — only when audience fallback is opted in.
         // 404: cross-tenant hosted content Graph can't serve — always try.
-        if ((fallback && err.status === 401) || err.status === 404) {
+        // 403: channel (thread.v2) hosted content Graph won't serve — the
+        // asyncgw object store does (membership is in the object ACL).
+        if ((fallback && err.status === 401) || err.status === 404 || err.status === 403) {
           return viaAsyncGw()
         }
       }

@@ -49,8 +49,19 @@ const oneOnOne = {
   title: null,
   createdAt: '2026-04-01T10:00:00Z',
   members: [
-    { mri: '8:orgid:11111111-1111-1111-1111-111111111111', objectId: '11111111-1111-1111-1111-111111111111', displayName: 'Me', role: 'Admin' },
-    { mri: '8:orgid:22222222-2222-2222-2222-222222222222', objectId: '22222222-2222-2222-2222-222222222222', displayName: 'Anna Example', email: 'anna@x.com', role: 'Admin' },
+    {
+      mri: '8:orgid:11111111-1111-1111-1111-111111111111',
+      objectId: '11111111-1111-1111-1111-111111111111',
+      displayName: 'Me',
+      role: 'Admin',
+    },
+    {
+      mri: '8:orgid:22222222-2222-2222-2222-222222222222',
+      objectId: '22222222-2222-2222-2222-222222222222',
+      displayName: 'Anna Example',
+      email: 'anna@x.com',
+      role: 'Admin',
+    },
   ],
   lastMessage: {
     id: '1779832878074',
@@ -68,7 +79,13 @@ const groupChat = {
   chatType: 'chat',
   title: 'Project Huddle',
   createdAt: '2026-03-01T10:00:00Z',
-  members: [{ mri: '8:orgid:33333333-3333-3333-3333-333333333333', objectId: '33333333-3333-3333-3333-333333333333', displayName: 'Bob' }],
+  members: [
+    {
+      mri: '8:orgid:33333333-3333-3333-3333-333333333333',
+      objectId: '33333333-3333-3333-3333-333333333333',
+      displayName: 'Bob',
+    },
+  ],
 }
 const meetingChat = {
   id: '19:meeting_xyz@thread.v2',
@@ -177,7 +194,9 @@ describe('fetchChats', () => {
 
     const chats = await fetchChats()
     expect(chats.map((c) => c.id)).toEqual([oneOnOne.id, groupChat.id])
-    expect(urls[0]).toStartWith('https://teams.microsoft.com/api/csa/emea/api/v2/teams/users/me/chats')
+    expect(urls[0]).toStartWith(
+      'https://teams.microsoft.com/api/csa/emea/api/v2/teams/users/me/chats',
+    )
     expect(urls[1]).toContain('continuationToken=c2')
     expect(seenAuth).toBe(`Bearer ${csaToken}`)
     expect(runnerArgs.some((a) => a.includes('--audience') && a.includes('csa'))).toBe(true)
@@ -195,7 +214,13 @@ describe('fetchTeams', () => {
     __setTransportForTests(async (url) => {
       urls.push(url)
       return jsonResponse({
-        teams: [{ id: '19:t@thread.tacv2', displayName: 'T', channels: [{ id: '19:t@thread.tacv2', displayName: 'General' }] }],
+        teams: [
+          {
+            id: '19:t@thread.tacv2',
+            displayName: 'T',
+            channels: [{ id: '19:t@thread.tacv2', displayName: 'General' }],
+          },
+        ],
       })
     })
     const { teams, channelsByTeam } = await fetchTeams()

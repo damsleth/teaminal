@@ -48,8 +48,7 @@ describe('splitBodyLinkSpans', () => {
   })
 
   test('correlates the focused link through a Safe-Links wrapper', () => {
-    const safe =
-      'https://eu.safelinks.protection.outlook.com/?url=https%3A%2F%2Fy.io%2Fp&data=1'
+    const safe = 'https://eu.safelinks.protection.outlook.com/?url=https%3A%2F%2Fy.io%2Fp&data=1'
     const spans = splitBodyLinkSpans(`go ${safe}`, 'https://y.io/p')
     expect(spans.find((s) => s.kind === 'link-focused')?.text).toBe(safe)
   })

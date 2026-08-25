@@ -11,11 +11,7 @@
 import { Box, Text, useApp, useInput } from 'ink'
 import { useEffect } from 'react'
 import type { ActivityItem } from '../graph/teamsActivity'
-import {
-  countUnreadMentions,
-  markActivityRead,
-  refreshActivityFeed,
-} from '../state/activityFeed'
+import { countUnreadMentions, markActivityRead, refreshActivityFeed } from '../state/activityFeed'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
 export function openActivity(store: ReturnType<typeof useAppStore>): void {
@@ -150,7 +146,10 @@ export function ActivityModal() {
   if (!isOpen) return null
 
   // Sliding window over the items list.
-  const top = Math.max(0, Math.min(items.length - VISIBLE_ROWS, cursor - Math.floor(VISIBLE_ROWS / 2)))
+  const top = Math.max(
+    0,
+    Math.min(items.length - VISIBLE_ROWS, cursor - Math.floor(VISIBLE_ROWS / 2)),
+  )
   const visible = items.slice(top, top + VISIBLE_ROWS)
   const now = Date.now()
   const totalUnread = items.filter((it) => !it.isRead).length

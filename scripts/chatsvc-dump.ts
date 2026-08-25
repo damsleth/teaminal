@@ -156,7 +156,12 @@ try {
     for (const r of per) {
       if (r.status !== 'fulfilled') continue
       for (const ch of r.value.chs) {
-        targets.push({ team: r.value.t.displayName, teamId: r.value.t.id, name: ch.displayName, id: ch.id })
+        targets.push({
+          team: r.value.t.displayName,
+          teamId: r.value.t.id,
+          name: ch.displayName,
+          id: ch.id,
+        })
       }
     }
     out(`found ${targets.length} channels across ${teams.length} teams\n`)
@@ -224,13 +229,17 @@ try {
       const cols = ptrKeys.map((c) => get(m, c)).join('  ')
       const subj = (m.properties?.subject as string) ?? (m.subject as string) ?? ''
       const isRoot = ptrKeys.every((c) => get(m, c) === id || get(m, c) === '·')
-      out(`  ${isRoot ? 'ROOT' : 'rply'} id=${id}  ${cols}${subj ? `  «${subj.slice(0, 40)}»` : ''}`)
+      out(
+        `  ${isRoot ? 'ROOT' : 'rply'} id=${id}  ${cols}${subj ? `  «${subj.slice(0, 40)}»` : ''}`,
+      )
     }
     const samplePath = '.plans/chatsvc-sample.json'
     await Bun.write(samplePath, JSON.stringify({ channel: best.tgt, raw: best.msgs }, null, 2))
     out(`\nraw first page saved → ${samplePath}`)
   } else {
-    out('\n(no reply-dense channel found in the scanned set — bump --max-channels or pass --channel)')
+    out(
+      '\n(no reply-dense channel found in the scanned set — bump --max-channels or pass --channel)',
+    )
   }
 
   // View comparison: does msnp24 actually expose rootMessageId, or is another
@@ -250,7 +259,9 @@ try {
             `root-keys=[${hasRoot.join(',') || '—'}]  seq-keys=[${hasSeq.join(',') || '—'}]`,
         )
       } catch (err) {
-        out(`  view=${(v || '(none)').padEnd(26)} ERROR ${err instanceof Error ? err.message : err}`)
+        out(
+          `  view=${(v || '(none)').padEnd(26)} ERROR ${err instanceof Error ? err.message : err}`,
+        )
       }
     }
   }
