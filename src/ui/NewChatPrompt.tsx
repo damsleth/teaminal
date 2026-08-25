@@ -17,10 +17,6 @@ const DEBOUNCE_MS = 250
 const RESULT_LIMIT = 5
 type PromptZone = 'input' | 'results'
 
-function looksLikeEmail(query: string): boolean {
-  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(query.trim())
-}
-
 // Accept a bare AAD object id (UUID) as a direct user reference.
 // Useful for unlinked-tenant cases where neither Graph search nor
 // Teams searchV2 surface the user but the OID is known (e.g. copied
@@ -57,6 +53,9 @@ export function NewChatPrompt(props: {
 
   useEffect(() => {
     const q = query.trim()
+    // Editing the query invalidates any previous external verdict - else a
+    // stale "No external match" line hangs above fresh Graph results.
+    setExternalLookup('idle')
     if (!isNewChatQueryCandidate(q)) {
       setResults([])
       setCursor(0)
@@ -142,11 +141,11 @@ export function NewChatPrompt(props: {
           })
           return
         }
-        // No Graph results. If the typed query looks like an email,
-        // fall back to the Teams external-tenant search (`searchV2`)
-        // before surrendering. This is the only path that reaches
-        // users in unlinked tenants without an OID on hand.
-        if (results.length === 0 && looksLikeEmail(trimmed)) {
+        // No Graph results. Fall back to the Teams middle-tier search
+        // (`searchV2`), which also covers B2B guests and cross-tenant
+        // (MTO) users Graph's /users misses. Not email-only: searchV2
+        // takes free text, and the hint below promises it for any query.
+        if (results.length === 0 && isNewChatQueryCandidate(trimmed)) {
           setExternalLookup('in-flight')
           setError(null)
           searchExternalUsers(trimmed, { top: RESULT_LIMIT })
@@ -202,7 +201,9 @@ export function NewChatPrompt(props: {
           <Text color="gray">Searching external tenants for {query.trim()}...</Text>
         )}
         {externalLookup === 'no-hit' && (
-          <Text color="gray">No external match for {query.trim()}</Text>
+          <Text color="gray">
+            No external match for {query.trim()} - paste their AAD object id to chat anyway
+          </Text>
         )}
         {error && <Text color="red">{error.slice(0, 120)}</Text>}
         {!loading &&
