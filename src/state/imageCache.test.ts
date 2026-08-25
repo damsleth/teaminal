@@ -342,7 +342,22 @@ describe('fetchAndCacheImage hosted-content routing', () => {
 })
 
 describe('ensureImageFetched disk-cache notification', () => {
+  // Redirect the cache to a temp dir: without this the test writes into the
+  // developer's real ~/.cache/teaminal (leaving artifacts behind, and failing
+  // outright with EPERM where the home cache is read-only). Same pattern as
+  // the fetch suites above — getCacheDir() reads process.env per call.
+  const realXdg = process.env.XDG_CACHE_HOME
+  let cacheRoot = ''
+
+  afterEach(() => {
+    if (realXdg === undefined) delete process.env.XDG_CACHE_HOME
+    else process.env.XDG_CACHE_HOME = realXdg
+    if (cacheRoot) rmSync(cacheRoot, { recursive: true, force: true })
+  })
+
   it('a disk hit notifies, so a caller showing "loading…" re-renders', async () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-disk-hit`)
+    process.env.XDG_CACHE_HOME = cacheRoot
     // The modal fetches on demand and renders a placeholder first; without a
     // notification on the disk-hit path it would stay on that placeholder
     // forever even though the blob is already in hand.

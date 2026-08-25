@@ -1,6 +1,6 @@
 {
   "name": "teaminal",
-  "version": "0.21.1",
+  "version": "0.22.0",
   "license": "MIT",
   "description": "Lightweight terminal Microsoft Teams client",
   "type": "module",
