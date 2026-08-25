@@ -31,6 +31,7 @@ import { applySeededState, isSeededMode } from '../src/state/seedFixtures'
 import { App } from '../src/ui/App'
 import { ErrorBoundary } from '../src/ui/ErrorBoundary'
 import { startFocusTracker } from '../src/ui/focusTracker'
+import { renderCleanExit } from '../src/ui/shutdown'
 import { PollerProvider } from '../src/ui/PollerContext'
 import type { PollerHandleRef } from '../src/state/poller'
 import { SessionProvider, type SessionApi } from '../src/ui/SessionContext'
@@ -388,6 +389,10 @@ function showAuthExpiredModal(profile: string | null, message: string): void {
   })
 }
 
+// Clean exit = the user quit and Ink unmounted on its own. The fatal paths
+// below call process.exit(), which skips `finally` entirely, so this stays
+// false and their error text is left on screen.
+let cleanExit = false
 ;(async () => {
   try {
     if (isSeededMode()) {
@@ -424,6 +429,7 @@ function showAuthExpiredModal(profile: string | null, message: string): void {
     }
 
     await ink.waitUntilExit()
+    cleanExit = true
   } catch (err) {
     ink.unmount()
     if (err instanceof Error) {
@@ -466,5 +472,13 @@ function showAuthExpiredModal(profile: string | null, message: string): void {
     try {
       flushNameCache()
     } catch {}
+    // Last: wipe Ink's final frame so the shell prompt comes back to a clean
+    // screen. After the helpers, whose teardown writes control sequences of
+    // its own.
+    if (cleanExit) {
+      try {
+        renderCleanExit()
+      } catch {}
+    }
   }
 })()
