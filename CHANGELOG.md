@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Real-time push works again.** Teams' `authsvc` token exchange now answers
+  `410 ApiRestricted` for non-first-party client ids, and trouter treated that
+  Skype token as a prerequisite — so push never connected and retried in a loop.
+  It was never needed: the registrar authorizes on the IC3-audience AAD token,
+  which is exactly what the Teams web client sends. Trouter now registers with
+  that Bearer token, treats the Skype token as optional (still sent where
+  `authsvc` answers), and logs the exchange failure once per session instead of
+  on every reconnect.
+
 ### Added
 
 - **The terminal is cleared when you quit.** A clean exit now deletes teaminal's

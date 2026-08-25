@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test'
-import { buildTrouterConnectUrl, parseSocketIoEvent, TrouterTransport } from './trouter'
+import {
+  buildRegistrarRequest,
+  buildTrouterConnectUrl,
+  parseSocketIoEvent,
+  resolveSkypeAuth,
+  TrouterTransport,
+} from './trouter'
 import { RealtimeEventBus } from './events'
 
 function makeDummyTransport() {
@@ -357,5 +363,47 @@ describe('TrouterTransport state', () => {
     unsub()
     transport.disconnect()
     expect(states).toEqual([])
+  })
+})
+
+describe('resolveSkypeAuth', () => {
+  test('returns the minted token when authsvc answers', async () => {
+    expect(await resolveSkypeAuth(async () => 'skype-abc')).toEqual({
+      skypeToken: 'skype-abc',
+      unavailable: false,
+    })
+  })
+
+  test('a walled-off authsvc yields no token instead of throwing', async () => {
+    // 410 ApiRestricted must not abort the connect: registrar authorizes on
+    // the IC3 Bearer token, so push works without a Skype token.
+    expect(
+      await resolveSkypeAuth(async () => {
+        throw new Error('teams authz 410: {"errorCode":"ApiRestricted"}')
+      }),
+    ).toEqual({ skypeToken: null, unavailable: true })
+  })
+})
+
+describe('buildRegistrarRequest', () => {
+  const base = { path: 'https://pub-x-f.trouter/v4/f/sr-1/', registrationId: 'reg-1' }
+
+  test('authorizes with the IC3 bearer token', () => {
+    const { url, init } = buildRegistrarRequest({ ...base, ic3Token: 'ic3-tok', skypeToken: null })
+    expect(url).toBe('https://teams.microsoft.com/registrar/prod/V2/registrations')
+    const headers = init.headers as Record<string, string>
+    expect(headers.authorization).toBe('Bearer ic3-tok')
+    // No Skype token available — the header must be absent, not empty.
+    expect('x-skypetoken' in headers).toBe(false)
+    const body = JSON.parse(init.body as string)
+    expect(body.registrationId).toBe('reg-1')
+    expect(body.transports.TROUTER[0].path).toBe(base.path)
+  })
+
+  test('sends x-skypetoken as well when the exchange succeeded', () => {
+    const { init } = buildRegistrarRequest({ ...base, ic3Token: 'ic3-tok', skypeToken: 'skype-1' })
+    const headers = init.headers as Record<string, string>
+    expect(headers.authorization).toBe('Bearer ic3-tok')
+    expect(headers['x-skypetoken']).toBe('skype-1')
   })
 })
