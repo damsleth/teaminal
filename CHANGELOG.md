@@ -6,6 +6,32 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-08-25
+
+### Added
+
+- **The terminal is cleared when you quit.** A clean exit now deletes teaminal's
+  Kitty image placements, restores the cursor, and wipes the visible screen, so
+  the shell prompt comes back without a dead copy of the UI above it. Scrollback
+  is left alone, and a fatal or auth-failure exit still leaves its error on
+  screen — as does a non-TTY (piped) run.
+
+- **Collapsible sidebar sections.** `h` / Left on a chat row collapses its type
+  section (Direct / Groups / Meetings / Other); on a channel it collapses the
+  channel's team. The header shows `▸` plus the hidden row count and becomes the
+  cursor stop that reopens it with `l` / Right / Enter — expanded headers are
+  still skipped by `j`/`k`, so normal navigation is unchanged. Collapsed state
+  persists in `chatListCollapsedSections`; filtering temporarily reveals matching
+  rows without clearing it.
+
+### Changed
+
+- **Grouped chat sections are capped at 10 rows.** With "group by type" enabled,
+  a long Direct list no longer pushes Groups, Meetings, and the team/channel rows
+  off the bottom of the sidebar. Each type caps independently and gets a
+  selectable `… N more` row that expands the section in place (Enter/l). Filtering
+  lifts the cap so a hidden chat is still reachable by name.
+
 ### Fixed
 
 - **Inline images no longer flood the terminal with redundant image data.**
@@ -55,30 +81,6 @@ adheres to [Semantic Versioning](https://semver.org/).
   that Bearer token, treats the Skype token as optional (still sent where
   `authsvc` answers), and logs the exchange failure once per session instead of
   on every reconnect.
-
-### Added
-
-- **The terminal is cleared when you quit.** A clean exit now deletes teaminal's
-  Kitty image placements, restores the cursor, and wipes the visible screen, so
-  the shell prompt comes back without a dead copy of the UI above it. Scrollback
-  is left alone, and a fatal or auth-failure exit still leaves its error on
-  screen — as does a non-TTY (piped) run.
-
-- **Collapsible sidebar sections.** `h` / Left on a chat row collapses its type
-  section (Direct / Groups / Meetings / Other); on a channel it collapses the
-  channel's team. The header shows `▸` plus the hidden row count and becomes the
-  cursor stop that reopens it with `l` / Right / Enter — expanded headers are
-  still skipped by `j`/`k`, so normal navigation is unchanged. Collapsed state
-  persists in `chatListCollapsedSections`; filtering temporarily reveals matching
-  rows without clearing it.
-
-### Changed
-
-- **Grouped chat sections are capped at 10 rows.** With "group by type" enabled,
-  a long Direct list no longer pushes Groups, Meetings, and the team/channel rows
-  off the bottom of the sidebar. Each type caps independently and gets a
-  selectable `… N more` row that expands the section in place (Enter/l). Filtering
-  lifts the cap so a hidden chat is still reachable by name.
 
 ## [0.21.1] - 2026-08-25
 
@@ -1149,7 +1151,8 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.21.1...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/damsleth/teaminal/compare/v0.21.1...v0.22.0
 [0.21.1]: https://github.com/damsleth/teaminal/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/damsleth/teaminal/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/damsleth/teaminal/compare/v0.19.0...v0.20.0

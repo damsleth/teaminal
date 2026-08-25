@@ -51,7 +51,7 @@ update all of these together in the same PR:
 5. CHANGELOG promoted: rename `## [Unreleased]` to
    `## [X.Y.Z] - YYYY-MM-DD`, add a fresh empty `## [Unreleased]`
    above it, update the comparison links at the bottom.
-6. `package.json` `"version"` and `bin/teaminal.tsx` `const VERSION`
+6. `package.json` `"version"` and `src/version.ts` `export const VERSION`
    both bumped to `X.Y.Z`.
 
 ## Cutting a release
@@ -60,8 +60,8 @@ update all of these together in the same PR:
 git checkout main
 git pull --ff-only
 
-# Bump version in package.json + bin/teaminal.tsx, promote CHANGELOG.
-$EDITOR package.json bin/teaminal.tsx CHANGELOG.md
+# Bump version in package.json + src/version.ts, promote CHANGELOG.
+$EDITOR package.json src/version.ts CHANGELOG.md
 git commit -am "release: vX.Y.Z"
 git push
 
