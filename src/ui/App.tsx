@@ -522,6 +522,7 @@ export function App() {
                 focusIndicatorActive={focus.kind !== 'list' && inputZone === 'list'}
                 loadOlderState={loadOlderState}
                 listPaneWidth={resolvedChatListWidth}
+                composerRows={resolvedComposerHeight}
               />
               {overlayModalKind && (
                 <Box

@@ -90,25 +90,42 @@ export function isKittyCapable(): boolean {
   )
 }
 
+// Images whose natural height is under this many pixels are stickers, inline
+// icons, or emoji-as-image. Scaling them up to the uniform display height
+// would balloon them, so their row count shrinks proportionally.
+const SMALL_IMAGE_PX = 200
+
+// Fit an image into at most `maxCols` x `maxRows` cells.
+//
+// Always placed by ROWS (`r=`), never by columns: with `c=` alone the terminal
+// derives the height itself from its real cell metrics, which can exceed the
+// rows we reserved in the layout — and the picture then paints over the next
+// message. Constraining rows makes the painted height exactly `reservedRows`,
+// so an inline image can never overlap text vertically no matter what the
+// terminal's cell aspect turns out to be. Width is derived by the terminal
+// from the aspect ratio at that height, bounded by picking rows that keep it
+// within `maxCols`.
 export function fitKittyPlacement(
   image: Buffer,
   maxCols: number,
   maxRows: number,
   opts?: { cellWidthToHeight?: number },
 ): KittyPlacement {
-  const cols = Math.max(1, Math.floor(maxCols))
-  const rows = Math.max(1, Math.floor(maxRows))
+  const maxColsFloored = Math.max(1, Math.floor(maxCols))
+  const maxRowsFloored = Math.max(1, Math.floor(maxRows))
   const size = readPngSize(image)
-  if (!size) return { rows, reservedRows: rows }
+  if (!size) return { rows: maxRowsFloored, reservedRows: maxRowsFloored }
 
   const cellWidthToHeight = opts?.cellWidthToHeight ?? DEFAULT_CELL_WIDTH_TO_HEIGHT
-  const heightForMaxWidth = Math.max(
+  // Rows at which the aspect-preserved width exactly fills maxCols. Floored so
+  // a rounding error shrinks the picture rather than overflowing the pane.
+  const rowsAtMaxWidth = Math.max(
     1,
-    Math.ceil((cols * size.height * cellWidthToHeight) / size.width),
+    Math.floor((maxColsFloored * size.height * cellWidthToHeight) / size.width),
   )
-
-  if (heightForMaxWidth <= rows) {
-    return { cols, reservedRows: heightForMaxWidth }
+  let rows = Math.min(maxRowsFloored, rowsAtMaxWidth)
+  if (size.height < SMALL_IMAGE_PX) {
+    rows = Math.max(1, Math.round(rows * (size.height / SMALL_IMAGE_PX)))
   }
   return { rows, reservedRows: rows }
 }

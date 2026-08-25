@@ -114,14 +114,44 @@ describe('buildKittyAPC', () => {
 })
 
 describe('fitKittyPlacement', () => {
-  it('uses width-only placement when the image fits inside the row budget', () => {
-    const wide = pngWithSize(800, 200)
-    expect(fitKittyPlacement(wide, 80, 10)).toEqual({ cols: 80, reservedRows: 10 })
+  it('always places by rows so the painted height equals the reserved rows', () => {
+    // `c=`-only placement lets the terminal choose the height from its own cell
+    // metrics, which can exceed the rows the layout reserved — the picture then
+    // paints over the next message. Every placement must be row-bound.
+    for (const [w, h] of [
+      [800, 200],
+      [200, 800],
+      [3600, 2014],
+      [1, 1],
+      [4000, 30],
+    ] as const) {
+      const placement = fitKittyPlacement(pngWithSize(w, h), 80, 10)
+      expect(placement.cols).toBeUndefined()
+      expect(placement.rows).toBe(placement.reservedRows)
+      expect(placement.reservedRows).toBeGreaterThanOrEqual(1)
+      expect(placement.reservedRows).toBeLessThanOrEqual(10)
+    }
   })
 
-  it('uses height-only placement when width-constrained display would be too tall', () => {
-    const tall = pngWithSize(200, 800)
-    expect(fitKittyPlacement(tall, 80, 10)).toEqual({ rows: 10, reservedRows: 10 })
+  it('trades rows away so an aspect-preserved width stays inside maxCols', () => {
+    // A very wide banner at 10 rows would be far wider than the pane, so the
+    // row count drops until the derived width fits.
+    const banner = fitKittyPlacement(pngWithSize(4000, 500), 80, 10)
+    expect(banner).toEqual({ rows: 5, reservedRows: 5 })
+  })
+
+  it('uses the full row budget for a tall image', () => {
+    expect(fitKittyPlacement(pngWithSize(200, 800), 80, 10)).toEqual({
+      rows: 10,
+      reservedRows: 10,
+    })
+  })
+
+  it('scales small images down instead of ballooning them to the uniform height', () => {
+    // A 64px-tall sticker should not paint as tall as a full screenshot.
+    const sticker = fitKittyPlacement(pngWithSize(64, 64), 80, 10)
+    expect(sticker.reservedRows).toBeLessThan(10)
+    expect(sticker.reservedRows).toBeGreaterThanOrEqual(1)
   })
 
   it('falls back to height-only placement when dimensions cannot be read', () => {

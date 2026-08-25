@@ -25,6 +25,12 @@ import type { Theme } from './theme'
 
 const TAIL_ROWS = 6
 
+// Rows the tail-panel strip occupies when at least one tail is enabled:
+// the bordered box (2) + each panel's heading (1) + TAIL_ROWS of content.
+// MessagePane needs this to anchor inline images, which are painted from the
+// bottom of the terminal — an unaccounted row here shifts every image down.
+export const TAIL_PANEL_ROWS = 2 + 1 + TAIL_ROWS
+
 function formatTs(ts: number): string {
   const d = new Date(ts)
   const hh = d.getHours().toString().padStart(2, '0')
