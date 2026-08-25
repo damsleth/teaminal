@@ -42,7 +42,14 @@ export type TeamsEndpoints = {
   partition: string
 }
 
+function shortString(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim().toLowerCase()
+  return /^[a-z0-9-]{2,12}$/.test(trimmed) ? trimmed : null
+}
+
 const regionCache = new Map<string, string>()
+const middleTierCache = new Map<string, string>()
 const partitionCache = new Map<string, string>()
 // Trouter registration URL is also derived from the authsvc response
 // (under `regionGtms.trouter`). Cache it alongside the region so the
@@ -113,7 +120,12 @@ export function ingestAuthzData(profile: string | undefined, data: unknown): voi
   const obj = data as Record<string, unknown>
   const regionGtms = obj.regionGtms as Record<string, unknown> | undefined
   const key = profile ?? '<default>'
-  const region = pickRegionFromGtms(regionGtms)
+  // authsvc states the region and partition outright (`"region":"no"`,
+  // `"partition":"no01"`). Trust those first: regionGtms parsing is a
+  // guess that can't express short regions like `no` (HAR-verified for
+  // a Norway-partitioned tenant) and misses tenants whose middleTier
+  // host carries no region prefix at all.
+  const region = shortString(obj.region) ?? pickRegionFromGtms(regionGtms)
   if (region) {
     const prev = regionCache.get(key)
     regionCache.set(key, region)
@@ -121,10 +133,15 @@ export function ingestAuthzData(profile: string | undefined, data: unknown): voi
       recordEvent('graph', 'info', `teams region resolved to "${region}" for profile ${key}`)
     }
   }
-  const partition = partitionFromMiddleTier(
-    regionGtms && typeof regionGtms.middleTier === 'string' ? regionGtms.middleTier : undefined,
-  )
+  const middleTier =
+    regionGtms && typeof regionGtms.middleTier === 'string' ? regionGtms.middleTier : undefined
+  const partition = partitionFromMiddleTier(middleTier) ?? shortString(obj.partition)
   if (partition) partitionCache.set(key, partition)
+  // Cache the middle-tier base verbatim rather than rebuilding it from
+  // the partition: authsvc hands back forms with and without the `part`
+  // segment (`.../api/mt/part/emea-02` but also plain `.../api/mt/emea`),
+  // and only the URL it gave us is guaranteed to route.
+  if (middleTier) middleTierCache.set(key, middleTier.replace(/\/+$/, ''))
   const trouterUrl =
     regionGtms && typeof regionGtms.trouter === 'string' ? regionGtms.trouter : undefined
   if (trouterUrl) trouterUrlCache.set(key, trouterUrl)
@@ -136,6 +153,18 @@ export function getCachedRegion(opts?: RegionResolveOpts): string | undefined {
 
 export function getCachedTrouterUrl(opts?: RegionResolveOpts): string | undefined {
   return trouterUrlCache.get(cacheKey(opts))
+}
+
+// Base URL for /api/mt/* calls (user search, fetchFederated). Prefers the
+// middleTier URL authsvc handed us verbatim - it is the only form
+// guaranteed to route, and its shape varies (`/api/mt/part/emea-02` for
+// some tenants, plain `/api/mt/emea` for others). Falls back to the
+// `part/{region}` shape that has always worked when authsvc is silent.
+export async function resolveMiddleTierBase(opts?: RegionResolveOpts): Promise<string> {
+  const cached = middleTierCache.get(cacheKey(opts))
+  if (cached) return cached
+  const region = await resolveRegion(opts)
+  return middleTierCache.get(cacheKey(opts)) ?? `${TEAMS_ORIGIN}/api/mt/part/${region}`
 }
 
 // Resolves the region for the given profile, triggering an authsvc
@@ -155,6 +184,14 @@ export async function resolveRegion(opts?: RegionResolveOpts): Promise<string> {
       'warn',
       `teams region resolve failed, defaulting to ${FALLBACK_REGION}: ${err instanceof Error ? err.message : String(err)}`,
     )
+    // A 410 from authsvc is Microsoft restricting the endpoint for our
+    // client, not a blip - pin the fallback so every later lookup stops
+    // paying for a doomed token fetch + authz round-trip. Transient
+    // failures stay uncached so a retry can still find the real region.
+    // ponytail: session-lifetime pin; drop it if authsvc opens back up.
+    const status =
+      err && typeof err === 'object' && 'status' in err ? (err as { status: unknown }).status : null
+    if (status === 410) regionCache.set(key, FALLBACK_REGION)
     return FALLBACK_REGION
   }
   return regionCache.get(key) ?? FALLBACK_REGION
@@ -194,6 +231,7 @@ export function __resetForTests(): void {
   regionCache.clear()
   partitionCache.clear()
   trouterUrlCache.clear()
+  middleTierCache.clear()
 }
 
 export function __setRegionForTests(profile: string | undefined, region: string): void {

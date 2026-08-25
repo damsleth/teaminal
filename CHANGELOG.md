@@ -6,6 +6,33 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **External user search now runs for names, not just email addresses.** The
+  new-chat prompt promised "Enter to search externally" for any query but only
+  ever called the Teams middle-tier search when the text looked like an email,
+  so searching an external colleague by name silently did nothing. `searchV2`
+  takes free text and surfaces B2B guests and cross-tenant (MTO) users that
+  Graph's `/users` misses, so the fallback now fires for every query the prompt
+  accepts. A stale "No external match" verdict is also cleared as soon as the
+  query is edited, and the miss message points at the AAD-object-id paste path
+  instead of dead-ending.
+- **Teams region resolution trusts what authsvc actually says.** The region and
+  partition were inferred from `regionGtms` hostnames through a
+  three-or-four-letter regex, which cannot represent a short region like `no` -
+  a Norway-partitioned tenant resolved to the `emea` fallback and every chatsvc
+  call went to the wrong cluster. The authz response states `region` and
+  `partition` outright; those now win, with the hostname parsing kept as the
+  fallback. Verified against a HAR of a `region: no` / `partition: no01` tenant.
+- **`/api/mt/*` calls use the middle-tier base authsvc hands back**, verbatim,
+  instead of rebuilding it as `/api/mt/part/{region}`. The real value varies in
+  shape - `/api/mt/part/emea-02` for some tenants, plain `/api/mt/emea` for
+  others - and only the URL authsvc gave us is guaranteed to route.
+- A `410 ApiRestricted` from authsvc now pins the region fallback for the
+  session, so a profile that cannot reach authsvc stops paying for a doomed
+  token fetch plus round-trip on every lookup. Transient failures stay
+  uncached so a retry can still find the real region.
+
 ## [0.22.0] - 2026-08-25
 
 ### Added
