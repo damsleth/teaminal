@@ -31,6 +31,7 @@ import { applySeededState, isSeededMode } from '../src/state/seedFixtures'
 import { App } from '../src/ui/App'
 import { ErrorBoundary } from '../src/ui/ErrorBoundary'
 import { startFocusTracker } from '../src/ui/focusTracker'
+import { cleanupImageTempFiles } from '../src/ui/openImageFile'
 import { renderCleanExit } from '../src/ui/shutdown'
 import { PollerProvider } from '../src/ui/PollerContext'
 import type { PollerHandleRef } from '../src/state/poller'
@@ -471,6 +472,11 @@ let cleanExit = false
     } catch {}
     try {
       flushNameCache()
+    } catch {}
+    // Images handed to the platform viewer live in a private temp dir; don't
+    // leave them on disk.
+    try {
+      cleanupImageTempFiles()
     } catch {}
     // Last: wipe Ink's final frame so the shell prompt comes back to a clean
     // screen. After the helpers, whose teardown writes control sequences of
