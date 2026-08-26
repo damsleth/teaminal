@@ -31,6 +31,7 @@ import { applySeededState, isSeededMode } from '../src/state/seedFixtures'
 import { App } from '../src/ui/App'
 import { ErrorBoundary } from '../src/ui/ErrorBoundary'
 import { startFocusTracker } from '../src/ui/focusTracker'
+import { probeCellAspect } from '../src/ui/kittyGraphics'
 import { cleanupImageTempFiles } from '../src/ui/openImageFile'
 import { renderCleanExit } from '../src/ui/shutdown'
 import { PollerProvider } from '../src/ui/PollerContext'
@@ -142,6 +143,12 @@ if (!process.stdin.isTTY && !isSeededMode()) {
   )
   process.exit(2)
 }
+
+// Ask the terminal for its cell size before Ink takes raw mode - afterwards
+// Ink owns stdin and the reply would land in the key handler. Sizes inline
+// images against the real cell aspect instead of a 0.5 guess; a terminal
+// that ignores the query keeps the fallback.
+if (!isSeededMode()) await probeCellAspect()
 
 const store = createAppStore()
 

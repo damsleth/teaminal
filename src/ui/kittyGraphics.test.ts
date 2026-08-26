@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it } from 'bun:test'
 import {
   TEAMINAL_KITTY_Z,
+  __resetCellAspectForTests,
   __resetKittyImageIdsForTests,
+  getCellWidthToHeight,
+  parseCellSizeReport,
   buildKittyAPC,
   buildKittyImageEscape,
   buildKittyPlaceById,
@@ -294,5 +297,31 @@ describe('transmit once, place many', () => {
 
   it('place-by-id needs a dimension to place into', () => {
     expect(buildKittyPlaceById(1, { reservedRows: 3 })).toBe('')
+  })
+})
+
+describe('parseCellSizeReport', () => {
+  it('reads the width/height ratio out of a CSI 16 t reply', () => {
+    // Ghostty, 22x41px cells - the figure that showed the 0.5 guess was off.
+    expect(parseCellSizeReport('\x1b[6;41;22t')).toBeCloseTo(0.537, 3)
+  })
+
+  it('ignores a reply to a different query', () => {
+    // CSI 14 t (window size in pixels) answers with a 4, not a 6.
+    expect(parseCellSizeReport('\x1b[4;1542;2574t')).toBeNull()
+    expect(parseCellSizeReport('')).toBeNull()
+    expect(parseCellSizeReport('\x1b[6;0;22t')).toBeNull()
+  })
+
+  it('refuses a ratio no monospace cell has', () => {
+    // A wrong ratio silently mis-sizes every inline image, so out-of-band
+    // values fall back rather than being trusted.
+    expect(parseCellSizeReport('\x1b[6;10;90t')).toBeNull() // 9.0
+    expect(parseCellSizeReport('\x1b[6;100;10t')).toBeNull() // 0.1
+  })
+
+  it('defaults to the conservative 0.5 until a probe succeeds', () => {
+    __resetCellAspectForTests()
+    expect(getCellWidthToHeight()).toBe(0.5)
   })
 })

@@ -14,14 +14,76 @@
 // Multi-chunk transmissions set m=1 on all but the final chunk.
 
 const MAX_B64_CHUNK = 4096
-// Cell aspect used to work out how many rows an image needs to fill a given
-// column budget. Measured on Ghostty (CSI 16 t reports 22x41px) the real
-// figure is 0.537, so this errs ~7% low and images come out slightly
-// narrower than the pane allows. That is the safe direction - overshooting
-// would push a picture past the pane edge - and asking the terminal at
-// startup costs a stdin round-trip before Ink takes raw mode. See
-// scripts/kitty-probe.ts.
+// Cell aspect (width/height) used to work out how many rows an image needs
+// to fill a given column budget. Only a fallback: probeCellAspect() asks the
+// terminal for the real figure at startup. Ghostty reports 22x41px = 0.537,
+// so guessing 0.5 renders images ~7% narrower than the pane allows.
 const DEFAULT_CELL_WIDTH_TO_HEIGHT = 0.5
+let cellWidthToHeight = DEFAULT_CELL_WIDTH_TO_HEIGHT
+
+export function getCellWidthToHeight(): number {
+  return cellWidthToHeight
+}
+
+// Parse the terminal's answer to CSI 16 t: `CSI 6 ; height ; width t`.
+export function parseCellSizeReport(report: string): number | null {
+  const m = /\x1b\[6;(\d+);(\d+)t/.exec(report)
+  if (!m) return null
+  const height = Number(m[1])
+  const width = Number(m[2])
+  if (!(height > 0) || !(width > 0)) return null
+  const ratio = width / height
+  // Real monospace cells sit near 0.4-0.7. Anything outside that is a
+  // misparse or a terminal answering a different query, not a font - and a
+  // wrong ratio here sizes every inline image wrong, so refuse it.
+  return ratio >= 0.3 && ratio <= 1 ? ratio : null
+}
+
+/**
+ * Ask the terminal how big a cell is, so image sizing stops guessing.
+ *
+ * MUST run before Ink takes raw mode - it owns stdin afterwards and the
+ * reply would land in the key handler. Best-effort by design: a terminal
+ * that ignores CSI 16 t just leaves the fallback in place, at the cost of
+ * `timeoutMs` once at startup.
+ */
+export async function probeCellAspect(timeoutMs = 150): Promise<number | null> {
+  const { stdin, stdout } = process
+  if (!stdin.isTTY || !stdout.isTTY || !isKittyCapable()) return null
+  const wasRaw = stdin.isRaw
+  let done = false
+  return new Promise<number | null>((resolve) => {
+    let acc = ''
+    const finish = (ratio: number | null): void => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      stdin.off('data', onData)
+      stdin.pause()
+      if (!wasRaw) stdin.setRawMode(false)
+      if (ratio !== null) cellWidthToHeight = ratio
+      resolve(ratio)
+    }
+    const onData = (chunk: Buffer): void => {
+      acc += chunk.toString('binary')
+      const ratio = parseCellSizeReport(acc)
+      if (ratio !== null) finish(ratio)
+    }
+    const timer = setTimeout(() => finish(null), timeoutMs)
+    try {
+      stdin.setRawMode(true)
+      stdin.resume()
+      stdin.on('data', onData)
+      stdout.write('\x1b[16t')
+    } catch {
+      finish(null)
+    }
+  })
+}
+
+export function __resetCellAspectForTests(): void {
+  cellWidthToHeight = DEFAULT_CELL_WIDTH_TO_HEIGHT
+}
 export const TEAMINAL_KITTY_Z = 17_042
 
 export type KittyPlacement = {
@@ -124,7 +186,7 @@ export function fitKittyPlacement(
   const size = readPngSize(image)
   if (!size) return { rows: maxRowsFloored, reservedRows: maxRowsFloored }
 
-  const cellWidthToHeight = opts?.cellWidthToHeight ?? DEFAULT_CELL_WIDTH_TO_HEIGHT
+  const cellWidthToHeight = opts?.cellWidthToHeight ?? getCellWidthToHeight()
   // Rows at which the aspect-preserved width exactly fills maxCols. Floored so
   // a rounding error shrinks the picture rather than overflowing the pane.
   const rowsAtMaxWidth = Math.max(
