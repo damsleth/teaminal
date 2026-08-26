@@ -12,6 +12,7 @@
 
 import {
   createOneOnOneChat as createOneOnOneChatGraph,
+  hideChat as hideChatGraph,
   editMessage as editMessageGraph,
   getChat,
   searchChatUsers as searchChatUsersGraph,
@@ -229,6 +230,38 @@ export async function deleteChatMessageById(
     () => softDeleteMessageGraph(chatId, messageId),
     'delete message',
   )
+}
+
+/**
+ * Teams' "Delete chat" on a conversation: drop it from the list right
+ * away, then hide it server-side. On failure the chat comes back and the
+ * error is logged - the poller would restore it on the next list pass
+ * anyway, so re-inserting locally just avoids the flicker of waiting.
+ */
+export async function deleteChatById(store: Store<AppState>, chatId: string): Promise<void> {
+  const before = store.get().chats
+  const removed = before.find((c) => c.id === chatId)
+  if (!removed) return
+  const selfId = store.get().me?.id
+  if (!selfId) throw new Error('cannot delete chat before /me is loaded')
+  store.set((s) => ({
+    chats: s.chats.filter((c) => c.id !== chatId),
+    ...(s.focus.kind === 'chat' && s.focus.chatId === chatId
+      ? { focus: { kind: 'list' as const }, inputZone: 'list' as const }
+      : {}),
+  }))
+  try {
+    await hideChatGraph(chatId, selfId)
+    recordEvent('graph', 'info', `deleted chat ${chatId}`)
+  } catch (err) {
+    store.set((s) => (s.chats.some((c) => c.id === chatId) ? {} : { chats: [removed, ...s.chats] }))
+    recordEvent(
+      'graph',
+      'error',
+      `delete chat failed: ${err instanceof Error ? err.message : String(err)}`,
+    )
+    throw err
+  }
 }
 
 /** Internal-tenant directory search for the new-chat prompt. */

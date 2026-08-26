@@ -54,6 +54,9 @@ export type Chat = {
   members?: ChatMember[]
   // present when listChats uses $expand=lastMessagePreview
   lastMessagePreview?: LastMessagePreview | null
+  // per-user read/hidden state; `isHidden` is what Teams' "Delete chat"
+  // sets, and /chats returns it without an explicit $select
+  viewpoint?: { isHidden?: boolean; lastMessageReadDateTime?: string } | null
 }
 
 export type Mention = {

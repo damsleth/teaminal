@@ -287,3 +287,24 @@ describe('handleListKeys', () => {
     expect(a.store.get().focus).toEqual({ kind: 'list' })
   })
 })
+
+describe('ctrl+d delete chat', () => {
+  test('opens the confirm modal for the row under the cursor', () => {
+    const a = makeCtx({ cursor: 1 })
+    expect(handleListKeys({ input: 'd', key: makeKey({ ctrl: true }) }, a.ctx)).toBe('handled')
+    expect(a.store.get().modal).toMatchObject({ kind: 'confirm-delete-chat', chatId: 'b' })
+  })
+
+  test('targets the open chat when one is focused, not the cursor row', () => {
+    const a = makeCtx({ cursor: 0, focus: { kind: 'chat', chatId: 'c' } })
+    handleListKeys({ input: 'd', key: makeKey({ ctrl: true }) }, a.ctx)
+    expect(a.store.get().modal).toMatchObject({ kind: 'confirm-delete-chat', chatId: 'c' })
+  })
+
+  test('plain d still half-pages instead of deleting', () => {
+    const a = makeCtx({ cursor: 0 })
+    handleListKeys({ input: 'd', key: makeKey() }, a.ctx)
+    expect(a.store.get().modal).toBeNull()
+    expect(a.store.get().cursor).toBeGreaterThan(0)
+  })
+})

@@ -71,12 +71,48 @@ function setSectionCollapsed(store: Store<AppState>, key: string, collapsed: boo
   void updateSettings({ chatListCollapsedSections: next }).catch(() => undefined)
 }
 
+// The chat ctrl+d acts on. Channels have no delete, so a focused channel
+// (or a cursor sitting on one) yields nothing.
+function deleteTarget(ctx: ListKeysCtx): { chat: Chat; label: string } | null {
+  if (ctx.focus.kind === 'chat') {
+    const chatId = ctx.focus.chatId
+    const chat = ctx.chats.find((c) => c.id === chatId)
+    return chat ? { chat, label: labelForChat(ctx, chat) } : null
+  }
+  if (ctx.focus.kind !== 'list') return null
+  const items = buildSelectableList(ctx)
+  const visible = ctx.filter ? items.filter((it) => itemMatchesFilter(it, ctx.filter)) : items
+  const it = visible[clampCursor(ctx.cursor, visible.length)]
+  return it && it.kind === 'chat' ? { chat: it.chat, label: it.label } : null
+}
+
+function labelForChat(ctx: ListKeysCtx, chat: Chat): string {
+  const item = buildSelectableList(ctx).find(
+    (it): it is Extract<typeof it, { kind: 'chat' }> =>
+      it.kind === 'chat' && it.chat.id === chat.id,
+  )
+  return item?.label ?? chat.topic ?? chat.id
+}
+
 export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyResult {
   const { store, exit, refresh, hardRefresh, openNewChatPrompt } = ctx
   const ch = input.toLowerCase()
 
   if (key.ctrl && ch === 'c') {
     exit()
+    return 'handled'
+  }
+
+  // ctrl+d deletes a chat: the open one when a chat is focused, otherwise
+  // the row under the list cursor. Confirmation lives in the modal.
+  if (key.ctrl && ch === 'd') {
+    const target = deleteTarget(ctx)
+    if (target) {
+      store.set({
+        modal: { kind: 'confirm-delete-chat', chatId: target.chat.id, label: target.label },
+        inputZone: 'list',
+      })
+    }
     return 'handled'
   }
 
