@@ -4,9 +4,18 @@
 // Format: a JSON object containing any subset of Settings. Unknown keys are
 // ignored with a warning; invalid values fall back to defaults.
 
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { warn } from '../log'
 import {
   CHAT_ROUTING_MODES,
   defaultSettings,
@@ -310,9 +319,40 @@ function migrateLegacyAudienceByAccount(value: unknown, out: Settings): void {
   }
 }
 
+/**
+ * mkdir -p the config directory, including the case where it is a symlink
+ * whose target no longer exists.
+ *
+ * A dangling symlink is invisible from both sides: `mkdir -p` sees the link
+ * itself and fails EEXIST, while every open through it fails ENOENT, so
+ * `existsSync` says no and `mkdir` says yes. That happens whenever a dotfiles
+ * link outlives the directory it points at - and because the persist call
+ * sites are fire-and-forget, the app just stops remembering settings without
+ * saying anything.
+ *
+ * Create what the link points at, so settings persist again, but WARN: the
+ * usual cause is a config that moved, and a silently-created target means a
+ * fresh default config while the real one sits orphaned somewhere else.
+ */
+function ensureConfigDir(dir: string): void {
+  try {
+    mkdirSync(dir, { recursive: true })
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+    // readlinkSync throws EINVAL when `dir` is a regular file, not a link:
+    // that is a genuine misconfiguration and should surface.
+    const target = resolve(dirname(dir), readlinkSync(dir))
+    mkdirSync(target, { recursive: true })
+    warn(
+      `config: ${dir} is a symlink to ${target}, which did not exist - created it.`,
+      'If your settings moved, re-point the link or they will not be read.',
+    )
+  }
+}
+
 function writeConfigAtomically(config: TeaminalConfig, path: string): void {
   const dir = dirname(path)
-  mkdirSync(dir, { recursive: true })
+  ensureConfigDir(dir)
   const tmp = join(dir, `.config.json.${process.pid}.${Date.now()}.tmp`)
   try {
     writeFileSync(tmp, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 })

@@ -13,6 +13,7 @@
 
 import type { AppState, Settings, Store } from '../../state/store'
 import { updateSettings } from '../../config/index'
+import { warn } from '../../log'
 import {
   CHAT_LIST_WIDTH_MIN,
   CHAT_LIST_WIDTH_MAX,
@@ -39,8 +40,12 @@ function persistAndUpdate(
   patch: Partial<Pick<Settings, 'chatListWidth' | 'composerHeight'>>,
 ): void {
   store.set((s) => ({ settings: { ...s.settings, ...patch } }))
-  // Fire-and-forget: persist to disk. Errors are non-fatal.
-  void updateSettings(patch).catch(() => undefined)
+  // Fire-and-forget: a failed write costs the user their pane sizes across
+  // restarts, not this keypress. Say so rather than swallowing it - silence
+  // here is how an unwritable config dir went unnoticed.
+  void updateSettings(patch).catch((err) => {
+    warn('config: failed to persist pane sizes:', err instanceof Error ? err.message : String(err))
+  })
 }
 
 export function handleResizeKeys({ input, key }: RawKey, ctx: ResizeKeysCtx): KeyResult {

@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -12,6 +20,7 @@ import {
   saveConfig,
   settingsToConfig,
   updateConfig,
+  updateSettings,
 } from './index'
 import { defaultSettings, type Settings } from '../state/store'
 
@@ -572,5 +581,40 @@ describe('Settings ↔ config.json parity', () => {
       expect(s.composerHeight).toBeNull()
       expect(w.some((m) => /"composerHeight"/.test(m))).toBe(true)
     })
+  })
+})
+
+// A dotfiles symlink that outlives its target is invisible from both sides:
+// mkdir -p sees the link and fails EEXIST, opening through it fails ENOENT.
+// Every persist call site is fire-and-forget, so this turned into "settings
+// just stop being remembered" with nothing logged anywhere.
+describe('config dir is a dangling symlink', () => {
+  test('writes through it by creating what the link points at', async () => {
+    const linkDir = join(tmpDir, 'linked')
+    const missingTarget = join(tmpDir, 'gone', 'teaminal')
+    symlinkSync(missingTarget, linkDir)
+    expect(existsSync(linkDir)).toBe(false) // resolves through the dead link
+
+    const path = join(linkDir, 'config.json')
+    await updateSettings({ chatListSort: 'alphabetical' }, path)
+
+    expect(existsSync(missingTarget)).toBe(true)
+    expect(loadSettings(path).settings.chatListSort).toBe('alphabetical')
+  })
+
+  test('a relative link target resolves against the link, not the cwd', async () => {
+    const linkDir = join(tmpDir, 'rel-linked')
+    symlinkSync(join('..', 'elsewhere', 'teaminal'), linkDir)
+    const path = join(linkDir, 'config.json')
+
+    await updateSettings({ statusBarPosition: 'top' }, path)
+
+    expect(loadSettings(path).settings.statusBarPosition).toBe('top')
+  })
+
+  test('a plain file where the config dir belongs still throws', async () => {
+    const filePath = join(tmpDir, 'not-a-dir')
+    writeFileSync(filePath, 'in the way')
+    await expect(updateSettings({ theme: 'dark' }, join(filePath, 'config.json'))).rejects.toThrow()
   })
 })
