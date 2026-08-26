@@ -14,6 +14,13 @@
 // Multi-chunk transmissions set m=1 on all but the final chunk.
 
 const MAX_B64_CHUNK = 4096
+// Cell aspect used to work out how many rows an image needs to fill a given
+// column budget. Measured on Ghostty (CSI 16 t reports 22x41px) the real
+// figure is 0.537, so this errs ~7% low and images come out slightly
+// narrower than the pane allows. That is the safe direction - overshooting
+// would push a picture past the pane edge - and asking the terminal at
+// startup costs a stdin round-trip before Ink takes raw mode. See
+// scripts/kitty-probe.ts.
 const DEFAULT_CELL_WIDTH_TO_HEIGHT = 0.5
 export const TEAMINAL_KITTY_Z = 17_042
 
@@ -100,7 +107,8 @@ const SMALL_IMAGE_PX = 200
 // Always placed by ROWS (`r=`), never by columns: with `c=` alone the terminal
 // derives the height itself from its real cell metrics, which can exceed the
 // rows we reserved in the layout — and the picture then paints over the next
-// message. Constraining rows makes the painted height exactly `reservedRows`,
+// message. Constraining rows makes the painted height exactly `reservedRows`
+// (confirmed on Ghostty: r=6/10/14 paint 6/10/14 rows),
 // so an inline image can never overlap text vertically no matter what the
 // terminal's cell aspect turns out to be. Width is derived by the terminal
 // from the aspect ratio at that height, bounded by picking rows that keep it
