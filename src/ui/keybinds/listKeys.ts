@@ -26,6 +26,7 @@ import {
   parentCollapseKey,
 } from '../../state/selectables'
 import { updateSettings } from '../../config/index'
+import { warn } from '../../log'
 import { isNewChatQueryCandidate } from '../ChatList'
 import { openKeybinds } from '../KeybindsModal'
 import { openMenu } from '../MenuModal'
@@ -59,7 +60,8 @@ export type ListKeysCtx = {
 // Collapsed sections are a persisted setting: patch the store for the current
 // render and write through to config.json. Persistence is fire-and-forget —
 // a failed write costs the user a collapsed section across restarts, nothing
-// more, and must not break the keypress.
+// more, and must not break the keypress — but it is logged, because silence
+// here is how an unwritable config dir went unnoticed.
 function setSectionCollapsed(store: Store<AppState>, key: string, collapsed: boolean): void {
   let next: Record<string, boolean> = {}
   store.set((s) => {
@@ -68,7 +70,12 @@ function setSectionCollapsed(store: Store<AppState>, key: string, collapsed: boo
     else delete next[key]
     return { settings: { ...s.settings, chatListCollapsedSections: next } }
   })
-  void updateSettings({ chatListCollapsedSections: next }).catch(() => undefined)
+  void updateSettings({ chatListCollapsedSections: next }).catch((err) => {
+    warn(
+      'config: failed to persist collapsed sections:',
+      err instanceof Error ? err.message : String(err),
+    )
+  })
 }
 
 // The chat ctrl+d acts on. Channels have no delete, so a focused channel
