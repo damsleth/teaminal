@@ -92,3 +92,52 @@ function trimQuotedPreview(raw: string): string {
   if (plain.length <= QUOTED_REPLY_PREVIEW_MAX) return plain
   return plain.slice(0, QUOTED_REPLY_PREVIEW_MAX - 1) + '…'
 }
+
+// 5s grace window: Graph rewrites lastModifiedDateTime as part of
+// server-side normalization on a fresh send, so 'edited within 5s'
+// is treated as 'not actually edited by the user'.
+const EDITED_GRACE_MS = 5_000
+
+export function isMessageEdited(m: ChatMessage): boolean {
+  if (!m.lastModifiedDateTime) return false
+  const created = Date.parse(m.createdDateTime)
+  const modified = Date.parse(m.lastModifiedDateTime)
+  if (!Number.isFinite(created) || !Number.isFinite(modified)) return false
+  return modified - created > EDITED_GRACE_MS
+}
+
+export function isMessageDeleted(m: ChatMessage): boolean {
+  if (m.deletedDateTime) return true
+  // Some channel paths return a stub with empty body and no deletedDateTime.
+  // We don't auto-detect those because empty bodies are also a legitimate
+  // shape for system events; rely on the explicit deletedDateTime field.
+  return false
+}
+
+/**
+ * The exact text a message renders as. The height math and the renderer
+ * MUST agree on this string - they used to derive it separately, and the
+ * differences (system events decoded here but not there) fed the row
+ * estimate a different body than the one Ink wrapped, sliding inline
+ * images out of the rows reserved for them.
+ */
+export function messageBodyText(m: ChatMessage): string {
+  if (isMessageDeleted(m)) {
+    const senderName = m.from?.user?.displayName ?? 'someone'
+    const time = m.createdDateTime.slice(11, 16)
+    return `(message deleted by ${senderName} \u00b7 ${time})`
+  }
+  if (m.messageType === 'systemEventMessage') {
+    const decoded = describeSystemEvent(m)
+    return decoded ?? ''
+  }
+  const raw = m.body.content ?? ''
+  if (m.body.contentType === 'text') {
+    return raw.replace(/\s+/g, ' ').trim()
+  }
+  // Graph inserts an opaque <attachment id="..."></attachment> tag at
+  // the top of body.content for quoted replies. htmlToText drops it
+  // (unknown tag) but leaves the preceding whitespace; trim again so
+  // the new message body starts at column 0.
+  return htmlToText(raw).trim()
+}
