@@ -11,7 +11,12 @@ import {
 import { __resetChatMessageFallbackForTests } from '../graph/chats'
 import type { ChatMessage, IdentityUser } from '../types'
 import { createAppStore } from './store'
-import { deleteChatMessageById, editChatMessageContent, toggleReaction } from './chatActions'
+import {
+  deleteChatById,
+  deleteChatMessageById,
+  editChatMessageContent,
+  toggleReaction,
+} from './chatActions'
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 const me: IdentityUser = { id: 'me-1', displayName: 'Me' }
@@ -24,7 +29,12 @@ function makeJwt(payload: Record<string, unknown>): string {
 
 function setup(transport: (url: string, init: RequestInit) => Promise<Response>) {
   setAudiencePreference('graph', { fallback: false })
-  setAuthRunner(async () => ({ stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }))
+  // tid is what hideChat reads off the token for the hideForUser body.
+  setAuthRunner(async () => ({
+    stdout: makeJwt({ exp: FAR_FUTURE, tid: 'tenant-1' }),
+    stderr: '',
+    exitCode: 0,
+  }))
   setClientTransport(transport)
   const store = createAppStore()
   const msg: ChatMessage = {
@@ -168,5 +178,38 @@ describe('deleteChatMessageById', () => {
     const store = setup(fail)
     await expect(deleteChatMessageById(store, 'c1', 'm1')).rejects.toThrow()
     expect(convMsgs(store)[0]!.deletedDateTime).toBeUndefined()
+  })
+})
+
+describe('deleteChatById', () => {
+  it('hides the chat and drops it from the list', async () => {
+    const seen: string[] = []
+    const store = setup(async (url) => {
+      seen.push(url)
+      return new Response(null, { status: 204 })
+    })
+    store.set({
+      me: { id: 'me-1', displayName: 'Me', userPrincipalName: 'me@x', mail: null },
+      chats: [
+        { id: 'c1', chatType: 'oneOnOne', createdDateTime: '2026-01-01T00:00:00Z' },
+        { id: 'c2', chatType: 'oneOnOne', createdDateTime: '2026-01-01T00:00:00Z' },
+      ],
+      focus: { kind: 'chat', chatId: 'c1' },
+    })
+    await deleteChatById(store, 'c1')
+    expect(seen[0]).toContain('/chats/c1/hideForUser')
+    expect(store.get().chats.map((c) => c.id)).toEqual(['c2'])
+    // the open chat was the deleted one, so focus falls back to the list
+    expect(store.get().focus).toEqual({ kind: 'list' })
+  })
+
+  it('puts the chat back when the hide call fails', async () => {
+    const store = setup(async () => new Response('nope', { status: 500 }))
+    store.set({
+      me: { id: 'me-1', displayName: 'Me', userPrincipalName: 'me@x', mail: null },
+      chats: [{ id: 'c1', chatType: 'oneOnOne', createdDateTime: '2026-01-01T00:00:00Z' }],
+    })
+    await expect(deleteChatById(store, 'c1')).rejects.toThrow()
+    expect(store.get().chats.map((c) => c.id)).toEqual(['c1'])
   })
 })

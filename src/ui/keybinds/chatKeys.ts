@@ -134,7 +134,8 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
     moveMessageCursor(-HALF_PAGE)
     return 'handled'
   }
-  if (ch === 'd' || (key as typeof key & { pageDown?: boolean }).pageDown) {
+  // ctrl+d is delete-chat (handled by the list dispatcher), not half-page.
+  if ((ch === 'd' && !key.ctrl) || (key as typeof key & { pageDown?: boolean }).pageDown) {
     moveMessageCursor(HALF_PAGE)
     return 'handled'
   }

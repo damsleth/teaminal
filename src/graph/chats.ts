@@ -8,7 +8,8 @@
 //   - Member expansion is capped at 25 so we hydrate lazily, only on
 //     visible/active chats
 
-import { getAudiencePreference, graph, GraphError } from './client'
+import { decodeJwtClaims, getToken } from '../auth/owaPiggy'
+import { getActiveProfile, getAudiencePreference, graph, GraphError } from './client'
 import { listChatMessagesViaChatsvc, sendChannelMessageViaChatsvc } from './teamsChatsvc'
 import { createOneOnOneThreadViaChatsvc } from './teamsFederation'
 import { recordEvent } from '../log'
@@ -59,7 +60,37 @@ export async function listChats(opts?: ListChatsOpts): Promise<Chat[]> {
     },
     signal: opts?.signal,
   })
-  return res.value
+  // Chats the user deleted in Teams (or here, via hideChat) keep coming
+  // back from /chats with viewpoint.isHidden - drop them so the list
+  // matches what Teams shows.
+  return res.value.filter((c) => c.viewpoint?.isHidden !== true)
+}
+
+/**
+ * Teams' "Delete chat": hides the conversation from the signed-in user's
+ * list. It reappears if someone posts to it again, and nothing is removed
+ * for the other participants. The hard `DELETE /chats/{id}` needs the
+ * app-only `Chat.ManageDeletion.All` scope our delegated token never has.
+ *
+ * The body's `tenantId` is mandatory (400 "TenantId for the user must be
+ * specified" without it) and comes from the access token's `tid` claim.
+ */
+export async function hideChat(
+  chatId: string,
+  userId: string,
+  opts?: SendMessageOpts,
+): Promise<void> {
+  const token = await getToken({ profile: getActiveProfile() })
+  const tenantId = decodeJwtClaims(token).tid
+  if (typeof tenantId !== 'string' || !tenantId) {
+    throw new Error('cannot delete chat: no tenant id on the access token')
+  }
+  await graph<void>({
+    method: 'POST',
+    path: `/chats/${encodeURIComponent(chatId)}/hideForUser`,
+    body: { user: { id: userId, tenantId } },
+    signal: opts?.signal,
+  })
 }
 
 export type GetChatOpts = {

@@ -19,6 +19,7 @@ const BINDINGS: Binding[] = [
   { keys: 'l / Enter', when: 'list', action: 'open chat / channel · expand section' },
   { keys: 'h / ←', when: 'list', action: 'collapse section (chat type / team)' },
   { keys: 'n', when: 'list', action: 'new chat prompt' },
+  { keys: 'Ctrl+D', when: 'list / chat', action: 'delete chat (confirm y/n)' },
   { keys: 'j / ↓', when: 'chat / channel', action: 'next message / attachment' },
   { keys: 'k / ↑', when: 'chat / channel', action: 'prev message / attachment / older' },
   { keys: 'Space', when: 'chat / channel', action: 'open focused image / link' },

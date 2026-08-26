@@ -467,6 +467,7 @@ export function App() {
     | 'activity'
     | 'reaction-picker'
     | 'confirm-delete'
+    | 'confirm-delete-chat'
     | 'message-search-global'
     | 'image'
     | 'edit-reactions'
@@ -551,7 +552,8 @@ export function App() {
                     <ActivityModal />
                   ) : overlayModalKind === 'reaction-picker' ? (
                     <ReactionPickerModal />
-                  ) : overlayModalKind === 'confirm-delete' ? (
+                  ) : overlayModalKind === 'confirm-delete' ||
+                    overlayModalKind === 'confirm-delete-chat' ? (
                     <ConfirmDeleteModal />
                   ) : overlayModalKind === 'message-search-global' ? (
                     <MessageSearchModal />
