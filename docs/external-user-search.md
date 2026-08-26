@@ -103,24 +103,35 @@ guided by a HAR capture of Teams web doing the equivalent action.
 Response is `{ type, value: SearchUser[] }`; map each entry into the
 existing `DirectoryUser` shape so the UI can keep using one type.
 
-### Tenant federation policy
+### Federated discovery (`externalsearchv3`)
 
-`searchV2` returning `value: []` does _not_ always mean the user
-doesn't exist. Microsoft's search is fundamentally bounded by:
+`searchV2` only ever answers with identities the tenant already
+knows: in-tenant users, B2B guests, MTO, and Teams' own cached
+entries. A user in a fully separate tenant reachable only through
+open federation comes back as `value: []`, not an error. The earlier
+conclusion in this doc - that such users are simply unreachable - was
+wrong; Teams web resolves them through a second endpoint:
 
-1. The destination tenant's external-access policy (Teams admin →
-   external access settings) must allow inbound discovery from the
-   caller's tenant.
-2. The user must be in _some_ directory the caller's tenant can
-   read - either the caller's own AAD, a B2B-linked tenant's AAD,
-   or a cached entry from a prior interaction (Teams' IndexedDB).
+`GET https://teams.microsoft.com/api/mt/part/{region}/beta/users/{email}/externalsearchv3?includeTFLUsers=true`
 
-For genuinely unlinked tenants where no prior interaction exists,
-neither `searchV2` nor `users/fetch` will surface the user - we
-confirmed this by capturing a HAR of Teams web opening a chat with
-`peer@external.example`: `searchV2` returned empty in that capture too.
-Teams web only succeeded because it had the user's AAD object id
-cached locally from previous sessions.
+- Accepts an **email or E.164 phone number only**. A bare name gets a
+  400 `Not a valid email id or phone number`.
+- Requires an `x-ms-client-version` header. Without it the request
+  fails 400 `Workload Unknown` from the UserDiscovery backend - the
+  header value itself is not validated, it just has to be present.
+- Returns a bare array of rows in the same shape `searchV2` uses
+  (`mri`, `objectId`, `displayName`, `email`, `userPrincipalName`),
+  with `type: "Federated"` and the peer's home `tenantId`/`tenantName`.
+- A miss is `200 []`.
+
+teaminal calls `searchV2` first and falls through to
+`externalsearchv3` only when `searchV2` came back empty _and_ the term
+is email-shaped, so name searches cost one request and B2B guests keep
+resolving to their in-tenant identity rather than their federated one.
+
+Discovery is still bounded by the destination tenant's external-access
+policy (Teams admin → external access): if it blocks inbound discovery
+from the caller's tenant, `externalsearchv3` returns `[]` too.
 
 For that scenario, teaminal lets the user paste the AAD object id
 directly into the new-chat prompt - if the input matches the UUID
