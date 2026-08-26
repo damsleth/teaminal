@@ -1,17 +1,19 @@
-// External user search via the Teams chatsvc-side `searchUsers`
-// endpoint.
+// External user search via the Teams middle-tier.
 //
 // Microsoft Graph's people / users search only surfaces in-tenant and
-// B2B-linked users. To start a chat with someone in a fully external
-// tenant (no B2B trust), we have to walk the federated identity graph
-// the same way Teams web does:
+// B2B-linked users. Two middle-tier surfaces cover the rest, and we need
+// both:
 //
-//   GET https://teams.microsoft.com/api/mt/{region}/beta/users/searchUsers
-//        ?searchTerm=<email>
+//   POST {base}/beta/users/searchV2          - free-text people search;
+//        covers in-tenant, B2B guests and MTO, but NOT users in a fully
+//        separate tenant (it answers 200 with an empty `value`).
+//   GET  {base}/beta/users/{email}/externalsearchv3
+//        - federated discovery: finds open-federation users in any
+//        tenant, but only accepts an email or E.164 phone number.
 //
-// Authenticated with the Skype token already used for chatsvc message
-// reads. Response is Skype-shaped; we map each entry into the existing
-// DirectoryUser shape so callers only deal with one type.
+// So: searchV2 first, and when it comes back empty for an email-shaped
+// term, fall through to externalsearchv3. Both take the Teams "spaces"
+// token and return rows we map into the existing DirectoryUser shape.
 //
 // See docs/external-user-search.md for the full design rationale.
 
@@ -63,6 +65,11 @@ function searchHeaders(spacesToken: string): Record<string, string> {
     Accept: 'application/json',
     Authorization: `Bearer ${spacesToken}`,
     'x-ms-client-type': 'teaminal',
+    // Required by the middle tier's federated-search path: without a
+    // client-version the UserDiscovery backend rejects the request with
+    // 400 "Workload Unknown". The value isn't validated; it just has to
+    // be there.
+    'x-ms-client-version': 'teaminal',
     'x-ms-client-caller': 'teaminal-external-search',
     'x-ms-client-request-type': '0',
     'x-client-ui-language': 'en-us',
@@ -134,6 +141,71 @@ export function skypeRowToDirectoryUser(row: SkypeSearchUser): DirectoryUser | n
     ...(mail ? { mail } : {}),
     ...(row.jobTitle ? { jobTitle: row.jobTitle } : {}),
   }
+}
+
+// searchV2 only ever returns identities the tenant already knows:
+// in-tenant users, B2B guests, MTO. A person in a fully separate tenant
+// (open federation, no guest invite) is invisible to it - it answers 200
+// with an empty `value`. Teams web resolves those through the federated
+// discovery endpoint instead:
+//
+//   GET {base}/beta/users/{email}/externalsearchv3?includeTFLUsers=true
+//
+// which takes an email or E.164 phone number only (a bare name 400s) and
+// returns a bare array of rows in the same shape searchV2 uses.
+async function searchFederated(
+  email: string,
+  base: string,
+  spacesToken: string,
+  opts?: ExternalSearchOpts,
+): Promise<SkypeSearchUser[]> {
+  const url = `${base}/beta/users/${encodeURIComponent(email)}/externalsearchv3?includeTFLUsers=true`
+  const startedAt = Date.now()
+  let res: Response
+  try {
+    res = await transport(url, {
+      method: 'GET',
+      headers: searchHeaders(spacesToken),
+      signal: opts?.signal,
+    })
+  } catch (err) {
+    recordRequest({
+      ts: startedAt,
+      method: 'GET',
+      path: '/api/mt/part/.../beta/users/.../externalsearchv3',
+      status: null,
+      durationMs: Date.now() - startedAt,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    throw err
+  }
+  recordRequest({
+    ts: startedAt,
+    method: 'GET',
+    path: '/api/mt/part/.../beta/users/.../externalsearchv3',
+    status: res.status,
+    durationMs: Date.now() - startedAt,
+  })
+  const text = await safeFullText(res)
+  // ponytail: a miss here is a miss, not an error - 400 means the term
+  // wasn't an email/phone the discovery backend accepts, 404 means nobody
+  // answered to it. Either way the caller just shows "no external match".
+  if (res.status === 400 || res.status === 404) return []
+  if (res.status < 200 || res.status >= 300) {
+    throw new TeamsExternalSearchError(
+      res.status,
+      `teams federated search ${res.status}: ${text.slice(0, 240) || 'request failed'}`,
+    )
+  }
+  try {
+    return extractRows(JSON.parse(text))
+  } catch {
+    return []
+  }
+}
+
+function looksLikeEmail(term: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(term)
 }
 
 const externalCache = new Map<string, { ts: number; users: DirectoryUser[] }>()
@@ -230,7 +302,10 @@ export async function searchExternalUsers(
       parsed = null
     }
   }
-  const rows = extractRows(parsed)
+  let rows = extractRows(parsed)
+  if (rows.length === 0 && looksLikeEmail(trimmed)) {
+    rows = await searchFederated(trimmed, base, spacesToken, opts)
+  }
   const users: DirectoryUser[] = []
   for (const row of rows) {
     const u = skypeRowToDirectoryUser(row)

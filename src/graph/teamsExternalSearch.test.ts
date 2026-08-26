@@ -208,3 +208,58 @@ describe('searchExternalUsers', () => {
     expect(users).toHaveLength(3)
   })
 })
+
+describe('federated fallback', () => {
+  test('falls through to externalsearchv3 when searchV2 finds nothing for an email', async () => {
+    const seen: string[] = []
+    __setTransportForTests(async (url) => {
+      seen.push(url)
+      if (url.includes('searchV2'))
+        return new Response(JSON.stringify({ value: [] }), { status: 200 })
+      return new Response(
+        JSON.stringify([
+          {
+            mri: '8:orgid:82568d8b-93c6-478d-94ed-818c97a7dfd0',
+            displayName: 'Carl Joakim Damsleth',
+            email: 'kim@damsleth.no',
+            userPrincipalName: 'kim@damsleth.no',
+            type: 'Federated',
+          },
+        ]),
+        { status: 200 },
+      )
+    })
+    const users = await searchExternalUsers('kim@damsleth.no')
+    expect(seen[1]).toContain('/beta/users/kim%40damsleth.no/externalsearchv3')
+    expect(users).toEqual([
+      {
+        id: '82568d8b-93c6-478d-94ed-818c97a7dfd0',
+        displayName: 'Carl Joakim Damsleth',
+        userPrincipalName: 'kim@damsleth.no',
+        mail: 'kim@damsleth.no',
+      },
+    ])
+  })
+
+  test('skips the federated call for non-email terms, and swallows its 400', async () => {
+    const seen: string[] = []
+    __setTransportForTests(async (url) => {
+      seen.push(url)
+      if (url.includes('searchV2'))
+        return new Response(JSON.stringify({ value: [] }), { status: 200 })
+      return new Response('{"errorCode":"BadRequest"}', { status: 400 })
+    })
+    expect(await searchExternalUsers('Finn Nordling')).toEqual([])
+    expect(seen).toHaveLength(1)
+    __resetForTests()
+    seen.length = 0
+    __setTransportForTests(async (url) => {
+      seen.push(url)
+      return url.includes('searchV2')
+        ? new Response(JSON.stringify({ value: [] }), { status: 200 })
+        : new Response('{"errorCode":"BadRequest"}', { status: 400 })
+    })
+    expect(await searchExternalUsers('ghost@nowhere.example')).toEqual([])
+    expect(seen[1]).toContain('/externalsearchv3')
+  })
+})
