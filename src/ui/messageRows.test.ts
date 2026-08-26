@@ -190,3 +190,45 @@ describe('message row viewport budgeting', () => {
     expect(rows.slice(start, end).map(rowKey)).toEqual(['c', 'd'])
   })
 })
+
+// Ink word-wraps (wrap-ansi, hard:true) rather than chopping every `columns`
+// characters, so a line that breaks early ahead of a long URL costs a row the
+// old ceil(len/width) math never counted. Inline images are anchored by
+// summing these heights, so each missed row slid the picture out of its
+// reserved block and over the text.
+describe('wrapped-row heights match Ink wrapping', () => {
+  const urlBody =
+    'Hola boss. Talked to Finn a bit about some tasks to call for your expertise. What do you think ' +
+    'about this UserStory? Would you take this on you? ' +
+    'https://dev.azure.com/Norconsult-Group/NOCOS/_sprints/taskboard/NOCOS%20Team/NOCOS/NOCOS%20CD%201?w… ' +
+    '(https://dev.azure.com/Norconsult-Group/NOCOS/_sprints/taskboard/NOCOS%20Team/NOCOS/NOCOS%20CD%201?workitem=16972) ' +
+    'I will provide all the necessary support.'
+
+  function height(content: string, columns: number): number {
+    const message: ChatMessage = {
+      id: 'x',
+      createdDateTime: '2026-05-05T10:00:00Z',
+      body: { contentType: 'text', content },
+      from: { user: { id: 'u1', displayName: 'User' } },
+    }
+    // -1 for the sender header row the height includes.
+    return (
+      messageRenderRowHeight(
+        { kind: 'message', key: 'x', message },
+        { messageTextColumns: columns },
+      ) - 1
+    )
+  }
+
+  test('counts the row a long URL forces onto its own line', () => {
+    // 402 chars over 110 columns is 4 by character division; the two long
+    // URLs each force an early break, so Ink paints 5.
+    expect(height(urlBody, 110)).toBe(5)
+  })
+
+  test('counts double-width glyphs as two columns', () => {
+    // 40 emoji = 80 columns wide, so they wrap at 60 columns; counting them
+    // as one column each would call it a single row.
+    expect(height('😄'.repeat(40), 60)).toBe(2)
+  })
+})

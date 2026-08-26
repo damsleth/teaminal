@@ -1,10 +1,10 @@
+import wrapAnsi from 'wrap-ansi'
 import type { ChatMessage } from '../types'
 import type { ReactionDisplayMode } from '../state/store'
 import { extractFileAttachments } from '../text/fileAttachments'
-import { htmlToText } from '../text/html'
 import { extractInlineImages } from '../text/inlineImages'
 import { reactionsSummary } from './reactions'
-import { getQuotedReply } from './renderableMessage'
+import { getQuotedReply, isMessageEdited, messageBodyText } from './renderableMessage'
 
 export type LoadMoreState = 'idle' | 'loading' | 'error' | 'unavailable'
 
@@ -243,17 +243,9 @@ function loadMoreLabel(state: LoadMoreState): string {
 function messageTextForHeight(row: MessageRenderRow, opts?: MessageRowHeightOpts): string {
   if (row.kind !== 'message') return ''
   const message = row.message
-  let text = ''
-  if (message.deletedDateTime) {
-    const senderName = message.from?.user?.displayName ?? 'someone'
-    const time = message.createdDateTime.slice(11, 16)
-    text = `(message deleted by ${senderName} · ${time})`
-  } else if (message.body.contentType === 'text') {
-    text = (message.body.content ?? '').replace(/\s+/g, ' ').trim()
-  } else {
-    text = htmlToText(message.body.content ?? '')
-  }
-  if (!message.deletedDateTime && isHeightEdited(message)) text += ' (edited)'
+  // Exactly the string the renderer paints - see messageBodyText.
+  let text = messageBodyText(message)
+  if (!message.deletedDateTime && isMessageEdited(message)) text += ' (edited)'
   if (shouldShowReactionRow(row, opts)) {
     const reactions = reactionsSummary(message.reactions)
     if (reactions) text += ` (${reactions})`
@@ -261,21 +253,16 @@ function messageTextForHeight(row: MessageRenderRow, opts?: MessageRowHeightOpts
   return text || ' '
 }
 
+// Rows a body occupies once wrapped. Ink wraps with wrap-ansi
+// ({ trim: false, hard: true }) - see ink/build/wrap-text.js - so we call the
+// same thing rather than dividing by the width. Character division silently
+// undercounts every line that breaks early on a long token (a URL is the
+// common case: est 4 rows vs 5 actually painted) and every double-width
+// glyph, and inline images are anchored by summing these heights, so each
+// missed row slides the picture a row out of its reserved block.
 function estimateWrappedRows(text: string, columns = 80): number {
   const width = Math.max(1, columns)
-  return text
-    .split('\n')
-    .reduce((sum, line) => sum + Math.max(1, Math.ceil(Array.from(line).length / width)), 0)
-}
-
-const HEIGHT_EDITED_GRACE_MS = 5_000
-
-function isHeightEdited(message: ChatMessage): boolean {
-  if (!message.lastModifiedDateTime) return false
-  const created = Date.parse(message.createdDateTime)
-  const modified = Date.parse(message.lastModifiedDateTime)
-  if (!Number.isFinite(created) || !Number.isFinite(modified)) return false
-  return modified - created > HEIGHT_EDITED_GRACE_MS
+  return wrapAnsi(text, width, { trim: false, hard: true }).split('\n').length
 }
 
 function formatDateHeader(iso: string, now = new Date()): string {

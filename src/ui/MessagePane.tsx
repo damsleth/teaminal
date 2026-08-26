@@ -16,15 +16,16 @@ import {
   type ChannelThreads,
 } from '../state/channelThreads'
 import type { Chat, ChatMessage, Channel, Team } from '../types'
-import { htmlToText } from '../text/html'
 import { extractFileAttachments, formatBytes } from '../text/fileAttachments'
 import { extractInlineImages, type InlineImageRef } from '../text/inlineImages'
 import { reactionsSummary } from './reactions'
-import { describeSystemEvent } from './systemEvent'
 import { searchMessages } from './messageSearch'
 import {
   effectiveSenderName,
   getQuotedReply,
+  isMessageDeleted,
+  isMessageEdited,
+  messageBodyText,
   messagesForTimelineNavigation,
 } from './renderableMessage'
 import {
@@ -409,7 +410,7 @@ export function MessagePane(props: {
     // last wrapped line so the picker anchors to the trailing edge.
     const focusedRow = rows[idx]
     const focusedMsg = focusedRow?.kind === 'message' ? focusedRow.message : null
-    const bodyText = focusedMsg ? previewBody(focusedMsg) : ''
+    const bodyText = focusedMsg ? messageBodyText(focusedMsg) : ''
     const bodyStartCol = messageBodyTerminalColumn({ bodyIndent, listPaneWidth })
     const fallbackCol = listPaneWidth + 3
     const col = pickerAnchorCol({
@@ -614,7 +615,7 @@ function MessageRow(props: {
       ? readReceiptLineForMessage(props.readReceipts, m.id, props.myUserId)
       : null
 
-  const bodyText = previewBody(m)
+  const bodyText = messageBodyText(m)
   // Resolve which attachment the focus ring points at, but only for the
   // focused message — every other row leaves its links/images at the subtle
   // (unfocused) treatment. Index 0 is the body, so >0 selects an attachment.
@@ -971,27 +972,6 @@ function inlineImagePlaceholder(cacheKey: string, name: string): string {
   return `[img] ${name}`
 }
 
-function previewBody(m: ChatMessage): string {
-  if (isMessageDeleted(m)) {
-    const senderName = m.from?.user?.displayName ?? 'someone'
-    const time = m.createdDateTime.slice(11, 16)
-    return `(message deleted by ${senderName} · ${time})`
-  }
-  if (m.messageType === 'systemEventMessage') {
-    const decoded = describeSystemEvent(m)
-    return decoded ?? ''
-  }
-  const raw = m.body.content ?? ''
-  if (m.body.contentType === 'text') {
-    return raw.replace(/\s+/g, ' ').trim()
-  }
-  // Graph inserts an opaque <attachment id="..."></attachment> tag at
-  // the top of body.content for quoted replies. htmlToText drops it
-  // (unknown tag) but leaves the preceding whitespace; trim again so
-  // the new message body starts at column 0.
-  return htmlToText(raw).trim()
-}
-
 // Locally-derived reply-count badge for a channel root message. `count` is
 // the number of replies present in the loaded stream; `more` is reserved for
 // a future window-gap signal (see the rootMessageId rebuild plan, step 3) and
@@ -1020,27 +1000,6 @@ export function readReceiptLineForMessage(
   ).length
   if (seenCount <= 0) return null
   return seenCount === 1 ? 'seen by 1' : `seen by ${seenCount}`
-}
-
-// 5s grace window: Graph rewrites lastModifiedDateTime as part of
-// server-side normalization on a fresh send, so 'edited within 5s'
-// is treated as 'not actually edited by the user'.
-const EDITED_GRACE_MS = 5_000
-
-export function isMessageEdited(m: ChatMessage): boolean {
-  if (!m.lastModifiedDateTime) return false
-  const created = Date.parse(m.createdDateTime)
-  const modified = Date.parse(m.lastModifiedDateTime)
-  if (!Number.isFinite(created) || !Number.isFinite(modified)) return false
-  return modified - created > EDITED_GRACE_MS
-}
-
-export function isMessageDeleted(m: ChatMessage): boolean {
-  if (m.deletedDateTime) return true
-  // Some channel paths return a stub with empty body and no deletedDateTime.
-  // We don't auto-detect those because empty bodies are also a legitimate
-  // shape for system events; rely on the explicit deletedDateTime field.
-  return false
 }
 
 function TypingLine(props: { typing: TypingIndicator[]; theme: Theme }) {
