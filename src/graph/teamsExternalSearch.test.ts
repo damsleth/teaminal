@@ -43,6 +43,11 @@ function primeAuth(): void {
 
 beforeEach(() => {
   __setRegionForTests(undefined, 'emea')
+  // Every test in this file goes through searchExternalUsers, which mints a
+  // token before it does anything else. Priming here rather than per-test is
+  // what stops a new test from silently spawning the real owa-piggy binary -
+  // which passes on a dev box that has it installed and fails on CI.
+  primeAuth()
 })
 
 afterEach(() => {
@@ -105,7 +110,6 @@ describe('skypeRowToDirectoryUser', () => {
 
 describe('searchExternalUsers', () => {
   test('POSTs the email body to /api/mt/part/{region}/beta/users/searchV2 with the spaces token', async () => {
-    primeAuth()
     let seenUrl = ''
     let seenAuth = ''
     let seenMethod = ''
@@ -144,7 +148,6 @@ describe('searchExternalUsers', () => {
   })
 
   test('handles bare-array response shape', async () => {
-    primeAuth()
     __setTransportForTests(async () =>
       jsonResponse([
         { mri: '8:orgid:abc-1234', displayName: 'A' },
@@ -156,7 +159,6 @@ describe('searchExternalUsers', () => {
   })
 
   test('caches results within the TTL window', async () => {
-    primeAuth()
     let calls = 0
     __setTransportForTests(async () => {
       calls++
@@ -171,19 +173,16 @@ describe('searchExternalUsers', () => {
   })
 
   test('returns empty list on 404', async () => {
-    primeAuth()
     __setTransportForTests(async () => jsonResponse({ message: 'not found' }, { status: 404 }))
     await expect(searchExternalUsers('nobody@nope.example')).resolves.toEqual([])
   })
 
   test('throws TeamsExternalSearchError on 500', async () => {
-    primeAuth()
     __setTransportForTests(async () => jsonResponse({ message: 'boom' }, { status: 500 }))
     await expect(searchExternalUsers('boom@example.com')).rejects.toThrow(/searchV2 500/)
   })
 
   test('returns [] for empty query without hitting the network', async () => {
-    primeAuth()
     let calls = 0
     __setTransportForTests(async () => {
       calls++
@@ -195,7 +194,6 @@ describe('searchExternalUsers', () => {
   })
 
   test('honors top to cap result count', async () => {
-    primeAuth()
     __setTransportForTests(async () =>
       jsonResponse(
         Array.from({ length: 10 }, (_, i) => ({
