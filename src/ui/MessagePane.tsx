@@ -6,8 +6,8 @@
 // HTML bodies are converted via src/ui/html.htmlToText so <at>, <emoji>,
 // <a>, and entity refs render correctly.
 
-import { Box, Text, useStdout } from 'ink'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { Box, Text, useStdout, useApp, type DOMElement } from 'ink'
+import { createContext, useContext, type ReactNode, useEffect, useRef, useState } from 'react'
 import { chatLabel, shortName } from '../state/selectables'
 import { focusKey, type ReadReceipt, type TypingIndicator } from '../state/store'
 import {
@@ -48,17 +48,18 @@ import {
   buildKittyImageEscape,
   clearKittyImages,
   fitKittyPlacement,
-  writeKittyImageAtOffset,
 } from './kittyGraphics'
 import { ensureImageFetched, getImageData } from '../state/imageCache'
 import { getActiveProfile } from '../graph/client'
 import { messageFocusables } from './messageFocusables'
 import { splitBodyLinkSpans } from './bodySpans'
 import { pickerAnchorCol } from './pickerAnchor'
+import { paintInlineImages, type InlineImageSlots } from './inlineImageLayout'
 
 export { effectiveSenderName, isRenderableMessage } from './renderableMessage'
 
 const TYPING_DOT = '…'
+const ImageSlotsContext = createContext<InlineImageSlots>(new Map())
 
 // Reserve for surrounding chrome so the message pane doesn't overflow the
 // terminal. Header bar (3) + composer box (3) + status bar (1) + pane
@@ -79,11 +80,11 @@ export function MessagePane(props: {
   focusedMessageId?: string | null
   focusIndicatorActive?: boolean
   loadOlderState?: LoadMoreState
-  /** Resolved chat-list pane width, used for Kitty cursor placement. */
+  /** Resolved chat-list pane width, used for the message width budget. */
   listPaneWidth?: number
   /**
    * Resolved composer box height. Part of the chrome below the pane, so it
-   * feeds the inline-image anchor — a stale guess shifts every image.
+   * feeds the timeline row budget.
    */
   composerRows?: number
 }) {
@@ -109,8 +110,7 @@ export function MessagePane(props: {
   const inlineImages = useAppState((s) => s.settings.inlineImages)
   const inlineImageMaxRows = useAppState((s) => s.settings.inlineImageMaxRows)
   // True when no status bar occupies the bottom row (hidden, or moved to the
-  // top): the Kitty image offset and the row budget both anchor to the bottom
-  // chrome, so 'top' frees the same row that 'hidden' does.
+  // top): this frees a row in the timeline budget.
   const statusBarHidden = useAppState((s) => s.settings.statusBarPosition !== 'bottom')
   const reactionPickerOpen = useAppState((s) => s.modal?.kind === 'reaction-picker')
   // Any open modal renders as a centred overlay on top of this pane. Kitty
@@ -128,9 +128,9 @@ export function MessagePane(props: {
   const listPaneWidth = props.listPaneWidth ?? LIST_PANE_WIDTH_DEFAULT
   const composerRows = props.composerRows ?? DEFAULT_COMPOSER_ROWS
   // The tail strip sits between this pane and the composer, so its rows count
-  // toward the image anchor. It renders only when a tail is enabled — and is
+  // toward the timeline budget. It renders only when a tail is enabled — and is
   // hidden entirely while a modal is open, which is also when image painting
-  // is suppressed, so enabled == visible for anchoring purposes.
+  // is suppressed, so enabled == visible for image layout purposes.
   const tailRows = useAppState(
     (s) => s.settings.tailEvents || s.settings.tailNetwork || s.settings.tailDiagnostics,
   )
@@ -157,6 +157,9 @@ export function MessagePane(props: {
     }
   }, [stdout])
   const windowStartRef = useRef(0)
+  const paneRef = useRef<DOMElement>(null)
+  const imageSlots = useRef<InlineImageSlots>(new Map())
+  const { waitUntilRenderFlush } = useApp()
 
   const isListFocus = focus.kind === 'list'
   const conv = focusKey(focus) ?? ''
@@ -203,7 +206,13 @@ export function MessagePane(props: {
   const chromeRows = CHROME_RESERVED_ROWS - (statusBarHidden ? 1 : 0)
   const rowBudget = Math.max(
     MIN_VISIBLE_ROWS,
-    terminalSize.rows - chromeRows - cozyRows - reservedDynamic,
+    terminalSize.rows -
+      chromeRows -
+      cozyRows -
+      reservedDynamic -
+      tailRows -
+      (composerRows - DEFAULT_COMPOSER_ROWS) -
+      (inputZone === 'message-search' ? 1 : 0),
   )
   // Body wrap width estimate for the viewport budget: pane content (terminal
   // minus the chat-list pane and its border) minus the body indent. Bodies now
@@ -289,95 +298,26 @@ export function MessagePane(props: {
     }
   })
 
-  // The inline-image paint plan: which blob goes how far up from the bottom of
-  // the frame, and how many rows it occupies. Derived during render so the
-  // paint effect can key off it — see the effect below.
-  //
-  // Empty while a modal is open: modals render as a centred overlay, and Kitty
-  // images composite above all terminal text, so leaving them painted would
-  // cover the overlay.
-  const imageColumn = messageBodyTerminalColumn({ bodyIndent, listPaneWidth })
-  const imagePaintPlan: Array<{ cacheKey: string; rowsFromBottom: number; rows: number }> = []
-  if (kittyEnabled && !modalOpen) {
-    const rowsAfter = new Array(rows.length).fill(0) as number[]
-    let below = 0
-    for (let i = rows.length - 1; i >= 0; i--) {
-      rowsAfter[i] = below
-      below += messageRenderRowHeight(rows[i]!, {
-        imageRowsForMessage,
-        messageTextColumns,
-        messageGap,
-        reactionDisplayMode,
-      })
-    }
-    for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-      const row = rows[rowIndex]!
-      if (row.kind !== 'message') continue
-      const refs = extractInlineImages(row.message)
-      // Per-image fitted rows (null = not yet loaded → renders a label row).
-      const reserved = refs.map((ref) =>
-        inlineImageReservedRows(ref.cacheKey, imgCols, inlineImageMaxRows, kittyEnabled),
-      )
-      const fileRows = extractFileAttachments(row.message).length
-      for (let imageIndex = 0; imageIndex < refs.length; imageIndex++) {
-        const ref = refs[imageIndex]!
-        const reservedRows = reserved[imageIndex]
-        if (reservedRows === null || reservedRows === undefined) continue
-        const imgData = getImageData(ref.cacheKey)
-        if (!imgData) continue
-        // Rows below this image's top, within its own message: the rest of
-        // this image, then later images' blocks (fitted rows or a label
-        // row each), then file-attachment rows, then the trailing group gap.
-        let belowWithinMessage = reservedRows - 1
-        for (let j = imageIndex + 1; j < refs.length; j++) {
-          const r = reserved[j]
-          belowWithinMessage += r === null || r === undefined ? 1 : r
-        }
-        belowWithinMessage += fileRows + messageGap
-        imagePaintPlan.push({
-          cacheKey: ref.cacheKey,
-          rowsFromBottom:
-            rowsAfter[rowIndex]! +
-            belowWithinMessage +
-            bottomChromeRows({ statusBarHidden, composerRows, tailRows }),
-          rows: reservedRows,
-        })
-      }
-    }
-  }
-
-  // The plan serialized. Every input to the paint is folded into it — the
-  // column, and each image's blob, offset, and height (rowsFromBottom already
-  // folds in the window, terminal size, gaps and chrome). So an unchanged
-  // signature means the pixels on screen are already correct, and using it as
-  // this effect's dependency is what keeps an idle session from re-clearing
-  // and re-placing images on every poll-driven render.
-  const paintSignature = imagePaintPlan
-    .map((p) => `${p.cacheKey}@${p.rowsFromBottom}x${p.rows}`)
-    .join(',')
-
+  // Yoga owns the positions, including unused space below short timelines,
+  // wrapped text and dynamic chrome. Wait for Ink's throttled text frame
+  // before reading those positions and placing graphics over their slots.
   useEffect(() => {
-    if (!stdout || imagePaintPlan.length === 0) return
-    clearKittyImages(stdout)
-    for (const p of imagePaintPlan) {
-      const data = getImageData(p.cacheKey)
-      if (!data) continue
-      // First paint of a blob transmits its pixels; later paints place the
-      // copy the terminal kept, ~40 bytes instead of ~1.2MB of base64.
-      const apc = buildKittyImageEscape(p.cacheKey, data, {
-        rows: p.rows,
-        reservedRows: p.rows,
+    if (!stdout || !kittyEnabled) return
+    let cancelled = false
+    void waitUntilRenderFlush().then(() => {
+      if (cancelled) return
+      clearKittyImages(stdout)
+      if (modalOpen || !paneRef.current) return
+      paintInlineImages(stdout, paneRef.current, imageSlots.current, (cacheKey, rows) => {
+        const data = getImageData(cacheKey)
+        return data ? buildKittyImageEscape(cacheKey, data, { rows, reservedRows: rows }) : ''
       })
-      writeKittyImageAtOffset(stdout, apc, p.rowsFromBottom, p.rows, imageColumn)
-    }
+    })
     return () => {
-      // Placements only — the transmitted pixels stay cached in the terminal so
-      // the next paint is cheap. They are freed on exit by freeKittyImages().
+      cancelled = true
       clearKittyImages(stdout)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- paintSignature
-    // folds in every input to the plan; see its definition above.
-  }, [paintSignature, imageColumn, stdout])
+  })
 
   // While the reaction picker is open we delegate to the macOS Character
   // Viewer, which anchors to the terminal's text cursor (after an Ink render
@@ -432,82 +372,85 @@ export function MessagePane(props: {
   }
 
   return (
-    <Box
-      flexDirection="column"
-      flexGrow={1}
-      flexShrink={1}
-      minWidth={0}
-      overflow="hidden"
-      paddingX={0}
-    >
-      {density === 'cozy' && (
-        <Box paddingLeft={bodyIndent} marginBottom={1} flexShrink={0}>
-          <Text bold={theme.emphasis.sectionHeadingBold}>{headerLabel}</Text>
-        </Box>
-      )}
-      {searchActive && (
-        <Box>
-          <Text>
-            <Text color={theme.mutedText}>/ </Text>
-            {searchQuery}
-            <Text color="cyan">█</Text>
-            <Text color={theme.mutedText}>
-              {'  '}
-              {hits.length} hit(s) · enter jumps · n step · esc closes
-            </Text>
-          </Text>
-        </Box>
-      )}
-      {isLoadingOlder && !showingHistoryTop && (
-        <Text color={theme.mutedText}>… loading older messages</Text>
-      )}
-      <Box flexDirection="column">
-        {messages.length === 0 ? (
-          <Text color="gray"> loading...</Text>
-        ) : (
-          <>
-            {rows.map((row) => (
-              <TimelineRow
-                key={
-                  row.kind === 'message'
-                    ? row.message.id
-                    : row.kind === 'date'
-                      ? row.key
-                      : 'load-more'
-                }
-                row={row}
-                focused={
-                  row.kind === 'message' &&
-                  showFocusIndicator &&
-                  row.message.id === props.focusedMessageId
-                }
-                focusIndicatorChar={focusIndicatorChar}
-                focusedMessageId={props.focusedMessageId}
-                focusedAttachmentIndex={focusedAttachmentIndex}
-                myUserId={me?.id}
-                reactionDisplayMode={reactionDisplayMode}
-                readReceipts={readReceiptsByConvo[conv]}
-                imgCols={imgCols}
-                inlineImageMaxRows={inlineImageMaxRows}
-                inlineImagesPainted={kittyEnabled}
-                selfMessagesOnRight={selfMessagesOnRight}
-                bodyIndent={bodyIndent}
-                messageGap={messageGap}
-                shortNames={shortNames}
-                showTimestamp={showTimestamps}
-                theme={theme}
-                threadMeta={
-                  channelThreads && row.kind === 'message'
-                    ? replyBadgeFor(channelThreads, row.message.id)
-                    : undefined
-                }
-              />
-            ))}
-            <TypingLine typing={conv ? (typingByConvo[conv] ?? []) : []} theme={theme} />
-          </>
+    <ImageSlotsContext.Provider value={imageSlots.current}>
+      <Box
+        ref={paneRef}
+        flexDirection="column"
+        flexGrow={1}
+        flexShrink={1}
+        minWidth={0}
+        overflow="hidden"
+        paddingX={0}
+      >
+        {density === 'cozy' && (
+          <Box paddingLeft={bodyIndent} marginBottom={1} flexShrink={0}>
+            <Text bold={theme.emphasis.sectionHeadingBold}>{headerLabel}</Text>
+          </Box>
         )}
+        {searchActive && (
+          <Box>
+            <Text>
+              <Text color={theme.mutedText}>/ </Text>
+              {searchQuery}
+              <Text color="cyan">█</Text>
+              <Text color={theme.mutedText}>
+                {'  '}
+                {hits.length} hit(s) · enter jumps · n step · esc closes
+              </Text>
+            </Text>
+          </Box>
+        )}
+        {isLoadingOlder && !showingHistoryTop && (
+          <Text color={theme.mutedText}>… loading older messages</Text>
+        )}
+        <Box flexDirection="column">
+          {messages.length === 0 ? (
+            <Text color="gray"> loading...</Text>
+          ) : (
+            <>
+              {rows.map((row) => (
+                <TimelineRow
+                  key={
+                    row.kind === 'message'
+                      ? row.message.id
+                      : row.kind === 'date'
+                        ? row.key
+                        : 'load-more'
+                  }
+                  row={row}
+                  focused={
+                    row.kind === 'message' &&
+                    showFocusIndicator &&
+                    row.message.id === props.focusedMessageId
+                  }
+                  focusIndicatorChar={focusIndicatorChar}
+                  focusedMessageId={props.focusedMessageId}
+                  focusedAttachmentIndex={focusedAttachmentIndex}
+                  myUserId={me?.id}
+                  reactionDisplayMode={reactionDisplayMode}
+                  readReceipts={readReceiptsByConvo[conv]}
+                  imgCols={imgCols}
+                  inlineImageMaxRows={inlineImageMaxRows}
+                  inlineImagesPainted={kittyEnabled}
+                  selfMessagesOnRight={selfMessagesOnRight}
+                  bodyIndent={bodyIndent}
+                  messageGap={messageGap}
+                  shortNames={shortNames}
+                  showTimestamp={showTimestamps}
+                  theme={theme}
+                  threadMeta={
+                    channelThreads && row.kind === 'message'
+                      ? replyBadgeFor(channelThreads, row.message.id)
+                      : undefined
+                  }
+                />
+              ))}
+              <TypingLine typing={conv ? (typingByConvo[conv] ?? []) : []} theme={theme} />
+            </>
+          )}
+        </Box>
       </Box>
-    </Box>
+    </ImageSlotsContext.Provider>
   )
 }
 
@@ -769,10 +712,7 @@ function MessageRow(props: {
             {`send failed: ${sendError.slice(0, 120)}`}
           </Text>,
         )}
-      {/* Inline images are not mirrored in flip mode: the picture is painted
-          out-of-band by the Kitty layer at a fixed column derived from the left
-          edge (messageBodyTerminalColumn), so flipping only the reserved rows
-          would desync the painting from its label. They share the body indent. */}
+      {/* Images share the left body indent, including in flip mode. */}
       {!isDeleted &&
         extractInlineImages(m).map((ref: InlineImageRef) => (
           <ImageRows
@@ -850,6 +790,7 @@ function ImageRows(props: {
   bodyIndent: number
   theme: Theme
 }) {
+  const slots = useContext(ImageSlotsContext)
   const indent = Math.max(0, props.bodyIndent)
   // A bar marks the image's vertical extent in lieu of a full box border: the
   // picture is painted out-of-band by the Kitty layer into rows whose
@@ -901,7 +842,22 @@ function ImageRows(props: {
     )
   }
   return (
-    <>
+    <Box
+      flexDirection="column"
+      height={reservedRows}
+      flexShrink={0}
+      ref={(node) => {
+        if (!node) return
+        slots.set(node, {
+          cacheKey: props.cacheKey,
+          rows: reservedRows,
+          inset: Math.max(1, indent),
+        })
+        return () => {
+          slots.delete(node)
+        }
+      }}
+    >
       {Array.from({ length: reservedRows }, (_, i) => (
         <Box key={`img-space-${i}`} flexDirection="row">
           {lead}
@@ -911,22 +867,8 @@ function ImageRows(props: {
           </Box>
         </Box>
       ))}
-    </>
+    </Box>
   )
-}
-
-// Rows Ink paints below the last message row. Inline images are placed by
-// moving the cursor UP from the bottom of the frame, so this total is the
-// image anchor: undercount it by k and every image paints k rows too low,
-// straight over the following messages. Measured against a real frame:
-// pane bottom border (1) + tail-panel strip (9 when any tail is enabled) +
-// composer box + status bar.
-export function bottomChromeRows(opts: {
-  statusBarHidden: boolean
-  composerRows: number
-  tailRows: number
-}): number {
-  return 1 + opts.tailRows + opts.composerRows + (opts.statusBarHidden ? 0 : 1)
 }
 
 function messageBodyTerminalColumn(opts: { bodyIndent: number; listPaneWidth: number }) {
