@@ -355,6 +355,19 @@ describe('handleChatKeys', () => {
     expect(a.movements).toEqual([])
   })
 
+  test('k from a message body enters the previous message at its end', () => {
+    const calls: [number, boolean | undefined][] = []
+    const a = makeCtx(CHAT_FOCUS, { moveMessageCursor: (d, atEnd) => calls.push([d, atEnd]) })
+    handleChatKeys({ input: 'k', key: makeKey() }, a.ctx)
+    handleChatKeys({ input: '', key: makeKey({ upArrow: true }) }, a.ctx)
+    handleChatKeys({ input: 'j', key: makeKey() }, a.ctx)
+    expect(calls).toEqual([
+      [-1, true],
+      [-1, true],
+      [1, undefined],
+    ])
+  })
+
   test('Space on a focused image opens the image modal', () => {
     const { ctx, store } = makeCtx(CHAT_FOCUS, {
       focusables: [{ kind: 'message' }, { kind: 'image', ref: IMG_REF }],
