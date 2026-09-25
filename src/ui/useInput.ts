@@ -4,6 +4,9 @@
 // on focus change. Ink strips the ESC and delivers "[I" / "[O" as typed
 // text, which then lands in the composer and other text fields. Every
 // component imports useInput from here instead of from 'ink'.
+//
+// Exact match is enough: Ink splits a batched chunk ("\x1b[O\x1b[Ia") into
+// one event per sequence, and it keeps a pasted literal "[I" intact.
 import { useInput as inkUseInput } from 'ink'
 
 type Handler = Parameters<typeof inkUseInput>[0]
