@@ -67,6 +67,9 @@ export function terminalNotifySequence(
   body: string,
   env: Record<string, string | undefined> = process.env,
 ): string | null {
+  // tmux drops unknown OSCs without passthrough, and inherits the outer
+  // terminal's env (KITTY_WINDOW_ID), so bail to the osascript fallback.
+  if (env.TMUX) return null
   const clean = (s: string) => s.replace(/[\x00-\x1f\x7f-\x9f]/g, ' ')
   const t = clean(title)
   const b = clean(body)
