@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Notifications for every chat message.** New 1:1 and group chat messages
+  now raise a desktop notification like the Teams client does, not only
+  @mentions. Toggle with `notifyChatMessages` (Esc → Settings → "Notify on
+  every chat message"); meeting chats and channels stay mention-only.
+- **Native terminal notifications.** In kitty, Ghostty, WezTerm and iTerm2 the
+  banner is posted by the terminal itself (OSC 99 / 777 / 9), so it shows
+  under the terminal's name and clicking it focuses the terminal. Other
+  terminals keep the `osascript` / `notify-send` fallback.
+- **Notifications view.** The activity feed is now "Notifications", lists the
+  chat messages teaminal notified about alongside Teams' activity feed, and
+  is reachable from the Esc menu as well as Ctrl+A.
+
 ### Fixed
 
 - **Keyboard input works again in kitty and Ghostty.** The startup cell-size

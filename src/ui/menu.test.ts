@@ -218,6 +218,7 @@ describe('ROOT_MENU shape', () => {
       'messageFocusIndicatorChar',
       // Notifications (quietHours is a cycle action, not a toggle key)
       'notifyMuted',
+      'notifyChatMessages',
       'notifyActiveBanner',
       // Presence
       'forceAvailableWhenFocused',

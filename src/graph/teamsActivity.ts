@@ -40,6 +40,9 @@ export type ActivityKind =
   | 'follow-post'
   | 'missed-call'
   | 'team-added'
+  // Local-only: a chat message teaminal itself notified about (Teams'
+  // activity feed never carries plain chat messages).
+  | 'message'
   | 'unknown'
 
 export type ActivityItem = {

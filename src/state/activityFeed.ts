@@ -25,9 +25,31 @@ export function mergeActivityItems(
   for (const item of current) {
     if (!byId.has(item.id)) byId.set(item.id, item)
   }
-  const merged = [...byId.values()]
+  // Locally recorded notifications (id `local:<messageId>`, see
+  // recordNotification) yield to the server's row for the same message.
+  const serverMessageIds = new Set<string>()
+  for (const item of byId.values()) {
+    if (!item.id.startsWith('local:') && item.messageId) serverMessageIds.add(item.messageId)
+  }
+  const merged = [...byId.values()].filter(
+    (item) => !item.id.startsWith('local:') || !serverMessageIds.has(item.messageId ?? ''),
+  )
   merged.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
   return merged.slice(0, ACTIVITY_FEED_CAP)
+}
+
+// Record a notification teaminal fired so it shows in the Notifications
+// view next to the server-side activity feed.
+export function recordNotification(
+  store: Store<AppState>,
+  item: Omit<ActivityItem, 'id' | 'isRead'> & { messageId: string },
+): void {
+  store.set((s) => {
+    const merged = mergeActivityItems(s.activityFeed, [
+      { ...item, id: `local:${item.messageId}`, isRead: false },
+    ])
+    return { activityFeed: merged, unreadMentionCount: countUnreadMentions(merged) }
+  })
 }
 
 export function countUnreadMentions(items: ActivityItem[]): number {

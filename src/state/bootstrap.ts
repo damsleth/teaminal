@@ -23,10 +23,17 @@ import { RealtimeEventBus } from '../realtime/events'
 import { setActiveTransport } from '../realtime/transport'
 import { TrouterTransport } from '../realtime/trouter'
 import { htmlToText } from '../text/html'
-import { mergeActivityItems, countUnreadMentions } from './activityFeed'
+import { mergeActivityItems, countUnreadMentions, recordNotification } from './activityFeed'
 import { startPoller, type PollerHandleRef } from './poller'
 import { startRealtimeBridge } from './realtimeBridge'
-import { audienceFromRouting, routingForAccount, type AppState, type Store } from './store'
+import { chatLabel } from './selectables'
+import {
+  audienceFromRouting,
+  focusKey,
+  routingForAccount,
+  type AppState,
+  type Store,
+} from './store'
 
 export type SessionHandle = {
   /** Profile passed to runSession; useful for logging / debugging. */
@@ -138,7 +145,25 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
             ? raw.replace(/\s+/g, ' ').trim()
             : htmlToText(raw)
         const s = store.get()
-        const scope = event.conv.startsWith('chat:') ? 'chat' : 'channel'
+        const chatId = event.conv.startsWith('chat:') ? event.conv.slice('chat:'.length) : null
+        const chat = chatId ? s.chats.find((c) => c.id === chatId) : undefined
+        const scope = chat
+          ? chatLabel(chat, s.me?.id, { nameByUserId: s.nameByUserId })
+          : chatId
+            ? 'chat'
+            : 'channel'
+        const viewing = focusKey(s.focus) === event.conv && s.terminalFocused !== false
+        if (!viewing) {
+          recordNotification(store, {
+            kind: event.kind,
+            chatId: chatId ?? undefined,
+            messageId: event.message.id,
+            senderId: event.message.from?.user?.id,
+            senderDisplayName: sender,
+            preview: preview.slice(0, 200),
+            createdAt: event.message.createdDateTime,
+          })
+        }
         notifyMention(
           { conv: event.conv, senderName: sender, preview: preview.slice(0, 120), scope },
           {

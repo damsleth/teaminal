@@ -340,8 +340,11 @@ export type Settings = {
   // that suppresses banners (bell still rings — terminal-level mute is
   // the user's responsibility). notifyActiveBanner forces the banner
   // even when the user is already viewing the active conv (default off:
-  // bell only). quietHoursStart/End are HH:MM strings or null to disable.
+  // bell only). notifyChatMessages extends banners from @mentions to
+  // every new 1:1 / group chat message, like the Teams client.
+  // quietHoursStart/End are HH:MM strings or null to disable.
   notifyMuted: boolean
+  notifyChatMessages: boolean
   notifyActiveBanner: boolean
   quietHoursStart: string | null
   quietHoursEnd: string | null
@@ -480,6 +483,7 @@ export const defaultSettings: Settings = {
   forceAvailableWhenFocused: true,
   realtimeEnabled: false,
   notifyMuted: false,
+  notifyChatMessages: true,
   notifyActiveBanner: false,
   quietHoursStart: null,
   quietHoursEnd: null,

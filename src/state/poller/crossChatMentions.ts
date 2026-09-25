@@ -24,7 +24,7 @@ import {
   type Store,
 } from '../store'
 import { isAbortError } from './intervals'
-import { shouldNotifyMention } from './mentions'
+import { notifyKind } from './mentions'
 import type { MentionEvent } from '../poller'
 
 const PROBE_TOP = 5
@@ -103,8 +103,11 @@ async function probeChatForMention(
   // active-loop open doesn't re-notify these IDs as "new".
   for (const m of messages) seenSet.add(m.id)
   seen.set(conv, seenSet)
-  if (target && wasUnseen && shouldNotifyMention(target, myId)) {
+  if (!target || !wasUnseen) return
+  const kind = notifyKind(target, myId, chat.chatType, store.get().settings.notifyChatMessages)
+  if (!kind) return
+  if (kind === 'mention') {
     store.set((s) => ({ unreadByChatId: bumpChatMention(s.unreadByChatId, chat.id) }))
-    onMention?.({ conv, message: target, source: 'list-diff' })
   }
+  onMention?.({ conv, message: target, source: 'list-diff', kind })
 }

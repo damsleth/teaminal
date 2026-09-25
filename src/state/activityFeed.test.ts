@@ -20,6 +20,13 @@ describe('mergeActivityItems', () => {
     expect(merged[0]!.preview).toBe('new')
   })
 
+  test('a locally recorded notification yields to the server row for the same message', () => {
+    const local = item({ id: 'local:m1', kind: 'message', messageId: 'm1' })
+    const other = item({ id: 'local:m2', kind: 'message', messageId: 'm2' })
+    const merged = mergeActivityItems([local, other], [item({ id: 'srv', messageId: 'm1' })])
+    expect(merged.map((m) => m.id).sort()).toEqual(['local:m2', 'srv'])
+  })
+
   test('sorts by createdAt descending (newest first)', () => {
     const a = item({ id: 'a', createdAt: '2026-05-20T10:00:00Z' })
     const b = item({ id: 'b', createdAt: '2026-05-20T11:00:00Z' })

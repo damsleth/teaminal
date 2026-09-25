@@ -1,7 +1,8 @@
-// Activity feed overlay (Teams web's bell-icon panel).
+// Notifications overlay (Teams web's bell-icon activity panel).
 //
 // Pulls from the CSA /api/csa/.../updates response stashed in
-// state.activityFeed. j/k navigates, Enter jumps the main view to the
+// state.activityFeed, plus the chat messages teaminal itself notified
+// about (recordNotification, kind 'message'). j/k navigates, Enter jumps the main view to the
 // source chat + message. Esc closes.
 //
 // The list is dedup'd at the reducer (mergeActivityItems) so the same
@@ -33,6 +34,8 @@ function kindGlyph(kind: ActivityItem['kind']): string {
       return '☎'
     case 'team-added':
       return '+'
+    case 'message':
+      return '✉'
     default:
       return '·'
   }
@@ -167,11 +170,11 @@ export function ActivityModal() {
         width={86}
       >
         <Text bold={theme.emphasis.modalTitleBold}>
-          Activity{totalUnread > 0 ? ` (${totalUnread} unread)` : ''}
+          Notifications{totalUnread > 0 ? ` (${totalUnread} unread)` : ''}
         </Text>
         <Box height={1} />
         {items.length === 0 ? (
-          <Text color="gray">(no activity)</Text>
+          <Text color="gray">(no notifications)</Text>
         ) : (
           visible.map((it, i) => {
             const absIdx = top + i

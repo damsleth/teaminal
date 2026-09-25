@@ -101,6 +101,7 @@ warnings and fall back to defaults.
   "forceAvailableWhenFocused": true,
   "realtimeEnabled": false,
   "notifyMuted": false,
+  "notifyChatMessages": true,
   "notifyActiveBanner": false,
   "quietHoursStart": null,
   "quietHoursEnd": null,
@@ -142,6 +143,7 @@ warnings and fall back to defaults.
 | `forceAvailableWhenFocused`    | boolean              |  `true` | While the terminal window has focus (DEC focus reporting; CSI ?1004), PUT `forceavailability=Available` to `presence.teams.microsoft.com` so Teams shows you Available, like the desktop client does for an active window. The override expires server-side after ~5 min and is refreshed inside that window. Set to `false` to leave presence to Teams' own desktop client / inactivity timer. |
 | `realtimeEnabled`              | boolean              | `false` | Enables the experimental Teams trouter push transport for typing, read-receipt, presence, and immediate refresh signals. Polling remains the source of truth and fallback. |
 | `notifyMuted`                  | boolean              | `false` | Suppress desktop notification banners while keeping terminal bells.                      |
+| `notifyChatMessages`           | boolean              |  `true` | Notify on every new 1:1 / group chat message, not just @mentions. Meeting chats and channels stay mention-only. |
 | `notifyActiveBanner`           | boolean              | `false` | Show banners even for the conversation currently open in a focused terminal.             |
 | `quietHoursStart`              | `HH:MM` or null      |  `null` | Quiet-hours start time; disabled unless both start and end are set.                      |
 | `quietHoursEnd`                | `HH:MM` or null      |  `null` | Quiet-hours end time; windows can cross midnight.                                        |
@@ -247,7 +249,7 @@ The in-app Settings menu persists changes back to `config.json`.
 | `d` / PageDown | chat / channel    | Move down half a page.                                                  |
 | `t`            | channel           | Open the thread for the focused channel message.                        |
 | `/`            | chat / channel    | Search messages in the open conversation.                               |
-| Ctrl+A         | any               | Open the activity feed.                                                 |
+| Ctrl+A         | any               | Open notifications (also in the Esc menu).                              |
 | Ctrl+X         | list              | Enter resize mode (h/l chat list, j/k composer, 0 reset, Esc done).     |
 | `?`            | list              | Show keybindings.                                                       |
 | `r`            | any               | Refresh now.                                                            |

@@ -265,6 +265,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     forceAvailableWhenFocused: settings.forceAvailableWhenFocused,
     realtimeEnabled: settings.realtimeEnabled,
     notifyMuted: settings.notifyMuted,
+    notifyChatMessages: settings.notifyChatMessages,
     notifyActiveBanner: settings.notifyActiveBanner,
     quietHoursStart: settings.quietHoursStart,
     quietHoursEnd: settings.quietHoursEnd,
@@ -500,6 +501,7 @@ function validateAndAssign(
     case 'forceAvailableWhenFocused':
     case 'realtimeEnabled':
     case 'notifyMuted':
+    case 'notifyChatMessages':
     case 'notifyActiveBanner':
     case 'tailEvents':
     case 'tailNetwork':

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { ChatMessage, Mention } from '../../types'
-import { shouldNotifyMention } from './mentions'
+import { notifyKind, shouldNotifyMention } from './mentions'
 
 const ME_ID = 'me-id'
 const OTHER_ID = 'other-id'
@@ -67,5 +67,30 @@ describe('shouldNotifyMention', () => {
       { id: 0, mentionText: '@Me', mentioned: { user: { id: '', displayName: 'Me' } } },
     ]
     expect(shouldNotifyMention(msg({ fromId: OTHER_ID, mentions }), ME_ID)).toBe(false)
+  })
+})
+
+describe('notifyKind', () => {
+  const mention: Mention[] = [
+    { id: 0, mentionText: '@Me', mentioned: { user: { id: ME_ID, displayName: 'Me' } } },
+  ]
+  test('mention wins regardless of chat type or setting', () => {
+    expect(notifyKind(msg({ fromId: OTHER_ID, mentions: mention }), ME_ID, 'meeting', false)).toBe(
+      'mention',
+    )
+  })
+  test('plain message notifies in 1:1 and group chats when enabled', () => {
+    expect(notifyKind(msg({ fromId: OTHER_ID }), ME_ID, 'oneOnOne', true)).toBe('message')
+    expect(notifyKind(msg({ fromId: OTHER_ID }), ME_ID, 'group', true)).toBe('message')
+  })
+  test('plain message is silent when disabled, in meetings/channels, or from me', () => {
+    expect(notifyKind(msg({ fromId: OTHER_ID }), ME_ID, 'oneOnOne', false)).toBeNull()
+    expect(notifyKind(msg({ fromId: OTHER_ID }), ME_ID, 'meeting', true)).toBeNull()
+    expect(notifyKind(msg({ fromId: OTHER_ID }), ME_ID, undefined, true)).toBeNull()
+    expect(notifyKind(msg({ fromId: ME_ID }), ME_ID, 'oneOnOne', true)).toBeNull()
+  })
+  test('system events never notify', () => {
+    const sys = { ...msg({ fromId: OTHER_ID }), messageType: 'systemEventMessage' }
+    expect(notifyKind(sys, ME_ID, 'oneOnOne', true)).toBeNull()
   })
 })
