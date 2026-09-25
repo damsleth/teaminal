@@ -35,6 +35,7 @@ After every meaningful set of changes (new feature, bug fix that affects users, 
    - `PATCH` for bug fixes and tightening
 3. **Keep packaging in sync:** when changing the released version, supported platforms, artifact names, or install flow, update `scripts/build.sh`, `README.md`, `docs/release.md`, and the Homebrew tap formula together. The tap formula should match the release artifacts produced by `scripts/build.sh`.
 4. **Promote the Unreleased section** to the new version on tagged releases: rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add a fresh empty `## [Unreleased]` above it, and update the comparison links at the bottom.
+5. **A release is not done until GitHub CI is green.** After pushing, wait for every workflow on the pushed commits — the `Release` run on the tag _and_ the `CI` run on `main` — and confirm success (`gh run list --limit 5`, `gh run watch <id> --exit-status`). A green `Release` run does not cover `CI`: only `CI` runs the tui-test flows, which catch menu-order and snapshot regressions that `bun test` misses. Run them locally before tagging: `CI=1 TEAMINAL_SEED=fixtures node node_modules/@microsoft/tui-test/index.js`.
 
 Trivial commits (typo fixes, comment-only edits, README polish) do not need a changelog entry or version bump.
 
