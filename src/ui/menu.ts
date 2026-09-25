@@ -51,6 +51,7 @@ export type ToggleKey =
   | 'useTeamsPresence'
   | 'realtimeEnabled'
   | 'notifyMuted'
+  | 'notifyChatMessages'
   | 'notifyActiveBanner'
   | 'tailEvents'
   | 'tailNetwork'
@@ -62,6 +63,7 @@ export type MenuAction =
   | { kind: 'resume' }
   | { kind: 'quit' }
   | { kind: 'show-accounts' }
+  | { kind: 'show-notifications' }
   | { kind: 'submenu' }
   | { kind: 'noop' }
   | { kind: 'toggle-setting'; key: ToggleKey }
@@ -116,6 +118,12 @@ export const ROOT_MENU: MenuItem[] = [
     id: 'accounts',
     label: 'Accounts',
     action: { kind: 'show-accounts' },
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    action: { kind: 'show-notifications' },
+    hint: 'Ctrl+A',
   },
   {
     id: 'settings',
@@ -274,6 +282,12 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'notifyMuted',
         label: 'Mute notifications',
         action: { kind: 'toggle-setting', key: 'notifyMuted' },
+      },
+      {
+        id: 'notifyChatMessages',
+        label: 'Notify on every chat message',
+        action: { kind: 'toggle-setting', key: 'notifyChatMessages' },
+        hint: 'off = @mentions only',
       },
       {
         id: 'notifyActiveBanner',
@@ -456,6 +470,7 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'useTeamsPresence':
     case 'realtimeEnabled':
     case 'notifyMuted':
+    case 'notifyChatMessages':
     case 'notifyActiveBanner':
     case 'tailEvents':
     case 'tailNetwork':
@@ -510,6 +525,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'useTeamsPresence':
     case 'realtimeEnabled':
     case 'notifyMuted':
+    case 'notifyChatMessages':
     case 'notifyActiveBanner':
     case 'tailEvents':
     case 'tailNetwork':

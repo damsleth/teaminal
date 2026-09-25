@@ -411,6 +411,7 @@ describe('Settings ↔ config.json parity', () => {
     forceAvailableWhenFocused: !defaultSettings.forceAvailableWhenFocused,
     realtimeEnabled: !defaultSettings.realtimeEnabled,
     notifyMuted: !defaultSettings.notifyMuted,
+    notifyChatMessages: !defaultSettings.notifyChatMessages,
     notifyActiveBanner: !defaultSettings.notifyActiveBanner,
     quietHoursStart: '22:00',
     quietHoursEnd: '07:00',

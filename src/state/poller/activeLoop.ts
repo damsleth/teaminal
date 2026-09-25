@@ -18,7 +18,7 @@ import type { ChatMessage } from '../../types'
 import { focusKey, type AppState, type ConvKey, type Focus, type Store } from '../store'
 import type { MentionEvent } from '../poller'
 import { backoff, isAbortError, jitter } from './intervals'
-import { shouldNotifyMention } from './mentions'
+import { notifyKind, type NotifyKind } from './mentions'
 import { mergeActivePagePatch, type MessagesPage } from './pagePatch'
 import type { Sleeper } from './sleeper'
 
@@ -95,22 +95,27 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
         if (stillSame) {
           const isFirst = !seen.has(conv)
           const seenSet = seen.get(conv) ?? new Set<string>()
-          const myId = store.get().me?.id
-          const newMentions: ChatMessage[] = []
+          const s0 = store.get()
+          const myId = s0.me?.id
+          const chatType =
+            focus.kind === 'chat'
+              ? s0.chats.find((c) => c.id === focus.chatId)?.chatType
+              : undefined
+          const toNotify: Array<{ msg: ChatMessage; kind: NotifyKind }> = []
           for (const msg of messages) {
             if (seenSet.has(msg.id)) continue
             seenSet.add(msg.id)
             if (isDebugEnabled()) logMessageImageShape(msg)
-            if (!isFirst && myId && shouldNotifyMention(msg, myId)) {
-              newMentions.push(msg)
-            }
+            if (isFirst || !myId) continue
+            const kind = notifyKind(msg, myId, chatType, s0.settings.notifyChatMessages)
+            if (kind) toNotify.push({ msg, kind })
           }
           seen.set(conv, seenSet)
           store.set((s) => ({
             ...mergeActivePagePatch(s, conv, page, focus),
           }))
-          for (const msg of newMentions) {
-            onMention?.({ conv, message: msg, source: 'active' })
+          for (const { msg, kind } of toNotify) {
+            onMention?.({ conv, message: msg, source: 'active', kind })
           }
           // Channel reply counts are now derived locally from the full
           // chatsvc stream in the message pane (src/state/channelThreads.ts),

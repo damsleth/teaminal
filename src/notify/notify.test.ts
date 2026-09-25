@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { __resetForTests, __setSpawnForTests, bell, escapeAppleScript, system } from './notify'
+import {
+  __resetForTests,
+  __setSpawnForTests,
+  bell,
+  escapeAppleScript,
+  system,
+  terminalNotifySequence,
+} from './notify'
 
 afterEach(() => {
   __resetForTests()
@@ -26,6 +33,27 @@ describe('escapeAppleScript', () => {
 
   test('no-op for plain ASCII without specials', () => {
     expect(escapeAppleScript('hello world')).toBe('hello world')
+  })
+})
+
+describe('terminalNotifySequence', () => {
+  test('picks the OSC dialect per terminal, null for unknown ones', () => {
+    expect(terminalNotifySequence('T', 'B', { TERM_PROGRAM: 'ghostty' })).toBe(
+      '\x1b]777;notify;T;B\x1b\\',
+    )
+    expect(terminalNotifySequence('T', 'B', { TERM_PROGRAM: 'iTerm.app' })).toBe('\x1b]9;T: B\x07')
+    expect(terminalNotifySequence('T', 'B', { KITTY_WINDOW_ID: '1' })).toBe(
+      '\x1b]99;i=teaminal:d=0;T\x1b\\\x1b]99;i=teaminal:p=body;B\x1b\\',
+    )
+    expect(terminalNotifySequence('T', 'B', { TERM_PROGRAM: 'Apple_Terminal' })).toBeNull()
+    expect(terminalNotifySequence('T', 'B', { TERM_PROGRAM: 'tmux' })).toBeNull()
+  })
+
+  test('strips control bytes so message text cannot break out of the OSC', () => {
+    const seq = terminalNotifySequence('a;b', 'x\x1b\\\x1b]0;pwned\x07y', {
+      TERM_PROGRAM: 'ghostty',
+    })
+    expect(seq).toBe('\x1b]777;notify;a,b;x \\ ]0;pwned y\x1b\\')
   })
 })
 
@@ -64,7 +92,7 @@ describe('system on darwin', () => {
       seenArgs = args
       return { exitCode: 0 }
     })
-    const result = await system('teaminal', 'Bjørn mentioned you')
+    const result = await system('teaminal', 'Bjørn mentioned you', {})
     expect(result).toBe('sent')
     expect(seenCmd).toBe('osascript')
     expect(seenArgs[0]).toBe('-e')
@@ -80,7 +108,7 @@ describe('system on darwin', () => {
       script = args[1] ?? ''
       return { exitCode: 0 }
     })
-    await system('he said "hi"', 'use \\path')
+    await system('he said "hi"', 'use \\path', {})
     // " and \ inside the embedded literal are escaped
     expect(script).toContain('\\"hi\\"')
     expect(script).toContain('\\\\path')
@@ -88,13 +116,13 @@ describe('system on darwin', () => {
 
   test('returns failed when osascript exits non-zero', async () => {
     __setSpawnForTests(async () => ({ exitCode: 1 }))
-    const result = await system('t', 'b')
+    const result = await system('t', 'b', {})
     expect(result).toBe('failed')
   })
 
   test('returns failed when spawn throws (cmd not found)', async () => {
     __setSpawnForTests(async () => ({ exitCode: -1 }))
-    const result = await system('t', 'b')
+    const result = await system('t', 'b', {})
     expect(result).toBe('failed')
   })
 })

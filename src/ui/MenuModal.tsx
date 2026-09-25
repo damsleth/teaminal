@@ -38,6 +38,7 @@ import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useTerminalRows } from './hooks/useTerminalRows'
 import { useSessionApi } from './SessionContext'
 import { openThemeEditor } from './ThemeEditorModal'
+import { openActivity } from './ActivityModal'
 import { clearProfileCaches } from '../state/cacheClear'
 import { updateSettings } from '../config'
 import { recordEvent, warn } from '../log'
@@ -214,6 +215,9 @@ export function MenuModal() {
       }
       case 'show-accounts':
         openAccounts(store)
+        return
+      case 'show-notifications':
+        openActivity(store)
         return
       case 'noop':
         // placeholders until backed by real flows

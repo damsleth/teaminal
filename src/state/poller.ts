@@ -35,6 +35,7 @@ import {
   adaptiveIntervalMs,
   isAbortError,
 } from './poller/intervals'
+import type { NotifyKind } from './poller/mentions'
 import { makeSleeper } from './poller/sleeper'
 import { makeActiveLoop } from './poller/activeLoop'
 import { makeListLoop } from './poller/listLoop'
@@ -59,6 +60,9 @@ export type MentionEvent = {
   // returned a new mention. 'list-diff' fires from the list loop's cross-
   // chat scan when a non-active 1:1/group chat got a new mention.
   source: 'active' | 'list-diff'
+  // 'mention' = structured @me; 'message' = plain 1:1/group chat message
+  // (only when settings.notifyChatMessages is on).
+  kind: NotifyKind
 }
 
 export type PollerOpts = {
