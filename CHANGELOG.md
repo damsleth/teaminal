@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Keyboard input works again in kitty and Ghostty.** The startup cell-size
+  probe left stdin in a state Ink could not read from, so no key registered —
+  not even Ctrl-C — in any terminal that answers the query. Terminal.app was
+  unaffected because it is not probed.
+
 - Switching terminal focus no longer types `[I` / `[O` into the composer or
   other text fields. The focus reports used for presence were reaching every
   input handler as plain text.

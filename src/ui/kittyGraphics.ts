@@ -67,7 +67,10 @@ export async function probeCellAspect(timeoutMs = 150): Promise<number | null> {
     const onData = (chunk: Buffer): void => {
       acc += chunk.toString('binary')
       const ratio = parseCellSizeReport(acc)
-      if (ratio !== null) finish(ratio)
+      // Finish outside the 'data' callback: Bun never emits 'readable' again
+      // for a stdin paused from inside its own 'data' handler, so Ink would
+      // attach its reader to a dead stream and every key (Ctrl-C too) is lost.
+      if (ratio !== null) setImmediate(() => finish(ratio))
     }
     const timer = setTimeout(() => finish(null), timeoutMs)
     try {
