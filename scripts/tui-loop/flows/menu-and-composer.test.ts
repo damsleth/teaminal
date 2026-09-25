@@ -71,8 +71,8 @@ test('activity-panel: Ctrl-A opens the Activity overlay', async ({ terminal }) =
   // Ctrl-A opens the Activity overlay (App.tsx → openActivity).
   terminal.keyPress('a', { ctrl: true })
 
-  // The overlay shows the Activity heading and its distinctive help line.
-  await expect(terminal.getByText('Activity')).toBeVisible()
+  // The overlay shows the Notifications heading and its distinctive help line.
+  await expect(terminal.getByText('Notifications')).toBeVisible()
   await expect(terminal.getByText('mark all read')).toBeVisible()
 
   // Text-snapshot gate for the open overlay.
