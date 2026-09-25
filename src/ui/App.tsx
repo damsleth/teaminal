@@ -232,16 +232,19 @@ export function App() {
     }))
   }
 
-  function moveMessageCursor(delta: number): void {
+  function moveMessageCursor(delta: number, atEnd = false): void {
     if (!activeConv || activeNavigationMessages.length === 0) return
+    const next = nextMessageCursor(activeMessageCursor, delta, activeNavigationMessages.length)
     store.set((s) => ({
       messageCursorByConvo: setStoredMessageCursor(
         s.messageCursorByConvo,
         activeConv,
-        nextMessageCursor(activeMessageCursor, delta, activeNavigationMessages.length),
+        next,
         activeNavigationMessages.length,
       ),
-      focusedAttachmentIndex: 0,
+      focusedAttachmentIndex: atEnd
+        ? messageFocusables(activeNavigationMessages[next]).length - 1
+        : 0,
     }))
   }
 

@@ -12,6 +12,10 @@ adheres to [Semantic Versioning](https://semver.org/).
   other text fields. The focus reports used for presence were reaching every
   input handler as plain text.
 
+- Moving up with `k` / ↑ now enters the previous message at its last link or
+  image, so attachments are reachable in both directions instead of only when
+  moving down.
+
 - **External user search now runs for names, not just email addresses.** The
   new-chat prompt promised "Enter to search externally" for any query but only
   ever called the Teams middle-tier search when the text looked like an email,

@@ -38,7 +38,8 @@ export type ChatKeysCtx = {
   focusables: Focusable[]
   // Current focus index within `focusables` (0 = the message body).
   focusedAttachmentIndex: number
-  moveMessageCursor: (delta: number) => void
+  // atEnd lands on the destination message's last focusable instead of its body.
+  moveMessageCursor: (delta: number, atEnd?: boolean) => void
   jumpMessageBottom: () => void
   tryLoadOlder: () => void
   // Set the focus index within the current message's focusables.
@@ -101,13 +102,14 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
     return 'handled'
   }
   if (ch === 'k' || key.upArrow) {
-    // Within a message, step back through its attachments before leaving it.
+    // Within a message, step back through its attachments before leaving it;
+    // the previous message is entered at its last attachment so k mirrors j.
     if (ctx.focusedAttachmentIndex > 0) {
       ctx.setAttachmentIndex(ctx.focusedAttachmentIndex - 1)
       return 'handled'
     }
     if (ctx.activeMessageCursor <= 0) tryLoadOlder()
-    else moveMessageCursor(-1)
+    else moveMessageCursor(-1, true)
     return 'handled'
   }
   // Space activates the focused attachment: an image opens the full-size
