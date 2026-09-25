@@ -7,7 +7,8 @@
 // gives the user the full system emoji set and matches the Graph setReaction
 // API, which wants the unicode glyph. Esc cancels.
 
-import { useApp, useInput } from 'ink'
+import { useApp } from 'ink'
+import { useInput } from './useInput'
 import { useEffect } from 'react'
 import { toggleReaction } from '../state/chatActions'
 import { openSystemEmojiPicker } from './emojiPicker'

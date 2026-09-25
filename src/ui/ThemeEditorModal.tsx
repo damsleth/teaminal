@@ -18,7 +18,8 @@
 // The field list + all value math live in ./themeEditor; this component is
 // the renderer + key dispatcher.
 
-import { Box, Text, useApp, useInput } from 'ink'
+import { Box, Text, useApp } from 'ink'
+import { useInput } from './useInput'
 import { useState, type ReactElement, type ReactNode } from 'react'
 import { replaceThemeOverrides, updateSettings } from '../config'
 import { warn } from '../log'

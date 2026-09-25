@@ -16,7 +16,8 @@
 // Menu structure lives in ./menu - this component is the renderer + input
 // dispatcher. Add menu items there, not here.
 
-import { Box, Text, useApp, useInput } from 'ink'
+import { Box, Text, useApp } from 'ink'
+import { useInput } from './useInput'
 import {
   cycleQuietHoursPreset,
   cycleSetting,

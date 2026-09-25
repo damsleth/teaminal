@@ -15,7 +15,8 @@
 // shown but not redacted: the user is looking at their own session and
 // owns whatever they decide to share.
 
-import { Box, Text, useApp, useInput } from 'ink'
+import { Box, Text, useApp } from 'ink'
+import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
 import { decodeJwtClaims, getToken } from '../auth/owaPiggy'
 import type { CapabilityResult } from '../graph/capabilities'

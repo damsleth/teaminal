@@ -2,7 +2,8 @@
 // user's own chat message (chat-zone `x`) and deleting a whole chat
 // (ctrl+d). `y` / Enter confirms, `n` / Esc cancels.
 
-import { Box, Text, useApp, useInput } from 'ink'
+import { Box, Text, useApp } from 'ink'
+import { useInput } from './useInput'
 import { deleteChatById, deleteChatMessageById } from '../state/chatActions'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 

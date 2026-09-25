@@ -18,7 +18,8 @@
 //
 // Keys: o = open the image, Space / Esc = close.
 
-import { Box, Text, useApp, useInput } from 'ink'
+import { Box, Text, useApp } from 'ink'
+import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
 import { getActiveProfile } from '../graph/client'
 import { ensureImageFetched, getImageData } from '../state/imageCache'

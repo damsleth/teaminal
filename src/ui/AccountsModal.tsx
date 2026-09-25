@@ -1,4 +1,5 @@
-import { Box, Text, useApp, useInput } from 'ink'
+import { Box, Text, useApp } from 'ink'
+import { useInput } from './useInput'
 import { useState } from 'react'
 import { listProfilesFromStatus, type OwaPiggyProfileStatus } from '../auth/owaPiggy'
 import { updateSettings } from '../config'

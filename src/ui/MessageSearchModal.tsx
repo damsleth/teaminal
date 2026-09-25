@@ -6,7 +6,8 @@
 // hit's conversation (chat hits only — channel hits lack a team mapping here
 // and render as non-jumpable rows); Esc closes.
 
-import { Box, Text, useApp, useInput } from 'ink'
+import { Box, Text, useApp } from 'ink'
+import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
 import { searchAllMessages } from '../state/chatActions'
 import { clampCursor } from '../state/selectables'

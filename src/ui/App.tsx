@@ -21,7 +21,8 @@
 // individual modal components. The dispatcher below only routes the
 // list / chat / filter zones plus a few app-wide shortcuts.
 
-import { Box, useApp, useInput, useStdin, useStdout } from 'ink'
+import { Box, useApp, useStdin, useStdout } from 'ink'
+import { useInput } from './useInput'
 import { useEffect, useRef, useState } from 'react'
 import { createOneOnOneChat, materializeChat, resolveFederatedChatId } from '../state/chatActions'
 import { indexNameFromDirectoryUser } from '../state/nameIndex'

@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Switching terminal focus no longer types `[I` / `[O` into the composer or
+  other text fields. The focus reports used for presence were reaching every
+  input handler as plain text.
+
 - **External user search now runs for names, not just email addresses.** The
   new-chat prompt promised "Enter to search externally" for any query but only
   ever called the Teams middle-tier search when the text looked like an email,
