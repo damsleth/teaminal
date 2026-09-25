@@ -35,7 +35,8 @@
 //   appended verbatim (newlines preserved) instead of being treated
 //   as a sequence of individual key events.
 
-import { Box, Text, useInput, useStdin, useStdout } from 'ink'
+import { Box, Text, useStdin, useStdout } from 'ink'
+import { useInput } from './useInput'
 import { useEffect, useRef, useState } from 'react'
 import {
   editChatMessageContent,

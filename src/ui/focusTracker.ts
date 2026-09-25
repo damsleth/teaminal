@@ -7,9 +7,9 @@
 // at startup, watch raw stdin for the two sequences, and turn it off
 // on shutdown so the terminal does not keep emitting them after exit.
 //
-// We attach our own 'data' listener; Ink's input parser is unaffected
-// because it ignores these sequences (they are not standard cursor
-// keys). Terminals that do not support 1004 simply never emit ESC[I/O
+// We attach our own 'data' listener. Ink does not recognise these
+// sequences and hands them to useInput as the text "[I" / "[O", so
+// components use the filtering wrapper in ./useInput. Terminals that do not support 1004 simply never emit ESC[I/O
 // and we stay on the optimistic default (focused = true). After
 // DEC_FALLBACK_MS without any focus event, we mark focusReportingHealthy
 // as false and stop trusting subsequent DEC sequences — better to over-

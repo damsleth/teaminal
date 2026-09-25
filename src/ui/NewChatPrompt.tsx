@@ -5,7 +5,8 @@
 // to its parent which decides whether to open an existing chat or
 // create a new one.
 
-import { Box, Text, useApp, useInput } from 'ink'
+import { Box, Text, useApp } from 'ink'
+import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
 import { searchChatUsers, searchExternalUsers } from '../state/chatActions'
 import { clampCursor } from '../state/selectables'

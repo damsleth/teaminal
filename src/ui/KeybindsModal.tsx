@@ -7,7 +7,8 @@
 // To add a keybind row, append to the BINDINGS table; columns are
 // [key, when, action]. Group rows with a divider when sections grow.
 
-import { Box, Text, useApp, useInput } from 'ink'
+import { Box, Text, useApp } from 'ink'
+import { useInput } from './useInput'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
 type Binding = { keys: string; when: string; action: string }

@@ -5,7 +5,8 @@
 // cursor, x / Enter removes the selected reaction, Esc closes.
 // Mirrors ConfirmDeleteModal / ReactionPickerModal in structure and theming.
 
-import { Box, Text, useApp, useInput } from 'ink'
+import { Box, Text, useApp } from 'ink'
+import { useInput } from './useInput'
 import { useState } from 'react'
 import { toggleReaction } from '../state/chatActions'
 import { ownReactionTypes } from '../state/messageMutations'

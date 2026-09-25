@@ -8,7 +8,8 @@
 // activity arriving twice — once via initial hydrate, once via trouter
 // push reconcile — renders as one row.
 
-import { Box, Text, useApp, useInput } from 'ink'
+import { Box, Text, useApp } from 'ink'
+import { useInput } from './useInput'
 import { useEffect } from 'react'
 import type { ActivityItem } from '../graph/teamsActivity'
 import { countUnreadMentions, markActivityRead, refreshActivityFeed } from '../state/activityFeed'
