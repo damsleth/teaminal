@@ -16,6 +16,11 @@ adheres to [Semantic Versioning](https://semver.org/).
   image, so attachments are reachable in both directions instead of only when
   moving down.
 
+- Inline images now use their measured terminal positions after the text frame
+  flushes. Scrolling and unused space below the timeline no longer shift images
+  over adjacent messages. Images clipped by the pane stay hidden, and the
+  viewport budget accounts for tail panels, composer height, and search.
+
 - **External user search now runs for names, not just email addresses.** The
   new-chat prompt promised "Enter to search externally" for any query but only
   ever called the Teams middle-tier search when the text looked like an email,
