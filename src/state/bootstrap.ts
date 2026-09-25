@@ -153,6 +153,9 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
             ? 'chat'
             : 'channel'
         const viewing = focusKey(s.focus) === event.conv && s.terminalFocused !== false
+        // Plain messages in the chat you're reading: no bell, no record.
+        // Mentions keep their bell-only path (decideQuiet).
+        if (viewing && event.kind === 'message') return
         if (!viewing) {
           recordNotification(store, {
             kind: event.kind,

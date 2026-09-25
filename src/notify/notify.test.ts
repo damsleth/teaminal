@@ -47,6 +47,7 @@ describe('terminalNotifySequence', () => {
     )
     expect(terminalNotifySequence('T', 'B', { TERM_PROGRAM: 'Apple_Terminal' })).toBeNull()
     expect(terminalNotifySequence('T', 'B', { TERM_PROGRAM: 'tmux' })).toBeNull()
+    expect(terminalNotifySequence('T', 'B', { KITTY_WINDOW_ID: '1', TMUX: '/tmp/x' })).toBeNull()
   })
 
   test('strips control bytes so message text cannot break out of the OSC', () => {
