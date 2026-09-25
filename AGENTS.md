@@ -91,6 +91,7 @@ content.replace(/<[^>]+>/g, '') // breaks on <at> mentions and entities
 7. **Notification scope is chats + active channel only** in v1. There is no efficient way to detect mentions in non-active channels under delegated auth.
 8. **Seed the seen-message-ID set on startup** — otherwise the first poll after launch notifies on every existing message.
 9. **`bun init` writes a tsconfig with `verbatimModuleSyntax: true`** — type-only imports must use `import type`, not bare `import`.
+10. **Never `stdin.pause()` from inside a stdin `'data'` handler before Ink starts.** Under Bun the stream then never emits `'readable'`, Ink's reader stays dead, and the app ignores every key including Ctrl-C. Defer with `setImmediate`. Only reproduces in a terminal that answers the query (kitty, Ghostty) — the tui-test xterm.js harness and Terminal.app stay silent, so they take the timeout path and look fine.
 
 ## Testing
 
@@ -109,6 +110,11 @@ bun run typecheck        # tsc --noEmit
 bun run format           # prettier
 bun run build            # compiled binary at dist/teaminal
 ```
+
+**Finish every task with a real `bun run build` from the main checkout.** The
+`teaminal` on PATH (`~/.local/bin/teaminal`) is a symlink to `dist/teaminal`, so
+until you rebuild, the maintainer keeps running the old binary — tests passing
+in a worktree changes nothing they can see.
 
 ## File Conventions
 
