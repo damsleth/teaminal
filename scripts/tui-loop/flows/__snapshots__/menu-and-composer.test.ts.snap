@@ -7,11 +7,11 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
 │──────╮                                                                                             │
 ││    Ops Channel    │                                                                              │
 │      │                                                                                             │
-││Mina: Deploy is gree│   Activity                                                                   │
+││Mina: Deploy is gree│   Notifications                                                              │
 │      │                                                                                             │
 ││the EU region.      │                                                                              │
 │      │                                                                                             │
-││                    │   (no activity)                                                              │
+││                    │   (no notifications)                                                         │
 │      │                                                                                             │
 ││                    │                                                                              │
 │      │                                                                                             │
@@ -118,7 +118,7 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
   "25,14": {
     "bold": 134217728
   },
-  "33,14": {
+  "38,14": {
     "bold": 0
   },
   "6,15": {
@@ -181,7 +181,7 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "38,18": {
+  "43,18": {
     "fgColorMode": 0,
     "fgColor": -1
   },

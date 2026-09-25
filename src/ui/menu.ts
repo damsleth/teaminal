@@ -120,12 +120,6 @@ export const ROOT_MENU: MenuItem[] = [
     action: { kind: 'show-accounts' },
   },
   {
-    id: 'notifications',
-    label: 'Notifications',
-    action: { kind: 'show-notifications' },
-    hint: 'Ctrl+A',
-  },
-  {
     id: 'settings',
     label: 'Settings',
     action: { kind: 'submenu' },
@@ -340,6 +334,12 @@ export const ROOT_MENU: MenuItem[] = [
         hint: 'messages, list, images',
       },
     ],
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    action: { kind: 'show-notifications' },
+    hint: 'Ctrl+A',
   },
   {
     id: 'help',
