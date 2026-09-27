@@ -403,51 +403,68 @@ export function MessagePane(props: {
         {isLoadingOlder && !showingHistoryTop && (
           <Text color={theme.mutedText}>… loading older messages</Text>
         )}
-        <Box flexDirection="column">
-          {messages.length === 0 ? (
-            <Text color="gray"> loading...</Text>
-          ) : (
-            <>
-              {rows.map((row) => (
-                <TimelineRow
-                  key={
-                    row.kind === 'message'
-                      ? row.message.id
-                      : row.kind === 'date'
-                        ? row.key
-                        : 'load-more'
-                  }
-                  row={row}
-                  focused={
-                    row.kind === 'message' &&
-                    showFocusIndicator &&
-                    row.message.id === props.focusedMessageId
-                  }
-                  focusIndicatorChar={focusIndicatorChar}
-                  focusedMessageId={props.focusedMessageId}
-                  focusedAttachmentIndex={focusedAttachmentIndex}
-                  myUserId={me?.id}
-                  reactionDisplayMode={reactionDisplayMode}
-                  readReceipts={readReceiptsByConvo[conv]}
-                  imgCols={imgCols}
-                  inlineImageMaxRows={inlineImageMaxRows}
-                  inlineImagesPainted={kittyEnabled}
-                  selfMessagesOnRight={selfMessagesOnRight}
-                  bodyIndent={bodyIndent}
-                  messageGap={messageGap}
-                  shortNames={shortNames}
-                  showTimestamp={showTimestamps}
-                  theme={theme}
-                  threadMeta={
-                    channelThreads && row.kind === 'message'
-                      ? replyBadgeFor(channelThreads, row.message.id)
-                      : undefined
-                  }
-                />
-              ))}
-              <TypingLine typing={conv ? (typingByConvo[conv] ?? []) : []} theme={theme} />
-            </>
-          )}
+        {/* The row window is sized from estimated heights; when wrapping makes
+            the real content taller than the pane, Yoga would shrink rows (Ink
+            boxes default to flexShrink 1) and a collapsed row — often a
+            one-line day header — gets painted over by its neighbour. Rows
+            never shrink instead: the viewport clips the overflow, at the top
+            while the window holds the newest message (flex-end), at the
+            bottom when scrolled back to an older focused one. flexGrow keeps
+            short content top-aligned. */}
+        <Box
+          flexDirection="column"
+          flexGrow={1}
+          flexShrink={1}
+          minHeight={0}
+          overflow="hidden"
+          justifyContent={windowEnd === allRows.length ? 'flex-end' : 'flex-start'}
+        >
+          <Box flexDirection="column" flexGrow={1} flexShrink={0}>
+            {messages.length === 0 ? (
+              <Text color="gray"> loading...</Text>
+            ) : (
+              <>
+                {rows.map((row) => (
+                  <TimelineRow
+                    key={
+                      row.kind === 'message'
+                        ? row.message.id
+                        : row.kind === 'date'
+                          ? row.key
+                          : 'load-more'
+                    }
+                    row={row}
+                    focused={
+                      row.kind === 'message' &&
+                      showFocusIndicator &&
+                      row.message.id === props.focusedMessageId
+                    }
+                    focusIndicatorChar={focusIndicatorChar}
+                    focusedMessageId={props.focusedMessageId}
+                    focusedAttachmentIndex={focusedAttachmentIndex}
+                    myUserId={me?.id}
+                    reactionDisplayMode={reactionDisplayMode}
+                    readReceipts={readReceiptsByConvo[conv]}
+                    imgCols={imgCols}
+                    inlineImageMaxRows={inlineImageMaxRows}
+                    inlineImagesPainted={kittyEnabled}
+                    selfMessagesOnRight={selfMessagesOnRight}
+                    bodyIndent={bodyIndent}
+                    messageGap={messageGap}
+                    shortNames={shortNames}
+                    showTimestamp={showTimestamps}
+                    theme={theme}
+                    threadMeta={
+                      channelThreads && row.kind === 'message'
+                        ? replyBadgeFor(channelThreads, row.message.id)
+                        : undefined
+                    }
+                  />
+                ))}
+                <TypingLine typing={conv ? (typingByConvo[conv] ?? []) : []} theme={theme} />
+              </>
+            )}
+          </Box>
         </Box>
       </Box>
     </ImageSlotsContext.Provider>
@@ -588,8 +605,9 @@ function MessageRow(props: {
   else if (isSelf) color = theme.selfMessage
 
   // The marker column carries the focus arrow when this row is focused;
-  // otherwise the send-status glyph (failed / sending). It is as wide as the
-  // body indent so the sender name lines up directly above the body.
+  // otherwise the send-status glyph (failed / sending). It sits on the body
+  // line (the thing being focused), not the sender header, and is as wide as
+  // the body indent so the sender name lines up directly above the body.
   const sendStatusGlyph = sendError ? '✗' : isSending ? '…' : ' '
   const indicator = props.focused ? props.focusIndicatorChar.slice(0, 1) || '>' : sendStatusGlyph
   const indent = Math.max(0, props.bodyIndent)
@@ -660,7 +678,7 @@ function MessageRow(props: {
     <>
       {hasHeader ? (
         <Box flexDirection="row">
-          {!flip && marker}
+          {!flip && <Box width={markerWidth} flexShrink={0} />}
           <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
             <Text wrap="truncate-end">
               <Text color={color} bold={senderName.length > 0 && theme.emphasis.senderBold}>
@@ -669,7 +687,7 @@ function MessageRow(props: {
               {props.showTimestamp && <Text color={theme.timestamp}>{`  ${time}`}</Text>}
             </Text>
           </Box>
-          {flip && marker}
+          {flip && <Box width={markerWidth} flexShrink={0} />}
         </Box>
       ) : (
         <Box flexDirection="row">
@@ -689,7 +707,15 @@ function MessageRow(props: {
             }`}
           </Text>,
         )}
-      {hasHeader && contentRow('body', bodyNode)}
+      {hasHeader && (
+        <Box flexDirection="row">
+          {!flip && marker}
+          <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
+            {bodyNode}
+          </Box>
+          {flip && marker}
+        </Box>
+      )}
       {props.threadMeta &&
         props.threadMeta.count > 0 &&
         contentRow(

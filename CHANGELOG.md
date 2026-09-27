@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The focused-message marker points at the message.** The `>` marker now sits
+  on the body line that is highlighted, instead of on the sender name above it.
+- **Day headers no longer vanish behind messages while scrolling.** When long
+  wrapped messages made the timeline taller than the pane, rows were squeezed
+  and a day header (or sender name) could be painted over by its neighbour.
+  Rows now keep their height and the overflow is clipped cleanly — at the top
+  when you're at the newest message, at the bottom when scrolled back.
+
 ## [0.23.0] - 2026-09-25
 
 ### Added
