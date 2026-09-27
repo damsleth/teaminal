@@ -374,7 +374,6 @@ export function MessagePane(props: {
   return (
     <ImageSlotsContext.Provider value={imageSlots.current}>
       <Box
-        ref={paneRef}
         flexDirection="column"
         flexGrow={1}
         flexShrink={1}
@@ -388,7 +387,7 @@ export function MessagePane(props: {
           </Box>
         )}
         {searchActive && (
-          <Box>
+          <Box flexShrink={0}>
             <Text>
               <Text color={theme.mutedText}>/ </Text>
               {searchQuery}
@@ -401,7 +400,9 @@ export function MessagePane(props: {
           </Box>
         )}
         {isLoadingOlder && !showingHistoryTop && (
-          <Text color={theme.mutedText}>… loading older messages</Text>
+          <Box flexShrink={0}>
+            <Text color={theme.mutedText}>… loading older messages</Text>
+          </Box>
         )}
         {/* The row window is sized from estimated heights; when wrapping makes
             the real content taller than the pane, Yoga would shrink rows (Ink
@@ -410,8 +411,11 @@ export function MessagePane(props: {
             never shrink instead: the viewport clips the overflow, at the top
             while the window holds the newest message (flex-end), at the
             bottom when scrolled back to an older focused one. flexGrow keeps
-            short content top-aligned. */}
+            short content top-aligned. Inline images are bounded by this
+            viewport (paneRef), so a top-clipped image can't paint over the
+            header / search bar above it. */}
         <Box
+          ref={paneRef}
           flexDirection="column"
           flexGrow={1}
           flexShrink={1}

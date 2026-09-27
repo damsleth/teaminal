@@ -26,11 +26,18 @@ const MESSAGES: ChatMessage[] = [
   msg('m6', '2026-01-03T09:05:00Z', 'Bob', 'third day, newest message'),
 ]
 
-function lines(paneHeight: number, focusedMessageId: string | null = null): string[] {
+function lines(
+  paneHeight: number,
+  focusedMessageId: string | null = null,
+  search: string | null = null,
+): string[] {
   const store = createAppStore()
   store.set({
     focus: { kind: 'chat', chatId: 'c1' },
     messagesByConvo: { 'chat:c1': MESSAGES },
+    ...(search !== null
+      ? { inputZone: 'message-search' as const, messageSearchQuery: search }
+      : {}),
   })
   const out = renderToString(
     <StoreProvider store={store}>
@@ -65,4 +72,10 @@ test('an overflowing pane clips whole rows at the top instead of overlapping the
   expect(clipped.length).toBeGreaterThan(0)
   expect(full.slice(full.length - clipped.length)).toEqual(clipped)
   expect(clipped.at(-1)).toContain('third day, newest message')
+})
+
+test('the search bar stays intact above an overflowing timeline', () => {
+  const out = lines(8, null, 'newest')
+  expect(out.filter((l) => l.includes('hit(s)'))).toHaveLength(1)
+  expect(out.filter((l) => l.trim() !== '').at(-1)).toContain('third day, newest message')
 })
