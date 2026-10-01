@@ -64,6 +64,18 @@ const THEME_KEYS = new Set<keyof ThemeOverrides>([
   'layout',
   'borders',
   'emphasis',
+  'dark',
+  'light',
+])
+
+// Keys allowed inside a per-base bucket (themeOverrides.dark / .light).
+const NESTED_ONLY_KEYS = new Set<keyof ThemeOverrides>([
+  'presence',
+  'layout',
+  'borders',
+  'emphasis',
+  'dark',
+  'light',
 ])
 
 const LAYOUT_KEYS = new Set<keyof NonNullable<ThemeOverrides['layout']>>([
@@ -374,16 +386,16 @@ function mergeConfigPatch(current: TeaminalConfig, patch: TeaminalConfig): Teami
       ...mergeNestedThemeOverride(current.themeOverrides, patch.themeOverrides, 'layout'),
       ...mergeNestedThemeOverride(current.themeOverrides, patch.themeOverrides, 'borders'),
       ...mergeNestedThemeOverride(current.themeOverrides, patch.themeOverrides, 'emphasis'),
+      ...mergeNestedThemeOverride(current.themeOverrides, patch.themeOverrides, 'dark'),
+      ...mergeNestedThemeOverride(current.themeOverrides, patch.themeOverrides, 'light'),
     }
   }
   return next
 }
 
-function mergeNestedThemeOverride<K extends 'presence' | 'layout' | 'borders' | 'emphasis'>(
-  current: ThemeOverrides | undefined,
-  patch: ThemeOverrides,
-  key: K,
-): Pick<ThemeOverrides, K> {
+function mergeNestedThemeOverride<
+  K extends 'presence' | 'layout' | 'borders' | 'emphasis' | 'dark' | 'light',
+>(current: ThemeOverrides | undefined, patch: ThemeOverrides, key: K): Pick<ThemeOverrides, K> {
   return {
     [key]: patch[key]
       ? {
@@ -423,6 +435,8 @@ function cloneThemeOverrides(overrides: ThemeOverrides): ThemeOverrides {
     layout: overrides.layout ? { ...overrides.layout } : undefined,
     borders: overrides.borders ? { ...overrides.borders } : undefined,
     emphasis: overrides.emphasis ? { ...overrides.emphasis } : undefined,
+    dark: overrides.dark ? { ...overrides.dark } : undefined,
+    light: overrides.light ? { ...overrides.light } : undefined,
   }
 }
 
@@ -703,17 +717,29 @@ function validateChatRoutingByAccount(
   return out
 }
 
-export function validateThemeOverrides(value: unknown, warnings: string[]): ThemeOverrides | null {
+export function validateThemeOverrides(
+  value: unknown,
+  warnings: string[],
+  scope = 'themeOverrides',
+): ThemeOverrides | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    warnings.push('config: "themeOverrides" must be a JSON object')
+    warnings.push(`config: "${scope}" must be a JSON object`)
     return null
   }
 
+  // A per-base bucket holds color tokens only.
+  const nested = scope !== 'themeOverrides'
   const out: ThemeOverrides = {}
   for (const [rawKey, rawValue] of Object.entries(value)) {
     const key = rawKey as keyof ThemeOverrides
-    if (!THEME_KEYS.has(key)) {
-      warnings.push(`config: unknown themeOverrides key "${rawKey}" ignored`)
+    if (!THEME_KEYS.has(key) || (nested && NESTED_ONLY_KEYS.has(key))) {
+      warnings.push(`config: unknown ${scope} key "${rawKey}" ignored`)
+      continue
+    }
+
+    if (key === 'dark' || key === 'light') {
+      const bucket = validateThemeOverrides(rawValue, warnings, `themeOverrides.${key}`)
+      if (bucket) out[key] = bucket
       continue
     }
 
@@ -754,7 +780,7 @@ export function validateThemeOverrides(value: unknown, warnings: string[]): Them
       continue
     }
 
-    warnings.push(`config: "themeOverrides.${rawKey}" must be a named color or hex color`)
+    warnings.push(`config: "${scope}.${rawKey}" must be a named color or hex color`)
   }
   return out
 }

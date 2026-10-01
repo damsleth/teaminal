@@ -138,7 +138,7 @@ warnings and fall back to defaults.
 | `messageFocusIndicatorChar`    | single character     |     `>` | Marker shown beside the focused message.                                                 |
 | `messageFocusIndicatorColor`   | color or null        |  `null` | Override focused-message marker color.                                                   |
 | `messageFocusBackgroundColor`  | color or null        |  `null` | Optional focused-message background color.                                               |
-| `themeOverrides`               | object               |    `{}` | Override color roles such as `text`, `mutedText`, `unread`, `timestamp`, `presence`, plus `layout` (paddings), `borders` (border styles for `panel` and `modal`), and `emphasis` (per-role bold flags). |
+| `themeOverrides`               | object               |    `{}` | Override color roles such as `text`, `mutedText`, `unread`, `timestamp`, `presence`, plus `layout` (paddings), `borders` (border styles for `panel` and `modal`), and `emphasis` (per-role bold flags). Colors under `dark` / `light` apply only to that base theme (the theme editor writes there); top-level colors apply to every theme. |
 | `useTeamsPresence`             | boolean              |  `true` | Use the Teams unified presence endpoint (`presence.teams.microsoft.com`) for own presence. Falls back to Graph `/me/presence` automatically on 401/403/404. Set to `false` to force Graph-only in tenants that block public-client access to that host. |
 | `forceAvailableWhenFocused`    | boolean              |  `true` | While the terminal window has focus (DEC focus reporting; CSI ?1004), PUT `forceavailability=Available` to `presence.teams.microsoft.com` so Teams shows you Available, like the desktop client does for an active window. The override expires server-side after ~5 min and is refreshed inside that window. Set to `false` to leave presence to Teams' own desktop client / inactivity timer. |
 | `realtimeEnabled`              | boolean              | `false` | Enables the experimental Teams trouter push transport for typing, read-receipt, presence, and immediate refresh signals. Polling remains the source of truth and fallback. |
@@ -213,7 +213,10 @@ theme layered on top of `dark`; any subset of these keys is accepted:
 ```
 
 `themeOverrides` in `config.json` still wins over the theme file, so
-you can ship a base theme and tweak per-machine. Unknown keys, bad
+you can ship a base theme and tweak per-machine. Color overrides nested
+under `themeOverrides.dark` / `themeOverrides.light` apply only to that
+base, so the in-app theme editor's tweaks don't follow you across a
+dark/light/auto switch; top-level color overrides apply to every theme. Unknown keys, bad
 colors, and out-of-range values are dropped with a warning at startup.
 
 The in-app Settings menu persists changes back to `config.json`.

@@ -228,7 +228,10 @@ export type ThemePresenceKey =
   | 'OutOfOffice'
   | 'PresenceUnknown'
 
-export type ThemeOverrides = {
+// Flat color tokens. At the top level of ThemeOverrides they apply to every
+// base theme (legacy); under `dark` / `light` they apply only to that base,
+// which is where the theme editor writes, so switching themes stays visible.
+export type ThemeColorOverrides = {
   background?: string
   text?: string
   mutedText?: string
@@ -248,6 +251,11 @@ export type ThemeOverrides = {
   messageFocusIndicator?: string
   messageFocusBackground?: string | null
   selectedRowBackground?: string | null
+}
+
+export type ThemeOverrides = ThemeColorOverrides & {
+  dark?: ThemeColorOverrides
+  light?: ThemeColorOverrides
   presence?: Partial<Record<ThemePresenceKey, string>>
   layout?: Partial<{
     panePaddingX: number
