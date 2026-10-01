@@ -161,7 +161,7 @@ warnings and fall back to defaults.
 | `headerElements`               | object               | all `true` | Per-segment visibility for the header bar. Keys: `app`, `user`, `presence`, `graph`, `chats`, `unread`, `push`, `updated`. Omitted keys keep their default. |
 | `headerUserFormat`             | `full`, `tenant`     |  `full` | Header identity format: `full` shows `user (tenant)`, `tenant` shows the tenant only. |
 | `statusBarShowKeyHints`        | boolean              |  `true` | Show the keybinding hints line in the status bar. |
-| `chatListCollapsedSections`    | object               |    `{}` | Collapsed sidebar headers, keyed by chat section (`oneOnOne`, `group`, `meeting`, `other`) or `team:<id>`. Maintained by `h`/`l` in the list; a collapsed header hides its rows and shows `▸` plus the hidden count. |
+| `chatListCollapsedSections`    | object               |    `{}` | Collapsed sidebar headers, keyed by section (`oneOnOne`, `group`, `meeting`, `other`, `teams`) or `team:<id>`. Maintained by `h`/`l` in the list; a collapsed header hides its rows and shows `▸` plus the hidden count. |
 | `chatListWidth`                | integer or null      |  `null` | Explicit chat-list panel width in columns. `null` = automatic (~28% of terminal, clamped 18–60). Adjusted interactively with Ctrl-X resize mode. |
 | `composerHeight`               | integer or null      |  `null` | Explicit composer height in rows. `null` = automatic (from draft line count, clamped 3–10). Adjusted interactively with Ctrl-X resize mode. |
 
@@ -239,7 +239,7 @@ The in-app Settings menu persists changes back to `config.json`.
 | `/`            | list              | Filter chats.                                                           |
 | `n`            | list              | Open the new-chat prompt.                                               |
 | `m`            | list              | Toggle the focused chat read/unread.                                    |
-| `h` / Left     | list              | Collapse the focused row's section (chat type, or team).                |
+| `h` / Left     | list              | Collapse the focused row's section (chat type, team, or all Teams).     |
 | `l` / Right    | list              | Expand the focused collapsed section, or show a section's hidden chats. |
 | `a`            | Accounts          | Find valid `owa-piggy status` profiles to add.                          |
 | `d` / Delete   | Accounts          | Remove the focused account from teaminal's list.                        |
