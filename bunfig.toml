@@ -10,3 +10,4 @@ coverage = false
 coverageReporter = ["text"]
 coverageSkipTestFiles = true
 pathIgnorePatterns = ["scripts/spike", "scripts/tui-loop/flows"]
+preload = ["./src/test-preload.ts"]

@@ -30,7 +30,7 @@ function render(theme: 'light' | 'dark', cursor: number): string[] {
 // focused one indistinguishable (and ANSI blue unreadable on dark terminals).
 // The focused header is padded out to a full-width background bar; assert on
 // the padding so the check holds at any color level >= 1 (with color off Ink
-// trims the trailing spaces, and there is no bar to see anyway).
+// trims the trailing spaces; src/test-preload.ts keeps color on under CI).
 for (const theme of ['light', 'dark'] as const) {
   test(`${theme}: only the focused section header renders a full-width bar`, () => {
     // eslint-disable-next-line no-control-regex
