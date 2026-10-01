@@ -89,16 +89,16 @@ function buildRows(
       }
       firstChatEmitted = true
     }
-    if (it.kind === 'team') {
+    if (it.kind === 'team' || (it.kind === 'section' && it.section === 'teams')) {
       // 'cozy' density: blank row between Chats and the team list.
       // 'compact': skip the spacer so more rows fit in the viewport.
-      // The team item itself renders as its own bold header below, so
-      // no generic "Teams" section label is emitted.
+      // Grouped lists open the team list with the selectable "Teams" section
+      // header; ungrouped ones start straight at the first team header.
       if (rows.length > 0 && density === 'cozy' && !firstTeamEmitted) {
         rows.push({ kind: 'spacer' })
       }
       firstTeamEmitted = true
-      lastTeamId = it.team.id
+      if (it.kind === 'team') lastTeamId = it.team.id
     }
     if (it.kind === 'channel' && it.team.id !== lastTeamId) {
       // Channel without its team in the same render scope (team filtered? archived team?)

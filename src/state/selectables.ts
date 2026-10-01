@@ -62,8 +62,8 @@ export function isSelectable(item: SelectableItem): boolean {
 }
 
 // The collapsed-state key of the section a row belongs to, or null when it has
-// none (an ungrouped chat) or is itself a header — a focused collapsed header
-// has nothing further to collapse into.
+// none (an ungrouped chat) or is itself a top-level header. A team header
+// belongs to the Teams section when grouped: channel -> team -> Teams.
 //
 // Derived from the row itself, never by scanning backwards for the nearest
 // header: under a filter the preceding header can belong to an unrelated
@@ -74,6 +74,7 @@ export function parentCollapseKey(item: SelectableItem, groupByType: boolean): s
   // Ungrouped lists have no chat-type headers, so there is nothing to collapse.
   if (item.kind === 'chat') return groupByType ? chatSection(item.chat.chatType) : null
   if (item.kind === 'more') return item.section
+  if (item.kind === 'team') return groupByType ? 'teams' : null
   return null
 }
 
@@ -88,8 +89,9 @@ export function headerIndexForKey(items: SelectableItem[], key: string): number 
 
 // Section identity when grouping by chat type. Anything unrecognised lands
 // in 'other', which sorts last. One source of truth for the sort rank, the
-// rendered header label, and the per-section cap.
-export type ChatSection = 'oneOnOne' | 'group' | 'meeting' | 'other'
+// rendered header label, and the per-section cap. 'teams' is the header over
+// the team list; it is never a chat type, so it stays out of CHAT_SECTIONS.
+export type ChatSection = 'oneOnOne' | 'group' | 'meeting' | 'other' | 'teams'
 
 const CHAT_SECTIONS: ChatSection[] = ['oneOnOne', 'group', 'meeting', 'other']
 
@@ -110,6 +112,8 @@ export function chatSectionLabel(section: ChatSection): string {
       return 'Groups'
     case 'meeting':
       return 'Meetings'
+    case 'teams':
+      return 'Teams'
     default:
       return 'Other'
   }
@@ -138,6 +142,17 @@ export function buildSelectableList(state: SelectableInput): SelectableItem[] {
     groupByType && !filtering
       ? sectionedChats(chatItems, collapsed, state.expandedChatSections ?? {})
       : [...chatItems]
+  if (groupByType && !filtering && state.teams.length > 0) {
+    const teamsCollapsed = !!collapsed.teams
+    items.push({
+      kind: 'section',
+      section: 'teams',
+      label: chatSectionLabel('teams'),
+      collapsed: teamsCollapsed,
+      count: state.teams.length,
+    })
+    if (teamsCollapsed) return items
+  }
   for (const team of state.teams) {
     const teamCollapsed = !!collapsed[teamCollapseKey(team.id)]
     items.push({ kind: 'team', team, collapsed: teamCollapsed })

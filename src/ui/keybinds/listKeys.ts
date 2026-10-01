@@ -275,9 +275,17 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       const headerKey = collapseKeyFor(it)
       if (headerKey) {
         // Only collapsed headers are focusable, so this always expands. The
-        // first child lands right after the header the cursor is on.
+        // cursor lands on the first selectable child — for Teams that skips
+        // the (expanded, unselectable) first team header to its channel.
         setSectionCollapsed(store, headerKey, false)
-        store.set({ cursor: safe + 1 })
+        const expanded = buildSelectableList({
+          ...ctx,
+          settings: {
+            ...ctx.settings,
+            chatListCollapsedSections: store.get().settings.chatListCollapsedSections,
+          },
+        })
+        store.set({ cursor: nextSelectableIndex(expanded, safe, +1) })
         return 'handled'
       }
       if (it.kind === 'more') {

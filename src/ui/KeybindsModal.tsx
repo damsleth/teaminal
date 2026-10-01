@@ -18,7 +18,7 @@ const BINDINGS: Binding[] = [
   { keys: 'k / ↑', when: 'list', action: 'cursor up' },
   { keys: 'u/d', when: 'list', action: 'half-page sidebar' },
   { keys: 'l / Enter', when: 'list', action: 'open chat / channel · expand section' },
-  { keys: 'h / ←', when: 'list', action: 'collapse section (chat type / team)' },
+  { keys: 'h / ←', when: 'list', action: 'collapse section (chat type / team / Teams)' },
   { keys: 'n', when: 'list', action: 'new chat prompt' },
   { keys: 'Ctrl+D', when: 'list / chat', action: 'delete chat (confirm y/n)' },
   { keys: 'j / ↓', when: 'chat / channel', action: 'next message / attachment' },

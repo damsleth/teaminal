@@ -207,6 +207,39 @@ describe('buildSelectableList', () => {
     expect(isSelectable(list[1]!)).toBe(false) // expanded
   })
 
+  test('grouped lists put a collapsible Teams header over the team list', () => {
+    const state = {
+      ...initialAppState(),
+      chats: [chat('d1', { topic: 'Ada' })],
+      teams: [team('t1', 'Crayon'), team('t2', 'Other')],
+      channelsByTeam: { t1: [channel('ch-a', 'General')] },
+      settings: { chatListGroupByType: true },
+    }
+    expect(buildSelectableList(state).map((i) => i.kind)).toEqual([
+      'section',
+      'chat',
+      'section',
+      'team',
+      'channel',
+      'team',
+    ])
+    const collapsed = buildSelectableList({
+      ...state,
+      settings: { chatListGroupByType: true, chatListCollapsedSections: { teams: true } },
+    })
+    expect(collapsed.map((i) => i.kind)).toEqual(['section', 'chat', 'section'])
+    expect(collapsed[2]).toEqual({
+      kind: 'section',
+      section: 'teams',
+      label: 'Teams',
+      collapsed: true,
+      count: 2,
+    })
+    // Ungrouped lists have no section headers at all.
+    const ungrouped = buildSelectableList({ ...state, settings: {} })
+    expect(ungrouped.some((i) => i.kind === 'section')).toBe(false)
+  })
+
   test('a filter reaches children of a collapsed section', () => {
     const state = {
       ...initialAppState(),
@@ -231,15 +264,18 @@ describe('buildSelectableList', () => {
       settings: { chatListSort: 'recent' as const, chatListGroupByType: true },
     }
     const list = buildSelectableList(state)
-    // [section Direct, Ada, section Groups, Eng, team Crayon, # General]
+    // [section Direct, Ada, section Groups, Eng, section Teams, team Crayon, # General]
     expect(parentCollapseKey(list[1]!, true)).toBe('oneOnOne')
     expect(parentCollapseKey(list[3]!, true)).toBe('group')
-    expect(parentCollapseKey(list[5]!, true)).toBe('team:t1') // channel → its team
-    expect(parentCollapseKey(list[0]!, true)).toBeNull() // a header has no parent
-    // Ungrouped lists render no chat-type headers, so a chat has nothing to
-    // collapse into; a channel still belongs to its team.
+    expect(parentCollapseKey(list[6]!, true)).toBe('team:t1') // channel → its team
+    expect(parentCollapseKey(list[5]!, true)).toBe('teams') // team → Teams
+    expect(parentCollapseKey(list[0]!, true)).toBeNull() // a top-level header has no parent
+    expect(parentCollapseKey(list[4]!, true)).toBeNull()
+    // Ungrouped lists render no section headers, so a chat or team has
+    // nothing to collapse into; a channel still belongs to its team.
     expect(parentCollapseKey(list[1]!, false)).toBeNull()
-    expect(parentCollapseKey(list[5]!, false)).toBe('team:t1')
+    expect(parentCollapseKey(list[5]!, false)).toBeNull()
+    expect(parentCollapseKey(list[6]!, false)).toBe('team:t1')
   })
 
   test('a filtered view resolves a channel to its own team, not a nearer header', () => {
