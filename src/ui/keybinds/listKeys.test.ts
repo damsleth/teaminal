@@ -286,6 +286,56 @@ describe('handleListKeys', () => {
     // Expanding must not also open a conversation.
     expect(a.store.get().focus).toEqual({ kind: 'list' })
   })
+
+  test('h on a collapsed team collapses Teams; l reopens it onto the first channel', () => {
+    const settings = {
+      chatListSort: 'recent' as const,
+      chatListGroupByType: true,
+      chatListCollapsedSections: { 'team:t1': true },
+    }
+    const a = makeCtx({
+      chats: [chat('a')],
+      teams: [
+        { id: 't1', displayName: 'Crayon' },
+        { id: 't2', displayName: 'Other' },
+      ],
+      channelsByTeam: { t2: [{ id: 'ch', displayName: 'General' }] },
+      settings,
+      cursor: 3, // [Direct, a, Teams, ▸ Crayon, Other, # General]
+    })
+    a.store.set((st) => ({ settings: { ...st.settings, ...settings } }))
+    handleListKeys({ input: 'h', key: makeKey() }, a.ctx)
+    expect(a.store.get().settings.chatListCollapsedSections).toEqual({
+      'team:t1': true,
+      teams: true,
+    })
+    expect(a.store.get().cursor).toBe(2)
+
+    a.ctx.settings = a.store.get().settings
+    a.ctx.cursor = 2
+    handleListKeys({ input: 'l', key: makeKey() }, a.ctx)
+    expect(a.store.get().settings.chatListCollapsedSections).toEqual({ 'team:t1': true })
+    // The collapsed Crayon header is the first cursor stop under Teams.
+    expect(a.store.get().cursor).toBe(3)
+  })
+
+  test('l on Teams skips an expanded team header to its first channel', () => {
+    const settings = {
+      chatListSort: 'recent' as const,
+      chatListGroupByType: true,
+      chatListCollapsedSections: { teams: true },
+    }
+    const a = makeCtx({
+      chats: [chat('a')],
+      teams: [{ id: 't1', displayName: 'Crayon' }],
+      channelsByTeam: { t1: [{ id: 'ch', displayName: 'General' }] },
+      settings,
+      cursor: 2, // [Direct, a, ▸ Teams]
+    })
+    a.store.set((st) => ({ settings: { ...st.settings, ...settings } }))
+    handleListKeys({ input: 'l', key: makeKey() }, a.ctx)
+    expect(a.store.get().cursor).toBe(4) // [Direct, a, Teams, Crayon, # General]
+  })
 })
 
 describe('ctrl+d delete chat', () => {
