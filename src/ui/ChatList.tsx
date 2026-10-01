@@ -385,17 +385,23 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         // selector gutter, `#` prefix, or unread badge. Navigation skips them
         // while expanded; a collapsed one is a cursor stop (see isSelectable)
         // and takes the selected color so it's clear what l/Enter reopens.
+        // Headers are bold at rest too, so the selected color alone can't
+        // carry focus (ANSI blue/cyan vanish on some palettes): a focused
+        // header also gets the same full-width background bar as chat rows.
         if (row.item.kind === 'team' || row.item.kind === 'section') {
           const isSelected = row.index === safeCursor
           const restColor = row.item.kind === 'team' ? theme.mutedText : undefined
+          const hdrBg = isSelected ? (theme.selectedRowBackground ?? undefined) : undefined
+          const hdrLabel = rowLabel(row.item)
           return (
             <Box key={`hdr-${row.index}`} flexDirection="row" flexShrink={0}>
               <Text
                 bold={theme.emphasis.sectionHeadingBold}
                 color={isSelected ? theme.selected : restColor}
+                backgroundColor={hdrBg}
                 wrap="truncate-end"
               >
-                {rowLabel(row.item)}
+                {hdrBg ? hdrLabel.padEnd(previewContentWidth) : hdrLabel}
               </Text>
             </Box>
           )

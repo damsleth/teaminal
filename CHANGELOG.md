@@ -15,6 +15,11 @@ adheres to [Semantic Versioning](https://semver.org/).
   and a day header (or sender name) could be painted over by its neighbour.
   Rows now keep their height and the overflow is clipped cleanly — at the top
   when you're at the newest message, at the bottom when scrolled back.
+- **You can see which chat-list heading is focused.** A focused section or team
+  heading (Direct, Groups, Meetings, a collapsed team) used to change only its
+  text color. That left it looking the same as the others in the light theme,
+  and nearly invisible on a dark terminal. It now gets the same full-width
+  highlight bar as a selected chat.
 
 ## [0.23.0] - 2026-09-25
 
