@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **The team list collapses under a "Teams" heading.** With
+  `chatListGroupByType` on, teams sit under a `▾ Teams` header that folds the
+  same way Direct, Groups and Meetings do: `h` on a collapsed team (or twice
+  from a channel) folds every team into `▸ Teams (N)`, and `l`/Enter opens it
+  again. The state persists in `chatListCollapsedSections` as `teams`.
+
 ### Fixed
 
 - **The focused-message marker points at the message.** The `>` marker now sits
