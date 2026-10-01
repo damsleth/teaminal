@@ -38,6 +38,7 @@ import {
   type EditableField,
   type FieldPatch,
 } from './themeEditor'
+import { resolveBaseName } from './theme'
 import { useTerminalRows } from './hooks/useTerminalRows'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
@@ -58,6 +59,9 @@ export function ThemeEditorModal() {
   const modal = useAppState((s) => s.modal)
   const settings = useAppState((s) => s.settings)
   const theme = useTheme()
+  // Color edits are scoped to the built-in base currently rendered.
+  const systemAppearance = useAppState((s) => s.systemAppearance)
+  const base = resolveBaseName(settings.theme, systemAppearance)
   const rows = useTerminalRows()
   const isOpen = modal?.kind === 'theme-editor'
 
@@ -95,7 +99,7 @@ export function ThemeEditorModal() {
     const f = focusedField()
     if (!f) return
     const cur = fieldValue(f.field, theme, settings)
-    void persist(applyField(settings, f.field, nextFieldValue(f.field, cur, dir)))
+    void persist(applyField(settings, f.field, nextFieldValue(f.field, cur, dir), base))
   }
 
   function beginHexEdit(): void {
@@ -124,7 +128,7 @@ export function ThemeEditorModal() {
         if (key.return) {
           if (isHexColor(hexEdit.buffer)) {
             const f = focusedField()
-            if (f) void persist(applyField(settings, f.field, hexEdit.buffer))
+            if (f) void persist(applyField(settings, f.field, hexEdit.buffer, base))
             setHexEdit(null)
           }
           return
@@ -150,7 +154,7 @@ export function ThemeEditorModal() {
       }
       if (input === 'r') {
         const f = focusedField()
-        if (f) void persist(resetField(settings, f.field))
+        if (f) void persist(resetField(settings, f.field, base))
         return
       }
       if (input === 'e') {
@@ -209,7 +213,7 @@ export function ThemeEditorModal() {
         key={field.id}
         field={field}
         selected={gi === cursor}
-        overridden={isOverridden(field, settings)}
+        overridden={isOverridden(field, settings, base)}
         value={fieldValue(field, theme, settings)}
         hexBuffer={gi === cursor && hexEdit ? hexEdit.buffer : null}
         theme={theme}
@@ -231,7 +235,7 @@ export function ThemeEditorModal() {
         paddingY={theme.layout.modalPaddingY}
       >
         <Text bold={theme.emphasis.modalTitleBold} backgroundColor={bg}>
-          {pad('Theme editor')}
+          {pad(`Theme editor · ${base} colors`)}
         </Text>
         <Text color="gray" backgroundColor={bg}>
           {pad('• = overridden · adjust live, persists to config')}

@@ -7,7 +7,9 @@
 // one-line addition here.
 //
 // Storage targets ("group"):
-//   color     - a flat color token in settings.themeOverrides.<key>
+//   color     - settings.themeOverrides.<base>.<key>, where <base> is the
+//               resolved built-in base (dark/light) being edited. Legacy flat
+//               settings.themeOverrides.<key> still counts as an override.
 //   layout    - settings.themeOverrides.layout.<key>   (ThemeLayout)
 //   borders   - settings.themeOverrides.borders.<key>  (ThemeBorders)
 //   emphasis  - settings.themeOverrides.emphasis.<key> (ThemeEmphasis)
@@ -19,7 +21,7 @@
 // wired in ThemeEditorModal.
 
 import { defaultSettings, type Settings, type ThemeOverrides } from '../state/store'
-import { BORDER_STYLES, type Theme } from './theme'
+import { BORDER_STYLES, type BuiltinThemeName, type Theme } from './theme'
 
 export type FieldKind = 'numeric' | 'color' | 'enum' | 'boolean'
 export type FieldGroup = 'color' | 'layout' | 'borders' | 'emphasis' | 'setting'
@@ -214,11 +216,18 @@ export function fieldValue(field: EditableField, theme: Theme, settings: Setting
 // Whether the field currently carries an override (or, for setting-backed
 // fields, differs from the built-in default). Used for the "•" override
 // marker and to gate per-field reset.
-export function isOverridden(field: EditableField, settings: Settings): boolean {
+export function isOverridden(
+  field: EditableField,
+  settings: Settings,
+  base: BuiltinThemeName,
+): boolean {
   const ov = settings.themeOverrides
   switch (field.group) {
     case 'color':
-      return (ov as Record<string, unknown>)[field.key] !== undefined
+      return (
+        (ov as Record<string, unknown>)[field.key] !== undefined ||
+        (ov[base] as Record<string, unknown> | undefined)?.[field.key] !== undefined
+      )
     case 'layout':
       return (ov.layout as Record<string, unknown> | undefined)?.[field.key] !== undefined
     case 'borders':
@@ -283,21 +292,31 @@ function cloneOverrides(ov: ThemeOverrides): ThemeOverrides {
   if (ov.layout) next.layout = { ...ov.layout }
   if (ov.borders) next.borders = { ...ov.borders }
   if (ov.emphasis) next.emphasis = { ...ov.emphasis }
+  if (ov.dark) next.dark = { ...ov.dark }
+  if (ov.light) next.light = { ...ov.light }
   return next
 }
 
 // Drop an empty sub-object so cleared overrides round-trip back to {} rather
 // than leaving "layout": {} cruft in config.json.
-function pruneEmpty<K extends 'layout' | 'borders' | 'emphasis'>(ov: ThemeOverrides, key: K): void {
+function pruneEmpty<K extends 'layout' | 'borders' | 'emphasis' | BuiltinThemeName>(
+  ov: ThemeOverrides,
+  key: K,
+): void {
   const sub = ov[key]
   if (sub && Object.keys(sub).length === 0) delete ov[key]
 }
 
-function setOverride(ov: ThemeOverrides, field: EditableField, value: FieldValue): ThemeOverrides {
+function setOverride(
+  ov: ThemeOverrides,
+  field: EditableField,
+  value: FieldValue,
+  base: BuiltinThemeName,
+): ThemeOverrides {
   const next = cloneOverrides(ov)
   switch (field.group) {
     case 'color':
-      ;(next as Record<string, unknown>)[field.key] = value
+      next[base] = { ...next[base], [field.key]: value }
       break
     case 'layout':
       next.layout = { ...next.layout, [field.key]: value as number }
@@ -315,11 +334,20 @@ function setOverride(ov: ThemeOverrides, field: EditableField, value: FieldValue
   return next
 }
 
-function clearOverride(ov: ThemeOverrides, field: EditableField): ThemeOverrides {
+function clearOverride(
+  ov: ThemeOverrides,
+  field: EditableField,
+  base: BuiltinThemeName,
+): ThemeOverrides {
   const next = cloneOverrides(ov)
   switch (field.group) {
     case 'color':
+      // Also drop a legacy global value, or reset would leave it in effect.
       delete (next as Record<string, unknown>)[field.key]
+      if (next[base]) {
+        delete (next[base] as Record<string, unknown>)[field.key]
+        pruneEmpty(next, base)
+      }
       break
     case 'layout':
       if (next.layout) {
@@ -353,19 +381,24 @@ export function applyField(
   settings: Settings,
   field: EditableField,
   value: FieldValue,
+  base: BuiltinThemeName,
 ): FieldPatch {
   if (field.group === 'setting') {
     return { kind: 'setting', patch: { [field.key]: value } as Partial<Settings> }
   }
-  return { kind: 'overrides', overrides: setOverride(settings.themeOverrides, field, value) }
+  return { kind: 'overrides', overrides: setOverride(settings.themeOverrides, field, value, base) }
 }
 
-export function resetField(settings: Settings, field: EditableField): FieldPatch {
+export function resetField(
+  settings: Settings,
+  field: EditableField,
+  base: BuiltinThemeName,
+): FieldPatch {
   if (field.group === 'setting') {
     const k = field.key as keyof Settings
     return { kind: 'setting', patch: { [k]: defaultSettings[k] } as Partial<Settings> }
   }
-  return { kind: 'overrides', overrides: clearOverride(settings.themeOverrides, field) }
+  return { kind: 'overrides', overrides: clearOverride(settings.themeOverrides, field, base) }
 }
 
 // Global reset clears every theme override back to {}. Setting-backed fields
@@ -375,8 +408,8 @@ export function resetAllOverrides(): FieldPatch {
   return { kind: 'overrides', overrides: {} }
 }
 
-export function anyOverridden(settings: Settings): boolean {
-  return FIELDS.some((f) => f.group !== 'setting' && isOverridden(f, settings))
+export function anyOverridden(settings: Settings, base: BuiltinThemeName): boolean {
+  return FIELDS.some((f) => f.group !== 'setting' && isOverridden(f, settings, base))
 }
 
 // Viewport window over the flat field list: keeps `cursor` centered within a

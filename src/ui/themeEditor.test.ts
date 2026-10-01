@@ -181,44 +181,56 @@ describe('fieldValue', () => {
 
 describe('isOverridden', () => {
   test('false for every field on a clean settings object', () => {
-    for (const f of FIELDS) expect(isOverridden(f, baseSettings)).toBe(false)
+    for (const f of FIELDS) expect(isOverridden(f, baseSettings, 'dark')).toBe(false)
   })
 
   test('true once a color override is present', () => {
     const s = withOverrides({ background: 'magenta' })
-    expect(isOverridden(field('color.background'), s)).toBe(true)
-    expect(isOverridden(field('color.text'), s)).toBe(false)
+    expect(isOverridden(field('color.background'), s, 'dark')).toBe(true)
+    expect(isOverridden(field('color.text'), s, 'dark')).toBe(false)
   })
 
   test('true for nested layout override', () => {
     const s = withOverrides({ layout: { panePaddingX: 3 } })
-    expect(isOverridden(field('layout.panePaddingX'), s)).toBe(true)
-    expect(isOverridden(field('layout.modalPaddingX'), s)).toBe(false)
+    expect(isOverridden(field('layout.panePaddingX'), s, 'dark')).toBe(true)
+    expect(isOverridden(field('layout.modalPaddingX'), s, 'dark')).toBe(false)
   })
 
   test('setting fields compare against the built-in default', () => {
-    expect(isOverridden(field('setting.inlineImageMaxRows'), baseSettings)).toBe(false)
+    expect(isOverridden(field('setting.inlineImageMaxRows'), baseSettings, 'dark')).toBe(false)
     const s: Settings = { ...defaultSettings, inlineImageMaxRows: 20 }
-    expect(isOverridden(field('setting.inlineImageMaxRows'), s)).toBe(true)
+    expect(isOverridden(field('setting.inlineImageMaxRows'), s, 'dark')).toBe(true)
   })
 })
 
 describe('applyField', () => {
   test('color field produces a themeOverrides patch', () => {
-    const patch = applyField(baseSettings, field('color.selected'), 'magenta')
+    const patch = applyField(baseSettings, field('color.selected'), 'magenta', 'dark')
     expect(patch.kind).toBe('overrides')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
-    expect(patch.overrides.selected).toBe('magenta')
+    expect(patch.overrides.dark?.selected).toBe('magenta')
+    expect(patch.overrides.selected).toBeUndefined()
+  })
+
+  test('color edits are scoped to the edited base', () => {
+    const patch = applyField(baseSettings, field('color.background'), '#102030', 'light')
+    if (patch.kind !== 'overrides') throw new Error('expected overrides')
+    const s = withOverrides(patch.overrides)
+    expect(resolveTheme({ ...s, theme: 'light' }).background).toBe('#102030')
+    expect(resolveTheme({ ...s, theme: 'dark' }).background).toBe(getTheme('dark').background)
+    expect(resolveTheme({ ...s, theme: 'auto' }, null, 'light').background).toBe('#102030')
+    expect(isOverridden(field('color.background'), s, 'light')).toBe(true)
+    expect(isOverridden(field('color.background'), s, 'dark')).toBe(false)
   })
 
   test('layout field nests under layout', () => {
-    const patch = applyField(baseSettings, field('layout.modalPaddingX'), 5)
+    const patch = applyField(baseSettings, field('layout.modalPaddingX'), 5, 'dark')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
     expect(patch.overrides.layout?.modalPaddingX).toBe(5)
   })
 
   test('setting field produces a settings patch, not an override', () => {
-    const patch = applyField(baseSettings, field('setting.inlineImageMaxRows'), 12)
+    const patch = applyField(baseSettings, field('setting.inlineImageMaxRows'), 12, 'dark')
     expect(patch.kind).toBe('setting')
     if (patch.kind !== 'setting') throw new Error('expected setting')
     expect(patch.patch).toEqual({ inlineImageMaxRows: 12 })
@@ -226,10 +238,10 @@ describe('applyField', () => {
 
   test('preserves sibling overrides', () => {
     const s = withOverrides({ background: 'red', layout: { panePaddingX: 2 } })
-    const patch = applyField(s, field('color.text'), 'white')
+    const patch = applyField(s, field('color.text'), 'white', 'dark')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
     expect(patch.overrides.background).toBe('red')
-    expect(patch.overrides.text).toBe('white')
+    expect(patch.overrides.dark?.text).toBe('white')
     expect(patch.overrides.layout?.panePaddingX).toBe(2)
   })
 })
@@ -237,29 +249,36 @@ describe('applyField', () => {
 describe('resetField', () => {
   test('removes a flat color override', () => {
     const s = withOverrides({ background: 'red', text: 'white' })
-    const patch = resetField(s, field('color.background'))
+    const patch = resetField(s, field('color.background'), 'dark')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
     expect('background' in patch.overrides).toBe(false)
     expect(patch.overrides.text).toBe('white')
   })
 
+  test('clears the base bucket and a legacy global value together', () => {
+    const s = withOverrides({ background: 'red', dark: { background: 'blue' } })
+    const patch = resetField(s, field('color.background'), 'dark')
+    if (patch.kind !== 'overrides') throw new Error('expected overrides')
+    expect(patch.overrides).toEqual({})
+  })
+
   test('removes a nested override and prunes the empty sub-object', () => {
     const s = withOverrides({ layout: { panePaddingX: 3 } })
-    const patch = resetField(s, field('layout.panePaddingX'))
+    const patch = resetField(s, field('layout.panePaddingX'), 'dark')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
     expect(patch.overrides.layout).toBeUndefined()
   })
 
   test('keeps sibling keys inside a sub-object', () => {
     const s = withOverrides({ layout: { panePaddingX: 3, modalPaddingX: 5 } })
-    const patch = resetField(s, field('layout.panePaddingX'))
+    const patch = resetField(s, field('layout.panePaddingX'), 'dark')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
     expect(patch.overrides.layout).toEqual({ modalPaddingX: 5 })
   })
 
   test('setting field resets to the built-in default', () => {
     const s: Settings = { ...defaultSettings, inlineImageMaxRows: 30 }
-    const patch = resetField(s, field('setting.inlineImageMaxRows'))
+    const patch = resetField(s, field('setting.inlineImageMaxRows'), 'dark')
     if (patch.kind !== 'setting') throw new Error('expected setting')
     expect(patch.patch).toEqual({ inlineImageMaxRows: defaultSettings.inlineImageMaxRows })
   })
@@ -275,15 +294,15 @@ describe('resetAllOverrides', () => {
 
 describe('anyOverridden', () => {
   test('false on a clean settings object', () => {
-    expect(anyOverridden(baseSettings)).toBe(false)
+    expect(anyOverridden(baseSettings, 'dark')).toBe(false)
   })
 
   test('ignores setting-backed differences (only theme overrides count)', () => {
-    expect(anyOverridden({ ...defaultSettings, inlineImageMaxRows: 42 })).toBe(false)
+    expect(anyOverridden({ ...defaultSettings, inlineImageMaxRows: 42 }, 'dark')).toBe(false)
   })
 
   test('true once a theme override exists', () => {
-    expect(anyOverridden(withOverrides({ selected: 'magenta' }))).toBe(true)
+    expect(anyOverridden(withOverrides({ selected: 'magenta' }), 'dark')).toBe(true)
   })
 })
 
@@ -292,7 +311,7 @@ describe('editor output validates without warnings', () => {
     let overrides: ThemeOverrides = {}
     for (const f of FIELDS) {
       if (f.group === 'setting') continue
-      const patch = applyField(withOverrides(overrides), f, sampleValue(f))
+      const patch = applyField(withOverrides(overrides), f, sampleValue(f), 'dark')
       if (patch.kind !== 'overrides') throw new Error('expected overrides')
       overrides = patch.overrides
     }
@@ -303,14 +322,14 @@ describe('editor output validates without warnings', () => {
   })
 
   test('an applied override is reflected in the resolved theme', () => {
-    const patch = applyField(baseSettings, field('color.background'), '#102030')
+    const patch = applyField(baseSettings, field('color.background'), '#102030', 'dark')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
     const resolved = resolveTheme(withOverrides(patch.overrides), null, 'dark')
     expect(resolved.background).toBe('#102030')
   })
 
   test('a cleared nullable color resolves to null', () => {
-    const patch = applyField(baseSettings, field('color.selectedRowBackground'), null)
+    const patch = applyField(baseSettings, field('color.selectedRowBackground'), null, 'dark')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
     const resolved = resolveTheme(withOverrides(patch.overrides), null, 'dark')
     expect(resolved.selectedRowBackground).toBeNull()

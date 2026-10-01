@@ -9,7 +9,13 @@
 // src/config/themes.ts) and are layered between the resolved built-in base
 // and Settings.themeOverrides.
 
-import type { Settings, SystemAppearance, ThemeOverrides, ThemePresenceKey } from '../state/store'
+import type {
+  Settings,
+  SystemAppearance,
+  ThemeColorOverrides,
+  ThemeOverrides,
+  ThemePresenceKey,
+} from '../state/store'
 
 export type PresenceMap = Record<ThemePresenceKey, string>
 
@@ -240,6 +246,16 @@ export type PartialTheme = {
   emphasis?: Partial<ThemeEmphasis>
 }
 
+// Built-in base a theme setting renders on: 'auto' follows the OS, a user
+// theme file (any other name) layers on 'dark'.
+export function resolveBaseName(
+  themeSetting: string,
+  systemAppearance: SystemAppearance = 'dark',
+): BuiltinThemeName {
+  const requested = themeSetting === 'auto' ? systemAppearance : themeSetting
+  return isBuiltinTheme(requested) ? requested : 'dark'
+}
+
 export function resolveTheme(
   settings: Settings,
   customTheme?: PartialTheme | null,
@@ -247,11 +263,10 @@ export function resolveTheme(
 ): Theme {
   // 'auto' follows the OS appearance; everything else is a literal theme
   // name (built-in or a user theme file, which falls back to 'dark').
-  const requested = settings.theme === 'auto' ? systemAppearance : settings.theme
-  const baseName = isBuiltinTheme(requested) ? requested : 'dark'
+  const baseName = resolveBaseName(settings.theme, systemAppearance)
   const base = cloneTheme(builtinThemes[baseName])
   const withCustom = customTheme ? mergePartial(base, customTheme) : base
-  const merged = applyOverrides(withCustom, settings.themeOverrides)
+  const merged = applyOverrides(withCustom, settings.themeOverrides, baseName)
 
   if (settings.messageFocusIndicatorColor) {
     merged.messageFocusIndicator = settings.messageFocusIndicatorColor
@@ -277,21 +292,31 @@ function mergePartial(theme: Theme, partial: PartialTheme): Theme {
   return theme
 }
 
-function applyOverrides(theme: Theme, overrides: ThemeOverrides): Theme {
-  const { presence, layout, borders, emphasis, ...flat } = overrides
-  for (const [key, value] of Object.entries(flat) as [
-    keyof Omit<ThemeOverrides, 'presence' | 'layout' | 'borders' | 'emphasis'>,
+function applyOverrides(
+  theme: Theme,
+  overrides: ThemeOverrides,
+  baseName: BuiltinThemeName,
+): Theme {
+  const { presence, layout, borders, emphasis, dark, light, ...flat } = overrides
+  // Global (legacy) colors first, then the active base's own colors.
+  applyColors(theme, flat)
+  applyColors(theme, baseName === 'light' ? light : dark)
+  if (presence) theme.presence = { ...theme.presence, ...presence }
+  if (layout) theme.layout = { ...theme.layout, ...layout }
+  if (borders) theme.borders = { ...theme.borders, ...borders }
+  if (emphasis) theme.emphasis = { ...theme.emphasis, ...emphasis }
+  return theme
+}
+
+function applyColors(theme: Theme, colors: ThemeColorOverrides | undefined): void {
+  for (const [key, value] of Object.entries(colors ?? {}) as [
+    keyof ThemeColorOverrides,
     string | null | undefined,
   ][]) {
     if (value !== undefined) {
       ;(theme[key] as string | null) = value
     }
   }
-  if (presence) theme.presence = { ...theme.presence, ...presence }
-  if (layout) theme.layout = { ...theme.layout, ...layout }
-  if (borders) theme.borders = { ...theme.borders, ...borders }
-  if (emphasis) theme.emphasis = { ...theme.emphasis, ...emphasis }
-  return theme
 }
 
 function cloneTheme(input: Theme): Theme {

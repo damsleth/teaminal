@@ -6,7 +6,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 ││  teaminal · You (example.com) · presence ● ? · graph ● online · 3 chats                          ││
 │╰──────────────────────────────╭────────────────────────────────────────────────────────────────╮──╯│
 │╭──────────────────────────╮╭──│                                                                │──╮│
-││Chats                     ││Se│   Theme editor                                                 │  ││
+││Chats                     ││Se│   Theme editor · dark colors                                   │  ││
 ││ ◯ > Ada Byron            ││  │   • = overridden · adjust live, persists to config             │  ││
 ││Ada: The launch notes are ││  │   ── Spacing / Layout                                          │  ││
 ││ ready for review.        ││  │   >   Pane padding X        1 (0–6)                            │  ││

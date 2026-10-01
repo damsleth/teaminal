@@ -8,6 +8,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Switching Theme between dark, light and auto works again.** Colors tuned
+  in the theme editor were saved as global overrides, so they covered every
+  base theme and the switch did nothing. The editor now saves colors under
+  `themeOverrides.dark` / `themeOverrides.light` for the base being edited
+  (shown in its title). Existing top-level color overrides still apply to
+  every theme: move them under `light` or `dark`, or reset them in the editor
+  (`R`), to see the switch.
+
 - **The focused-message marker points at the message.** The `>` marker now sits
   on the body line that is highlighted, instead of on the sender name above it.
 - **Day headers no longer vanish behind messages while scrolling.** When long
