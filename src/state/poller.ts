@@ -171,6 +171,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
     return loadOlderMessagesImpl({
       store,
       reportError: (err) => reportError('active', err),
+      signal: sessionAbort.signal,
     })
   }
 

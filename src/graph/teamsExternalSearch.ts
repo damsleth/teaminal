@@ -233,11 +233,16 @@ function maskEmail(email: string): string {
 
 export async function searchExternalUsers(
   searchTerm: string,
-  opts?: ExternalSearchOpts,
+  searchOpts?: ExternalSearchOpts,
 ): Promise<DirectoryUser[]> {
   const trimmed = searchTerm.trim()
   if (!trimmed) return []
-  const cacheKey = trimmed.toLowerCase()
+  // Pin the profile once: an account switch mid-await must not mint the
+  // token (or resolve the region) for a different account than the cache key.
+  const opts: ExternalSearchOpts = { ...searchOpts, profile: profile(searchOpts) }
+  // Keyed by profile: hits carry tenant-specific oids/MRIs that must never
+  // be offered (or fed to createOneOnOneChat) in another account.
+  const cacheKey = `${opts.profile ?? ''}::${trimmed.toLowerCase()}`
   const cached = cacheGet(cacheKey)
   if (cached) return cached.slice(0, opts?.top ?? cached.length)
 

@@ -81,7 +81,19 @@ export function startForceAvailabilityDriver(store: Store<AppState>): ForceAvail
   }
 
   let prevOn = false
+  let lastProfile = getActiveProfile()
   const handle = (s: AppState): void => {
+    // Account switch: a 403 on the previous account must not latch this one
+    // off, and the new account should go Available now rather than at the
+    // next 4-minute tick.
+    const profile = getActiveProfile()
+    if (profile !== lastProfile) {
+      lastProfile = profile
+      unreachable = false
+      prevOn = false
+      cancelTimer()
+      inFlight?.abort()
+    }
     const isOn = shouldFire(s)
     if (isOn && !prevOn) {
       void fire()

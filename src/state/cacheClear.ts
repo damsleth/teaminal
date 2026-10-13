@@ -3,6 +3,7 @@
 // Removes a single profile's on-disk caches:
 //   - the chat/teams list cache  (list[.<profile>].json)
 //   - the message cache          (messages[.<profile>].json)
+//   - the userId -> name index   (names[.<profile>].json)
 //   - the image blob directory   (<profile>/images/)
 //
 // Scoped to one profile so emptying the active account's cache never
@@ -11,8 +12,9 @@
 
 import { existsSync, unlinkSync } from 'node:fs'
 import { clearImageCache, getImageCacheDir } from './imageCache'
-import { getListCachePath } from './listCachePersistence'
-import { getMessageCachePath } from './messageCachePersistence'
+import { flushListCache, getListCachePath } from './listCachePersistence'
+import { flushMessageCache, getMessageCachePath } from './messageCachePersistence'
+import { flushNameCache, getNameCachePath } from './nameCachePersistence'
 
 type Env = Record<string, string | undefined>
 
@@ -40,9 +42,15 @@ export function clearProfileCaches(
   profile: string | null,
   env: Env = process.env,
 ): CacheClearResult {
+  // Land pending debounced writes first, or they'd recreate the files
+  // a couple of seconds after we delete them.
+  flushMessageCache()
+  flushListCache()
+  flushNameCache()
   const removed: string[] = []
   removeFileIfPresent(getMessageCachePath(env, profile), removed)
   removeFileIfPresent(getListCachePath(env, profile), removed)
+  removeFileIfPresent(getNameCachePath(env, profile), removed)
   const imageDir = getImageCacheDir(profile)
   const hadImages = existsSync(imageDir)
   clearImageCache(profile)

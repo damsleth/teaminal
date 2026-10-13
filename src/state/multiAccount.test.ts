@@ -42,6 +42,7 @@ describe('resetAccountScopedState', () => {
       realtimeState: 'connected',
       terminalFocused: true,
       settings: { ...store.get().settings, theme: 'light' },
+      customTheme: { name: 'mine', data: { fg: '#fff' } },
     })
 
     resetAccountScopedState(store)
@@ -68,6 +69,7 @@ describe('resetAccountScopedState', () => {
 
     // Preserved
     expect(s.terminalFocused).toBe(true)
+    expect(s.customTheme).toEqual({ name: 'mine', data: { fg: '#fff' } })
     expect(s.settings.theme).toBe('light')
   })
 })

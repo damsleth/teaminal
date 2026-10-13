@@ -613,6 +613,31 @@ describe('reseed', () => {
     expect(calls[3]?.[0]).toBe('token')
   })
 
+  test('reseeding one profile leaves prefix-sharing and default profiles cached', async () => {
+    const token = makeJwt({ exp: FAR_FUTURE })
+    let tokenCalls = 0
+    __setRunnerForTests(async (args) => {
+      if (args[0] === 'token') tokenCalls++
+      return { stdout: token, stderr: '', exitCode: 0 }
+    })
+    await getToken({ profile: 'a' })
+    await getToken({ profile: 'ab' })
+    await getToken()
+    expect(tokenCalls).toBe(3)
+
+    await reseed({ profile: 'a' })
+    await getToken({ profile: 'ab' })
+    await getToken()
+    expect(tokenCalls).toBe(3)
+
+    // A default-profile reseed must not purge named profiles either.
+    await reseed()
+    await getToken({ profile: 'ab' })
+    expect(tokenCalls).toBe(3)
+    await getToken()
+    expect(tokenCalls).toBe(4)
+  })
+
   test('throws OwaPiggyError on non-zero exit', async () => {
     __setRunnerForTests(async () => ({
       stdout: '',

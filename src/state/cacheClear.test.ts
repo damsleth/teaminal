@@ -6,6 +6,7 @@ import { clearProfileCaches } from './cacheClear'
 import { getImageCacheDir } from './imageCache'
 import { getListCachePath } from './listCachePersistence'
 import { getMessageCachePath } from './messageCachePersistence'
+import { getNameCachePath } from './nameCachePersistence'
 
 let cacheRoot: string
 let prevXdg: string | undefined
@@ -29,6 +30,7 @@ function seedProfile(profile: string | null): void {
   mkdirSync(join(cacheRoot, 'teaminal'), { recursive: true })
   writeFileSync(getMessageCachePath(env, profile), '{"version":1,"caches":{}}')
   writeFileSync(getListCachePath(env, profile), '{"version":1,"chats":[],"teams":[]}')
+  writeFileSync(getNameCachePath(env, profile), '{"version":1,"names":{}}')
   const imgDir = getImageCacheDir(profile)
   mkdirSync(imgDir, { recursive: true })
   writeFileSync(join(imgDir, 'abc.bin'), 'blob')
@@ -40,8 +42,9 @@ describe('clearProfileCaches', () => {
     const result = clearProfileCaches('work')
     expect(existsSync(getMessageCachePath(process.env, 'work'))).toBe(false)
     expect(existsSync(getListCachePath(process.env, 'work'))).toBe(false)
+    expect(existsSync(getNameCachePath(process.env, 'work'))).toBe(false)
     expect(existsSync(getImageCacheDir('work'))).toBe(false)
-    expect(result.removed.length).toBe(3)
+    expect(result.removed.length).toBe(4)
   })
 
   test('leaves another profile untouched', () => {
@@ -50,6 +53,7 @@ describe('clearProfileCaches', () => {
     clearProfileCaches('work')
     expect(existsSync(getMessageCachePath(process.env, 'home'))).toBe(true)
     expect(existsSync(getListCachePath(process.env, 'home'))).toBe(true)
+    expect(existsSync(getNameCachePath(process.env, 'home'))).toBe(true)
     expect(existsSync(getImageCacheDir('home'))).toBe(true)
   })
 
@@ -62,6 +66,6 @@ describe('clearProfileCaches', () => {
     seedProfile(null)
     const result = clearProfileCaches(null)
     expect(existsSync(getMessageCachePath(process.env, null))).toBe(false)
-    expect(result.removed.length).toBe(3)
+    expect(result.removed.length).toBe(4)
   })
 })

@@ -35,6 +35,22 @@ adheres to [Semantic Versioning](https://semver.org/).
   text color. That left it looking the same as the others in the light theme,
   and nearly invisible on a dark terminal. It now gets the same full-width
   highlight bar as a selected chat.
+- **Switching accounts no longer leaks or loses data between them.**
+  - Switching to an account with no cached messages could empty the previous
+    account's message cache on disk.
+  - Directory search results from one tenant could be offered in another.
+  - "Force available when focused" stayed off for the session after one
+    account returned 403, and a new account waited up to four minutes for it.
+  - Reseeding one account dropped every other account's cached tokens.
+  - An older-messages page that arrived during a switch could land in the
+    new account's chat.
+  - The custom theme was dropped on switch.
+  - Changing an account's chat routing now also clears the Conditional Access
+    fallback taken under the old routing.
+- **"Empty the cache" also removes the cached display names**, and a pending
+  save can no longer recreate the files right after they are deleted.
+- **Test and demo runs (`TEAMINAL_SEED`) no longer touch your real caches.**
+  The tui-test suite used to overwrite `~/.cache/teaminal` with fixture chats.
 
 ## [0.23.0] - 2026-09-25
 

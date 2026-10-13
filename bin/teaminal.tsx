@@ -248,9 +248,15 @@ function hydrateListCache(profile: string | null): void {
     warn('bootstrap: hydrate list cache failed:', err instanceof Error ? err.message : String(err))
   }
 }
-hydrateNameCache(activeProfile)
-hydrateCache(activeProfile)
-hydrateListCache(activeProfile)
+// Seeded/offline mode (tui-test, demos) must neither read nor write the real
+// per-profile caches: fixture data would overwrite ~/.cache/teaminal, and
+// real cached data would leak into deterministic snapshots.
+const persistCaches = !isSeededMode()
+if (persistCaches) {
+  hydrateNameCache(activeProfile)
+  hydrateCache(activeProfile)
+  hydrateListCache(activeProfile)
+}
 
 // Detect the OS appearance before the first render so the 'auto' theme
 // paints the right base immediately, then keep it updated on an interval.
@@ -262,8 +268,11 @@ const systemAppearance = startSystemAppearanceDriver(store)
 let lastSavedCaches = store.get().messageCacheByConvo
 let activeCachePath = getMessageCachePath(process.env, activeProfile)
 const cacheSubscription = store.subscribe((s) => {
-  if (s.messageCacheByConvo === lastSavedCaches) return
+  if (!persistCaches || s.messageCacheByConvo === lastSavedCaches) return
   lastSavedCaches = s.messageCacheByConvo
+  // An empty cache is the wiped post-switch / hard-refresh state; writing it
+  // would clobber the profile's history before the poller refills it.
+  if (Object.keys(s.messageCacheByConvo).length === 0) return
   scheduleMessageCacheSave(s.messageCacheByConvo, undefined, activeCachePath)
 })
 
@@ -273,7 +282,7 @@ let lastSavedChats = store.get().chats
 let lastSavedTeams = store.get().teams
 let activeListCachePath = getListCachePath(process.env, activeProfile)
 const listCacheSubscription = store.subscribe((s) => {
-  if (s.chats === lastSavedChats && s.teams === lastSavedTeams) return
+  if (!persistCaches || (s.chats === lastSavedChats && s.teams === lastSavedTeams)) return
   lastSavedChats = s.chats
   lastSavedTeams = s.teams
   // Don't persist a wiped list — resetAccountScopedState clears chats/teams
@@ -293,7 +302,7 @@ const listCacheSubscription = store.subscribe((s) => {
 let lastSavedNames = store.get().nameByUserId
 let activeNameCachePath = getNameCachePath(process.env, activeProfile)
 const nameCacheSubscription = store.subscribe((s) => {
-  if (s.nameByUserId === lastSavedNames) return
+  if (!persistCaches || s.nameByUserId === lastSavedNames) return
   lastSavedNames = s.nameByUserId
   if (Object.keys(s.nameByUserId).length === 0) return
   scheduleNameCacheSave(s.nameByUserId, undefined, activeNameCachePath)
@@ -366,14 +375,18 @@ async function switchAccount(nextProfile: string | null): Promise<void> {
   try {
     flushNameCache()
   } catch {}
-  resetAccountScopedState(store)
+  // Swap the persistence paths before the reset: the reset fires the cache
+  // subscribers, and any write they schedule must target the new profile.
   activeProfile = nextProfile
   activeCachePath = getMessageCachePath(process.env, activeProfile)
   activeListCachePath = getListCachePath(process.env, activeProfile)
   activeNameCachePath = getNameCachePath(process.env, activeProfile)
-  hydrateNameCache(activeProfile)
-  hydrateCache(activeProfile)
-  hydrateListCache(activeProfile)
+  resetAccountScopedState(store)
+  if (persistCaches) {
+    hydrateNameCache(activeProfile)
+    hydrateCache(activeProfile)
+    hydrateListCache(activeProfile)
+  }
 
   try {
     currentSession = await runSession({

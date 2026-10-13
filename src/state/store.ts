@@ -926,5 +926,6 @@ export function resetAccountScopedState(store: Store<AppState>): void {
   fresh.terminalFocused = prev.terminalFocused
   fresh.focusReportingHealthy = prev.focusReportingHealthy
   fresh.systemAppearance = prev.systemAppearance
+  fresh.customTheme = prev.customTheme
   store.replace(fresh)
 }

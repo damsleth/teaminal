@@ -94,6 +94,30 @@ describe('loadOlderMessages', () => {
     expect(calls).toBe(0)
   })
 
+  test('drops a page that lands after the session stop signal fired', async () => {
+    const stop = new AbortController()
+    __setTransportForTests(async () => {
+      // The response arrives just as the session is torn down.
+      stop.abort()
+      return jsonResponse({ value: [msg('older-1', '2026-01-01T00:00:00Z')] })
+    })
+    const store = createAppStore()
+    const conv: ConvKey = 'chat:c1'
+    store.set({
+      focus: { kind: 'chat', chatId: 'c1' },
+      messageCacheByConvo: {
+        [conv]: {
+          messages: [msg('m1', '2026-01-01T01:00:00Z')],
+          loadingOlder: false,
+          fullyLoaded: false,
+        },
+      },
+    })
+    const result = await loadOlderMessages({ store, reportError: () => {}, signal: stop.signal })
+    expect(result.added).toBe(0)
+    expect(store.get().messageCacheByConvo[conv]?.messages.map((m) => m.id)).toEqual(['m1'])
+  })
+
   test('marks channel cache fullyLoaded when there is no nextLink', async () => {
     let calls = 0
     __setTransportForTests(async () => {

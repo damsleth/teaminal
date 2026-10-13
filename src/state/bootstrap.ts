@@ -32,8 +32,18 @@ import {
   focusKey,
   routingForAccount,
   type AppState,
+  type ChatRoutingMode,
   type Store,
 } from './store'
+
+// Apply a chat routing mode to the graph client and clear the chatsvc
+// message latch, so a graph-401 fallback taken under the old mode (or the old
+// account) doesn't outlive the change.
+export function applyChatRouting(mode: ChatRoutingMode): void {
+  const { audience, fallback } = audienceFromRouting(mode)
+  setAudiencePreference(audience, { fallback })
+  resetChatMessageTransport()
+}
 
 export type SessionHandle = {
   /** Profile passed to runSession; useful for logging / debugging. */
@@ -95,9 +105,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
   {
     const settings = store.get().settings
     const account = profile ?? settings.activeAccount ?? null
-    const { audience, fallback } = audienceFromRouting(routingForAccount(settings, account))
-    setAudiencePreference(audience, { fallback })
-    resetChatMessageTransport()
+    applyChatRouting(routingForAccount(settings, account))
   }
 
   let pollerHandle: Awaited<ReturnType<typeof startPoller>> | null = null
@@ -212,6 +220,9 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
         profile: profile ?? undefined,
       })
       transport.onStateChange((state) => {
+        // A late state from a pending connect/reconnect must not land in
+        // the next account's store after a switch.
+        if (stopped) return
         store.set({
           realtimeState:
             state === 'disconnected'
