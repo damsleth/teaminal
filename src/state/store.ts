@@ -269,6 +269,7 @@ export type ThemeOverrides = ThemeColorOverrides & {
   borders?: Partial<{
     panel: BorderStyleName
     modal: BorderStyleName
+    active: BorderStyleName
   }>
   emphasis?: Partial<{
     modalTitleBold: boolean

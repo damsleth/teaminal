@@ -32,6 +32,7 @@ import {
   moveMessageCursor as nextMessageCursor,
   setMessageCursor as setStoredMessageCursor,
   type Focus,
+  type InputZone,
   type ModalState,
 } from '../state/store'
 import { AccountsModal } from './AccountsModal'
@@ -75,6 +76,25 @@ import type { Chat, DirectoryUser } from '../types'
 
 export function shouldShowTailPanels(modal: ModalState | null): boolean {
   return modal === null
+}
+
+export type ActivePane = 'list' | 'conversation' | 'composer' | null
+
+// The pane that currently takes input, for the active border. Modals draw
+// their own active border, so no pane is active behind one.
+export function activePane(zone: InputZone, focus: Focus): ActivePane {
+  switch (zone) {
+    case 'composer':
+      return 'composer'
+    case 'filter':
+      return 'list'
+    case 'message-search':
+      return 'conversation'
+    case 'list':
+      return focus.kind === 'list' ? 'list' : 'conversation'
+    default:
+      return null
+  }
 }
 
 function otherUserIdForFederatedResolution(
@@ -479,6 +499,11 @@ export function App() {
   const replaceModal = modal?.kind === 'auth-expired' ? modal : null
   const showTailPanels = shouldShowTailPanels(modal)
   const theme = useTheme()
+  const active = activePane(inputZone, focus)
+  const paneBorder = (pane: ActivePane) =>
+    pane === active
+      ? { borderStyle: theme.borders.active, borderColor: theme.borderActive }
+      : { borderStyle: theme.borders.panel, borderColor: theme.border }
   return (
     <Box flexDirection="column" height={terminalRows}>
       {statusBarPosition === 'top' && <StatusBar />}
@@ -490,21 +515,10 @@ export function App() {
         <HeaderBar />
       </Box>
       <Box flexDirection="row" flexGrow={1}>
-        <Box
-          width={resolvedChatListWidth}
-          flexShrink={0}
-          borderStyle={theme.borders.panel}
-          borderColor={theme.border}
-        >
+        <Box width={resolvedChatListWidth} flexShrink={0} {...paneBorder('list')}>
           <ChatList listPaneWidth={resolvedChatListWidth} />
         </Box>
-        <Box
-          flexGrow={1}
-          flexShrink={1}
-          minWidth={0}
-          borderStyle={theme.borders.panel}
-          borderColor={theme.border}
-        >
+        <Box flexGrow={1} flexShrink={1} minWidth={0} {...paneBorder('conversation')}>
           {newChatPrompt !== null ? (
             <NewChatPrompt
               initialQuery={newChatPrompt}
@@ -575,11 +589,7 @@ export function App() {
         </Box>
       </Box>
       {showTailPanels && <TailPanels />}
-      <Box
-        borderStyle={theme.borders.panel}
-        borderColor={theme.border}
-        height={resolvedComposerHeight}
-      >
+      <Box {...paneBorder('composer')} height={resolvedComposerHeight}>
         <Composer />
       </Box>
       {statusBarPosition === 'bottom' && <StatusBar />}

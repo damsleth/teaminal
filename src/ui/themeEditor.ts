@@ -123,7 +123,7 @@ const num = (
   max,
   step,
 })
-const border = (key: 'panel' | 'modal', label: string): EnumField => ({
+const border = (key: 'panel' | 'modal' | 'active', label: string): EnumField => ({
   kind: 'enum',
   id: `borders.${key}`,
   label,
@@ -175,6 +175,7 @@ export const FIELDS: readonly EditableField[] = [
   // — Borders —
   border('panel', 'Panel border'),
   border('modal', 'Modal border'),
+  border('active', 'Active pane border'),
   // — Emphasis —
   bool('modalTitleBold', 'Modal title bold'),
   bool('sectionHeadingBold', 'Section heading bold'),

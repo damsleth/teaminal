@@ -923,6 +923,10 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,26": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,27": {
     "fgColorMode": 0,
     "fgColor": -1
@@ -937,7 +941,7 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
   },
   "99,27": {
     "fgColorMode": 16777216,
-    "fgColor": 8
+    "fgColor": 6
   },
   "0,29": {
     "fgColorMode": 0,

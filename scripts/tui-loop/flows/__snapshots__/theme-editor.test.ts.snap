@@ -18,7 +18,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 ││the EU region.            ││  │       Chat list pad R       1                                  │  ││
 ││                          ││  │   ── Colors                                                    │  ││
 ││                          ││  │       Background            ██ black                           │  ││
-││                          ││  │      ↓ 28 more                                                 │  ││
+││                          ││  │      ↓ 29 more                                                 │  ││
 ││                          ││  │                                                                │  ││
 ││                          ││  │   ╭────────────────────────────────────────────────────────╮   │  ││
 ││                          ││  │   │Ada  Sample message body  12:34                         │   │  ││

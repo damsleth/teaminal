@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { shouldShowTailPanels } from './App'
+import { activePane, shouldShowTailPanels } from './App'
 
 describe('shouldShowTailPanels', () => {
   test('keeps always-on tails visible when no modal is active', () => {
@@ -28,5 +28,20 @@ describe('shouldShowTailPanels', () => {
         status: 'idle',
       }),
     ).toBe(false)
+  })
+})
+
+describe('activePane', () => {
+  const chat = { kind: 'chat', chatId: 'c1' } as const
+  test('follows the input zone and focus to the pane that takes keys', () => {
+    expect(activePane('list', { kind: 'list' })).toBe('list')
+    expect(activePane('filter', chat)).toBe('list')
+    expect(activePane('list', chat)).toBe('conversation')
+    expect(activePane('message-search', chat)).toBe('conversation')
+    expect(activePane('composer', chat)).toBe('composer')
+  })
+
+  test('no pane is active behind a modal', () => {
+    expect(activePane('menu', chat)).toBeNull()
   })
 })

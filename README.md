@@ -138,7 +138,7 @@ warnings and fall back to defaults.
 | `messageFocusIndicatorChar`    | single character     |     `>` | Marker shown beside the focused message.                                                 |
 | `messageFocusIndicatorColor`   | color or null        |  `null` | Override focused-message marker color.                                                   |
 | `messageFocusBackgroundColor`  | color or null        |  `null` | Optional focused-message background color.                                               |
-| `themeOverrides`               | object               |    `{}` | Override color roles such as `text`, `mutedText`, `unread`, `timestamp`, `presence`, plus `layout` (paddings), `borders` (border styles for `panel` and `modal`), and `emphasis` (per-role bold flags). Colors under `dark` / `light` apply only to that base theme (the theme editor writes there); top-level colors apply to every theme. |
+| `themeOverrides`               | object               |    `{}` | Override color roles such as `text`, `mutedText`, `unread`, `timestamp`, `presence`, plus `layout` (paddings), `borders` (border styles for `panel`, `modal`, and the `active` pane, which is drawn in `borderActive`), and `emphasis` (per-role bold flags). Colors under `dark` / `light` apply only to that base theme (the theme editor writes there); top-level colors apply to every theme. |
 | `useTeamsPresence`             | boolean              |  `true` | Use the Teams unified presence endpoint (`presence.teams.microsoft.com`) for own presence. Falls back to Graph `/me/presence` automatically on 401/403/404. Set to `false` to force Graph-only in tenants that block public-client access to that host. |
 | `forceAvailableWhenFocused`    | boolean              |  `true` | While the terminal window has focus (DEC focus reporting; CSI ?1004), PUT `forceavailability=Available` to `presence.teams.microsoft.com` so Teams shows you Available, like the desktop client does for an active window. The override expires server-side after ~5 min and is refreshed inside that window. Set to `false` to leave presence to Teams' own desktop client / inactivity timer. |
 | `realtimeEnabled`              | boolean              | `false` | Enables the experimental Teams trouter push transport for typing, read-receipt, presence, and immediate refresh signals. Polling remains the source of truth and fallback. |
@@ -199,7 +199,7 @@ theme layered on top of `dark`; any subset of these keys is accepted:
     "chatListPaddingRight": 1,
   },
   // Border styles (single | double | round | bold | classic | singleDouble | doubleSingle | arrow):
-  "borders": { "panel": "single", "modal": "double" },
+  "borders": { "panel": "single", "modal": "double", "active": "bold" },
   // Per-role bold (true/false):
   "emphasis": {
     "modalTitleBold": true,
@@ -234,6 +234,7 @@ The in-app Settings menu persists changes back to `config.json`.
 | Tab            | composer          | Return to message navigation.                                           |
 | Esc            | composer / filter | Leave mode.                                                             |
 | Esc            | anywhere else     | Toggle the menu overlay. Use `h` / Left to step back a pane.            |
+| Enter / Space  | menu              | Activate the selected menu item (also in submenus).                     |
 | Enter          | composer          | Send message.                                                           |
 | Ctrl+J         | composer          | Insert newline.                                                         |
 | `/`            | list              | Filter chats.                                                           |

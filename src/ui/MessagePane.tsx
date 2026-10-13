@@ -620,12 +620,9 @@ function MessageRow(props: {
 
   const marker = (
     <Box width={markerWidth} flexShrink={0}>
-      <Text
-        color={props.focused ? theme.messageFocusIndicator : undefined}
-        backgroundColor={props.focused ? (theme.messageFocusBackground ?? undefined) : undefined}
-      >
-        {indicator}
-      </Text>
+      {/* No background: the marker color stands on its own, and the focus
+          background belongs to the focused message body. */}
+      <Text color={props.focused ? theme.messageFocusIndicator : undefined}>{indicator}</Text>
     </Box>
   )
 
@@ -645,6 +642,7 @@ function MessageRow(props: {
   const bodyNode = (
     <Text
       color={isDeleted ? theme.mutedText : props.focused ? theme.messageFocusIndicator : color}
+      backgroundColor={props.focused ? (theme.messageFocusBackground ?? undefined) : undefined}
       italic={isDeleted}
       bold={props.focused && !isDeleted}
       wrap="wrap"

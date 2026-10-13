@@ -26,13 +26,15 @@ const MESSAGES: ChatMessage[] = [
   msg('m6', '2026-01-03T09:05:00Z', 'Bob', 'third day, newest message'),
 ]
 
-function lines(
+function render(
   paneHeight: number,
   focusedMessageId: string | null = null,
   search: string | null = null,
-): string[] {
+  focusBackground: string | null = null,
+): string {
   const store = createAppStore()
   store.set({
+    settings: { ...store.get().settings, messageFocusBackgroundColor: focusBackground },
     focus: { kind: 'chat', chatId: 'c1' },
     messagesByConvo: { 'chat:c1': MESSAGES },
     ...(search !== null
@@ -47,9 +49,27 @@ function lines(
     </StoreProvider>,
     { columns: 80 },
   )
-  // eslint-disable-next-line no-control-regex
-  return out.replace(/\x1b\[[0-9;]*m/g, '').split('\n')
+  return out
 }
+
+function lines(
+  paneHeight: number,
+  focusedMessageId: string | null = null,
+  search: string | null = null,
+): string[] {
+  // eslint-disable-next-line no-control-regex
+  return render(paneHeight, focusedMessageId, search)
+    .replace(/\x1b\[[0-9;]*m/g, '')
+    .split('\n')
+}
+
+test('the focus background colors the message body, not the focus marker', () => {
+  const raw = render(40, 'm4', null, '#ff0000').split('\n')
+  const body = raw.find((l) => l.includes('second day, second message'))!
+  const bg = body.indexOf('48;2;255;0;0')
+  expect(bg).toBeGreaterThan(-1)
+  expect(body.indexOf('>')).toBeLessThan(bg)
+})
 
 test('the focus marker sits on the message body line, not the sender name', () => {
   const out = lines(40, 'm4')
