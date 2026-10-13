@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../../graph/client'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { __resetForTests, __setTransportForTests } from '../../graph/client'
 import {
@@ -7,6 +8,8 @@ import {
 import type { ChatMessage } from '../../types'
 import { createAppStore, type ConvKey } from '../store'
 import { loadOlderMessages } from './loadOlder'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -52,7 +55,7 @@ afterEach(() => {
 describe('loadOlderMessages', () => {
   test('returns conv=null with fullyLoaded=true when nothing is focused', async () => {
     const store = createAppStore()
-    const result = await loadOlderMessages({ store, reportError: () => {} })
+    const result = await loadOlderMessages({ getClient: testClient, store, reportError: () => {} })
     expect(result).toEqual({ conv: null, added: 0, fullyLoaded: true })
   })
 
@@ -70,7 +73,7 @@ describe('loadOlderMessages', () => {
         [conv]: { messages: [msg('m1', 'x')], loadingOlder: false, fullyLoaded: true },
       },
     })
-    const result = await loadOlderMessages({ store, reportError: () => {} })
+    const result = await loadOlderMessages({ getClient: testClient, store, reportError: () => {} })
     expect(result.fullyLoaded).toBe(true)
     expect(calls).toBe(0)
   })
@@ -89,7 +92,7 @@ describe('loadOlderMessages', () => {
         [conv]: { messages: [msg('m1', 'x')], loadingOlder: true, fullyLoaded: false },
       },
     })
-    const result = await loadOlderMessages({ store, reportError: () => {} })
+    const result = await loadOlderMessages({ getClient: testClient, store, reportError: () => {} })
     expect(result.added).toBe(0)
     expect(calls).toBe(0)
   })
@@ -113,7 +116,12 @@ describe('loadOlderMessages', () => {
         },
       },
     })
-    const result = await loadOlderMessages({ store, reportError: () => {}, signal: stop.signal })
+    const result = await loadOlderMessages({
+      getClient: testClient,
+      store,
+      reportError: () => {},
+      signal: stop.signal,
+    })
     expect(result.added).toBe(0)
     expect(store.get().messageCacheByConvo[conv]?.messages.map((m) => m.id)).toEqual(['m1'])
   })
@@ -132,7 +140,7 @@ describe('loadOlderMessages', () => {
         [conv]: { messages: [msg('m1', 'x')], loadingOlder: false, fullyLoaded: false },
       },
     })
-    const result = await loadOlderMessages({ store, reportError: () => {} })
+    const result = await loadOlderMessages({ getClient: testClient, store, reportError: () => {} })
     expect(result.fullyLoaded).toBe(true)
     expect(calls).toBe(0)
     expect(store.get().messageCacheByConvo[conv]?.fullyLoaded).toBe(true)
@@ -158,7 +166,7 @@ describe('loadOlderMessages', () => {
         },
       },
     })
-    const result = await loadOlderMessages({ store, reportError: () => {} })
+    const result = await loadOlderMessages({ getClient: testClient, store, reportError: () => {} })
     expect(seenUrl).toContain('/v1.0/chats/c1/messages')
     expect(seenUrl.replace(/\+/g, ' ')).toContain('createdDateTime lt')
     expect(result.added).toBe(2)
@@ -182,6 +190,7 @@ describe('loadOlderMessages', () => {
     })
     const errors: Error[] = []
     const result = await loadOlderMessages({
+      getClient: testClient,
       store,
       reportError: (e) => errors.push(e),
     })

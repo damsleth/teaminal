@@ -36,6 +36,8 @@ import { cleanupImageTempFiles } from '../src/ui/openImageFile'
 import { renderCleanExit } from '../src/ui/shutdown'
 import { PollerProvider } from '../src/ui/PollerContext'
 import type { PollerHandleRef } from '../src/state/poller'
+import { accountRef } from '../src/account'
+import { createGraphClient, getAudiencePreference } from '../src/graph/client'
 import { SessionProvider, type SessionApi } from '../src/ui/SessionContext'
 import { StoreProvider } from '../src/ui/StoreContext'
 import { debug, setLogFile, setNetworkLog, warn } from '../src/log'
@@ -341,11 +343,18 @@ process.on('unhandledRejection', (reason) => {
 const focusTracker = startFocusTracker(store)
 // Seeded/offline mode must not touch the network: the forceAvailability driver
 // PUTs to presence.teams.microsoft.com, so stub it out when seeded.
-const forceAvailability = isSeededMode() ? { stop() {} } : startForceAvailabilityDriver(store)
+const forceAvailability = isSeededMode()
+  ? { stop() {} }
+  : startForceAvailabilityDriver(store, () => accountRef(activeProfile))
 
 function makeSessionApi(): SessionApi {
   return {
     getActiveProfile: () => activeProfile,
+    // The running session's client; before one exists (seeded mode, the
+    // auth-expired modal) a client bound to the selected profile.
+    client: () =>
+      currentSession?.client() ??
+      createGraphClient({ account: accountRef(activeProfile), ...getAudiencePreference() }),
     switchAccount,
   }
 }

@@ -14,10 +14,12 @@ import { toggleReaction } from '../state/chatActions'
 import { openSystemEmojiPicker } from './emojiPicker'
 import { isEmojiGlyph } from './reactions'
 import { useAppState, useAppStore } from './StoreContext'
+import { useSessionApi } from './SessionContext'
 
 export function ReactionPickerModal() {
   const { exit } = useApp()
   const store = useAppStore()
+  const session = useSessionApi()
   const modal = useAppState((s) => s.modal)
   const me = useAppState((s) => s.me)
   const isOpen = modal?.kind === 'reaction-picker'
@@ -46,7 +48,10 @@ export function ReactionPickerModal() {
       // toggleReaction logs + rolls back its optimistic update on failure;
       // swallow the rejection so a Graph error never escapes as an unhandled
       // rejection and tears down the TUI.
-      if (me) void toggleReaction(store, chatId, messageId, input.trim(), me).catch(() => {})
+      if (me)
+        void toggleReaction(session.client(), store, chatId, messageId, input.trim(), me).catch(
+          () => {},
+        )
     },
     { isActive: isOpen },
   )

@@ -1,3 +1,5 @@
+import { accountRef } from '../account'
+import { createGraphClient, currentAccountContext } from '../graph/client'
 import { afterEach, describe, expect, it, mock } from 'bun:test'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -31,6 +33,8 @@ import {
   imageCacheKey as cacheKey,
   readCachedImage,
 } from './imageCache'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 describe('imageCacheKey', () => {
   it('combines messageId and attachmentId with ::', () => {
@@ -141,7 +145,7 @@ describe('fetchAndCacheImage isExternal branch', () => {
       'https://media.giphy.com/test.gif',
       key,
       { contentType: 'image/gif', name: 'test.gif' },
-      { isExternal: true, profile: '__external_test__' },
+      { isExternal: true, client: testClient() },
     )
 
     expect(buf).not.toBeNull()
@@ -163,7 +167,14 @@ describe('fetchAndCacheImage isExternal branch', () => {
       'https://media.giphy.com/test.gif',
       key,
       { contentType: 'image/gif', name: 'test.gif' },
-      { isExternal: true, profile: '../escape/profile' },
+      {
+        isExternal: true,
+        client: createGraphClient({
+          account: accountRef('../escape/profile'),
+          audience: 'graph',
+          fallback: false,
+        }),
+      },
     )
 
     expect(readCachedImage(key, '../escape/profile')).not.toBeNull()
@@ -232,7 +243,7 @@ describe('fetchAndCacheImage hosted-content routing', () => {
       '/chats/chat-1/messages/msg-1/hostedContents/AAA/$value',
       `ic3-test-${Date.now()}`,
       { contentType: '', name: 'image' },
-      { profile: '__ic3_test__', objectId: '0-na-d2-eb96', region: 'amer' },
+      { client: testClient(), objectId: '0-na-d2-eb96', region: 'amer' },
     )
     expect(buf).not.toBeNull()
     expect(buf!.byteLength).toBe(5)
@@ -282,7 +293,7 @@ describe('fetchAndCacheImage hosted-content routing', () => {
       '/chats/chat-x/messages/msg-x/hostedContents/0-nch-d4-8efd/$value',
       `xtenant-test-${Date.now()}`,
       { contentType: '', name: 'image' },
-      { profile: '__xtenant_test__', objectId: '0-nch-d4-8efd' },
+      { client: testClient(), objectId: '0-nch-d4-8efd' },
     )
     expect(buf).not.toBeNull()
     expect(buf!.byteLength).toBe(3)
@@ -332,7 +343,7 @@ describe('fetchAndCacheImage hosted-content routing', () => {
       '/chats/chat-c/messages/msg-c/hostedContents/0-csea-d9-cb8e/$value',
       `channel-test-${Date.now()}`,
       { contentType: '', name: 'image' },
-      { profile: '__channel_test__', objectId: '0-csea-d9-cb8e' },
+      { client: testClient(), objectId: '0-csea-d9-cb8e' },
     )
     expect(buf).not.toBeNull()
     expect(buf!.byteLength).toBe(3)
@@ -385,7 +396,7 @@ describe('ensureImageFetched disk-cache notification', () => {
       'ignored',
       key,
       { contentType: 'image/png', name: 'x.png' },
-      { onChange: () => notified++ },
+      { client: testClient(), onChange: () => notified++ },
     )
     expect(notified).toBe(1)
     expect(getImageData(key)).toEqual(png)
@@ -395,7 +406,7 @@ describe('ensureImageFetched disk-cache notification', () => {
       'ignored',
       key,
       { contentType: 'image/png', name: 'x.png' },
-      { onChange: () => notified++ },
+      { client: testClient(), onChange: () => notified++ },
     )
     expect(notified).toBe(1)
   })

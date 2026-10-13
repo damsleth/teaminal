@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // Live raw-payload dump for the Teams chat service channel-message stream.
 //
 // Step 1 de-risk for .plans/channel-threading-rootmessageid-rebuild.md: the
@@ -25,6 +26,8 @@ import { setActiveProfile } from '../src/graph/client'
 import { listChannels, listJoinedTeams } from '../src/graph/teams'
 import { getSkypeToken } from '../src/graph/teamsFederation'
 import { resolveRegion } from '../src/graph/teamsRegion'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 const TEAMS_ORIGIN = 'https://teams.microsoft.com'
 
@@ -150,9 +153,9 @@ try {
     targets = [{ team: '(arg)', teamId: '', name: '(arg)', id: channelArg }]
   } else {
     out('discovering teams + channels…')
-    const teams = await listJoinedTeams()
+    const teams = await listJoinedTeams(testClient())
     const per = await Promise.allSettled(
-      teams.map(async (t) => ({ t, chs: await listChannels(t.id) })),
+      teams.map(async (t) => ({ t, chs: await listChannels(testClient(), t.id) })),
     )
     for (const r of per) {
       if (r.status !== 'fulfilled') continue

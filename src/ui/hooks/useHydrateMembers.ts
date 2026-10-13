@@ -8,12 +8,14 @@
 // background hydration pass for chats currently visible in the list.
 
 import { useEffect, useState } from 'react'
+import { useSessionApi } from '../SessionContext'
 import { GraphError } from '../../graph/client'
 import { warn } from '../../log'
 import { hydrateChat } from '../../state/chatActions'
 import type { Focus, Store, AppState } from '../../state/store'
 
 export function useHydrateMembers(focus: Focus, store: Store<AppState>): void {
+  const session = useSessionApi()
   // hydrated tracks chat ids we've already issued a getChat call for, so
   // a Tab-into-composer-and-back doesn't re-fetch.
   const [hydrated, setHydrated] = useState<Set<string>>(new Set())
@@ -30,7 +32,7 @@ export function useHydrateMembers(focus: Focus, store: Store<AppState>): void {
     let cancelled = false
     ;(async () => {
       try {
-        const full = await hydrateChat(chatId)
+        const full = await hydrateChat(session.client(), chatId)
         if (cancelled) return
         store.set((s) => ({
           chats: s.chats.map((c) => (c.id === chatId ? { ...c, members: full.members } : c)),

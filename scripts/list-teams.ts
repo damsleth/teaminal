@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // Live smoke for src/graph/teams.
 //
 // Lists joined teams + their channels (with $select fields) to confirm the
@@ -6,11 +7,13 @@
 import { setActiveProfile } from '../src/graph/client'
 import { listChannels, listJoinedTeams } from '../src/graph/teams'
 
+const testClient = () => createGraphClient(currentAccountContext())
+
 const profile = Bun.argv[2]
 if (profile) setActiveProfile(profile)
 
 const t0 = performance.now()
-const teams = await listJoinedTeams()
+const teams = await listJoinedTeams(testClient())
 const tTeams = performance.now() - t0
 
 process.stdout.write(`fetched ${teams.length} teams in ${tTeams.toFixed(0)}ms\n\n`)
@@ -34,7 +37,7 @@ if (teams.length === 0) {
 // concurrency check on the wrapper.
 const tCh0 = performance.now()
 const results = await Promise.allSettled(
-  teams.map(async (team) => ({ team, channels: await listChannels(team.id) })),
+  teams.map(async (team) => ({ team, channels: await listChannels(testClient(), team.id) })),
 )
 const tCh = performance.now() - tCh0
 

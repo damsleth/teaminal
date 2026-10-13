@@ -4,7 +4,8 @@
 // Teams path is disabled or unreachable for the session. Returns a
 // partial map: any user id missing from the result simply has no dot.
 
-import { getActiveProfile } from '../../graph/client'
+import { owaProfile } from '../../account'
+import type { GraphClient } from '../../graph/client'
 import { getPresencesByUserId } from '../../graph/presence'
 import { getTeamsPresenceByOid } from '../../graph/teamsPresence'
 import type { Presence } from '../../types'
@@ -16,6 +17,7 @@ export type FetchMemberPresenceOpts = {
 }
 
 export async function fetchMemberPresence(
+  client: GraphClient,
   oids: string[],
   opts: FetchMemberPresenceOpts,
 ): Promise<Map<string, Presence>> {
@@ -23,7 +25,7 @@ export async function fetchMemberPresence(
   if (oids.length === 0) return out
   if (opts.useTeams) {
     const teams = await getTeamsPresenceByOid(oids, {
-      profile: getActiveProfile(),
+      profile: owaProfile(client.ctx.account),
       signal: opts.signal,
     })
     for (const [oid, entry] of teams) {
@@ -36,7 +38,7 @@ export async function fetchMemberPresence(
     return out
   }
   if (opts.useGraph) {
-    const list = await getPresencesByUserId(oids, { signal: opts.signal })
+    const list = await getPresencesByUserId(client, oids, { signal: opts.signal })
     for (const p of list) out.set(p.id, p)
   }
   return out

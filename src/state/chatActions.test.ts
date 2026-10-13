@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../graph/client'
 import { afterEach, describe, expect, it } from 'bun:test'
 import {
   __resetForTests as resetAuth,
@@ -17,6 +18,8 @@ import {
   editChatMessageContent,
   toggleReaction,
 } from './chatActions'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 const me: IdentityUser = { id: 'me-1', displayName: 'Me' }
@@ -65,7 +68,7 @@ describe('toggleReaction', () => {
       path = url
       return ok()
     })
-    await toggleReaction(store, 'c1', 'm1', 'like', me)
+    await toggleReaction(testClient(), store, 'c1', 'm1', 'like', me)
     expect(path).toContain('/messages/m1/setReaction')
     expect(convMsgs(store)[0]!.reactions?.[0]!.reactionType).toBe('like')
   })
@@ -79,7 +82,7 @@ describe('toggleReaction', () => {
       body = init.body ? JSON.parse(String(init.body)) : undefined
       return ok()
     })
-    await toggleReaction(store, 'c1', 'm1', 'heart', me)
+    await toggleReaction(testClient(), store, 'c1', 'm1', 'heart', me)
     expect(body).toEqual({ reactionType: '❤️' })
     expect(convMsgs(store)[0]!.reactions?.[0]!.reactionType).toBe('heart')
   })
@@ -97,7 +100,7 @@ describe('toggleReaction', () => {
         ],
       },
     })
-    await toggleReaction(store, 'c1', 'm1', 'like', me)
+    await toggleReaction(testClient(), store, 'c1', 'm1', 'like', me)
     expect(path).toContain('/messages/m1/unsetReaction')
     expect(convMsgs(store)[0]!.reactions).toEqual([])
   })
@@ -116,7 +119,7 @@ describe('toggleReaction', () => {
         ],
       },
     })
-    await toggleReaction(store, 'c1', 'm1', 'heart', me)
+    await toggleReaction(testClient(), store, 'c1', 'm1', 'heart', me)
     // Should have called setReaction (not unset).
     expect(paths[0]).toContain('/messages/m1/setReaction')
     // Both reactions must be present.
@@ -141,14 +144,14 @@ describe('toggleReaction', () => {
         ],
       },
     })
-    await toggleReaction(store, 'c1', 'm1', 'like', me)
+    await toggleReaction(testClient(), store, 'c1', 'm1', 'like', me)
     const reactions = convMsgs(store)[0]!.reactions!
     expect(reactions.map((r) => r.reactionType)).toEqual(['heart'])
   })
 
   it('rolls back the optimistic reaction on failure', async () => {
     const store = setup(fail)
-    await expect(toggleReaction(store, 'c1', 'm1', 'like', me)).rejects.toThrow()
+    await expect(toggleReaction(testClient(), store, 'c1', 'm1', 'like', me)).rejects.toThrow()
     expect(convMsgs(store)[0]!.reactions ?? []).toEqual([])
   })
 })
@@ -156,13 +159,15 @@ describe('toggleReaction', () => {
 describe('editChatMessageContent', () => {
   it('updates the body on success', async () => {
     const store = setup(ok)
-    await editChatMessageContent(store, 'c1', 'm1', 'edited')
+    await editChatMessageContent(testClient(), store, 'c1', 'm1', 'edited')
     expect(convMsgs(store)[0]!.body.content).toBe('edited')
   })
 
   it('rolls back to the original body on failure', async () => {
     const store = setup(fail)
-    await expect(editChatMessageContent(store, 'c1', 'm1', 'edited')).rejects.toThrow()
+    await expect(
+      editChatMessageContent(testClient(), store, 'c1', 'm1', 'edited'),
+    ).rejects.toThrow()
     expect(convMsgs(store)[0]!.body.content).toBe('hello')
   })
 })
@@ -170,13 +175,13 @@ describe('editChatMessageContent', () => {
 describe('deleteChatMessageById', () => {
   it('tombstones the message on success', async () => {
     const store = setup(ok)
-    await deleteChatMessageById(store, 'c1', 'm1')
+    await deleteChatMessageById(testClient(), store, 'c1', 'm1')
     expect(convMsgs(store)[0]!.deletedDateTime).toBeTruthy()
   })
 
   it('restores the message on failure', async () => {
     const store = setup(fail)
-    await expect(deleteChatMessageById(store, 'c1', 'm1')).rejects.toThrow()
+    await expect(deleteChatMessageById(testClient(), store, 'c1', 'm1')).rejects.toThrow()
     expect(convMsgs(store)[0]!.deletedDateTime).toBeUndefined()
   })
 })
@@ -196,7 +201,7 @@ describe('deleteChatById', () => {
       ],
       focus: { kind: 'chat', chatId: 'c1' },
     })
-    await deleteChatById(store, 'c1')
+    await deleteChatById(testClient(), store, 'c1')
     expect(seen[0]).toContain('/chats/c1/hideForUser')
     expect(store.get().chats.map((c) => c.id)).toEqual(['c2'])
     // the open chat was the deleted one, so focus falls back to the list
@@ -209,7 +214,7 @@ describe('deleteChatById', () => {
       me: { id: 'me-1', displayName: 'Me', userPrincipalName: 'me@x', mail: null },
       chats: [{ id: 'c1', chatType: 'oneOnOne', createdDateTime: '2026-01-01T00:00:00Z' }],
     })
-    await expect(deleteChatById(store, 'c1')).rejects.toThrow()
+    await expect(deleteChatById(testClient(), store, 'c1')).rejects.toThrow()
     expect(store.get().chats.map((c) => c.id)).toEqual(['c1'])
   })
 })

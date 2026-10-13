@@ -10,7 +10,8 @@
 // so we don't keep slamming a 401/403/404 path every 60s; the next
 // teaminal launch retries.
 
-import { getActiveProfile } from '../../graph/client'
+import { owaProfile } from '../../account'
+import type { GraphClient } from '../../graph/client'
 import { getMyPresence } from '../../graph/presence'
 import { getMyTeamsPresence, TeamsPresenceError } from '../../graph/teamsPresence'
 import type { Presence } from '../../types'
@@ -21,6 +22,8 @@ import type { Sleeper } from './sleeper'
 
 export type PresenceLoopDeps = {
   store: Store<AppState>
+  // Bound Graph client for this session's account.
+  getClient: () => GraphClient
   sleeper: Sleeper
   intervalMs: number | (() => number)
   // Session-wide stop signal owned by the parent poller. Combined with
@@ -62,7 +65,7 @@ export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
         if (useTeams) {
           try {
             const teams = await getMyTeamsPresence({
-              profile: getActiveProfile(),
+              profile: owaProfile(deps.getClient().ctx.account),
               signal,
             })
             if (isStopped()) return
@@ -94,7 +97,7 @@ export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
           }
         }
         if (!updated && useGraph) {
-          const myPresence = await getMyPresence({ signal })
+          const myPresence = await getMyPresence(deps.getClient(), { signal })
           if (isStopped()) return
           store.set({ myPresence })
         }
@@ -117,7 +120,7 @@ export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
           }
           if (oids.length > 0) {
             try {
-              const fetched = await fetchMemberPresence(oids, {
+              const fetched = await fetchMemberPresence(deps.getClient(), oids, {
                 useTeams,
                 useGraph,
                 signal,

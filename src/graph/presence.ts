@@ -5,7 +5,7 @@
 // 403s the bulk call, the StatusBar still shows own presence and chat
 // member dots simply go unrendered.
 
-import { graph } from './client'
+import type { GraphClient } from './client'
 import type { Presence } from '../types'
 
 const BULK_BATCH_LIMIT = 650
@@ -16,8 +16,11 @@ export type GetMyPresenceOpts = {
   signal?: AbortSignal
 }
 
-export async function getMyPresence(opts?: GetMyPresenceOpts): Promise<Presence> {
-  return graph<Presence>({
+export async function getMyPresence(
+  client: GraphClient,
+  opts?: GetMyPresenceOpts,
+): Promise<Presence> {
+  return client.graph<Presence>({
     method: 'GET',
     path: '/me/presence',
     signal: opts?.signal,
@@ -33,6 +36,7 @@ export type GetPresencesByUserIdOpts = {
 // the results. Empty input is a no-op (no HTTP call), which simplifies the
 // caller's "fetch presence for currently visible chat members" loop.
 export async function getPresencesByUserId(
+  client: GraphClient,
   ids: string[],
   opts?: GetPresencesByUserIdOpts,
 ): Promise<Presence[]> {
@@ -40,7 +44,7 @@ export async function getPresencesByUserId(
   const out: Presence[] = []
   for (let i = 0; i < ids.length; i += BULK_BATCH_LIMIT) {
     const batch = ids.slice(i, i + BULK_BATCH_LIMIT)
-    const res = await graph<CollectionResponse<Presence>>({
+    const res = await client.graph<CollectionResponse<Presence>>({
       method: 'POST',
       path: '/communications/getPresencesByUserId',
       body: { ids: batch },

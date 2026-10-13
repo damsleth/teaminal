@@ -72,6 +72,7 @@ import { openExternal } from './openExternal'
 import { usePollerHandleRef } from './PollerContext'
 import { StatusBar } from './StatusBar'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
+import { useSessionApi } from './SessionContext'
 import type { Chat, DirectoryUser } from '../types'
 
 export function shouldShowTailPanels(modal: ModalState | null): boolean {
@@ -125,6 +126,7 @@ export function App() {
   const { exit } = useApp()
   const { isRawModeSupported } = useStdin()
   const store = useAppStore()
+  const session = useSessionApi()
   const pollerRef = usePollerHandleRef()
 
   const terminalRows = useTerminalRows()
@@ -182,9 +184,9 @@ export function App() {
     federatedFocusCheckedRef.current.add(focus.chatId)
     let cancelled = false
     void (async () => {
-      const federatedChatId = await resolveFederatedChatId(me.id, otherUserId)
+      const federatedChatId = await resolveFederatedChatId(session.client(), me.id, otherUserId)
       if (!federatedChatId || federatedChatId === focus.chatId || cancelled) return
-      const canonical = await materializeChat(store, federatedChatId)
+      const canonical = await materializeChat(session.client(), store, federatedChatId)
       if (cancelled) return
       store.set((s) => ({
         chats: [canonical, ...s.chats.filter((c) => c.id !== canonical.id)],
@@ -322,9 +324,9 @@ export function App() {
     if (user.id === selfId) {
       throw new Error('That is your own account; open your notes-to-self chat from the list')
     }
-    const federatedChatId = await resolveFederatedChatId(selfId, user.id)
+    const federatedChatId = await resolveFederatedChatId(session.client(), selfId, user.id)
     if (federatedChatId) {
-      const chat = await materializeChat(store, federatedChatId)
+      const chat = await materializeChat(session.client(), store, federatedChatId)
       setNewChatPrompt(null)
       store.set((s) => ({
         chats: [chat, ...s.chats.filter((c) => c.id !== chat.id)],
@@ -336,7 +338,7 @@ export function App() {
       pollerRef.current?.refresh()
       return
     }
-    const chat = await createOneOnOneChat(selfId, user.id)
+    const chat = await createOneOnOneChat(session.client(), selfId, user.id)
     setNewChatPrompt(null)
     store.set((s) => ({
       chats: [chat, ...s.chats.filter((c) => c.id !== chat.id)],

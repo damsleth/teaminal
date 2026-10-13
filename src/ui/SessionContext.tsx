@@ -9,10 +9,16 @@
 
 import { createContext, useContext } from 'react'
 import type { ReactNode } from 'react'
+import type { GraphClient } from '../graph/client'
 
 export type SessionApi = {
   /** Current owa-piggy profile alias, or null for the default. */
   getActiveProfile: () => string | null
+  /**
+   * Graph client bound to the active account. One-shot UI actions call this
+   * at the moment they run, so an action never borrows another account.
+   */
+  client: () => GraphClient
   /**
    * Tear down the running session, reset account-scoped state, hydrate
    * the new profile's message cache, and bring up a new session against

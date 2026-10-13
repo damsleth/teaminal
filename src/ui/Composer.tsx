@@ -64,6 +64,7 @@ import {
 import { htmlToText } from '../text/html'
 import { shortName } from '../state/selectables'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
+import { useSessionApi } from './SessionContext'
 
 const MAX_VISIBLE_LINES = 5
 
@@ -91,6 +92,7 @@ export function findRootQuote(
 
 export function Composer() {
   const store = useAppStore()
+  const session = useSessionApi()
   const { isRawModeSupported } = useStdin()
   const { stdout } = useStdout()
   const focus = useAppState((s) => s.focus)
@@ -279,10 +281,16 @@ export function Composer() {
     try {
       const sent =
         focus.kind === 'chat'
-          ? await sendChatMessage(focus.chatId, trimmed)
+          ? await sendChatMessage(session.client(), focus.chatId, trimmed)
           : focus.kind === 'channel'
-            ? await sendChannelMessage(focus.teamId, focus.channelId, trimmed)
-            : await postChannelReply(focus.teamId, focus.channelId, focus.rootId, trimmed)
+            ? await sendChannelMessage(session.client(), focus.teamId, focus.channelId, trimmed)
+            : await postChannelReply(
+                session.client(),
+                focus.teamId,
+                focus.channelId,
+                focus.rootId,
+                trimmed,
+              )
       store.set((s) => ({
         messagesByConvo: {
           ...s.messagesByConvo,
@@ -321,7 +329,7 @@ export function Composer() {
     try {
       // editChatMessageContent updates the message optimistically and rolls
       // back on failure; restore the buffer so the user can retry.
-      await editChatMessageContent(store, focus.chatId, id, trimmed)
+      await editChatMessageContent(session.client(), store, focus.chatId, id, trimmed)
     } catch {
       setBuf({ text: trimmed, cursor: trimmed.length })
       store.set({ editingMessageId: id, inputZone: 'composer' })

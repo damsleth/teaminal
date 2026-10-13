@@ -9,8 +9,8 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { accountRef } from '../account'
-import { getAudiencePreference, graphBinary, GraphError } from '../graph/client'
+import { owaProfile } from '../account'
+import { GraphError, type GraphClient } from '../graph/client'
 import { fetchObjectById, fetchObjectByUrl, isAsyncGwUrl } from '../graph/teamsAsyncGw'
 import { recordEvent } from '../log'
 
@@ -95,7 +95,9 @@ function writeCachedImage(key: string, data: Buffer, meta: ImageMeta, profile?: 
 }
 
 export type FetchImageOpts = {
-  profile?: string
+  // Bound client for the account whose chat the image belongs to; also picks
+  // that account's on-disk cache directory.
+  client: GraphClient
   signal?: AbortSignal
   // When true, fetch directly with plain fetch() and no Authorization
   // header. Used for giphy/tenor URLs returned by the Teams gif picker;
@@ -119,20 +121,20 @@ function isGraphFetchable(path: string): boolean {
 
 // Fetch a hosted-content image, routing between the Graph hostedContents
 // endpoint and the asyncgw object store per the account's routing mode
-// (getAudiencePreference). ic3 accounts go to asyncgw (the Graph endpoint is
+// (client.ctx). ic3 accounts go to asyncgw (the Graph endpoint is
 // CA-gated); graph accounts use Graph and fall back to asyncgw when the
 // object id is known: on 401 when audience fallback is enabled, and on 404
 // always — cross-tenant 1:1 chats home the hosted content in the other
 // tenant, so our tenant's Graph 404s while the asyncgw object store serves
 // it (chat membership is in the object ACL).
-async function fetchHostedContent(path: string, opts?: FetchImageOpts): Promise<Uint8Array> {
-  const { audience, fallback } = getAudiencePreference()
-  const objectId = opts?.objectId
+async function fetchHostedContent(path: string, opts: FetchImageOpts): Promise<Uint8Array> {
+  const { audience, fallback } = opts.client.ctx
+  const objectId = opts.objectId
   const viaGraph = (): Promise<Uint8Array> =>
-    graphBinary({ method: 'GET', path, signal: opts?.signal })
+    opts.client.graphBinary({ method: 'GET', path, signal: opts.signal })
   const viaAsyncGw = async (): Promise<Uint8Array> => {
     const { bytes } = await fetchObjectById(objectId!, {
-      account: accountRef(opts?.profile),
+      account: opts.client.ctx.account,
       region: opts?.region,
       signal: opts?.signal,
     })
@@ -179,9 +181,10 @@ export async function fetchAndCacheImage(
   path: string,
   key: string,
   meta: { contentType: string; name: string },
-  opts?: FetchImageOpts,
+  opts: FetchImageOpts,
 ): Promise<Buffer | null> {
-  const cached = readCachedImage(key, opts?.profile)
+  const profile = owaProfile(opts.client.ctx.account)
+  const cached = readCachedImage(key, profile)
   if (cached) return cached.data
 
   let bytes: Uint8Array
@@ -191,7 +194,7 @@ export async function fetchAndCacheImage(
       // cookie obtained from aadtokenauth. Route them through the
       // asyncgw client which mints/refreshes the cookie as needed.
       const fetched = await fetchObjectByUrl(path, {
-        account: accountRef(opts.profile),
+        account: opts.client.ctx.account,
         signal: opts.signal,
       })
       bytes = fetched.bytes
@@ -219,7 +222,7 @@ export async function fetchAndCacheImage(
   }
 
   const buf = Buffer.from(bytes)
-  writeCachedImage(key, buf, { ...meta, size: bytes.byteLength }, opts?.profile)
+  writeCachedImage(key, buf, { ...meta, size: bytes.byteLength }, profile)
   return buf
 }
 
@@ -263,7 +266,7 @@ export function ensureImageFetched(
   const current = fetchStatus.get(key)
   if (current === 'loading' || current === 'ready' || current === 'error') return
 
-  const disk = readCachedImage(key, opts.profile)
+  const disk = readCachedImage(key, owaProfile(opts.client.ctx.account))
   if (disk) {
     fetchStatus.set(key, 'ready')
     imageDataCache.set(key, disk.data)

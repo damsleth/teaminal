@@ -8,39 +8,34 @@
 //   - Member expansion is capped at 25 so we hydrate lazily, only on
 //     visible/active chats
 
+import { owaProfile, type AccountId, type AccountRef } from '../account'
 import { decodeJwtClaims, getToken } from '../auth/owaPiggy'
-import {
-  currentAccountContext,
-  getActiveProfile,
-  getAudiencePreference,
-  graph,
-  GraphError,
-} from './client'
+import { GraphError, type GraphClient } from './client'
 import { listChatMessagesViaChatsvc, sendChannelMessageViaChatsvc } from './teamsChatsvc'
 import { createOneOnOneThreadViaChatsvc } from './teamsFederation'
 import { recordEvent } from '../log'
 import type { Chat, ChatMessage, DirectoryUser, Person } from '../types'
 
 // Chat message reads/sends route between graph.microsoft.com and the Teams
-// chatsvc (ic3) endpoints according to the active account's routing mode,
-// exposed via getAudiencePreference(): { audience, fallback }.
+// chatsvc (ic3) endpoints according to the account's routing mode, carried
+// on the bound client as client.ctx: { audience, fallback }.
 //   - audience 'graph' → graph endpoints first
 //   - audience 'ic3'   → chatsvc endpoints first
 //   - fallback true    → try the other transport when the primary fails
 // Under a graph-primary, fallback-enabled mode (graph+ic3, the default) the
 // first graph 401 (Conditional Access gate) latches us onto chatsvc for the
 // rest of the session so we don't re-hit the 401 every poll. The latch is
-// cleared on profile switch via resetChatMessageTransport(). ic3-primary
-// modes never touch the graph chat endpoints, and graph-only / ic3-only
-// modes never fall back.
-let graphMessages401 = false
+// per account and cleared on session start / routing change via
+// resetChatMessageTransport(account). ic3-primary modes never touch the
+// graph chat endpoints, and graph-only / ic3-only modes never fall back.
+const graphMessages401 = new Set<AccountId>()
 
-export function resetChatMessageTransport(): void {
-  graphMessages401 = false
+export function resetChatMessageTransport(account: AccountRef): void {
+  graphMessages401.delete(account.id)
 }
 
 export function __resetChatMessageFallbackForTests(): void {
-  graphMessages401 = false
+  graphMessages401.clear()
 }
 
 type CollectionResponse<T> = { value: T[]; '@odata.nextLink'?: string }
@@ -54,9 +49,9 @@ export type ListChatsOpts = {
   signal?: AbortSignal
 }
 
-export async function listChats(opts?: ListChatsOpts): Promise<Chat[]> {
+export async function listChats(client: GraphClient, opts?: ListChatsOpts): Promise<Chat[]> {
   const top = opts?.top ?? CHATS_TOP_DEFAULT
-  const res = await graph<CollectionResponse<Chat>>({
+  const res = await client.graph<CollectionResponse<Chat>>({
     method: 'GET',
     path: '/chats',
     query: {
@@ -82,16 +77,17 @@ export async function listChats(opts?: ListChatsOpts): Promise<Chat[]> {
  * specified" without it) and comes from the access token's `tid` claim.
  */
 export async function hideChat(
+  client: GraphClient,
   chatId: string,
   userId: string,
   opts?: SendMessageOpts,
 ): Promise<void> {
-  const token = await getToken({ profile: getActiveProfile() })
+  const token = await getToken({ profile: owaProfile(client.ctx.account) })
   const tenantId = decodeJwtClaims(token).tid
   if (typeof tenantId !== 'string' || !tenantId) {
     throw new Error('cannot delete chat: no tenant id on the access token')
   }
-  await graph<void>({
+  await client.graph<void>({
     method: 'POST',
     path: `/chats/${encodeURIComponent(chatId)}/hideForUser`,
     body: { user: { id: userId, tenantId } },
@@ -104,8 +100,12 @@ export type GetChatOpts = {
   signal?: AbortSignal
 }
 
-export async function getChat(chatId: string, opts?: GetChatOpts): Promise<Chat> {
-  return graph<Chat>({
+export async function getChat(
+  client: GraphClient,
+  chatId: string,
+  opts?: GetChatOpts,
+): Promise<Chat> {
+  return client.graph<Chat>({
     method: 'GET',
     path: `/chats/${encodeURIComponent(chatId)}`,
     query: opts?.members ? { $expand: 'members' } : undefined,
@@ -143,6 +143,7 @@ const GRAPH_BATCH_MAX = 20
 // `errors` map rather than thrown - one bad chat shouldn't abort the
 // whole hydration pass.
 export async function getChatsBatch(
+  client: GraphClient,
   chatIds: string[],
   opts?: GetChatsBatchOpts,
 ): Promise<GetChatsBatchResult> {
@@ -156,7 +157,7 @@ export async function getChatsBatch(
       method: 'GET',
       url: `/chats/${encodeURIComponent(id)}${opts?.members ? '?$expand=members' : ''}`,
     }))
-    const res = await graph<BatchResponse>({
+    const res = await client.graph<BatchResponse>({
       method: 'POST',
       path: '/$batch',
       body: { requests },
@@ -198,13 +199,18 @@ export type MessagesPage = {
 // can append in render order without re-sorting. Graph returns descending
 // by createdDateTime; this helper reverses the slice before returning.
 export async function listMessages(
+  client: GraphClient,
   chatId: string,
   opts?: ListMessagesOpts,
 ): Promise<ChatMessage[]> {
-  return (await listMessagesPage(chatId, opts)).messages
+  return (await listMessagesPage(client, chatId, opts)).messages
 }
 
-async function graphMessagesPage(chatId: string, opts?: ListMessagesOpts): Promise<MessagesPage> {
+async function graphMessagesPage(
+  client: GraphClient,
+  chatId: string,
+  opts?: ListMessagesOpts,
+): Promise<MessagesPage> {
   const query: Record<string, string | number | undefined> = {
     $top: opts?.top ?? MESSAGES_TOP_DEFAULT,
     $orderby: 'createdDateTime desc',
@@ -212,7 +218,7 @@ async function graphMessagesPage(chatId: string, opts?: ListMessagesOpts): Promi
   if (opts?.beforeCreatedDateTime) {
     query.$filter = `createdDateTime lt ${opts.beforeCreatedDateTime}`
   }
-  const res = await graph<CollectionResponse<ChatMessage>>({
+  const res = await client.graph<CollectionResponse<ChatMessage>>({
     method: 'GET',
     path: `/chats/${encodeURIComponent(chatId)}/messages`,
     query,
@@ -225,40 +231,41 @@ async function graphMessagesPage(chatId: string, opts?: ListMessagesOpts): Promi
 }
 
 export async function listMessagesPage(
+  client: GraphClient,
   chatId: string,
   opts?: ListMessagesOpts,
 ): Promise<MessagesPage> {
-  const { audience, fallback } = getAudiencePreference()
+  const { audience, fallback } = client.ctx
   // ic3-primary modes read straight from chatsvc; only ic3+graph falls back.
   if (audience === 'ic3') {
-    if (!fallback) return chatsvcMessagesPage(chatId, opts)
+    if (!fallback) return chatsvcMessagesPage(client, chatId, opts)
     try {
-      return await chatsvcMessagesPage(chatId, opts)
+      return await chatsvcMessagesPage(client, chatId, opts)
     } catch (err) {
       recordEvent(
         'graph',
         'warn',
         `chatsvc chat messages failed (${err instanceof Error ? err.message : String(err)}) — trying graph`,
       )
-      return graphMessagesPage(chatId, opts)
+      return graphMessagesPage(client, chatId, opts)
     }
   }
   // graph-primary modes. Once latched (fallback-enabled graph 401), stay on
   // chatsvc rather than re-hitting the gated graph endpoint each poll.
-  if (graphMessages401 && fallback) {
-    return chatsvcMessagesPage(chatId, opts)
+  if (graphMessages401.has(client.ctx.account.id) && fallback) {
+    return chatsvcMessagesPage(client, chatId, opts)
   }
   try {
-    return await graphMessagesPage(chatId, opts)
+    return await graphMessagesPage(client, chatId, opts)
   } catch (err) {
     if (err instanceof GraphError && err.status === 401 && fallback) {
-      graphMessages401 = true
+      graphMessages401.add(client.ctx.account.id)
       recordEvent(
         'graph',
         'warn',
         'graph chat messages 401 (likely Conditional Access) — switching to chatsvc',
       )
-      return chatsvcMessagesPage(chatId, opts)
+      return chatsvcMessagesPage(client, chatId, opts)
     }
     throw err
   }
@@ -267,9 +274,13 @@ export async function listMessagesPage(
 // chatsvc returns the most-recent page; older-page paging via chatsvc's
 // backwardLink isn't wired through MessagesPage yet (nextLink is a Graph
 // URL). Returning no nextLink simply means "no older page" for now.
-async function chatsvcMessagesPage(chatId: string, opts?: ListMessagesOpts): Promise<MessagesPage> {
+async function chatsvcMessagesPage(
+  client: GraphClient,
+  chatId: string,
+  opts?: ListMessagesOpts,
+): Promise<MessagesPage> {
   const page = await listChatMessagesViaChatsvc(chatId, {
-    account: currentAccountContext().account,
+    account: client.ctx.account,
     ...(opts?.signal ? { signal: opts.signal } : {}),
     ...(opts?.top ? { pageSize: opts.top } : {}),
   })
@@ -277,10 +288,11 @@ async function chatsvcMessagesPage(chatId: string, opts?: ListMessagesOpts): Pro
 }
 
 export async function listMessagesNextPage(
+  client: GraphClient,
   nextLink: string,
   opts?: { signal?: AbortSignal },
 ): Promise<MessagesPage> {
-  const res = await graph<CollectionResponse<ChatMessage>>({
+  const res = await client.graph<CollectionResponse<ChatMessage>>({
     method: 'GET',
     path: nextLink,
     signal: opts?.signal,
@@ -295,8 +307,13 @@ export type SendMessageOpts = {
   signal?: AbortSignal
 }
 
-function graphSend(chatId: string, content: string, opts?: SendMessageOpts): Promise<ChatMessage> {
-  return graph<ChatMessage>({
+function graphSend(
+  client: GraphClient,
+  chatId: string,
+  content: string,
+  opts?: SendMessageOpts,
+): Promise<ChatMessage> {
+  return client.graph<ChatMessage>({
     method: 'POST',
     path: `/chats/${encodeURIComponent(chatId)}/messages`,
     body: { body: { contentType: 'text', content } },
@@ -305,16 +322,17 @@ function graphSend(chatId: string, content: string, opts?: SendMessageOpts): Pro
 }
 
 export async function sendMessage(
+  client: GraphClient,
   chatId: string,
   content: string,
   opts?: SendMessageOpts,
 ): Promise<ChatMessage> {
   const chatsvcSend = (): Promise<ChatMessage> =>
     sendChannelMessageViaChatsvc(chatId, content, {
-      account: currentAccountContext().account,
+      account: client.ctx.account,
       ...(opts?.signal ? { signal: opts.signal } : {}),
     })
-  const { audience, fallback } = getAudiencePreference()
+  const { audience, fallback } = client.ctx
   // ic3-primary modes send via chatsvc; only ic3+graph falls back to graph.
   if (audience === 'ic3') {
     if (!fallback) return chatsvcSend()
@@ -326,18 +344,18 @@ export async function sendMessage(
         'warn',
         `chatsvc chat send failed (${err instanceof Error ? err.message : String(err)}) — trying graph`,
       )
-      return graphSend(chatId, content, opts)
+      return graphSend(client, chatId, content, opts)
     }
   }
   // graph-primary modes, honoring the session latch from a prior 401.
-  if (graphMessages401 && fallback) {
+  if (graphMessages401.has(client.ctx.account.id) && fallback) {
     return chatsvcSend()
   }
   try {
-    return await graphSend(chatId, content, opts)
+    return await graphSend(client, chatId, content, opts)
   } catch (err) {
     if (err instanceof GraphError && err.status === 401 && fallback) {
-      graphMessages401 = true
+      graphMessages401.add(client.ctx.account.id)
       recordEvent(
         'graph',
         'warn',
@@ -350,6 +368,7 @@ export async function sendMessage(
 }
 
 export async function editMessage(
+  client: GraphClient,
   chatId: string,
   messageId: string,
   content: string,
@@ -357,7 +376,7 @@ export async function editMessage(
 ): Promise<void> {
   // Graph PATCH on chat messages returns 204; the wrapper resolves to
   // undefined - no return value needed.
-  await graph<void>({
+  await client.graph<void>({
     method: 'PATCH',
     path: `/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}`,
     body: { body: { contentType: 'text', content } },
@@ -370,11 +389,12 @@ export async function editMessage(
 // tombstone with deletedDateTime set, which the UI renders as a
 // "(message deleted)" placeholder.
 export async function softDeleteMessage(
+  client: GraphClient,
   chatId: string,
   messageId: string,
   opts?: SendMessageOpts,
 ): Promise<void> {
-  await graph<void>({
+  await client.graph<void>({
     method: 'POST',
     path: `/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}/softDelete`,
     signal: opts?.signal,
@@ -404,12 +424,13 @@ function reactionPayload(reactionType: string): string {
 // short names (like / heart / laugh / surprised / sad / angry), translated to
 // its unicode glyph for the payload. Returns 204 on success.
 export async function setReaction(
+  client: GraphClient,
   chatId: string,
   messageId: string,
   reactionType: string,
   opts?: SendMessageOpts,
 ): Promise<void> {
-  await graph<void>({
+  await client.graph<void>({
     method: 'POST',
     path: `/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}/setReaction`,
     body: { reactionType: reactionPayload(reactionType) },
@@ -419,12 +440,13 @@ export async function setReaction(
 
 // Remove a previously-set reaction of the given type from a chat message.
 export async function unsetReaction(
+  client: GraphClient,
   chatId: string,
   messageId: string,
   reactionType: string,
   opts?: SendMessageOpts,
 ): Promise<void> {
-  await graph<void>({
+  await client.graph<void>({
     method: 'POST',
     path: `/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}/unsetReaction`,
     body: { reactionType: reactionPayload(reactionType) },
@@ -449,10 +471,14 @@ function graphSearchField(field: string, value: string): string {
   return `"${field}:${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
 }
 
-export async function searchPeople(query: string, opts?: SearchPeopleOpts): Promise<Person[]> {
+export async function searchPeople(
+  client: GraphClient,
+  query: string,
+  opts?: SearchPeopleOpts,
+): Promise<Person[]> {
   const q = normalizedSearchQuery(query)
   if (!q) return []
-  const res = await graph<CollectionResponse<Person>>({
+  const res = await client.graph<CollectionResponse<Person>>({
     method: 'GET',
     path: '/me/people',
     query: {
@@ -471,10 +497,14 @@ export type SearchUsersOpts = {
   signal?: AbortSignal
 }
 
-export async function searchUsers(query: string, opts?: SearchUsersOpts): Promise<DirectoryUser[]> {
+export async function searchUsers(
+  client: GraphClient,
+  query: string,
+  opts?: SearchUsersOpts,
+): Promise<DirectoryUser[]> {
   const q = normalizedSearchQuery(query)
   if (!q) return []
-  const res = await graph<CollectionResponse<DirectoryUser>>({
+  const res = await client.graph<CollectionResponse<DirectoryUser>>({
     method: 'GET',
     path: '/users',
     headers: { ConsistencyLevel: 'eventual' },
@@ -522,12 +552,16 @@ export type SearchChatUsersOpts = {
 }
 
 export async function searchChatUsers(
+  client: GraphClient,
   query: string,
   opts?: SearchChatUsersOpts,
 ): Promise<DirectoryUser[]> {
   const q = normalizedSearchQuery(query)
   if (!q) return []
-  const [people, users] = await Promise.all([searchPeople(q, opts), searchUsers(q, opts)])
+  const [people, users] = await Promise.all([
+    searchPeople(client, q, opts),
+    searchUsers(client, q, opts),
+  ])
   const relevance = new Map<string, number>()
   people.forEach((person, index) => {
     for (const key of personKeys(person)) {
@@ -576,6 +610,7 @@ function aadMember(userId: string): AadConversationMember {
 }
 
 async function createChat(
+  client: GraphClient,
   chatType: 'oneOnOne' | 'group',
   memberUserIds: string[],
   opts?: CreateChatOpts & { topic?: string },
@@ -587,7 +622,7 @@ async function createChat(
   if (chatType === 'group' && members.length < 3) {
     throw new Error('createGroupChat requires at least three user IDs including self')
   }
-  return graph<Chat>({
+  return client.graph<Chat>({
     method: 'POST',
     path: '/chats',
     body: {
@@ -600,12 +635,13 @@ async function createChat(
 }
 
 export async function createOneOnOneChat(
+  client: GraphClient,
   selfUserId: string,
   otherUserId: string,
   opts?: CreateChatOpts,
 ): Promise<Chat> {
   try {
-    return await createChat('oneOnOne', [selfUserId, otherUserId], opts)
+    return await createChat(client, 'oneOnOne', [selfUserId, otherUserId], opts)
   } catch (err) {
     // Graph rejects unlinked-tenant peers with 403/404 (the Chat.Create
     // path requires either same-tenant or B2B-linked membership).
@@ -613,7 +649,7 @@ export async function createOneOnOneChat(
     // directly with the spaces-Bearer token; we mirror that.
     if (!isUnlinkedPeerCreateRejection(err)) throw err
     const threadId = await createOneOnOneThreadViaChatsvc(selfUserId, otherUserId, {
-      account: currentAccountContext().account,
+      account: client.ctx.account,
       signal: opts?.signal,
     })
     return {
@@ -641,8 +677,9 @@ export type CreateGroupChatOpts = CreateChatOpts & {
 }
 
 export async function createGroupChat(
+  client: GraphClient,
   memberUserIds: string[],
   opts?: CreateGroupChatOpts,
 ): Promise<Chat> {
-  return createChat('group', memberUserIds, opts)
+  return createChat(client, 'group', memberUserIds, opts)
 }

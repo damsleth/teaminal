@@ -1,8 +1,10 @@
+import { createGraphClient, currentAccountContext } from '../../src/graph/client'
 import { searchChatUsers } from '../../src/graph/chats'
-import { currentAccountContext } from '../../src/graph/client'
 import { getMe } from '../../src/graph/me'
 import { resolveFederatedEquivalentConversationId } from '../../src/graph/teamsFederation'
 import type { E2ETest } from '../types'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 // For each configured external user, run the federated equivalent
 // resolver. A null return is acceptable (no chat exists yet); a thrown
@@ -17,10 +19,10 @@ const test: E2ETest = {
     if (ctx.externalUsers.length === 0) {
       throw new Error('no external users configured')
     }
-    const me = await getMe()
+    const me = await getMe(testClient())
     if (!me.id) throw new Error('me.id required')
     for (const email of ctx.externalUsers) {
-      const matches = await searchChatUsers(email)
+      const matches = await searchChatUsers(testClient(), email)
       const peer = matches.find(
         (m) =>
           m.userPrincipalName?.toLowerCase() === email.toLowerCase() ||

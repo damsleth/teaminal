@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../graph/client'
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
@@ -5,6 +6,8 @@ import {
 } from '../auth/owaPiggy'
 import { __resetForTests, __setTransportForTests } from './client'
 import { getChatsBatch } from './chats'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -54,7 +57,7 @@ describe('getChatsBatch', () => {
       })
     })
 
-    const result = await getChatsBatch(['c1', 'c2'], { members: true })
+    const result = await getChatsBatch(testClient(), ['c1', 'c2'], { members: true })
     expect(seenUrl).toBe('https://graph.microsoft.com/v1.0/$batch')
     const parsed = JSON.parse(seenBody) as {
       requests: { id: string; method: string; url: string }[]
@@ -82,7 +85,7 @@ describe('getChatsBatch', () => {
         })),
       })
     })
-    await getChatsBatch(chatIds)
+    await getChatsBatch(testClient(), chatIds)
     // 45 chats / 20 per batch = 3 batches.
     expect(batchCount).toBe(3)
   })
@@ -98,7 +101,7 @@ describe('getChatsBatch', () => {
         ],
       }),
     )
-    const result = await getChatsBatch(['c1', 'c2', 'c3'])
+    const result = await getChatsBatch(testClient(), ['c1', 'c2', 'c3'])
     expect(result.hydrated.size).toBe(1)
     expect(result.errors.size).toBe(2)
     expect(result.errors.get('c2')).toEqual({ status: 403, message: 'forbidden' })
@@ -112,7 +115,7 @@ describe('getChatsBatch', () => {
       calls++
       return jsonResponse({ responses: [] })
     })
-    const result = await getChatsBatch([])
+    const result = await getChatsBatch(testClient(), [])
     expect(calls).toBe(0)
     expect(result.hydrated.size).toBe(0)
   })
@@ -126,7 +129,7 @@ describe('getChatsBatch', () => {
         responses: [{ id: '0', status: 200, body: { id: 'c1', chatType: 'oneOnOne' } }],
       })
     })
-    await getChatsBatch(['c1'])
+    await getChatsBatch(testClient(), ['c1'])
     const parsed = JSON.parse(seenBody) as { requests: { url: string }[] }
     expect(parsed.requests[0]?.url).toBe('/chats/c1')
   })

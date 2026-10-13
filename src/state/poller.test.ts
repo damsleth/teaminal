@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../graph/client'
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
@@ -23,6 +24,8 @@ import {
   type PollerHandle,
   startPoller,
 } from './poller'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -181,6 +184,7 @@ describe('active loop', () => {
 
     const events: MentionEvent[] = []
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 30, listMs: 99_999, presenceMs: 99_999 },
       onMention: (e) => events.push(e),
@@ -222,6 +226,7 @@ describe('active loop', () => {
 
     const events: MentionEvent[] = []
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 30, listMs: 99_999, presenceMs: 99_999 },
       onMention: (e) => events.push(e),
@@ -262,6 +267,7 @@ describe('active loop', () => {
 
     const events: MentionEvent[] = []
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 30, listMs: 99_999, presenceMs: 99_999 },
       onMention: (e) => events.push(e),
@@ -294,6 +300,7 @@ describe('active loop', () => {
     store.set({ me: ME, focus: { kind: 'chat', chatId: 'c1' } })
 
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 9_999, listMs: 99_999, presenceMs: 99_999 },
       onMention: () => {},
@@ -319,6 +326,7 @@ describe('active loop', () => {
     const store = createAppStore()
     store.set({ me: ME, focus: { kind: 'list' } })
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 20, listMs: 99_999, presenceMs: 99_999 },
     })
@@ -363,6 +371,7 @@ describe('active loop', () => {
     })
 
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 99_999 },
     })
@@ -423,6 +432,7 @@ describe('active loop', () => {
     const store = createAppStore()
     store.set({ me: ME, focus: { kind: 'chat', chatId: 'c1' } })
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 99_999 },
     })
@@ -470,6 +480,7 @@ describe('active loop', () => {
     const store = createAppStore()
     store.set({ me: ME, focus: { kind: 'chat', chatId: 'c1' } })
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 99_999 },
     })
@@ -499,6 +510,7 @@ describe('list loop', () => {
     )
     const store = createAppStore()
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
@@ -547,6 +559,7 @@ describe('list loop', () => {
     })
     const store = createAppStore()
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
@@ -575,6 +588,7 @@ describe('list loop', () => {
     })
     const store = createAppStore()
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
@@ -622,6 +636,7 @@ describe('list loop', () => {
     })
     const store = createAppStore()
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
@@ -646,6 +661,7 @@ describe('list loop', () => {
     )
     const store = createAppStore()
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
@@ -666,6 +682,7 @@ describe('list loop', () => {
     const errors: { loop: string; err: Error }[] = []
     const store = createAppStore()
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
       onError: (loop, err) => errors.push({ loop, err }),
@@ -699,6 +716,7 @@ describe('list loop', () => {
     const store = createAppStore()
     store.set({ me: ME })
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
@@ -737,6 +755,7 @@ describe('list loop', () => {
     const store = createAppStore()
     store.set({ me: ME })
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
@@ -774,6 +793,7 @@ describe('list loop', () => {
     const store = createAppStore()
     store.set({ me: ME, focus: { kind: 'chat', chatId: 'active-chat' } })
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
@@ -803,6 +823,7 @@ describe('presence loop', () => {
       settings: { ...store.get().settings, useTeamsPresence: false },
     })
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 30 },
     })
@@ -837,6 +858,7 @@ describe('presence loop', () => {
       settings: { ...store.get().settings, useTeamsPresence: false },
     })
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 30 },
     })
@@ -877,6 +899,7 @@ describe('presence loop', () => {
       settings: { ...store.get().settings, useTeamsPresence: false },
     })
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 30 },
     })
@@ -923,6 +946,7 @@ describe('presence loop', () => {
     const store = createAppStore()
     store.set({ me: ME, capabilities: { presence: { ok: true } } as Capabilities })
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 30 },
     })
@@ -961,6 +985,7 @@ describe('presence loop', () => {
     const store = createAppStore()
     store.set({ me: ME, capabilities: { presence: { ok: true } } as Capabilities })
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 25 },
       onError: (loop, err) => errors.push({ loop, err }),
@@ -1006,6 +1031,7 @@ describe('presence loop', () => {
       settings: { ...store.get().settings, useTeamsPresence: false },
     })
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 30 },
     })
@@ -1029,6 +1055,7 @@ describe('stop', () => {
     )
     const store = createAppStore()
     const handle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
@@ -1101,6 +1128,7 @@ describe('cross-chat mention detection', () => {
     store.set({ me: ME, focus: { kind: 'list' } })
     const events: MentionEvent[] = []
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
       onMention: (e) => events.push(e),
@@ -1146,6 +1174,7 @@ describe('cross-chat mention detection', () => {
     store.set({ me: ME, focus: { kind: 'list' } })
     const events: MentionEvent[] = []
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
       onMention: (e) => events.push(e),
@@ -1195,6 +1224,7 @@ describe('cross-chat mention detection', () => {
     store.set({ me: ME, focus: { kind: 'chat', chatId: 'active-chat' } })
     const events: MentionEvent[] = []
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
       onMention: (e) => events.push(e),
@@ -1234,6 +1264,7 @@ describe('member hydration', () => {
     const store = createAppStore()
     store.set({ me: ME })
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
@@ -1270,6 +1301,7 @@ describe('member hydration', () => {
     const store = createAppStore()
     store.set({ me: ME })
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
@@ -1312,6 +1344,7 @@ describe('member hydration', () => {
     const store = createAppStore()
     store.set({ me: ME })
     activeHandle = startPoller({
+      getClient: testClient,
       store,
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })

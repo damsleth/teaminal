@@ -1,12 +1,15 @@
+import { createGraphClient, currentAccountContext } from '../../src/graph/client'
 import { listChats } from '../../src/graph/chats'
 import type { E2ETest } from '../types'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 const test: E2ETest = {
   name: 'listChats',
   description: 'Active chat list returns ≥1 chat',
   authGated: true,
   async run(ctx) {
-    const chats = await listChats()
+    const chats = await listChats(testClient())
     if (chats.length === 0) throw new Error('listChats returned 0 chats')
     ctx.log(`got ${chats.length} chats`)
     const oneOnOne = chats.filter((c) => c.chatType === 'oneOnOne').length

@@ -18,7 +18,7 @@
 //   - 5xx / network: warn once and try again on the next refresh tick.
 //   - Aborts during shutdown are silent.
 
-import { getActiveProfile } from '../graph/client'
+import { owaProfile, type AccountRef } from '../account'
 import { forceMyAvailability, TeamsPresenceError } from '../graph/teamsPresence'
 import { warn } from '../log'
 import type { AppState, Store } from './store'
@@ -31,7 +31,12 @@ export type ForceAvailabilityHandle = {
   stop: () => void
 }
 
-export function startForceAvailabilityDriver(store: Store<AppState>): ForceAvailabilityHandle {
+// `getAccount` names the account currently in the foreground; the driver
+// follows it across switches.
+export function startForceAvailabilityDriver(
+  store: Store<AppState>,
+  getAccount: () => AccountRef,
+): ForceAvailabilityHandle {
   let timer: ReturnType<typeof setTimeout> | null = null
   let inFlight: AbortController | null = null
   let unreachable = false
@@ -51,7 +56,7 @@ export function startForceAvailabilityDriver(store: Store<AppState>): ForceAvail
     inFlight = new AbortController()
     const signal = inFlight.signal
     try {
-      await forceMyAvailability('Available', { profile: getActiveProfile(), signal })
+      await forceMyAvailability('Available', { profile: owaProfile(getAccount()), signal })
     } catch (err) {
       if (signal.aborted) return
       if (err instanceof Error && /abort/i.test(err.message)) return
@@ -81,14 +86,14 @@ export function startForceAvailabilityDriver(store: Store<AppState>): ForceAvail
   }
 
   let prevOn = false
-  let lastProfile = getActiveProfile()
+  let lastAccount = getAccount().id
   const handle = (s: AppState): void => {
     // Account switch: a 403 on the previous account must not latch this one
     // off, and the new account should go Available now rather than at the
     // next 4-minute tick.
-    const profile = getActiveProfile()
-    if (profile !== lastProfile) {
-      lastProfile = profile
+    const account = getAccount().id
+    if (account !== lastAccount) {
+      lastAccount = account
       unreachable = false
       prevOn = false
       cancelTimer()

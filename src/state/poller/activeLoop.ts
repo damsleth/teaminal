@@ -10,7 +10,7 @@
 // conversation's view with the previous one's messages.
 
 import { listMessagesPage } from '../../graph/chats'
-import { GraphError } from '../../graph/client'
+import { GraphError, type GraphClient } from '../../graph/client'
 import { listChannelMessagesPage, listChannelRepliesPage } from '../../graph/teams'
 import { recordEvent, isDebugEnabled } from '../../log'
 import { logMessageImageShape } from './imageDebug'
@@ -24,6 +24,8 @@ import type { Sleeper } from './sleeper'
 
 export type ActiveLoopDeps = {
   store: Store<AppState>
+  // Bound Graph client for this session's account.
+  getClient: () => GraphClient
   sleeper: Sleeper
   intervalMs: number | (() => number)
   // seen-message-ID set, shared across loops (the cross-chat mention
@@ -37,15 +39,19 @@ export type ActiveLoopDeps = {
   reportError: (err: unknown) => void
 }
 
-async function fetchActiveMessages(focus: Focus, signal: AbortSignal): Promise<MessagesPage> {
+async function fetchActiveMessages(
+  client: GraphClient,
+  focus: Focus,
+  signal: AbortSignal,
+): Promise<MessagesPage> {
   if (focus.kind === 'chat') {
-    return listMessagesPage(focus.chatId, { signal })
+    return listMessagesPage(client, focus.chatId, { signal })
   }
   if (focus.kind === 'channel') {
-    return listChannelMessagesPage(focus.teamId, focus.channelId, { signal })
+    return listChannelMessagesPage(client, focus.teamId, focus.channelId, { signal })
   }
   if (focus.kind === 'thread') {
-    return listChannelRepliesPage(focus.teamId, focus.channelId, focus.rootId, { signal })
+    return listChannelRepliesPage(client, focus.teamId, focus.channelId, focus.rootId, { signal })
   }
   return { messages: [] }
 }
@@ -82,7 +88,7 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
       try {
         const startedAt = Date.now()
         recordEvent('poller', 'debug', 'active refresh started', { conv })
-        const page = await fetchActiveMessages(focus, ctrl.signal)
+        const page = await fetchActiveMessages(deps.getClient(), focus, ctrl.signal)
         const messages = page.messages
         recordEvent('poller', 'debug', 'active refresh fetched', {
           conv,

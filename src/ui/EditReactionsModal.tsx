@@ -11,11 +11,13 @@ import { useState } from 'react'
 import { toggleReaction } from '../state/chatActions'
 import { ownReactionTypes } from '../state/messageMutations'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
+import { useSessionApi } from './SessionContext'
 import { reactionGlyph } from './reactions'
 
 export function EditReactionsModal() {
   const { exit } = useApp()
   const store = useAppStore()
+  const session = useSessionApi()
   const modal = useAppState((s) => s.modal)
   const me = useAppState((s) => s.me)
   const messagesByConvo = useAppState((s) => s.messagesByConvo)
@@ -67,7 +69,7 @@ export function EditReactionsModal() {
           // Move cursor up if it was at the end.
           setCursor((c) => Math.min(myReactionTypes.length - 2, c))
         }
-        void toggleReaction(store, chatId, messageId, type, me).catch(() => {})
+        void toggleReaction(session.client(), store, chatId, messageId, type, me).catch(() => {})
       }
     },
     { isActive: isOpen },

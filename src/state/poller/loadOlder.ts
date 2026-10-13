@@ -15,6 +15,7 @@
 // poller; this module never imports the store factory directly.
 
 import { listMessagesNextPage, listMessagesPage } from '../../graph/chats'
+import type { GraphClient } from '../../graph/client'
 import { listChannelMessagesNextPage } from '../../graph/teams'
 import {
   cacheMessagesFromLegacy,
@@ -39,6 +40,7 @@ export type LoadOlderMessagesResult = {
 
 export type LoadOlderDeps = {
   store: Store<AppState>
+  getClient: () => GraphClient
   reportError: (err: Error) => void
   // Session stop signal: aborts the fetch, and a page that lands after stop
   // (account switch, shutdown) is dropped instead of written into the reset store.
@@ -104,19 +106,20 @@ export async function loadOlderMessages(deps: LoadOlderDeps): Promise<LoadOlderM
   })
 
   try {
+    const client = deps.getClient()
     const cache = store.get().messageCacheByConvo[conv] ?? initialCache
     let page: MessagesPage
     if (cache.nextLink) {
       page =
         focus.kind === 'chat'
-          ? await listMessagesNextPage(cache.nextLink, { signal })
-          : await listChannelMessagesNextPage(cache.nextLink, { signal })
+          ? await listMessagesNextPage(client, cache.nextLink, { signal })
+          : await listChannelMessagesNextPage(client, cache.nextLink, { signal })
     } else if (focus.kind === 'chat') {
       const oldest = cache.messages[0]
       if (!oldest) {
         page = { messages: [] }
       } else {
-        page = await listMessagesPage(focus.chatId, {
+        page = await listMessagesPage(client, focus.chatId, {
           beforeCreatedDateTime: oldest.createdDateTime,
           signal,
         })

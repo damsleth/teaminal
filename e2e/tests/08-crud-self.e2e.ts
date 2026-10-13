@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../../src/graph/client'
 import {
   createOneOnOneChat,
   editMessage,
@@ -7,6 +8,8 @@ import {
 } from '../../src/graph/chats'
 import { getMe } from '../../src/graph/me'
 import type { E2ETest } from '../types'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 // Full message CRUD against a self-chat. createOneOnOneChat with
 // otherUserId === selfUserId returns the existing self-chat (Microsoft
@@ -19,19 +22,19 @@ const test: E2ETest = {
   authGated: true,
   mutating: true,
   async run(ctx) {
-    const me = await getMe()
+    const me = await getMe(testClient())
     if (!me.id) throw new Error('me.id is empty')
-    const chat = await createOneOnOneChat(me.id, me.id)
+    const chat = await createOneOnOneChat(testClient(), me.id, me.id)
     ctx.log(`self-chat id=${chat.id}`)
 
     const stamp = new Date().toISOString()
     const initial = `[teaminal-e2e crud-self] hello @ ${stamp}`
-    const sent = await sendMessage(chat.id, initial)
+    const sent = await sendMessage(testClient(), chat.id, initial)
     ctx.log(`sent message id=${sent.id}`)
     if (!sent.id) throw new Error('sendMessage returned no id')
 
     // Read it back to verify it landed.
-    const messages = await listMessages(chat.id, { top: 50 })
+    const messages = await listMessages(testClient(), chat.id, { top: 50 })
     const found = messages.find((m) => m.id === sent.id)
     if (!found) throw new Error('sent message not present in listMessages')
     if (!found.body.content?.includes('hello')) {
@@ -41,14 +44,14 @@ const test: E2ETest = {
 
     // Edit the message.
     const edited = `${initial} (edited)`
-    await editMessage(chat.id, sent.id, edited)
+    await editMessage(testClient(), chat.id, sent.id, edited)
     ctx.log('edited OK')
 
     // Soft-delete; the tombstone stays in the conversation but the
     // body is hidden. We don't assert the tombstone shape here - Graph
     // returns it eventually consistent, sometimes lagging the delete
     // call. We just verify the API call returns 2xx without throwing.
-    await softDeleteMessage(chat.id, sent.id)
+    await softDeleteMessage(testClient(), chat.id, sent.id)
     ctx.log('soft-delete OK')
   },
 }

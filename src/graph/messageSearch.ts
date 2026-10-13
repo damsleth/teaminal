@@ -12,7 +12,7 @@
 // entity type (the query then returns an empty hit set, surfaced as "no
 // results" rather than an error).
 
-import { graph } from './client'
+import type { GraphClient } from './client'
 import { htmlToText } from '../text/html'
 import type { ChatMessageSearchHit } from '../types'
 
@@ -85,12 +85,13 @@ export function parseSearchResponse(json: unknown): ChatMessageSearchHit[] {
 }
 
 export async function searchMessages(
+  client: GraphClient,
   query: string,
   opts?: SearchMessagesOpts,
 ): Promise<ChatMessageSearchHit[]> {
   const q = query.trim()
   if (!q) return []
-  const json = await graph<unknown>({
+  const json = await client.graph<unknown>({
     method: 'POST',
     path: '/search/query',
     body: {

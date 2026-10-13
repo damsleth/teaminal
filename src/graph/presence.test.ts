@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../graph/client'
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
@@ -6,6 +7,8 @@ import {
 import { __resetForTests, __setTransportForTests, GraphError } from './client'
 import { getMyPresence, getPresencesByUserId } from './presence'
 import type { Presence } from '../types'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -47,7 +50,7 @@ describe('getMyPresence', () => {
         activity: 'Available',
       })
     })
-    const presence = await getMyPresence()
+    const presence = await getMyPresence(testClient())
     expect(seenUrl).toBe('https://graph.microsoft.com/v1.0/me/presence')
     expect(presence.availability).toBe('Available')
     expect(presence.activity).toBe('Available')
@@ -61,7 +64,7 @@ describe('getMyPresence', () => {
       return jsonResponse({ id: 'x', availability: 'Offline', activity: 'Offline' })
     })
     const ctrl = new AbortController()
-    await getMyPresence({ signal: ctrl.signal })
+    await getMyPresence(testClient(), { signal: ctrl.signal })
     expect(seenSignal).toBe(ctrl.signal)
   })
 
@@ -73,7 +76,7 @@ describe('getMyPresence', () => {
         { status: 403 },
       ),
     )
-    const err = await getMyPresence().catch((e) => e)
+    const err = await getMyPresence(testClient()).catch((e) => e)
     expect(err).toBeInstanceOf(GraphError)
     expect((err as GraphError).status).toBe(403)
   })
@@ -87,7 +90,7 @@ describe('getPresencesByUserId', () => {
       httpCalls++
       return jsonResponse({ value: [] })
     })
-    const out = await getPresencesByUserId([])
+    const out = await getPresencesByUserId(testClient(), [])
     expect(out).toEqual([])
     expect(httpCalls).toBe(0)
   })
@@ -110,7 +113,7 @@ describe('getPresencesByUserId', () => {
         ],
       })
     })
-    const out = await getPresencesByUserId(['u-1', 'u-2'])
+    const out = await getPresencesByUserId(testClient(), ['u-1', 'u-2'])
     expect(httpCalls).toBe(1)
     expect(seenMethod).toBe('POST')
     expect(seenUrl).toBe('https://graph.microsoft.com/v1.0/communications/getPresencesByUserId')
@@ -136,7 +139,7 @@ describe('getPresencesByUserId', () => {
         })),
       })
     })
-    const out = await getPresencesByUserId(ids)
+    const out = await getPresencesByUserId(testClient(), ids)
     expect(seenBatchSizes).toEqual([650, 650, 1])
     expect(out).toHaveLength(1301)
     expect(out[0]?.id).toBe('u-0')
@@ -160,7 +163,7 @@ describe('getPresencesByUserId', () => {
         })),
       })
     })
-    await getPresencesByUserId(ids)
+    await getPresencesByUserId(testClient(), ids)
     expect(httpCalls).toBe(2)
   })
 
@@ -182,7 +185,7 @@ describe('getPresencesByUserId', () => {
       })
     })
     const ctrl = new AbortController()
-    await getPresencesByUserId(ids, { signal: ctrl.signal })
+    await getPresencesByUserId(testClient(), ids, { signal: ctrl.signal })
     expect(seenSignals).toHaveLength(2)
     expect(seenSignals.every((s) => s === ctrl.signal)).toBe(true)
   })
@@ -195,7 +198,7 @@ describe('getPresencesByUserId', () => {
         { status: 403 },
       ),
     )
-    const err = await getPresencesByUserId(['u-1', 'u-2']).catch((e) => e)
+    const err = await getPresencesByUserId(testClient(), ['u-1', 'u-2']).catch((e) => e)
     expect(err).toBeInstanceOf(GraphError)
     expect((err as GraphError).status).toBe(403)
   })
