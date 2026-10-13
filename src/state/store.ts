@@ -184,14 +184,7 @@ export type ThemeMode = string
 export type SystemAppearance = 'dark' | 'light'
 export type ChatListDensity = 'cozy' | 'compact'
 export type BorderStyleName =
-  | 'single'
-  | 'double'
-  | 'round'
-  | 'bold'
-  | 'classic'
-  | 'singleDouble'
-  | 'doubleSingle'
-  | 'arrow'
+  'single' | 'double' | 'round' | 'bold' | 'classic' | 'singleDouble' | 'doubleSingle' | 'arrow'
 export type ReactionDisplayMode = 'off' | 'current' | 'all'
 
 // Toggleable HeaderBar segments. The keys are also the HEADER_ELEMENT order
