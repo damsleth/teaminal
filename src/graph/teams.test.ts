@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../graph/client'
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
@@ -22,6 +23,8 @@ import {
   sendChannelMessage,
 } from './teams'
 import type { Channel, ChannelMessage, Team } from '../types'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -83,7 +86,7 @@ describe('listJoinedTeams', () => {
       seenUrl = url
       return jsonResponse({ value: [TEAM] })
     })
-    const teams = await listJoinedTeams()
+    const teams = await listJoinedTeams(testClient())
     expect(teams).toEqual([TEAM])
     // No "?" - the probe revealed Graph rejects $top/$select here
     expect(seenUrl).toBe('https://graph.microsoft.com/v1.0/me/joinedTeams')
@@ -97,7 +100,7 @@ describe('listJoinedTeams', () => {
       return jsonResponse({ value: [] })
     })
     const ctrl = new AbortController()
-    await listJoinedTeams({ signal: ctrl.signal })
+    await listJoinedTeams(testClient(), { signal: ctrl.signal })
     expect(seenSignal).toBe(ctrl.signal)
   })
 })
@@ -110,7 +113,7 @@ describe('listChannels', () => {
       seenUrl = url
       return jsonResponse({ value: [CHANNEL] })
     })
-    await listChannels('team-1')
+    await listChannels(testClient(), 'team-1')
     expect(seenUrl).toContain('/v1.0/teams/team-1/channels?')
     expect(seenUrl).toContain(
       '%24select=id%2CdisplayName%2Cdescription%2CmembershipType%2CisArchived',
@@ -124,7 +127,7 @@ describe('listChannels', () => {
       seenUrl = url
       return jsonResponse({ value: [] })
     })
-    await listChannels('team:with:colons')
+    await listChannels(testClient(), 'team:with:colons')
     expect(seenUrl).toContain('/teams/team%3Awith%3Acolons/channels')
   })
 })
@@ -140,7 +143,7 @@ describe('listChannelMessages', () => {
     setFederationTransport(async () =>
       jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }),
     )
-    await listChannelMessages('team-1', '19:abc@thread.tacv2')
+    await listChannelMessages(testClient(), 'team-1', '19:abc@thread.tacv2')
     expect(seenUrl).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
     expect(seenUrl).toContain(encodeURIComponent('19:abc@thread.tacv2'))
     expect(seenUrl).toContain('pageSize=50')
@@ -156,7 +159,7 @@ describe('listChannelMessages', () => {
     setFederationTransport(async () =>
       jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }),
     )
-    await listChannelMessages('team-1', '19:abc', { top: 10 })
+    await listChannelMessages(testClient(), 'team-1', '19:abc', { top: 10 })
     expect(seenUrl).toContain('pageSize=10')
   })
 
@@ -174,7 +177,7 @@ describe('listChannelMessages', () => {
     setFederationTransport(async () =>
       jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }),
     )
-    const msgs = await listChannelMessages('team-1', '19:abc')
+    const msgs = await listChannelMessages(testClient(), 'team-1', '19:abc')
     expect(msgs.map((x) => x.id)).toEqual(['1', '2', '3'])
   })
 
@@ -207,13 +210,13 @@ describe('listChannelMessages', () => {
       jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }),
     )
 
-    const page = await listChannelMessagesPage('team-1', '19:abc@thread.tacv2')
+    const page = await listChannelMessagesPage(testClient(), 'team-1', '19:abc@thread.tacv2')
     expect(graphCalls).toBe(0)
     expect(chatsvcCalls).toBe(1)
     expect(page.messages.map((m) => m.id)).toEqual(['1717770000000'])
 
     // Every subsequent call also goes to chatsvc.
-    await listChannelMessagesPage('team-1', '19:abc@thread.tacv2')
+    await listChannelMessagesPage(testClient(), 'team-1', '19:abc@thread.tacv2')
     expect(graphCalls).toBe(0)
     expect(chatsvcCalls).toBe(2)
   })
@@ -236,7 +239,7 @@ describe('paginateChannelMessages', () => {
     })
 
     const ids: string[] = []
-    for await (const page of paginateChannelMessages('team-1', '19:abc')) {
+    for await (const page of paginateChannelMessages(testClient(), 'team-1', '19:abc')) {
       for (const m of page) ids.push(m.id)
     }
     expect(ids).toEqual(['page1', 'page2'])
@@ -273,7 +276,12 @@ describe('sendChannelMessage', () => {
       jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }),
     )
 
-    const sent = await sendChannelMessage('team-1', '19:abc@thread.tacv2', 'hi channel')
+    const sent = await sendChannelMessage(
+      testClient(),
+      'team-1',
+      '19:abc@thread.tacv2',
+      'hi channel',
+    )
     expect(graphCalls).toBe(0)
     expect(chatsvcCalls).toBe(1)
     expect(chatsvcUrl).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
@@ -303,7 +311,7 @@ describe('sendChannelMessage', () => {
       jsonResponse({ tokens: { skypeToken: 'skype-test-token', expiresIn: 3600 } }),
     )
     const ctrl = new AbortController()
-    await sendChannelMessage('team-1', '19:abc', 'hi', { signal: ctrl.signal })
+    await sendChannelMessage(testClient(), 'team-1', '19:abc', 'hi', { signal: ctrl.signal })
     expect(seenSignal).toBe(ctrl.signal)
   })
 })

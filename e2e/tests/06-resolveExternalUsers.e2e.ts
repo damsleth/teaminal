@@ -1,7 +1,9 @@
+import { createGraphClient, currentAccountContext } from '../../src/graph/client'
 import { searchChatUsers } from '../../src/graph/chats'
-import { currentAccountContext } from '../../src/graph/client'
 import { searchExternalUsers } from '../../src/graph/teamsExternalSearch'
 import type { E2ETest } from '../types'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 // Resolve every configured external test user via the same two-step
 // path the new-chat prompt uses: Graph search first (in-tenant + B2B
@@ -18,7 +20,7 @@ const test: E2ETest = {
     }
     const failures: string[] = []
     for (const email of ctx.externalUsers) {
-      const matches = await searchChatUsers(email)
+      const matches = await searchChatUsers(testClient(), email)
       const direct = matches.find(
         (m) =>
           m.userPrincipalName?.toLowerCase() === email.toLowerCase() ||

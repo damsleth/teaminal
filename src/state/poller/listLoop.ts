@@ -12,12 +12,7 @@
 // can surface the state.
 
 import { listChats } from '../../graph/chats'
-import {
-  currentAccountContext,
-  getAudiencePreference,
-  GraphError,
-  RateLimitError,
-} from '../../graph/client'
+import { GraphError, RateLimitError, type GraphClient } from '../../graph/client'
 import { fetchChatsAndTeams } from '../../graph/teamsCsa'
 import { recordEvent } from '../../log'
 import type { Channel, Chat, Team } from '../../types'
@@ -35,6 +30,8 @@ type ChatsTeams = { chats: Chat[]; teams: Team[]; channelsByTeam: Record<string,
 
 export type ListLoopDeps = {
   store: Store<AppState>
+  // Bound Graph client for this session's account.
+  getClient: () => GraphClient
   sleeper: Sleeper
   intervalMs: number | (() => number)
   seen: Map<ConvKey, Set<string>>
@@ -83,18 +80,19 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
   let graphList401 = false
 
   async function loadGraphChatsTeams(signal: AbortSignal): Promise<ChatsTeams> {
+    const client = deps.getClient()
     const [chats, tc] = await Promise.all([
-      listChats({ signal }),
-      fetchTeamsAndChannels(signal, reportError),
+      listChats(client, { signal }),
+      fetchTeamsAndChannels(client, signal, reportError),
     ])
     return { chats, teams: tc.teams, channelsByTeam: tc.channelsByTeam }
   }
 
   async function loadChatsTeams(signal: AbortSignal): Promise<ChatsTeams> {
-    const { audience, fallback } = getAudiencePreference()
+    const { audience, fallback, account } = deps.getClient().ctx
     if (audience === 'ic3') {
       try {
-        return await fetchChatsAndTeams({ account: currentAccountContext().account, signal })
+        return await fetchChatsAndTeams({ account, signal })
       } catch (err) {
         if (!fallback) throw err
         recordEvent(
@@ -107,7 +105,7 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
     }
 
     if (graphList401 && fallback) {
-      return fetchChatsAndTeams({ account: currentAccountContext().account, signal })
+      return fetchChatsAndTeams({ account, signal })
     }
     try {
       return await loadGraphChatsTeams(signal)
@@ -119,7 +117,7 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
           'warn',
           'graph chat/teams list 401 (likely Conditional Access) — switching to Teams CSA',
         )
-        return fetchChatsAndTeams({ account: currentAccountContext().account, signal })
+        return fetchChatsAndTeams({ account, signal })
       }
       throw err
     }
@@ -166,6 +164,7 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
         hydrateMissingMembers(
           {
             store,
+            getClient: deps.getClient,
             hydrated: memberHydrated,
             signal: hydrateSignal,
             isStopped,
@@ -181,7 +180,7 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
         firstListPoll = false
         if (myId && !wasFirst) {
           await runCrossChatMentionPass(
-            { store, seen, prevPreviewIds, onMention, reportError },
+            { store, getClient: deps.getClient, seen, prevPreviewIds, onMention, reportError },
             chats,
             myId,
             signal,

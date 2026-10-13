@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // Live smoke for src/graph/client + src/graph/me.
 //
 // Hits real /me through the graph client, prints displayName + redacted id
@@ -10,15 +11,17 @@
 import { setActiveProfile } from '../src/graph/client'
 import { getMe } from '../src/graph/me'
 
+const testClient = () => createGraphClient(currentAccountContext())
+
 const profile = Bun.argv[2]
 if (profile) setActiveProfile(profile)
 
 const profileLabel = profile ?? '<owa-default>'
 
 const t0 = performance.now()
-const me1 = await getMe()
+const me1 = await getMe(testClient())
 const t1 = performance.now()
-const me2 = await getMe()
+const me2 = await getMe(testClient())
 const t2 = performance.now()
 
 const idPrefix = `${me1.id.slice(0, 8)}...`

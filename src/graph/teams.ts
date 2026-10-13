@@ -11,7 +11,7 @@
 //     where the user is only a shared-channel member; shared-channel
 //     discovery is parked for after v1
 
-import { currentAccountContext, graph, paginate } from './client'
+import type { GraphClient } from './client'
 import {
   listChannelMessagesViaChatsvc,
   listChannelMessagesViaChatsvcNextPage,
@@ -43,10 +43,13 @@ export type ListJoinedTeamsOpts = {
   signal?: AbortSignal
 }
 
-export async function listJoinedTeams(opts?: ListJoinedTeamsOpts): Promise<Team[]> {
+export async function listJoinedTeams(
+  client: GraphClient,
+  opts?: ListJoinedTeamsOpts,
+): Promise<Team[]> {
   // Intentionally no $select/$top - Graph rejects them under delegated auth
   // for /me/joinedTeams (returns 400 "Query option ... is not allowed").
-  const res = await graph<CollectionResponse<Team>>({
+  const res = await client.graph<CollectionResponse<Team>>({
     method: 'GET',
     path: '/me/joinedTeams',
     signal: opts?.signal,
@@ -58,8 +61,12 @@ export type ListChannelsOpts = {
   signal?: AbortSignal
 }
 
-export async function listChannels(teamId: string, opts?: ListChannelsOpts): Promise<Channel[]> {
-  const res = await graph<CollectionResponse<Channel>>({
+export async function listChannels(
+  client: GraphClient,
+  teamId: string,
+  opts?: ListChannelsOpts,
+): Promise<Channel[]> {
+  const res = await client.graph<CollectionResponse<Channel>>({
     method: 'GET',
     path: `/teams/${encodeURIComponent(teamId)}/channels`,
     query: { $select: 'id,displayName,description,membershipType,isArchived' },
@@ -85,14 +92,16 @@ export type ChannelMessagesPage = {
 // Replies/threads are NOT included - that's the documented v1 limit; load
 // older pages with `paginateChannelMessages`.
 export async function listChannelMessages(
+  client: GraphClient,
   teamId: string,
   channelId: string,
   opts?: ListChannelMessagesOpts,
 ): Promise<ChannelMessage[]> {
-  return (await listChannelMessagesPage(teamId, channelId, opts)).messages
+  return (await listChannelMessagesPage(client, teamId, channelId, opts)).messages
 }
 
 export async function listChannelMessagesPage(
+  client: GraphClient,
   _teamId: string,
   channelId: string,
   opts?: ListChannelMessagesOpts,
@@ -102,7 +111,7 @@ export async function listChannelMessagesPage(
   // FOCI cannot mint that scope from the OWA refresh token. Always go
   // through the Teams chat service.
   const fallback = await listChannelMessagesViaChatsvc(channelId, {
-    account: currentAccountContext().account,
+    account: client.ctx.account,
     pageSize: opts?.top ?? CHANNEL_MESSAGES_TOP_DEFAULT,
     signal: opts?.signal,
   })
@@ -110,11 +119,12 @@ export async function listChannelMessagesPage(
 }
 
 export async function listChannelMessagesNextPage(
+  client: GraphClient,
   nextLink: string,
   opts?: { signal?: AbortSignal },
 ): Promise<ChannelMessagesPage> {
   const fallback = await listChannelMessagesViaChatsvcNextPage(nextLink, {
-    account: currentAccountContext().account,
+    account: client.ctx.account,
     signal: opts?.signal,
   })
   return { messages: fallback.messages, nextLink: fallback.backwardLink }
@@ -125,11 +135,12 @@ export async function listChannelMessagesNextPage(
 // chronologically. Use sparingly - paging an active channel from the top
 // repeatedly is wasteful; v1 only pages on explicit "load older" intents.
 export function paginateChannelMessages(
+  client: GraphClient,
   teamId: string,
   channelId: string,
   opts?: ListChannelMessagesOpts,
 ): AsyncGenerator<ChannelMessage[], void, unknown> {
-  return paginate<ChannelMessage>({
+  return client.paginate<ChannelMessage>({
     method: 'GET',
     path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages`,
     query: { $top: opts?.top ?? CHANNEL_MESSAGES_TOP_DEFAULT },
@@ -143,6 +154,7 @@ export type SendChannelMessageOpts = {
 }
 
 export async function sendChannelMessage(
+  client: GraphClient,
   _teamId: string,
   channelId: string,
   content: string,
@@ -151,7 +163,7 @@ export async function sendChannelMessage(
   // Graph send needs ChannelMessage.Send which FOCI never issues.
   // Route through chatsvc unconditionally.
   return sendChannelMessageViaChatsvc(channelId, content, {
-    account: currentAccountContext().account,
+    account: client.ctx.account,
     signal: opts?.signal,
   })
 }
@@ -177,22 +189,24 @@ export type ChannelRepliesPage = {
 const CHANNEL_REPLIES_TOP_DEFAULT = 50
 
 export async function listChannelReplies(
+  client: GraphClient,
   teamId: string,
   channelId: string,
   rootId: string,
   opts?: ListChannelRepliesOpts,
 ): Promise<ChannelMessage[]> {
-  return (await listChannelRepliesPage(teamId, channelId, rootId, opts)).messages
+  return (await listChannelRepliesPage(client, teamId, channelId, rootId, opts)).messages
 }
 
 export async function listChannelRepliesPage(
+  client: GraphClient,
   _teamId: string,
   channelId: string,
   rootId: string,
   opts?: ListChannelRepliesOpts,
 ): Promise<ChannelRepliesPage> {
   const page = await listChannelRepliesViaChatsvc(channelId, rootId, {
-    account: currentAccountContext().account,
+    account: client.ctx.account,
     pageSize: opts?.top ?? CHANNEL_REPLIES_TOP_DEFAULT,
     signal: opts?.signal,
   })
@@ -200,13 +214,14 @@ export async function listChannelRepliesPage(
 }
 
 export async function listChannelRepliesNextPage(
+  client: GraphClient,
   nextLink: string,
   opts?: { signal?: AbortSignal },
 ): Promise<ChannelRepliesPage> {
   // The Skype backwardLink is absolute; the generic chatsvc follower handles
   // both channel and thread (sub-conversation) pages.
   const page = await listChannelMessagesViaChatsvcNextPage(nextLink, {
-    account: currentAccountContext().account,
+    account: client.ctx.account,
     signal: opts?.signal,
   })
   return { messages: page.messages, nextLink: page.backwardLink }
@@ -220,6 +235,7 @@ export async function listChannelRepliesNextPage(
  * `replyToId` set to the root.
  */
 export async function postChannelReply(
+  client: GraphClient,
   _teamId: string,
   channelId: string,
   rootId: string,
@@ -227,7 +243,7 @@ export async function postChannelReply(
   opts?: SendChannelMessageOpts,
 ): Promise<ChannelMessage> {
   return sendChannelMessageViaChatsvc(channelId, content, {
-    account: currentAccountContext().account,
+    account: client.ctx.account,
     replyToId: rootId,
     signal: opts?.signal,
   })

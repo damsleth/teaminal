@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // Live smoke for src/state/poller.
 //
 // Wires the capability probe + me + poller together, waits ~6s, prints
@@ -10,13 +11,15 @@ import { getMe } from '../src/graph/me'
 import { startPoller, type MentionEvent } from '../src/state/poller'
 import { createAppStore } from '../src/state/store'
 
+const testClient = () => createGraphClient(currentAccountContext())
+
 const profile = Bun.argv[2]
 if (profile) setActiveProfile(profile)
 
 const store = createAppStore()
-const me = await getMe()
+const me = await getMe(testClient())
 store.set({ me })
-const capabilities = await probeCapabilities()
+const capabilities = await probeCapabilities(testClient())
 store.set({ capabilities })
 
 process.stdout.write('Capabilities:\n')
@@ -28,6 +31,7 @@ const mentions: MentionEvent[] = []
 const errors: { loop: string; msg: string }[] = []
 
 const handle = startPoller({
+  getClient: testClient,
   store,
   intervals: { activeMs: 5_000, listMs: 5_000, presenceMs: 8_000 },
   onMention: (e) => mentions.push(e),

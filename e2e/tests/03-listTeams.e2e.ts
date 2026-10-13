@@ -1,12 +1,15 @@
+import { createGraphClient, currentAccountContext } from '../../src/graph/client'
 import { listJoinedTeams } from '../../src/graph/teams'
 import type { E2ETest } from '../types'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 const test: E2ETest = {
   name: 'listJoinedTeams',
   description: 'GET /me/joinedTeams returns ≥1 team',
   authGated: true,
   async run(ctx) {
-    const teams = await listJoinedTeams()
+    const teams = await listJoinedTeams(testClient())
     if (teams.length === 0) throw new Error('listJoinedTeams returned 0 teams')
     ctx.log(`got ${teams.length} teams`)
     const sample = teams

@@ -25,6 +25,7 @@
 // Focus change wakes the active loop's interruptable sleep and aborts any
 // in-flight active fetch so opening a chat is responsive even mid-poll.
 
+import type { GraphClient } from '../graph/client'
 import type { ChatMessage } from '../types'
 import { recordEvent } from '../log'
 import { type AppState, type ConvKey, focusKey, type Store } from './store'
@@ -67,6 +68,9 @@ export type MentionEvent = {
 
 export type PollerOpts = {
   store: Store<AppState>
+  // Bound Graph client for the session's account. Called per request so a
+  // routing change for this account applies to the next call.
+  getClient: () => GraphClient
   intervals?: {
     activeMs?: number
     listMs?: number
@@ -99,7 +103,7 @@ export type PollerHandle = {
 }
 
 export function startPoller(opts: PollerOpts): PollerHandle {
-  const { store, onMention, onError } = opts
+  const { store, getClient, onMention, onError } = opts
   // When the caller passes explicit interval overrides (tests do this
   // to drive the loops at sub-second cadence), we honor them verbatim.
   // Otherwise each loop reads its current interval from the store on
@@ -170,6 +174,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
   function loadOlderMessages(): Promise<LoadOlderMessagesResult> {
     return loadOlderMessagesImpl({
       store,
+      getClient,
       reportError: (err) => reportError('active', err),
       signal: sessionAbort.signal,
     })
@@ -179,6 +184,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
 
   const runActiveLoop = makeActiveLoop({
     store,
+    getClient,
     sleeper: activeSleeper,
     intervalMs: activeMs,
     seen,
@@ -190,6 +196,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
 
   const runListLoop = makeListLoop({
     store,
+    getClient,
     sleeper: listSleeper,
     intervalMs: listMs,
     seen,
@@ -203,6 +210,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
 
   const runPresenceLoop = makePresenceLoop({
     store,
+    getClient,
     sleeper: presenceSleeper,
     intervalMs: presenceMs,
     stopSignal: sessionAbort.signal,

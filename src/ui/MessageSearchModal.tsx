@@ -14,6 +14,7 @@ import { clampCursor } from '../state/selectables'
 import type { AppState, Store } from '../state/store'
 import type { ChatMessageSearchHit } from '../types'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
+import { useSessionApi } from './SessionContext'
 
 const DEBOUNCE_MS = 350
 const RESULT_LIMIT = 25
@@ -26,6 +27,7 @@ export function openMessageSearch(store: Store<AppState>): void {
 export function MessageSearchModal() {
   const { exit } = useApp()
   const store = useAppStore()
+  const session = useSessionApi()
   const modal = useAppState((s) => s.modal)
   const theme = useTheme()
   const isOpen = modal?.kind === 'message-search-global'
@@ -49,7 +51,7 @@ export function MessageSearchModal() {
     const timer = setTimeout(() => {
       setLoading(true)
       setError(null)
-      searchAllMessages(q, { size: RESULT_LIMIT, signal: ctrl.signal })
+      searchAllMessages(session.client(), q, { size: RESULT_LIMIT, signal: ctrl.signal })
         .then((hits) => {
           setResults(hits)
           setCursor(0)

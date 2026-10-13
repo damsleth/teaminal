@@ -2,7 +2,8 @@
 
 import { decodeJwtClaims, getToken } from '../auth/owaPiggy'
 import { recordEvent } from '../log'
-import { getActiveProfile, getAudiencePreference, graph, GraphError } from './client'
+import { owaProfile } from '../account'
+import { GraphError, type GraphClient } from './client'
 
 export type Me = {
   id: string
@@ -11,16 +12,16 @@ export type Me = {
   mail: string | null
 }
 
-export async function getMe(signal?: AbortSignal): Promise<Me> {
+export async function getMe(client: GraphClient, signal?: AbortSignal): Promise<Me> {
   // ic3-primary accounts are Conditional-Access gated on graph.microsoft.com,
   // so the /me round-trip just 401s. Derive identity from the token claims
   // directly (oid / name / upn are all present) and skip the gated call.
-  if (getAudiencePreference().audience === 'ic3') {
-    const fromToken = await meFromToken()
+  if (client.ctx.audience === 'ic3') {
+    const fromToken = await meFromToken(client)
     if (fromToken) return fromToken
   }
   try {
-    return await graph<Me>({
+    return await client.graph<Me>({
       method: 'GET',
       path: '/me',
       query: { $select: 'id,displayName,userPrincipalName,mail' },
@@ -31,7 +32,7 @@ export async function getMe(signal?: AbortSignal): Promise<Me> {
       // graph /me is Conditional-Access gated in some tenants. The access
       // token itself carries everything we need (oid / name / upn), so
       // derive identity from its claims rather than failing bootstrap.
-      const fromToken = await meFromToken()
+      const fromToken = await meFromToken(client)
       if (fromToken) {
         recordEvent(
           'graph',
@@ -45,9 +46,9 @@ export async function getMe(signal?: AbortSignal): Promise<Me> {
   }
 }
 
-async function meFromToken(): Promise<Me | null> {
+async function meFromToken(client: GraphClient): Promise<Me | null> {
   try {
-    const token = await getToken({ profile: getActiveProfile() })
+    const token = await getToken({ profile: owaProfile(client.ctx.account) })
     const claims = decodeJwtClaims(token)
     const id = typeof claims.oid === 'string' ? claims.oid : undefined
     if (!id) return null

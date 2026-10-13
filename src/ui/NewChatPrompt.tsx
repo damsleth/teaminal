@@ -12,6 +12,7 @@ import { searchChatUsers, searchExternalUsers } from '../state/chatActions'
 import { clampCursor } from '../state/selectables'
 import type { DirectoryUser } from '../types'
 import { isNewChatQueryCandidate } from './ChatList'
+import { useSessionApi } from './SessionContext'
 import { useTheme } from './StoreContext'
 
 const DEBOUNCE_MS = 250
@@ -43,6 +44,7 @@ export function NewChatPrompt(props: {
   onSelectUser: (user: DirectoryUser) => Promise<void>
 }) {
   const { exit } = useApp()
+  const session = useSessionApi()
   const [query, setQuery] = useState(props.initialQuery)
   const [results, setResults] = useState<DirectoryUser[]>([])
   const [cursor, setCursor] = useState(0)
@@ -67,7 +69,7 @@ export function NewChatPrompt(props: {
     const timer = setTimeout(() => {
       setLoading(true)
       setError(null)
-      searchChatUsers(q, { top: RESULT_LIMIT, signal: ctrl.signal })
+      searchChatUsers(session.client(), q, { top: RESULT_LIMIT, signal: ctrl.signal })
         .then((users) => {
           setResults(users)
           setCursor(0)
@@ -149,7 +151,7 @@ export function NewChatPrompt(props: {
         if (results.length === 0 && isNewChatQueryCandidate(trimmed)) {
           setExternalLookup('in-flight')
           setError(null)
-          searchExternalUsers(trimmed, { top: RESULT_LIMIT })
+          searchExternalUsers(session.client(), trimmed, { top: RESULT_LIMIT })
             .then((users) => {
               if (users.length === 0) {
                 setExternalLookup('no-hit')

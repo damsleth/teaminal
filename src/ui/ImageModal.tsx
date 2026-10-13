@@ -21,11 +21,11 @@
 import { Box, Text, useApp } from 'ink'
 import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
-import { getActiveProfile } from '../graph/client'
 import { ensureImageFetched, getImageData } from '../state/imageCache'
 import { detectImageFormat } from './kittyGraphics'
 import { materializeImage, openImageFile } from './openImageFile'
 import { openExternal } from './openExternal'
+import { useSessionApi } from './SessionContext'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
 function readPngDimensions(buf: Buffer): { width: number; height: number } | null {
@@ -52,6 +52,7 @@ function openableUrl(ref: {
 export function ImageModal() {
   const { exit } = useApp()
   const store = useAppStore()
+  const session = useSessionApi()
   const modal = useAppState((s) => s.modal)
   const theme = useTheme()
   const isOpen = modal?.kind === 'image'
@@ -72,7 +73,7 @@ export function ImageModal() {
       ref.cacheKey,
       { contentType: ref.contentType, name: ref.name },
       {
-        profile: getActiveProfile(),
+        client: session.client(),
         isExternal: ref.isExternal,
         ...(ref.objectId ? { objectId: ref.objectId } : {}),
         ...(ref.region ? { region: ref.region } : {}),

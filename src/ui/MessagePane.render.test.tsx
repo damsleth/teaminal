@@ -2,11 +2,21 @@ import { expect, test } from 'bun:test'
 import { Box, renderToString } from 'ink'
 import { createAppStore } from '../state/store'
 import type { ChatMessage } from '../types'
+import { accountRef } from '../account'
+import { createGraphClient } from '../graph/client'
 import { MessagePane } from './MessagePane'
+import { SessionProvider, type SessionApi } from './SessionContext'
 import { StoreProvider } from './StoreContext'
 
 // Real Ink/Yoga renders of the pane, so layout regressions show up as the
 // characters a terminal would actually get.
+
+const session: SessionApi = {
+  getActiveProfile: () => null,
+  switchAccount: async () => {},
+  client: () =>
+    createGraphClient({ account: accountRef(null), audience: 'graph', fallback: false }),
+}
 
 const msg = (id: string, at: string, name: string, text: string): ChatMessage => ({
   id,
@@ -43,9 +53,11 @@ function render(
   })
   const out = renderToString(
     <StoreProvider store={store}>
-      <Box flexDirection="column" height={paneHeight}>
-        <MessagePane focusedMessageId={focusedMessageId} focusIndicatorActive />
-      </Box>
+      <SessionProvider api={session}>
+        <Box flexDirection="column" height={paneHeight}>
+          <MessagePane focusedMessageId={focusedMessageId} focusIndicatorActive />
+        </Box>
+      </SessionProvider>
     </StoreProvider>,
     { columns: 80 },
   )

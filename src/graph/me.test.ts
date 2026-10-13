@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../graph/client'
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
@@ -5,6 +6,8 @@ import {
 } from '../auth/owaPiggy'
 import { __resetForTests, __setTransportForTests, setAudiencePreference } from './client'
 import { getMe } from './me'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -44,7 +47,7 @@ describe('getMe', () => {
       })
     })
 
-    const me = await getMe()
+    const me = await getMe(testClient())
     expect(me.id).toBe('00000000-0000-0000-0000-000000000001')
     expect(me.displayName).toBe('Carl Joakim Damsleth')
     expect(me.userPrincipalName).toBe('kim@example.onmicrosoft.com')
@@ -68,7 +71,7 @@ describe('getMe', () => {
         mail: null,
       }),
     )
-    const me = await getMe()
+    const me = await getMe(testClient())
     expect(me.mail).toBeNull()
   })
 
@@ -84,7 +87,7 @@ describe('getMe', () => {
       return jsonResponse({ id: 'x', displayName: 'X', userPrincipalName: 'x@x', mail: null })
     })
     const ctrl = new AbortController()
-    await getMe(ctrl.signal)
+    await getMe(testClient(), ctrl.signal)
     expect(seenSignal).toBe(ctrl.signal)
   })
 
@@ -103,7 +106,7 @@ describe('getMe', () => {
     __setTransportForTests(async () =>
       jsonResponse({ error: { code: 'Unauthorized', message: 'CA' } }, { status: 401 }),
     )
-    const me = await getMe()
+    const me = await getMe(testClient())
     expect(me.id).toBe('6555c7ee-7c68-4aa8-9f0c-05164c288c36')
     expect(me.displayName).toBe('Damsleth, Carl Joakim')
     expect(me.userPrincipalName).toBe('carljoakim.damsleth@softwareone.com')
@@ -127,7 +130,7 @@ describe('getMe', () => {
       graphCalled = true
       return jsonResponse({ error: { code: 'Unauthorized', message: 'CA' } }, { status: 401 })
     })
-    const me = await getMe()
+    const me = await getMe(testClient())
     expect(me.id).toBe('6555c7ee-7c68-4aa8-9f0c-05164c288c36')
     expect(me.displayName).toBe('Damsleth, Carl Joakim')
     expect(graphCalled).toBe(false)
@@ -142,6 +145,6 @@ describe('getMe', () => {
     __setTransportForTests(async () =>
       jsonResponse({ error: { code: 'Unauthorized', message: 'CA' } }, { status: 401 }),
     )
-    await expect(getMe()).rejects.toMatchObject({ status: 401 })
+    await expect(getMe(testClient())).rejects.toMatchObject({ status: 401 })
   })
 })

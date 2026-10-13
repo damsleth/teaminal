@@ -9,6 +9,7 @@
 // chats we've already issued a getChat($expand=members) call for.
 
 import { getChatsBatch } from '../../graph/chats'
+import type { GraphClient } from '../../graph/client'
 import type { Chat } from '../../types'
 import { indexNamesFromChats } from '../nameIndex'
 import type { AppState, Store } from '../store'
@@ -16,6 +17,8 @@ import { isAbortError } from './intervals'
 
 export type HydrateMembersDeps = {
   store: Store<AppState>
+  // Bound Graph client for this session's account.
+  getClient: () => GraphClient
   // Set of chat IDs we've already issued a hydration call for (mutated).
   hydrated: Set<string>
   // Hot-stop signal. Gets aborted at stop() time so an in-flight
@@ -41,6 +44,7 @@ export async function hydrateMissingMembers(
   if (isStopped() || signal.aborted) return
   try {
     const result = await getChatsBatch(
+      deps.getClient(),
       targets.map((c) => c.id),
       { members: true, signal },
     )

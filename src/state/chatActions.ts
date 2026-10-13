@@ -31,7 +31,7 @@ import {
   postChannelReply as postChannelReplyGraph,
   sendChannelMessage as sendChannelMessageGraph,
 } from '../graph/teams'
-import { currentAccountContext } from '../graph/client'
+import type { GraphClient } from '../graph/client'
 import { recordEvent } from '../log'
 import type { Chat, ChatMessage, ChatMessageSearchHit, DirectoryUser, IdentityUser } from '../types'
 import {
@@ -49,12 +49,13 @@ import type { AppState, Store } from './store'
  * federated peer exists; never throws.
  */
 export async function resolveFederatedChatId(
+  client: GraphClient,
   selfId: string,
   otherUserId: string,
 ): Promise<string | null> {
   try {
     return await resolveFederatedEquivalentConversationId(selfId, otherUserId, {
-      account: currentAccountContext().account,
+      account: client.ctx.account,
     })
   } catch (err) {
     recordEvent(
@@ -72,10 +73,14 @@ export async function resolveFederatedChatId(
  * failure so the caller can still focus the chat - the poller will
  * fill in the real details on the next list refresh.
  */
-export async function materializeChat(store: Store<AppState>, chatId: string): Promise<Chat> {
+export async function materializeChat(
+  client: GraphClient,
+  store: Store<AppState>,
+  chatId: string,
+): Promise<Chat> {
   const local = store.get().chats.find((c) => c.id === chatId)
   if (local) return local
-  return getChat(chatId, { members: true }).catch((err) => {
+  return getChat(client, chatId, { members: true }).catch((err) => {
     recordEvent(
       'graph',
       'warn',
@@ -90,43 +95,50 @@ export async function materializeChat(store: Store<AppState>, chatId: string): P
 }
 
 /** Create a 1:1 chat with another user. Surfaces Graph errors to the caller. */
-export async function createOneOnOneChat(selfId: string, otherUserId: string): Promise<Chat> {
-  return createOneOnOneChatGraph(selfId, otherUserId)
+export async function createOneOnOneChat(
+  client: GraphClient,
+  selfId: string,
+  otherUserId: string,
+): Promise<Chat> {
+  return createOneOnOneChatGraph(client, selfId, otherUserId)
 }
 
 /** Hydrate a chat from Graph with members expanded. Throws on Graph errors. */
-export async function hydrateChat(chatId: string): Promise<Chat> {
-  return getChat(chatId, { members: true })
+export async function hydrateChat(client: GraphClient, chatId: string): Promise<Chat> {
+  return getChat(client, chatId, { members: true })
 }
 
 /** Send a message to a 1:1 / group chat. */
 export async function sendChatMessage(
+  client: GraphClient,
   chatId: string,
   content: string,
   opts?: { signal?: AbortSignal },
 ): Promise<ChatMessage> {
-  return sendMessageGraph(chatId, content, opts)
+  return sendMessageGraph(client, chatId, content, opts)
 }
 
 /** Send a top-level message to a channel. */
 export async function sendChannelMessage(
+  client: GraphClient,
   teamId: string,
   channelId: string,
   content: string,
   opts?: { signal?: AbortSignal },
 ): ReturnType<typeof sendChannelMessageGraph> {
-  return sendChannelMessageGraph(teamId, channelId, content, opts)
+  return sendChannelMessageGraph(client, teamId, channelId, content, opts)
 }
 
 /** Post a reply to a channel thread. */
 export async function postChannelReply(
+  client: GraphClient,
   teamId: string,
   channelId: string,
   rootId: string,
   content: string,
   opts?: { signal?: AbortSignal },
 ): ReturnType<typeof postChannelReplyGraph> {
-  return postChannelReplyGraph(teamId, channelId, rootId, content, opts)
+  return postChannelReplyGraph(client, teamId, channelId, rootId, content, opts)
 }
 
 // --- Write path: reactions, edits, deletes (chat messages only) ---
@@ -177,6 +189,7 @@ async function withOptimisticChatUpdate(
  * thus adds to the user's reactions while picking the same emoji removes it.
  */
 export async function toggleReaction(
+  client: GraphClient,
   store: Store<AppState>,
   chatId: string,
   messageId: string,
@@ -196,14 +209,15 @@ export async function toggleReaction(
         : applyReaction(messages, messageId, reactionType, me),
     () =>
       removing
-        ? unsetReactionGraph(chatId, messageId, reactionType)
-        : setReactionGraph(chatId, messageId, reactionType),
+        ? unsetReactionGraph(client, chatId, messageId, reactionType)
+        : setReactionGraph(client, chatId, messageId, reactionType),
     removing ? 'unset reaction' : 'set reaction',
   )
 }
 
 /** Edit the content of one of the user's own chat messages. */
 export async function editChatMessageContent(
+  client: GraphClient,
   store: Store<AppState>,
   chatId: string,
   messageId: string,
@@ -215,13 +229,14 @@ export async function editChatMessageContent(
     store,
     chatId,
     (messages) => applyEdit(messages, messageId, trimmed, new Date().toISOString()),
-    () => editMessageGraph(chatId, messageId, trimmed),
+    () => editMessageGraph(client, chatId, messageId, trimmed),
     'edit message',
   )
 }
 
 /** Soft-delete one of the user's own chat messages (renders as a tombstone). */
 export async function deleteChatMessageById(
+  client: GraphClient,
   store: Store<AppState>,
   chatId: string,
   messageId: string,
@@ -230,7 +245,7 @@ export async function deleteChatMessageById(
     store,
     chatId,
     (messages) => applyDelete(messages, messageId, new Date().toISOString()),
-    () => softDeleteMessageGraph(chatId, messageId),
+    () => softDeleteMessageGraph(client, chatId, messageId),
     'delete message',
   )
 }
@@ -241,7 +256,11 @@ export async function deleteChatMessageById(
  * error is logged - the poller would restore it on the next list pass
  * anyway, so re-inserting locally just avoids the flicker of waiting.
  */
-export async function deleteChatById(store: Store<AppState>, chatId: string): Promise<void> {
+export async function deleteChatById(
+  client: GraphClient,
+  store: Store<AppState>,
+  chatId: string,
+): Promise<void> {
   const before = store.get().chats
   const removed = before.find((c) => c.id === chatId)
   if (!removed) return
@@ -254,7 +273,7 @@ export async function deleteChatById(store: Store<AppState>, chatId: string): Pr
       : {}),
   }))
   try {
-    await hideChatGraph(chatId, selfId)
+    await hideChatGraph(client, chatId, selfId)
     recordEvent('graph', 'info', `deleted chat ${chatId}`)
   } catch (err) {
     store.set((s) => (s.chats.some((c) => c.id === chatId) ? {} : { chats: [removed, ...s.chats] }))
@@ -269,24 +288,27 @@ export async function deleteChatById(store: Store<AppState>, chatId: string): Pr
 
 /** Internal-tenant directory search for the new-chat prompt. */
 export async function searchChatUsers(
+  client: GraphClient,
   query: string,
   opts?: { top?: number; signal?: AbortSignal },
 ): Promise<DirectoryUser[]> {
-  return searchChatUsersGraph(query, opts)
+  return searchChatUsersGraph(client, query, opts)
 }
 
 /** External / federated directory search for the new-chat prompt. */
 export async function searchExternalUsers(
+  client: GraphClient,
   query: string,
   opts?: { top?: number; signal?: AbortSignal },
 ): Promise<DirectoryUser[]> {
-  return searchExternalUsersGraph(query, { ...opts, account: currentAccountContext().account })
+  return searchExternalUsersGraph(query, { ...opts, account: client.ctx.account })
 }
 
 /** Tenant-wide server-side message search (Microsoft Search API). */
 export async function searchAllMessages(
+  client: GraphClient,
   query: string,
   opts?: SearchMessagesOpts,
 ): Promise<ChatMessageSearchHit[]> {
-  return searchMessagesGraph(query, opts)
+  return searchMessagesGraph(client, query, opts)
 }

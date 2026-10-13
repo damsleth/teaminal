@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // Live smoke for src/graph/capabilities.
 //
 // Hits real Graph and prints a per-probe result table.
@@ -5,11 +6,13 @@
 import { setActiveProfile } from '../src/graph/client'
 import { probeCapabilities } from '../src/graph/capabilities'
 
+const testClient = () => createGraphClient(currentAccountContext())
+
 const profile = Bun.argv[2]
 if (profile) setActiveProfile(profile)
 
 const t0 = performance.now()
-const caps = await probeCapabilities()
+const caps = await probeCapabilities(testClient())
 const elapsed = performance.now() - t0
 
 const rows = (Object.entries(caps) as [string, (typeof caps)[keyof typeof caps]][]).map(

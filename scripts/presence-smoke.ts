@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // Live smoke for src/graph/presence.
 //
 // Tries getMyPresence and getPresencesByUserId(self). Prints availability
@@ -8,6 +9,8 @@
 import { setActiveProfile, GraphError } from '../src/graph/client'
 import { getMe } from '../src/graph/me'
 import { getMyPresence, getPresencesByUserId } from '../src/graph/presence'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 const profile = Bun.argv[2]
 if (profile) setActiveProfile(profile)
@@ -27,10 +30,10 @@ async function describe(label: string, fn: () => Promise<unknown>): Promise<void
   }
 }
 
-await describe('getMyPresence', () => getMyPresence())
+await describe('getMyPresence', () => getMyPresence(testClient()))
 
-const me = await getMe()
+const me = await getMe(testClient())
 await describe(`getPresencesByUserId([${me.id.slice(0, 8)}...])`, () =>
-  getPresencesByUserId([me.id]))
+  getPresencesByUserId(testClient(), [me.id]))
 
-await describe('getPresencesByUserId([])', () => getPresencesByUserId([]))
+await describe('getPresencesByUserId([])', () => getPresencesByUserId(testClient(), []))

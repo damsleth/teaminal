@@ -164,7 +164,9 @@ export function AccountsModal() {
         void persist({ chatRoutingByAccount }).then(() => {
           // If we just changed the active account's routing, apply the
           // derived audience/fallback to the graph client immediately.
-          if (profile === session.getActiveProfile()) applyChatRouting(next)
+          if (profile === session.getActiveProfile()) {
+            applyChatRouting(session.client().ctx.account, next)
+          }
         })
         return
       }

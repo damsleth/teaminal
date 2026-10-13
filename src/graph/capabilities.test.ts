@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../graph/client'
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
@@ -14,6 +15,8 @@ import {
   __setTransportForTests as setTeamsPresenceTransport,
 } from './teamsPresence'
 import { probeCapabilities } from './capabilities'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 const TEST_OID = '6555c7ee-7c68-4aa8-9f0c-05164c288c36'
@@ -75,7 +78,7 @@ describe('probeCapabilities', () => {
       'https://graph.microsoft.com/v1.0/me/joinedTeams': () => jsonResponse({ value: [] }),
       [TEAMS_PRESENCE_URL]: () => teamsPresenceOk(),
     })
-    const caps = await probeCapabilities()
+    const caps = await probeCapabilities(testClient())
     expect(caps.me.ok).toBe(true)
     expect(caps.chats.ok).toBe(true)
     expect(caps.joinedTeams.ok).toBe(true)
@@ -94,7 +97,7 @@ describe('probeCapabilities', () => {
       },
       seenUrls,
     )
-    const caps = await probeCapabilities()
+    const caps = await probeCapabilities(testClient())
     // me via token claims, chats/joinedTeams assumed-ok (served by CSA).
     expect(caps.me.ok).toBe(true)
     expect(caps.chats.ok).toBe(true)
@@ -116,7 +119,7 @@ describe('probeCapabilities', () => {
         ),
       [TEAMS_PRESENCE_URL]: () => new Response('Presence not licensed', { status: 403 }),
     })
-    const caps = await probeCapabilities()
+    const caps = await probeCapabilities(testClient())
     expect(caps.me.ok).toBe(true)
     expect(caps.chats.ok).toBe(true)
     expect(caps.joinedTeams.ok).toBe(false)
@@ -141,7 +144,7 @@ describe('probeCapabilities', () => {
       )
     __setTransportForTests(handler)
     setTeamsPresenceTransport(handler)
-    const caps = await probeCapabilities()
+    const caps = await probeCapabilities(testClient())
     // /me 401s under Conditional Access, but getMe falls back to the
     // token's oid/name/upn claims, so the me capability reports ok — this
     // is what keeps bootstrap from fatally aborting a CA-gated session.
@@ -165,7 +168,7 @@ describe('probeCapabilities', () => {
       'https://graph.microsoft.com/v1.0/me/joinedTeams': () => jsonResponse({ value: [] }),
       [TEAMS_PRESENCE_URL]: () => teamsPresenceOk(),
     })
-    const caps = await probeCapabilities()
+    const caps = await probeCapabilities(testClient())
     expect(caps.me.ok).toBe(true)
     expect(caps.chats.ok).toBe(false)
     if (!caps.chats.ok) {
@@ -184,7 +187,7 @@ describe('probeCapabilities', () => {
       'https://graph.microsoft.com/v1.0/me/joinedTeams': () => jsonResponse({ value: [] }),
       [TEAMS_PRESENCE_URL]: () => new Response('Service Unavailable', { status: 503 }),
     })
-    const caps = await probeCapabilities()
+    const caps = await probeCapabilities(testClient())
     if (!caps.presence.ok) {
       expect(caps.presence.reason).toBe('unknown')
       expect(caps.presence.status).toBe(503)
@@ -200,7 +203,7 @@ describe('probeCapabilities', () => {
     }
     __setTransportForTests(handler)
     setTeamsPresenceTransport(handler)
-    const caps = await probeCapabilities()
+    const caps = await probeCapabilities(testClient())
     for (const area of ['me', 'chats', 'joinedTeams', 'presence'] as const) {
       const r = caps[area]
       expect(r.ok).toBe(false)
@@ -232,7 +235,7 @@ describe('probeCapabilities', () => {
     }
     __setTransportForTests(handler)
     setTeamsPresenceTransport(handler)
-    const pending = probeCapabilities()
+    const pending = probeCapabilities(testClient())
     // Yield to let all four probes reach the transport await
     await Bun.sleep(20)
     expect(maxInFlight).toBe(4)
@@ -256,7 +259,7 @@ describe('probeCapabilities', () => {
       },
       seen,
     )
-    await probeCapabilities()
+    await probeCapabilities(testClient())
     const meUrl = seen.find((u) => u.startsWith('https://graph.microsoft.com/v1.0/me?'))
     const chatsUrl = seen.find((u) => u.startsWith('https://graph.microsoft.com/v1.0/chats?'))
     const teamsUrl = seen.find((u) => u === 'https://graph.microsoft.com/v1.0/me/joinedTeams')

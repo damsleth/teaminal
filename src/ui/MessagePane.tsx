@@ -39,6 +39,7 @@ import {
   type MessageRenderRow,
 } from './messageRows'
 import type { Theme } from './theme'
+import { useSessionApi } from './SessionContext'
 import { useAppState, useTheme } from './StoreContext'
 import { TAIL_PANEL_ROWS } from './TailPanels'
 import {
@@ -50,7 +51,6 @@ import {
   fitKittyPlacement,
 } from './kittyGraphics'
 import { ensureImageFetched, getImageData } from '../state/imageCache'
-import { getActiveProfile } from '../graph/client'
 import { messageFocusables } from './messageFocusables'
 import { splitBodyLinkSpans } from './bodySpans'
 import { pickerAnchorCol } from './pickerAnchor'
@@ -124,6 +124,7 @@ export function MessagePane(props: {
   // strong highlight. 0 = the message body itself (no attachment focused).
   const focusedAttachmentIndex = useAppState((s) => s.focusedAttachmentIndex)
   const theme = useTheme()
+  const session = useSessionApi()
 
   const listPaneWidth = props.listPaneWidth ?? LIST_PANE_WIDTH_DEFAULT
   const composerRows = props.composerRows ?? DEFAULT_COMPOSER_ROWS
@@ -278,7 +279,7 @@ export function MessagePane(props: {
   // re-renders once an image transitions loading → ready.
   useEffect(() => {
     if (!kittyEnabled) return
-    const profile = getActiveProfile()
+    const client = session.client()
     for (const row of rows) {
       if (row.kind !== 'message') continue
       for (const ref of extractInlineImages(row.message)) {
@@ -287,7 +288,7 @@ export function MessagePane(props: {
           ref.cacheKey,
           { contentType: ref.contentType, name: ref.name },
           {
-            profile,
+            client,
             isExternal: ref.isExternal,
             ...(ref.objectId ? { objectId: ref.objectId } : {}),
             ...(ref.region ? { region: ref.region } : {}),

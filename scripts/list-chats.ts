@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // Live smoke for src/graph/chats.listChats.
 //
 // Prints the most recent N chats with topic, type, and last-message preview
@@ -7,12 +8,14 @@
 import { setActiveProfile } from '../src/graph/client'
 import { listChats } from '../src/graph/chats'
 
+const testClient = () => createGraphClient(currentAccountContext())
+
 const profile = Bun.argv[2]
 if (profile) setActiveProfile(profile)
 
 const top = 10
 const t0 = performance.now()
-const chats = await listChats({ top })
+const chats = await listChats(testClient(), { top })
 const elapsed = performance.now() - t0
 
 process.stdout.write(`fetched ${chats.length} chats in ${elapsed.toFixed(0)}ms\n\n`)

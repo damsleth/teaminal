@@ -1,3 +1,4 @@
+import { createGraphClient, currentAccountContext } from '../graph/client'
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
@@ -28,6 +29,8 @@ import {
 } from './teamsFederation'
 import { __resetForTests as resetRegion, __setRegionForTests } from './teamsRegion'
 import type { Chat, ChatMessage } from '../types'
+
+const testClient = () => createGraphClient(currentAccountContext())
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -89,7 +92,7 @@ describe('listChats', () => {
       seenUrl = url
       return jsonResponse({ value: [SAMPLE_CHAT] })
     })
-    const chats = await listChats()
+    const chats = await listChats(testClient())
     expect(chats).toHaveLength(1)
     expect(seenUrl).toContain('/v1.0/chats?')
     expect(seenUrl).toContain('%24expand=lastMessagePreview')
@@ -104,7 +107,7 @@ describe('listChats', () => {
       seenUrl = url
       return jsonResponse({ value: [] })
     })
-    await listChats({ top: 10 })
+    await listChats(testClient(), { top: 10 })
     expect(seenUrl).toContain('%24top=10')
   })
 
@@ -116,7 +119,7 @@ describe('listChats', () => {
       return jsonResponse({ value: [] })
     })
     const ctrl = new AbortController()
-    await listChats({ signal: ctrl.signal })
+    await listChats(testClient(), { signal: ctrl.signal })
     expect(seenSignal).toBe(ctrl.signal)
   })
 })
@@ -129,7 +132,7 @@ describe('getChat', () => {
       seenUrl = url
       return jsonResponse(SAMPLE_CHAT)
     })
-    await getChat('19:abc@unq.gbl.spaces')
+    await getChat(testClient(), '19:abc@unq.gbl.spaces')
     // No query string at all
     expect(seenUrl).toBe('https://graph.microsoft.com/v1.0/chats/19%3Aabc%40unq.gbl.spaces')
   })
@@ -141,7 +144,7 @@ describe('getChat', () => {
       seenUrl = url
       return jsonResponse({ ...SAMPLE_CHAT, members: [] })
     })
-    await getChat('19:abc@unq.gbl.spaces', { members: true })
+    await getChat(testClient(), '19:abc@unq.gbl.spaces', { members: true })
     expect(seenUrl).toContain('%24expand=members')
   })
 
@@ -152,7 +155,7 @@ describe('getChat', () => {
       seenUrl = url
       return jsonResponse(SAMPLE_CHAT)
     })
-    await getChat('19:meeting_xxx@thread.v2')
+    await getChat(testClient(), '19:meeting_xxx@thread.v2')
     expect(seenUrl).toContain('19%3Ameeting_xxx%40thread.v2')
   })
 })
@@ -165,7 +168,7 @@ describe('listMessages', () => {
       seenUrl = url
       return jsonResponse({ value: [SAMPLE_MESSAGE] })
     })
-    await listMessages('19:abc@unq.gbl.spaces')
+    await listMessages(testClient(), '19:abc@unq.gbl.spaces')
     expect(seenUrl).toContain('/messages?')
     expect(seenUrl).toContain('%24top=50')
     expect(seenUrl).toContain('%24orderby=createdDateTime+desc')
@@ -179,7 +182,7 @@ describe('listMessages', () => {
       seenUrl = url
       return jsonResponse({ value: [] })
     })
-    await listMessages('19:abc@unq.gbl.spaces', {
+    await listMessages(testClient(), '19:abc@unq.gbl.spaces', {
       beforeCreatedDateTime: '2026-04-29T09:00:00Z',
     })
     expect(seenUrl).toContain('%24filter=createdDateTime+lt+2026-04-29T09%3A00%3A00Z')
@@ -194,7 +197,7 @@ describe('listMessages', () => {
       seenUrl = url
       return jsonResponse({ value: [] })
     })
-    await listMessages('19:abc@unq.gbl.spaces', { top: 10 })
+    await listMessages(testClient(), '19:abc@unq.gbl.spaces', { top: 10 })
     expect(seenUrl).toContain('%24top=10')
   })
 
@@ -214,7 +217,7 @@ describe('listMessages', () => {
         ],
       }),
     )
-    const msgs = await listMessages('19:abc@unq.gbl.spaces')
+    const msgs = await listMessages(testClient(), '19:abc@unq.gbl.spaces')
     expect(msgs.map((x) => x.id)).toEqual(['oldest', 'middle', 'latest'])
   })
 
@@ -233,7 +236,7 @@ describe('listMessages', () => {
       },
     ]
     __setTransportForTests(async () => jsonResponse({ value: original }))
-    await listMessages('19:abc@unq.gbl.spaces')
+    await listMessages(testClient(), '19:abc@unq.gbl.spaces')
     expect(original.map((x) => x.id)).toEqual(['b', 'a'])
   })
 
@@ -250,7 +253,7 @@ describe('listMessages', () => {
         '@odata.nextLink': 'https://graph.microsoft.com/v1.0/chats/c/messages?$skiptoken=abc',
       }),
     )
-    const page = await listMessagesPage('19:abc@unq.gbl.spaces')
+    const page = await listMessagesPage(testClient(), '19:abc@unq.gbl.spaces')
     expect(page.messages.map((x) => x.id)).toEqual(['older', 'newer'])
     expect(page.nextLink).toBe('https://graph.microsoft.com/v1.0/chats/c/messages?$skiptoken=abc')
   })
@@ -276,7 +279,7 @@ describe('listMessages', () => {
       })
     })
     const nextLink = 'https://graph.microsoft.com/v1.0/chats/c/messages?$skiptoken=abc'
-    const page = await listMessagesNextPage(nextLink)
+    const page = await listMessagesNextPage(testClient(), nextLink)
     expect(seenUrl).toBe(nextLink)
     expect(page.messages.map((x) => x.id)).toEqual(['a', 'b'])
   })
@@ -316,14 +319,14 @@ describe('listMessages', () => {
       })
     })
 
-    const page = await listMessagesPage('19:aaaa_bbbb@unq.gbl.spaces')
+    const page = await listMessagesPage(testClient(), '19:aaaa_bbbb@unq.gbl.spaces')
     // chronological (oldest first), all messages kept.
     expect(page.messages.map((m) => m.id)).toEqual(['1', '2'])
     expect(chatsvcUrl).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
 
     // Latched: a second call goes straight to chatsvc (graph transport
     // would still 401, but we never hit it).
-    const page2 = await listMessagesPage('19:aaaa_bbbb@unq.gbl.spaces')
+    const page2 = await listMessagesPage(testClient(), '19:aaaa_bbbb@unq.gbl.spaces')
     expect(page2.messages.map((m) => m.id)).toEqual(['1', '2'])
   })
 })
@@ -338,7 +341,7 @@ describe('search helpers', () => {
         value: [{ id: 'p1', displayName: 'Nina', userPrincipalName: 'nina@example.com' }],
       })
     })
-    const people = await searchPeople('  Nina   Example  ', { top: 5 })
+    const people = await searchPeople(testClient(), '  Nina   Example  ', { top: 5 })
     expect(people).toHaveLength(1)
     expect(seenUrl).toContain('/v1.0/me/people?')
     expect(seenUrl).toContain('%24search=%22Nina+Example%22')
@@ -358,7 +361,7 @@ describe('search helpers', () => {
       seenAuth = headers.get('authorization') ?? ''
       return jsonResponse({ value: [{ id: 'u1', displayName: 'Nina' }] })
     })
-    const users = await searchUsers('nina@example.com')
+    const users = await searchUsers(testClient(), 'nina@example.com')
     expect(users.map((x) => x.id)).toEqual(['u1'])
     expect(seenUrl).toContain('/v1.0/users?')
     expect(seenUrl).toContain('%24count=true')
@@ -388,7 +391,7 @@ describe('search helpers', () => {
         ],
       })
     })
-    const users = await searchChatUsers('pref')
+    const users = await searchChatUsers(testClient(), 'pref')
     expect(users.map((x) => x.id)).toEqual(['u-preferred', 'u-late'])
   })
 
@@ -399,9 +402,9 @@ describe('search helpers', () => {
       calls++
       return jsonResponse({ value: [] })
     })
-    expect(await searchPeople('   ')).toEqual([])
-    expect(await searchUsers('   ')).toEqual([])
-    expect(await searchChatUsers('   ')).toEqual([])
+    expect(await searchPeople(testClient(), '   ')).toEqual([])
+    expect(await searchUsers(testClient(), '   ')).toEqual([])
+    expect(await searchChatUsers(testClient(), '   ')).toEqual([])
     expect(calls).toBe(0)
   })
 })
@@ -418,7 +421,7 @@ describe('create chat helpers', () => {
       seenBody = typeof init.body === 'string' ? init.body : ''
       return jsonResponse({ ...SAMPLE_CHAT, id: 'existing', chatType: 'oneOnOne' })
     })
-    const chat = await createOneOnOneChat('self-id', 'other-id')
+    const chat = await createOneOnOneChat(testClient(), 'self-id', 'other-id')
     const body = JSON.parse(seenBody)
     expect(chat.id).toBe('existing')
     expect(seenMethod).toBe('POST')
@@ -438,7 +441,7 @@ describe('create chat helpers', () => {
       seenBody = typeof init.body === 'string' ? init.body : ''
       return jsonResponse({ ...SAMPLE_CHAT, id: 'group', chatType: 'group' })
     })
-    await createGroupChat(['self-id', 'a-id', 'a-id', "b'id"], { topic: 'Project' })
+    await createGroupChat(testClient(), ['self-id', 'a-id', 'a-id', "b'id"], { topic: 'Project' })
     const body = JSON.parse(seenBody)
     expect(body).toMatchObject({ chatType: 'group', topic: 'Project' })
     expect(body.members).toHaveLength(3)
@@ -454,8 +457,12 @@ describe('create chat helpers', () => {
       calls++
       return jsonResponse(SAMPLE_CHAT)
     })
-    await expect(createOneOnOneChat('self-id', 'self-id')).rejects.toThrow(/exactly two/)
-    await expect(createGroupChat(['self-id', 'other-id'])).rejects.toThrow(/at least three/)
+    await expect(createOneOnOneChat(testClient(), 'self-id', 'self-id')).rejects.toThrow(
+      /exactly two/,
+    )
+    await expect(createGroupChat(testClient(), ['self-id', 'other-id'])).rejects.toThrow(
+      /at least three/,
+    )
     expect(calls).toBe(0)
   })
 })
@@ -476,7 +483,7 @@ describe('sendMessage', () => {
         body: { contentType: 'text', content: 'hello' },
       })
     })
-    const created = await sendMessage('19:abc@unq.gbl.spaces', 'hello')
+    const created = await sendMessage(testClient(), '19:abc@unq.gbl.spaces', 'hello')
     expect(seenMethod).toBe('POST')
     expect(seenUrl).toBe(
       'https://graph.microsoft.com/v1.0/chats/19%3Aabc%40unq.gbl.spaces/messages',
@@ -496,7 +503,7 @@ describe('sendMessage', () => {
     })
     const content =
       'first line\nsecond line\nNo - emdash 🙃 — wait, that one is allowed in user content'
-    await sendMessage('19:abc@unq.gbl.spaces', content)
+    await sendMessage(testClient(), '19:abc@unq.gbl.spaces', content)
     expect(JSON.parse(seenBody).body.content).toBe(content)
   })
 
@@ -508,7 +515,7 @@ describe('sendMessage', () => {
       return jsonResponse(SAMPLE_MESSAGE)
     })
     const ctrl = new AbortController()
-    await sendMessage('19:abc@unq.gbl.spaces', 'hi', { signal: ctrl.signal })
+    await sendMessage(testClient(), '19:abc@unq.gbl.spaces', 'hi', { signal: ctrl.signal })
     expect(seenSignal).toBe(ctrl.signal)
   })
 
@@ -533,7 +540,7 @@ describe('sendMessage', () => {
         },
       )
     })
-    const created = await sendMessage('19:aaaa_bbbb@unq.gbl.spaces', 'hello')
+    const created = await sendMessage(testClient(), '19:aaaa_bbbb@unq.gbl.spaces', 'hello')
     expect(chatsvcPost).toContain('POST')
     expect(chatsvcPost).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
     expect(created.body.content).toBe('hello')
@@ -568,7 +575,7 @@ describe('chat routing modes', () => {
       })
     })
 
-    const page = await listMessagesPage('19:aaaa_bbbb@unq.gbl.spaces')
+    const page = await listMessagesPage(testClient(), '19:aaaa_bbbb@unq.gbl.spaces')
     expect(page.messages.map((m) => m.id)).toEqual(['1'])
     expect(chatsvcUrl).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
     expect(graphCalled).toBe(false)
@@ -587,7 +594,7 @@ describe('chat routing modes', () => {
       return jsonResponse({ messages: [] })
     })
 
-    await expect(listMessagesPage('19:aaaa_bbbb@unq.gbl.spaces')).rejects.toThrow()
+    await expect(listMessagesPage(testClient(), '19:aaaa_bbbb@unq.gbl.spaces')).rejects.toThrow()
     expect(chatsvcCalled).toBe(false)
   })
 })

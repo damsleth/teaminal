@@ -6,10 +6,12 @@ import { Box, Text, useApp } from 'ink'
 import { useInput } from './useInput'
 import { deleteChatById, deleteChatMessageById } from '../state/chatActions'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
+import { useSessionApi } from './SessionContext'
 
 export function ConfirmDeleteModal() {
   const { exit } = useApp()
   const store = useAppStore()
+  const session = useSessionApi()
   const modal = useAppState((s) => s.modal)
   const theme = useTheme()
   const isOpen = modal?.kind === 'confirm-delete' || modal?.kind === 'confirm-delete-chat'
@@ -32,9 +34,11 @@ export function ConfirmDeleteModal() {
         // Graph error never escapes as an unhandled rejection and tears down
         // the TUI.
         if (modal.kind === 'confirm-delete-chat') {
-          void deleteChatById(store, modal.chatId).catch(() => {})
+          void deleteChatById(session.client(), store, modal.chatId).catch(() => {})
         } else if (modal.kind === 'confirm-delete') {
-          void deleteChatMessageById(store, modal.chatId, modal.messageId).catch(() => {})
+          void deleteChatMessageById(session.client(), store, modal.chatId, modal.messageId).catch(
+            () => {},
+          )
         }
       }
     },

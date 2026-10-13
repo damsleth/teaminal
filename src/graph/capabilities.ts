@@ -9,7 +9,8 @@
 // All probes are non-mutating GETs - we never POST a test message to
 // verify send permissions.
 
-import { getActiveProfile, getAudiencePreference, graph, GraphError } from './client'
+import { owaProfile } from '../account'
+import { GraphError, type GraphClient } from './client'
 import { getMe } from './me'
 import { getMyTeamsPresence, TeamsPresenceError } from './teamsPresence'
 
@@ -68,23 +69,26 @@ async function runProbe(fn: () => Promise<unknown>): Promise<CapabilityResult> {
   }
 }
 
-export async function probeCapabilities(opts?: ProbeOpts): Promise<Capabilities> {
+export async function probeCapabilities(
+  client: GraphClient,
+  opts?: ProbeOpts,
+): Promise<Capabilities> {
   const signal = opts?.signal
   // ic3-primary accounts are Conditional-Access gated on graph.microsoft.com;
   // the chat list and teams come from the Teams CSA endpoints instead, so
   // probing graph /chats and /me/joinedTeams would just 401 noisily. Treat
   // them as available (the list loop serves them via CSA).
-  const ic3 = getAudiencePreference().audience === 'ic3'
+  const ic3 = client.ctx.audience === 'ic3'
   const [me, chats, joinedTeams, presence] = await Promise.all([
     // Use getMe (not a raw graph /me) so the token-claims fallback under a
     // Conditional Access gate counts as 'ok' — otherwise bootstrap's
     // me-unauthorized check would fatally abort a session that the CSA
     // migration can actually run.
-    runProbe(() => getMe(signal)),
+    runProbe(() => getMe(client, signal)),
     ic3
       ? Promise.resolve<CapabilityResult>({ ok: true })
       : runProbe(() =>
-          graph({
+          client.graph({
             method: 'GET',
             path: '/chats',
             query: { $top: 1, $expand: 'lastMessagePreview' },
@@ -97,7 +101,7 @@ export async function probeCapabilities(opts?: ProbeOpts): Promise<Capabilities>
           // /me/joinedTeams does not accept $top or $select under delegated auth -
           // any unsupported query parameter returns 400 ("Query option ... is not
           // allowed"). The probe pays the small cost of fetching the full list.
-          graph({
+          client.graph({
             method: 'GET',
             path: '/me/joinedTeams',
             signal,
@@ -111,7 +115,7 @@ export async function probeCapabilities(opts?: ProbeOpts): Promise<Capabilities>
     // path works fine. The runtime poller already uses the Teams
     // transport; the probe matches it so Diagnostics reflects reality.
     runProbe(async () => {
-      const result = await getMyTeamsPresence({ profile: getActiveProfile(), signal })
+      const result = await getMyTeamsPresence({ profile: owaProfile(client.ctx.account), signal })
       if (!result) {
         throw new TeamsPresenceError(0, 'presence.teams.microsoft.com: token had no oid claim')
       }

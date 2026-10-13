@@ -13,6 +13,7 @@
 // throttles when many chats change between polls.
 
 import { listMessages } from '../../graph/chats'
+import type { GraphClient } from '../../graph/client'
 import type { Chat } from '../../types'
 import {
   bumpChatMention,
@@ -32,6 +33,8 @@ const CONCURRENCY = 5
 
 export type CrossChatMentionDeps = {
   store: Store<AppState>
+  // Bound Graph client for this session's account.
+  getClient: () => GraphClient
   // Seen-message-ID set keyed by ConvKey, shared with the active loop.
   // Mutated to add IDs we just fetched as a side effect.
   seen: Map<ConvKey, Set<string>>
@@ -95,7 +98,7 @@ async function probeChatForMention(
   const conv: ConvKey = `chat:${chat.id}`
   const targetId = chat.lastMessagePreview?.id
   if (!targetId) return
-  const messages = await listMessages(chat.id, { top: PROBE_TOP, signal })
+  const messages = await listMessages(deps.getClient(), chat.id, { top: PROBE_TOP, signal })
   const seenSet = seen.get(conv) ?? new Set<string>()
   const target = messages.find((m) => m.id === targetId)
   const wasUnseen = target && !seenSet.has(target.id)

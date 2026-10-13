@@ -11,10 +11,16 @@
 // runSession once at startup; the AccountsModal calls it again on
 // switch via the SessionContext.
 
-import { accountRef } from '../account'
+import { accountRef, type AccountRef } from '../account'
 import { getToken } from '../auth/owaPiggy'
 import { probeCapabilities } from '../graph/capabilities'
-import { setActiveProfile, setAudiencePreference } from '../graph/client'
+import {
+  createGraphClient,
+  getAudiencePreference,
+  setActiveProfile,
+  setAudiencePreference,
+  type GraphClient,
+} from '../graph/client'
 import { resetChatMessageTransport } from '../graph/chats'
 import { getMe } from '../graph/me'
 import { listActivityFeed } from '../graph/teamsActivity'
@@ -37,18 +43,21 @@ import {
   type Store,
 } from './store'
 
-// Apply a chat routing mode to the graph client and clear the chatsvc
-// message latch, so a graph-401 fallback taken under the old mode (or the old
-// account) doesn't outlive the change.
-export function applyChatRouting(mode: ChatRoutingMode): void {
+// Apply an account's chat routing mode and clear its chatsvc message latch,
+// so a graph-401 fallback taken under the old mode doesn't outlive the change.
+// ponytail: M1 keeps the audience in one process-wide preference that every
+// session client reads; per-account routing state arrives with the store split.
+export function applyChatRouting(account: AccountRef, mode: ChatRoutingMode): void {
   const { audience, fallback } = audienceFromRouting(mode)
   setAudiencePreference(audience, { fallback })
-  resetChatMessageTransport()
+  resetChatMessageTransport(account)
 }
 
 export type SessionHandle = {
   /** Profile passed to runSession; useful for logging / debugging. */
   profile: string | null
+  /** Graph client bound to this session's account. */
+  client: () => GraphClient
   stop: () => Promise<void>
 }
 
@@ -66,11 +75,11 @@ export type RunSessionOpts = {
 
 async function hydrateActivityFeed(
   store: Store<AppState>,
-  profile: string | undefined,
+  account: AccountRef,
   isStale: () => boolean,
 ): Promise<void> {
   try {
-    const page = await listActivityFeed({ account: accountRef(profile), isPrefetch: true })
+    const page = await listActivityFeed({ account, isPrefetch: true })
     // Drop the result if the session was torn down (profile switch)
     // while this detached fetch was in flight — otherwise we'd
     // repopulate the next account's wiped feed with this account's items.
@@ -95,6 +104,12 @@ async function hydrateActivityFeed(
 
 export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
   const { store, profile, pollerHandleRef, onFatal } = opts
+  const sessionAccount = accountRef(profile)
+  // Every Graph call this session makes runs as sessionAccount. The audience
+  // comes from the account's routing (applied below) and is read per call so
+  // a routing change in the Accounts modal applies to the next request.
+  const client = (): GraphClient =>
+    createGraphClient({ account: sessionAccount, ...getAudiencePreference() })
 
   setActiveProfile(profile ?? undefined)
   // Apply this account's chat routing mode. The mode resolves to the token
@@ -105,8 +120,8 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
   // Access fallback doesn't leak across a profile switch.
   {
     const settings = store.get().settings
-    const account = profile ?? settings.activeAccount ?? null
-    applyChatRouting(routingForAccount(settings, account))
+    const routingKey = profile ?? settings.activeAccount ?? null
+    applyChatRouting(sessionAccount, routingForAccount(settings, routingKey))
   }
 
   let pollerHandle: Awaited<ReturnType<typeof startPoller>> | null = null
@@ -123,11 +138,11 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
 
   try {
     recordEvent('app', 'info', `session starting profile=${profile ?? '(default)'}`)
-    const me = await getMe()
+    const me = await getMe(client())
     store.set({ me })
     recordEvent('app', 'info', 'bootstrap /me loaded')
 
-    const capabilities = await probeCapabilities()
+    const capabilities = await probeCapabilities(client())
     store.set({ capabilities })
     recordEvent('app', 'info', 'bootstrap capability probe complete')
 
@@ -137,6 +152,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
       // want a quiet teardown rather than continuing to spin up.
       return {
         profile,
+        client,
         async stop() {
           /* nothing started yet */
         },
@@ -145,6 +161,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
 
     pollerHandle = startPoller({
       store,
+      getClient: client,
       onError: (loop, err) => warn(`poller[${loop}]:`, err.message),
       onMention: (event) => {
         const sender = event.message.from?.user?.displayName ?? 'someone'
@@ -249,7 +266,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
     // Initial CSA activity feed hydrate. Best-effort: if the endpoint
     // 404s on a tenant or auth shape we haven't seen, log and continue —
     // the rest of the app doesn't depend on it.
-    void hydrateActivityFeed(store, profile ?? undefined, isStale)
+    void hydrateActivityFeed(store, sessionAccount, isStale)
   } catch (err) {
     // Roll back partial bootstrap so the caller can retry / switch.
     try {
@@ -269,6 +286,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
 
   return {
     profile,
+    client,
     async stop() {
       recordEvent('app', 'info', `session stopping profile=${profile ?? '(default)'}`)
       // Signal detached async work (activity hydrate / bridge refresh) to
