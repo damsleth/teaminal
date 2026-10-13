@@ -6,8 +6,10 @@
 // tears them all down in reverse order so the next session can start
 // cleanly.
 //
-// Account switching wires this together with resetAccountScopedState
-// and setActiveProfile from src/graph/client. The CLI bootstrap calls
+// Account switching wires this together with resetAccountScopedState.
+// Every Graph call the session makes runs on its own bound client
+// (SessionHandle.client); there is no process-wide active profile. The CLI
+// bootstrap calls
 // runSession once at startup; the AccountsModal calls it again on
 // switch via the SessionContext.
 
@@ -17,7 +19,6 @@ import { probeCapabilities } from '../graph/capabilities'
 import {
   createGraphClient,
   getAudiencePreference,
-  setActiveProfile,
   setAudiencePreference,
   type GraphClient,
 } from '../graph/client'
@@ -111,7 +112,6 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
   const client = (): GraphClient =>
     createGraphClient({ account: sessionAccount, ...getAudiencePreference() })
 
-  setActiveProfile(profile ?? undefined)
   // Apply this account's chat routing mode. The mode resolves to the token
   // audience the graph client mints for default calls plus whether it may
   // fall back to the other transport. A plain install (no per-account

@@ -60,6 +60,8 @@ export class RateLimitError extends GraphError {
   }
 }
 
+// ponytail: scripts / e2e / tests only (with currentAccountContext). The app
+// never sets an ambient profile; every session binds its own client.
 let activeProfile: string | undefined = undefined
 
 export function setActiveProfile(profile: string | undefined): void {
@@ -107,7 +109,8 @@ export type AccountContext = Readonly<{
   fallback: boolean
 }>
 
-// M1 shim: the context the ambient globals describe right now.
+// The context the ambient globals describe right now. Scripts, e2e and tests
+// use it; app code gets its client from the session.
 export function currentAccountContext(): AccountContext {
   return {
     account: accountRef(activeProfile),
