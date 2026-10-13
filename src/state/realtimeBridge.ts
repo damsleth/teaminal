@@ -164,8 +164,7 @@ export function startRealtimeBridge(opts: RealtimeBridgeOpts): RealtimeBridgeHan
           myPresence: {
             id: event.userId,
             availability: event.availability as AppState['myPresence'] extends
-              | { availability: infer A }
-              | undefined
+              { availability: infer A } | undefined
               ? A
               : string,
             activity: event.availability as string & {},
