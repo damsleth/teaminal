@@ -77,6 +77,18 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,3": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,3": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "0,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,4": {
     "fgColorMode": 0,
     "fgColor": -1,
@@ -86,6 +98,10 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "bold": 0
   },
   "27,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,4": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -97,9 +113,15 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,5": {
     "bgColorMode": 33554432,
-    "bgColor": 235
+    "bgColor": 235,
+    "fgColorMode": 16777216,
+    "fgColor": 8
   },
   "4,5": {
     "fgColorMode": 16777216,
@@ -117,6 +139,10 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
   },
   "27,5": {
     "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,5": {
+    "fgColorMode": 16777216,
     "fgColor": 8
   },
   "29,5": {
@@ -127,11 +153,23 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "26,6": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,6": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -143,11 +181,23 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "19,7": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,7": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -159,11 +209,23 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "3,8": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,8": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -175,11 +237,23 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "23,9": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,9": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -191,11 +265,23 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "24,10": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,10": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -207,11 +293,23 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "3,11": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,11": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -223,11 +321,23 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "26,12": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,12": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -239,11 +349,23 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "15,13": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,13": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -255,11 +377,19 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,14": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,14": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -271,11 +401,19 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,15": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,15": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -287,11 +425,19 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,16": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,16": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -303,11 +449,19 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,17": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,17": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -319,11 +473,19 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,18": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,18": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,18": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,18": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -335,11 +497,19 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,19": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,19": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -351,11 +521,19 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,20": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,20": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -367,11 +545,19 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,21": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,21": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -383,11 +569,19 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,22": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,22": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -399,11 +593,19 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,23": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,23": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -415,11 +617,19 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,24": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,24": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -428,6 +638,14 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColor": -1
   },
   "99,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "0,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,25": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -539,6 +757,18 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,3": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,3": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "0,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,4": {
     "fgColorMode": 0,
     "fgColor": -1,
@@ -548,6 +778,10 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "bold": 0
   },
   "27,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,4": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -559,9 +793,15 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,5": {
     "bgColorMode": 33554432,
-    "bgColor": 235
+    "bgColor": 235,
+    "fgColorMode": 16777216,
+    "fgColor": 8
   },
   "4,5": {
     "fgColorMode": 16777216,
@@ -579,6 +819,10 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
   },
   "27,5": {
     "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,5": {
+    "fgColorMode": 16777216,
     "fgColor": 8
   },
   "29,5": {
@@ -589,11 +833,23 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "26,6": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,6": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -605,11 +861,23 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "19,7": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,7": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -621,11 +889,23 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "3,8": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,8": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -637,11 +917,23 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "23,9": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,9": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -653,11 +945,23 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "24,10": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,10": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -669,11 +973,23 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "3,11": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,11": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -685,11 +1001,23 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "26,12": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,12": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -701,11 +1029,23 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "15,13": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,13": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -717,11 +1057,19 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,14": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,14": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -733,11 +1081,19 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,15": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,15": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -749,11 +1105,19 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,16": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,16": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -765,11 +1129,19 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,17": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,17": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -781,11 +1153,19 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,18": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,18": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,18": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,18": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -797,11 +1177,19 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,19": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,19": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -813,11 +1201,19 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,20": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,20": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -829,11 +1225,19 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,21": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,21": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -845,11 +1249,19 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,22": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,22": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -861,11 +1273,19 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,23": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,23": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -877,11 +1297,19 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,24": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,24": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -890,6 +1318,14 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColor": -1
   },
   "99,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "0,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,25": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },

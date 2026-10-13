@@ -13,9 +13,16 @@ adheres to [Semantic Versioning](https://semver.org/).
   same way Direct, Groups and Meetings do: `h` on a collapsed team (or twice
   from a channel) folds every team into `▸ Teams (N)`, and `l`/Enter opens it
   again. The state persists in `chatListCollapsedSections` as `teams`.
+- **The pane you're in is outlined.** The chat list, conversation or composer
+  that takes your keys now gets the active border, like modals already did.
+  Set its color (`Active border`) and style (`Active pane border`) in the theme
+  editor, or with `borderActive` and `themeOverrides.borders.active`.
+- **Space works like Enter in the menu**, including every submenu.
 
 ### Fixed
 
+- **The focus background colors the focused message, not the focus marker.**
+  The marker keeps its own color on the plain background.
 - **Switching Theme between dark, light and auto works again.** Colors tuned
   in the theme editor were saved as global overrides, so they covered every
   base theme and the switch did nothing. The editor now saves colors under

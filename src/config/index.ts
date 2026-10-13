@@ -88,7 +88,11 @@ const LAYOUT_KEYS = new Set<keyof NonNullable<ThemeOverrides['layout']>>([
   'chatListPaddingRight',
 ])
 
-const BORDERS_KEYS = new Set<keyof NonNullable<ThemeOverrides['borders']>>(['panel', 'modal'])
+const BORDERS_KEYS = new Set<keyof NonNullable<ThemeOverrides['borders']>>([
+  'panel',
+  'modal',
+  'active',
+])
 
 const EMPHASIS_KEYS = new Set<keyof NonNullable<ThemeOverrides['emphasis']>>([
   'modalTitleBold',

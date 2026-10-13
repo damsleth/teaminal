@@ -81,6 +81,18 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "0,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,5": {
     "fgColorMode": 0,
     "fgColor": -1,
@@ -91,11 +103,21 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
   },
   "11,5": {
     "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,5": {
+    "fgColorMode": 16777216,
     "fgColor": 8
+  },
+  "0,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
   },
   "1,6": {
     "bgColorMode": 33554432,
-    "bgColor": 235
+    "bgColor": 235,
+    "fgColorMode": 16777216,
+    "fgColor": 8
   },
   "4,6": {
     "fgColorMode": 16777216,
@@ -113,6 +135,10 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
   },
   "11,6": {
     "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,6": {
+    "fgColorMode": 16777216,
     "fgColor": 8
   },
   "29,6": {
@@ -122,6 +148,10 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
   "49,6": {
     "fgColorMode": 16777216,
     "fgColor": 8
+  },
+  "0,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
   },
   "1,7": {
     "bgColorMode": 33554432,
@@ -143,6 +173,10 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
   },
   "11,7": {
     "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,7": {
+    "fgColorMode": 16777216,
     "fgColor": 8
   },
   "13,7": {
@@ -152,6 +186,10 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
   "49,7": {
     "fgColorMode": 16777216,
     "fgColor": 8
+  },
+  "0,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
   },
   "1,8": {
     "bgColorMode": 33554432,
@@ -175,6 +213,10 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
   },
   "11,8": {
     "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,8": {
+    "fgColorMode": 16777216,
     "fgColor": 8
   },
   "13,8": {
@@ -185,11 +227,23 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "10,9": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,9": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -201,11 +255,23 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "10,10": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,10": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -217,11 +283,23 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "3,11": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,11": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -233,11 +311,19 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,12": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,12": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -249,11 +335,19 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,13": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,13": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -265,11 +359,23 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "7,14": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,14": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -281,11 +387,23 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "6,15": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,15": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -297,11 +415,23 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "8,16": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,16": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -313,11 +443,23 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "3,17": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,17": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -329,11 +471,19 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,18": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,18": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,18": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,18": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -345,11 +495,19 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,19": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,19": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -361,11 +519,23 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "7,20": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,20": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -377,11 +547,23 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "10,21": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,21": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -393,11 +575,23 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "4,22": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,22": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -409,11 +603,19 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,23": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,23": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -425,11 +627,19 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,24": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,24": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -441,11 +651,19 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,25": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "11,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,25": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -454,6 +672,14 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": -1
   },
   "49,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "0,26": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "12,26": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -565,6 +791,18 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "0,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,5": {
     "fgColorMode": 0,
     "fgColor": -1,
@@ -574,6 +812,10 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "bold": 0
   },
   "27,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,5": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -585,9 +827,15 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,6": {
     "bgColorMode": 33554432,
-    "bgColor": 235
+    "bgColor": 235,
+    "fgColorMode": 16777216,
+    "fgColor": 8
   },
   "4,6": {
     "fgColorMode": 16777216,
@@ -605,6 +853,10 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
   },
   "27,6": {
     "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,6": {
+    "fgColorMode": 16777216,
     "fgColor": 8
   },
   "29,6": {
@@ -615,11 +867,23 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "26,7": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,7": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -631,11 +895,23 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "19,8": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,8": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -647,11 +923,23 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "3,9": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,9": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -663,11 +951,23 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "23,10": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,10": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -679,11 +979,23 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "24,11": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,11": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -695,11 +1007,23 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "3,12": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,12": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -711,11 +1035,23 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "26,13": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,13": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -727,11 +1063,23 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "1,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
   "15,14": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,14": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -743,11 +1091,19 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,15": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,15": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -759,11 +1115,19 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,16": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,16": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -775,11 +1139,19 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,17": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,17": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -791,11 +1163,19 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,18": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,18": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,18": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,18": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -807,11 +1187,19 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,19": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,19": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -823,11 +1211,19 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,20": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,20": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,20": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -839,11 +1235,19 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,21": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,21": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -855,11 +1259,19 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,22": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,22": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -871,11 +1283,19 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,23": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,23": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -887,11 +1307,19 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,24": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,24": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,24": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -903,11 +1331,19 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
+  "0,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
   "1,25": {
     "fgColorMode": 0,
     "fgColor": -1
   },
   "27,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,25": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -916,6 +1352,14 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": -1
   },
   "99,25": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "0,26": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "28,26": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },

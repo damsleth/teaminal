@@ -127,7 +127,8 @@ export function MenuModal() {
         store.set({ modal: { ...m, cursor: next } })
         return
       }
-      if (key.return) {
+      // Space activates like Enter, in the root menu and every submenu.
+      if (key.return || input === ' ') {
         const item = items[m.cursor]
         if (!item || item.disabled) return
         activate(item, m.path)

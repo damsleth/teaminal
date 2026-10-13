@@ -57,6 +57,9 @@ export type ThemeBorders = {
   panel: BorderStyle
   // Modal frames + new-chat prompt (paired with theme.borderActive).
   modal: BorderStyle
+  // The pane that has input (chat list, conversation, composer), paired with
+  // theme.borderActive. Inactive panes keep `panel` + theme.border.
+  active: BorderStyle
 }
 
 export type ThemeEmphasis = {
@@ -126,7 +129,7 @@ const LAYOUT_DEFAULT: ThemeLayout = {
   chatListPaddingRight: 1,
 }
 
-const BORDERS_DEFAULT: ThemeBorders = { panel: 'round', modal: 'round' }
+const BORDERS_DEFAULT: ThemeBorders = { panel: 'round', modal: 'round', active: 'round' }
 
 const EMPHASIS_DEFAULT: ThemeEmphasis = {
   modalTitleBold: true,
