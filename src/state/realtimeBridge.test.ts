@@ -1,3 +1,4 @@
+import { accountRef } from '../account'
 import { describe, expect, test } from 'bun:test'
 import { RealtimeEventBus } from '../realtime/events'
 import { createAppStore } from './store'
@@ -20,6 +21,7 @@ function setup() {
     }),
   }
   const bridge = startRealtimeBridge({
+    account: accountRef(null),
     bus,
     store,
     getPoller: () => fakePoller,
@@ -160,6 +162,7 @@ describe('realtimeBridge', () => {
     const bus = new RealtimeEventBus()
     const store = createAppStore()
     const bridge = startRealtimeBridge({
+      account: accountRef(null),
       bus,
       store,
       getPoller: () => null,

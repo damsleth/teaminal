@@ -6,8 +6,7 @@
 // the merged list rather than tracked separately, so a stale count can't
 // drift from the visible list.
 
-import { accountRef } from '../account'
-import { getActiveProfile } from '../graph/client'
+import type { AccountRef } from '../account'
 import { listActivityFeed, type ActivityItem } from '../graph/teamsActivity'
 import { recordEvent } from '../log'
 import type { AppState, Store } from './store'
@@ -66,22 +65,21 @@ export function countUnreadMentions(items: ActivityItem[]): number {
 // opens) without violating the ui → graph layering rule. Always
 // best-effort: a failure is logged and the cached feed remains.
 //
-// `isStale` lets callers cancel the store write if the session was torn
-// down (profile switch) while the fetch was in flight — otherwise the
-// resolved page would repopulate the new account's wiped feed with the
-// old account's items.
+// `isStale` must report whether the session that asked was torn down
+// (account switch) while the fetch was in flight — otherwise the resolved
+// page would repopulate the new account's wiped feed with the old
+// account's items.
 export async function refreshActivityFeed(
   store: Store<AppState>,
-  isStale?: () => boolean,
+  account: AccountRef,
+  isStale: () => boolean,
 ): Promise<void> {
-  const requestProfile = getActiveProfile()
   try {
     const page = await listActivityFeed({
-      account: accountRef(requestProfile),
+      account,
       syncState: store.get().activitySyncState,
     })
-    // Drop the result if the session/profile changed under us.
-    if (isStale?.() || getActiveProfile() !== requestProfile) return
+    if (isStale()) return
     if (page.items.length === 0 && !page.syncState) return
     store.set((s) => {
       const merged = mergeActivityItems(s.activityFeed, page.items)

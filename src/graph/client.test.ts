@@ -8,16 +8,23 @@ import {
   __resetForTests,
   __setSleepForTests,
   createGraphClient,
+  currentAccountContext,
   __setTransportForTests,
-  graph,
   GraphError,
-  paginate,
-  paginateAll,
   parseRetryAfter,
+  type GraphOpts,
   RateLimitError,
   setActiveProfile,
   setAudiencePreference,
 } from './client'
+
+// These tests drive the retry/pagination core through a client bound to the
+// ambient (M1 shim) context, so setActiveProfile / setAudiencePreference in a
+// test apply to the next call.
+const ambient = () => createGraphClient(currentAccountContext())
+const graph = <T>(opts: GraphOpts) => ambient().graph<T>(opts)
+const paginate = <T>(opts: GraphOpts) => ambient().paginate<T>(opts)
+const paginateAll = <T>(opts: GraphOpts) => ambient().paginateAll<T>(opts)
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -654,22 +661,5 @@ describe('bound clients', () => {
     const a = createGraphClient({ account: accountRef('a'), audience: 'graph', fallback: false })
     expect(await a.paginateAll<number>({ method: 'GET', path: '/items' })).toEqual([1, 2])
     expect(seen.map((c) => c.p)).toEqual(['a', 'a'])
-  })
-
-  test('the ambient wrappers pin the account for the whole call', async () => {
-    primeTokensPerAccount()
-    setActiveProfile('a')
-    const seen: string[] = []
-    __setTransportForTests(async (url, init) => {
-      seen.push(tokenClaims(init).p)
-      if (url.includes('page2')) return jsonResponse({ value: [] })
-      setActiveProfile('z')
-      return jsonResponse({
-        value: [],
-        '@odata.nextLink': 'https://graph.microsoft.com/v1.0/items?page2=1',
-      })
-    })
-    await paginateAll({ method: 'GET', path: '/items' })
-    expect(seen).toEqual(['a', 'a'])
   })
 })

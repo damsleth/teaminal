@@ -54,6 +54,12 @@ adheres to [Semantic Versioning](https://semver.org/).
   - The custom theme was dropped on switch.
   - Changing an account's chat routing now also clears the Conditional Access
     fallback taken under the old routing.
+  - A message sent just before a switch could land in the new account's chat,
+    and its text could reappear in the new account's composer if it failed.
+  - Activity items fetched during a switch could merge into the new account's
+    Notifications view.
+  - Images served through Teams' object store reused a session minted for a
+    different region.
 - **"Empty the cache" also removes the cached display names**, and a pending
   save can no longer recreate the files right after they are deleted.
 - **Test and demo runs (`TEAMINAL_SEED`) no longer touch your real caches.**

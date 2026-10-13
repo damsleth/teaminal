@@ -12,6 +12,7 @@
 // uses them as "something changed" signals that trigger authoritative
 // Graph fetches through the existing poller.
 
+import type { AccountRef } from '../account'
 import type { RealtimeEventBus } from '../realtime/events'
 import { refreshActivityFeed } from './activityFeed'
 import type { AppState, ConvKey, Store, TypingIndicator } from './store'
@@ -23,6 +24,8 @@ const TYPING_CLEANUP_INTERVAL_MS = 2_000
 export type RealtimeBridgeOpts = {
   bus: RealtimeEventBus
   store: Store<AppState>
+  /** The session's account; activity refreshes run as it. */
+  account: AccountRef
   /** Set once the poller is started; the bridge tolerates null during bootstrap. */
   getPoller: () => PollerHandle | null
   /**
@@ -39,7 +42,7 @@ export type RealtimeBridgeHandle = {
 }
 
 export function startRealtimeBridge(opts: RealtimeBridgeOpts): RealtimeBridgeHandle {
-  const { bus, store, getPoller, isStale } = opts
+  const { bus, store, account, getPoller, isStale = () => false } = opts
   const unsubs: (() => void)[] = []
 
   // --- New-message acceleration ---
@@ -84,7 +87,7 @@ export function startRealtimeBridge(opts: RealtimeBridgeOpts): RealtimeBridgeHan
     pendingActivityTimer = setTimeout(() => {
       pendingActivityTimer = null
       lastActivityRefreshAt = Date.now()
-      void refreshActivityFeed(store, isStale)
+      void refreshActivityFeed(store, account, isStale)
     }, wait)
   }
 

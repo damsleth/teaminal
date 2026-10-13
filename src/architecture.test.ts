@@ -70,7 +70,7 @@ describe('architecture: layer boundaries', () => {
   test('src/ui does not call src/graph operation modules (use state/* actions instead)', () => {
     // Permitted:
     //   - `import type` (pure shape sharing, no runtime coupling)
-    //   - imports from `graph/client` (error classes, active-profile config)
+    //   - imports from `graph/client` (error classes, GraphClient type)
     // Forbidden: runtime value imports from graph/chats, graph/teams,
     // graph/me, graph/presence, graph/capabilities, graph/teamsFederation,
     // graph/teamsExternalSearch, graph/teamsPresence - those are data

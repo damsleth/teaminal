@@ -20,9 +20,9 @@ import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
 import { decodeJwtClaims, getToken } from '../auth/owaPiggy'
 import type { CapabilityResult } from '../graph/capabilities'
-import { getActiveProfile } from '../graph/client'
 import { getActiveTransport } from '../realtime/transport'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
+import { useSessionApi } from './SessionContext'
 
 type LoadState =
   | { status: 'loading' }
@@ -53,6 +53,7 @@ function asScopeList(scp: unknown): string[] {
 export function DiagnosticsModal() {
   const { exit } = useApp()
   const store = useAppStore()
+  const session = useSessionApi()
   const modal = useAppState((s) => s.modal)
   const capabilities = useAppState((s) => s.capabilities)
   const me = useAppState((s) => s.me)
@@ -110,7 +111,7 @@ export function DiagnosticsModal() {
 
   if (!isOpen) return null
 
-  const profile = getActiveProfile() ?? '(default)'
+  const profile = session.getActiveProfile() ?? '(default)'
 
   return (
     <Box alignItems="center" justifyContent="center" flexGrow={1}>

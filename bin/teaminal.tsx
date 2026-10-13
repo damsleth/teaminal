@@ -360,13 +360,15 @@ function makeSessionApi(): SessionApi {
   }
 }
 
-// Bumped on every account switch, so async UI work can tell that the store
-// was reset under it (even across A -> B -> A).
+// Bumped when a switch resets the store, so async UI work can tell its
+// write would land in another account's state (even across A -> B -> A).
+// Bumped at the reset itself, not at the start of the switch: work begun
+// during teardown still holds the old session's client and must count as
+// stale too.
 let sessionGeneration = 0
 
 async function switchAccount(nextProfile: string | null): Promise<void> {
   if (currentSession?.profile === nextProfile) return
-  sessionGeneration += 1
   // Tear down the running session first so its loops can't write into
   // the about-to-be-reset store.
   if (currentSession) {
@@ -396,6 +398,7 @@ async function switchAccount(nextProfile: string | null): Promise<void> {
   activeCachePath = getMessageCachePath(process.env, activeProfile)
   activeListCachePath = getListCachePath(process.env, activeProfile)
   activeNameCachePath = getNameCachePath(process.env, activeProfile)
+  sessionGeneration += 1
   resetAccountScopedState(store)
   if (persistCaches) {
     hydrateNameCache(activeProfile)
