@@ -3,13 +3,8 @@ import { useInput } from './useInput'
 import { useState } from 'react'
 import { listProfilesFromStatus, type OwaPiggyProfileStatus } from '../auth/owaPiggy'
 import { updateSettings } from '../config'
-import { setAudiencePreference } from '../graph/client'
-import {
-  audienceFromRouting,
-  nextChatRouting,
-  routingForAccount,
-  type Settings,
-} from '../state/store'
+import { applyChatRouting } from '../state/bootstrap'
+import { nextChatRouting, routingForAccount, type Settings } from '../state/store'
 import { useSessionApi } from './SessionContext'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
@@ -169,10 +164,7 @@ export function AccountsModal() {
         void persist({ chatRoutingByAccount }).then(() => {
           // If we just changed the active account's routing, apply the
           // derived audience/fallback to the graph client immediately.
-          if (profile === session.getActiveProfile()) {
-            const { audience, fallback } = audienceFromRouting(next)
-            setAudiencePreference(audience, { fallback })
-          }
+          if (profile === session.getActiveProfile()) applyChatRouting(next)
         })
         return
       }

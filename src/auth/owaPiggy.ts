@@ -107,10 +107,14 @@ export async function reseed(opts?: ReseedOpts): Promise<void> {
   // Reseed rotates the refresh + access tokens; clear cached tokens
   // and the per-scope failure set so the next getToken re-spawns
   // against a fresh refresh token.
+  // Only the reseeded profile's entries: other profiles' tokens are untouched.
+  const prefix = `${opts?.profile ?? DEFAULT_KEY}::`
   for (const key of Array.from(cache.keys())) {
-    if (!opts?.profile || key.startsWith(`${opts.profile}::`)) cache.delete(key)
+    if (key.startsWith(prefix)) cache.delete(key)
   }
-  scopeFallbacks.clear()
+  for (const key of Array.from(scopeFallbacks)) {
+    if (key.startsWith(prefix)) scopeFallbacks.delete(key)
+  }
 }
 
 export type OwaPiggyProfileStatus = {

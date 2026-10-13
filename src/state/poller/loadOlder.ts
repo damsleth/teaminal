@@ -40,10 +40,13 @@ export type LoadOlderMessagesResult = {
 export type LoadOlderDeps = {
   store: Store<AppState>
   reportError: (err: Error) => void
+  // Session stop signal: aborts the fetch, and a page that lands after stop
+  // (account switch, shutdown) is dropped instead of written into the reset store.
+  signal?: AbortSignal
 }
 
 export async function loadOlderMessages(deps: LoadOlderDeps): Promise<LoadOlderMessagesResult> {
-  const { store, reportError } = deps
+  const { store, reportError, signal } = deps
   const focus = store.get().focus
   const conv = focusKey(focus)
   if (!conv) return { conv: null, added: 0, fullyLoaded: true }
@@ -100,15 +103,14 @@ export async function loadOlderMessages(deps: LoadOlderDeps): Promise<LoadOlderM
     }
   })
 
-  const olderAbort = new AbortController()
   try {
     const cache = store.get().messageCacheByConvo[conv] ?? initialCache
     let page: MessagesPage
     if (cache.nextLink) {
       page =
         focus.kind === 'chat'
-          ? await listMessagesNextPage(cache.nextLink, { signal: olderAbort.signal })
-          : await listChannelMessagesNextPage(cache.nextLink, { signal: olderAbort.signal })
+          ? await listMessagesNextPage(cache.nextLink, { signal })
+          : await listChannelMessagesNextPage(cache.nextLink, { signal })
     } else if (focus.kind === 'chat') {
       const oldest = cache.messages[0]
       if (!oldest) {
@@ -116,13 +118,14 @@ export async function loadOlderMessages(deps: LoadOlderDeps): Promise<LoadOlderM
       } else {
         page = await listMessagesPage(focus.chatId, {
           beforeCreatedDateTime: oldest.createdDateTime,
-          signal: olderAbort.signal,
+          signal,
         })
       }
     } else {
       page = { messages: [] }
     }
 
+    if (signal?.aborted) return { conv, added: 0, fullyLoaded: false, anchorMessageId }
     let result: LoadOlderMessagesResult = {
       conv,
       added: 0,
@@ -161,7 +164,7 @@ export async function loadOlderMessages(deps: LoadOlderDeps): Promise<LoadOlderM
     })
     return result
   } catch (err) {
-    if (isAbortError(err)) {
+    if (isAbortError(err) || signal?.aborted) {
       return { conv, added: 0, fullyLoaded: false, anchorMessageId }
     }
     const error = err instanceof Error ? err : new Error(String(err))

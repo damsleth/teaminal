@@ -15,6 +15,7 @@ import {
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
 import { __setRegionForTests } from './teamsRegion'
+import { setActiveProfile } from './client'
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -170,6 +171,40 @@ describe('searchExternalUsers', () => {
     await searchExternalUsers('k@example.com')
     await searchExternalUsers('K@EXAMPLE.COM') // case-insensitive cache key
     expect(calls).toBe(1)
+  })
+
+  test("does not serve one profile's cached hits to another profile", async () => {
+    let calls = 0
+    __setTransportForTests(async () => {
+      calls++
+      return jsonResponse([
+        { mri: '8:orgid:22222222-2222-2222-2222-222222222222', email: 'k@example.com' },
+      ])
+    })
+    await searchExternalUsers('k@example.com', { profile: 'a', region: 'emea' })
+    await searchExternalUsers('k@example.com', { profile: 'b', region: 'emea' })
+    expect(calls).toBe(2)
+  })
+
+  test('an account switch mid-search still mints the token for the starting profile', async () => {
+    __setRegionForTests('a', 'emea')
+    __setRegionForTests('b', 'emea')
+    const profiles: (string | undefined)[] = []
+    setAuthRunner(async (args) => {
+      const i = args.indexOf('--profile')
+      profiles.push(i >= 0 ? args[i + 1] : undefined)
+      return { stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }
+    })
+    __setTransportForTests(async () => jsonResponse([]))
+    setActiveProfile('a')
+    try {
+      const pending = searchExternalUsers('k@example.com')
+      setActiveProfile('b') // switch lands while the search awaits its region
+      await pending
+    } finally {
+      setActiveProfile(undefined)
+    }
+    expect(profiles[0]).toBe('a')
   })
 
   test('returns empty list on 404', async () => {
