@@ -1,3 +1,4 @@
+import { accountRef } from '../account'
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
@@ -17,6 +18,8 @@ import {
   __setTransportForTests as setFederationTransport,
 } from './teamsFederation'
 import { __resetForTests as resetRegion, __setRegionForTests } from './teamsRegion'
+
+const ACCOUNT = accountRef(undefined)
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 const OID = '4bc16140-a25f-46fa-af77-572d8b946c1c'
@@ -101,8 +104,8 @@ describe('bootstrap', () => {
         headers: { 'set-cookie': 'skypetoken_asm=Bearer%20abc; Path=/; Secure' },
       })
     })
-    const a = await bootstrap()
-    const b = await bootstrap()
+    const a = await bootstrap({ account: ACCOUNT })
+    const b = await bootstrap({ account: ACCOUNT })
     expect(a.userOid).toBe(OID)
     // Only the name=value pair is kept, not the cookie attributes.
     expect(a.cookie).toBe('skypetoken_asm=Bearer%20abc')
@@ -110,6 +113,28 @@ describe('bootstrap', () => {
     // Second call returns the cached session — no extra network.
     expect(calls).toBe(1)
     expect(b).toBe(a)
+  })
+
+  test('keeps one session per account and regional host', async () => {
+    primeAuth()
+    primeSkype()
+    __setRegionForTests('a', 'emea')
+    __setRegionForTests('b', 'emea')
+    let calls = 0
+    __setTransportForTests(async () => {
+      calls += 1
+      return new Response(null, {
+        status: 200,
+        headers: { 'set-cookie': `skypetoken_asm=s${calls}; Path=/` },
+      })
+    })
+    const a = await bootstrap({ account: accountRef('a') })
+    const b = await bootstrap({ account: accountRef('b') })
+    const aAmer = await bootstrap({ account: accountRef('a'), region: 'amer' })
+    expect(new Set([a.cookie, b.cookie, aAmer.cookie]).size).toBe(3)
+    expect(a.host).not.toBe(aAmer.host)
+    expect(await bootstrap({ account: accountRef('a') })).toBe(a)
+    expect(calls).toBe(3)
   })
 
   test('falls back to aadtokenauth when the skype token is unavailable', async () => {
@@ -125,7 +150,7 @@ describe('bootstrap', () => {
       }
       return new Response('unexpected', { status: 500 })
     })
-    const a = await bootstrap()
+    const a = await bootstrap({ account: ACCOUNT })
     expect(a.cookie).toBe('AGW=abc')
     expect(seen.some((u) => u.endsWith('/aadtokenauth'))).toBe(true)
   })
@@ -134,7 +159,7 @@ describe('bootstrap', () => {
     primeAuth()
     primeSkypeUnavailable()
     __setTransportForTests(async () => new Response('nope', { status: 403 }))
-    await expect(bootstrap()).rejects.toMatchObject({ status: 403 })
+    await expect(bootstrap({ account: ACCOUNT })).rejects.toMatchObject({ status: 403 })
   })
 })
 
@@ -161,7 +186,7 @@ describe('fetchObjectByUrl', () => {
     })
     const objectUrl =
       'https://eu-prod.asyncgw.teams.microsoft.com/v1/objects/abc/views/imgpsh_fullsize'
-    const out = await fetchObjectByUrl(objectUrl)
+    const out = await fetchObjectByUrl(objectUrl, { account: ACCOUNT })
     expect(out.contentType).toBe('image/jpeg')
     expect(out.bytes.byteLength).toBe(3)
     expect(seenCookie).toBe('AGW=session-1')
@@ -190,6 +215,7 @@ describe('fetchObjectByUrl', () => {
     })
     const out = await fetchObjectByUrl(
       'https://eu-prod.asyncgw.teams.microsoft.com/v1/objects/abc/views/original',
+      { account: ACCOUNT },
     )
     expect(out.bytes.byteLength).toBe(3)
     expect(bootstrapCalls).toBe(2)
@@ -197,9 +223,9 @@ describe('fetchObjectByUrl', () => {
   })
 
   test('throws when the URL is not an asyncgw URL', async () => {
-    await expect(fetchObjectByUrl('https://media.giphy.com/abc.gif')).rejects.toThrow(
-      /not an asyncgw/,
-    )
+    await expect(
+      fetchObjectByUrl('https://media.giphy.com/abc.gif', { account: ACCOUNT }),
+    ).rejects.toThrow(/not an asyncgw/)
   })
 })
 
@@ -218,7 +244,7 @@ describe('fetchObjectById', () => {
         headers: { 'content-type': 'image/png' },
       })
     })
-    const out = await fetchObjectById('0-wch-d2-eb96')
+    const out = await fetchObjectById('0-wch-d2-eb96', { account: ACCOUNT })
     expect(out.bytes.byteLength).toBe(4)
     expect(objectUrl).toBe(
       `https://eu-prod.asyncgw.teams.microsoft.com/v1/${OID}/objects/0-wch-d2-eb96/views/imgpsh_fullsize`,
@@ -236,7 +262,7 @@ describe('fetchObjectById', () => {
       objectUrl = url
       return new Response(new Uint8Array([1]), { status: 200 })
     })
-    await fetchObjectById('0-wch-d2-eb96', { view: 'imgo' })
+    await fetchObjectById('0-wch-d2-eb96', { account: ACCOUNT, view: 'imgo' })
     expect(objectUrl).toContain('/views/imgo')
   })
 })

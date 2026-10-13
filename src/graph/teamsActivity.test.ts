@@ -1,3 +1,4 @@
+import { accountRef } from '../account'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
@@ -15,6 +16,8 @@ import {
   __setTransportForTests as setFederationTransport,
 } from './teamsFederation'
 import { __setRegionForTests } from './teamsRegion'
+
+const ACCOUNT = accountRef(undefined)
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -145,7 +148,7 @@ describe('listActivityFeed', () => {
       })
     })
 
-    const page = await listActivityFeed({ isPrefetch: true })
+    const page = await listActivityFeed({ account: ACCOUNT, isPrefetch: true })
 
     expect(seenUrl).toStartWith(
       'https://teams.microsoft.com/api/csa/emea/api/v3/teams/users/me/updates',
@@ -162,13 +165,13 @@ describe('listActivityFeed', () => {
   test('throws TeamsActivityError on non-2xx with the wire status', async () => {
     primeAuth()
     __setTransportForTests(async () => new Response('boom', { status: 503 }))
-    await expect(listActivityFeed()).rejects.toMatchObject({ status: 503 })
+    await expect(listActivityFeed({ account: ACCOUNT })).rejects.toMatchObject({ status: 503 })
   })
 
   test('returns an empty page for an empty value array (no syncState)', async () => {
     primeAuth()
     __setTransportForTests(async () => jsonResponse({ value: [] }))
-    const page = await listActivityFeed()
+    const page = await listActivityFeed({ account: ACCOUNT })
     expect(page.items).toEqual([])
     expect(page.syncState).toBeUndefined()
   })

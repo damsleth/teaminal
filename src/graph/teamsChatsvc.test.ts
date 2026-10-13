@@ -1,3 +1,4 @@
+import { accountRef } from '../account'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetFederation,
@@ -19,6 +20,8 @@ import {
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
 import { __setRegionForTests } from './teamsRegion'
+
+const ACCOUNT = accountRef(undefined)
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -201,7 +204,7 @@ describe('listChannelMessagesViaChatsvc', () => {
       })
     })
 
-    const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2')
+    const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2', { account: ACCOUNT })
 
     expect(seenUrl).toContain('teams.microsoft.com/api/chatsvc/emea/v1/users/ME/conversations/')
     expect(seenUrl).toContain(encodeURIComponent('19:abc@thread.tacv2'))
@@ -221,7 +224,7 @@ describe('listChannelMessagesViaChatsvc', () => {
       }),
     )
 
-    const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2')
+    const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2', { account: ACCOUNT })
     expect(page.messages.map((m) => m.id)).toEqual(['1', '2', '3'])
   })
 
@@ -236,7 +239,7 @@ describe('listChannelMessagesViaChatsvc', () => {
         },
       }),
     )
-    const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2')
+    const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2', { account: ACCOUNT })
     expect(page.backwardLink).toContain('startTime=1234')
   })
 
@@ -250,7 +253,7 @@ describe('listChannelMessagesViaChatsvc', () => {
         ],
       }),
     )
-    const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2')
+    const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2', { account: ACCOUNT })
     // Reversed to chronological; both root and reply retained - the view
     // layer (channelThreads) groups roots/replies, the reader drops nothing.
     expect(page.messages.map((m) => m.id)).toEqual(['1', '2'])
@@ -269,7 +272,7 @@ describe('listChannelMessagesViaChatsvc', () => {
         ],
       }),
     )
-    const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2')
+    const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2', { account: ACCOUNT })
     expect(page.messages.map((m) => m.id)).toEqual(['1', '2'])
     const root = page.messages.find((m) => m.id === '1')
     const reply = page.messages.find((m) => m.id === '2')
@@ -293,7 +296,7 @@ describe('listChannelMessagesViaChatsvc', () => {
         ],
       })
     })
-    const page = await listChatMessagesViaChatsvc('19:a_b@unq.gbl.spaces')
+    const page = await listChatMessagesViaChatsvc('19:a_b@unq.gbl.spaces', { account: ACCOUNT })
     expect(page.messages.map((m) => m.id)).toEqual(['1', '2'])
     expect(seenUrl).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
   })
@@ -327,7 +330,7 @@ describe('listChannelMessagesViaChatsvc', () => {
       })
     })
 
-    const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2')
+    const page = await listChannelMessagesViaChatsvc('19:abc@thread.tacv2', { account: ACCOUNT })
     expect(page.messages.map((m) => m.id)).toEqual(['7'])
     expect(chatsvcCalls).toBe(2)
     expect(tokensSeen).toEqual(['token-A', 'token-B'])
@@ -351,7 +354,9 @@ describe('listChannelRepliesViaChatsvc', () => {
         _metadata: { backwardLink: 'https://teams.microsoft.com/x?startTime=9&pageSize=20' },
       })
     })
-    const page = await listChannelRepliesViaChatsvc('19:abc@thread.tacv2', '1')
+    const page = await listChannelRepliesViaChatsvc('19:abc@thread.tacv2', '1', {
+      account: ACCOUNT,
+    })
     expect(seenUrl).toContain('/conversations/')
     expect(seenUrl).toContain(';messageid=1/messages')
     expect(seenUrl).toContain('view=msnp24')
@@ -443,6 +448,7 @@ describe('sendChannelMessageViaChatsvc', () => {
     })
 
     const sent = await sendChannelMessageViaChatsvc('19:abc@thread.tacv2', 'standup at 10', {
+      account: ACCOUNT,
       imdisplayname: 'Carl',
       fromUserId: '4bc16140-a25f-46fa-af77-572d8b946c1c',
     })
@@ -478,6 +484,7 @@ describe('sendChannelMessageViaChatsvc', () => {
     })
 
     const sent = await sendChannelMessageViaChatsvc('19:abc@thread.tacv2', 'reply text', {
+      account: ACCOUNT,
       replyToId: '100',
     })
 

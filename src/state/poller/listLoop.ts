@@ -12,7 +12,12 @@
 // can surface the state.
 
 import { listChats } from '../../graph/chats'
-import { getAudiencePreference, GraphError, RateLimitError } from '../../graph/client'
+import {
+  currentAccountContext,
+  getAudiencePreference,
+  GraphError,
+  RateLimitError,
+} from '../../graph/client'
 import { fetchChatsAndTeams } from '../../graph/teamsCsa'
 import { recordEvent } from '../../log'
 import type { Channel, Chat, Team } from '../../types'
@@ -89,7 +94,7 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
     const { audience, fallback } = getAudiencePreference()
     if (audience === 'ic3') {
       try {
-        return await fetchChatsAndTeams({ signal })
+        return await fetchChatsAndTeams({ account: currentAccountContext().account, signal })
       } catch (err) {
         if (!fallback) throw err
         recordEvent(
@@ -101,7 +106,9 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
       }
     }
 
-    if (graphList401 && fallback) return fetchChatsAndTeams({ signal })
+    if (graphList401 && fallback) {
+      return fetchChatsAndTeams({ account: currentAccountContext().account, signal })
+    }
     try {
       return await loadGraphChatsTeams(signal)
     } catch (err) {
@@ -112,7 +119,7 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
           'warn',
           'graph chat/teams list 401 (likely Conditional Access) — switching to Teams CSA',
         )
-        return fetchChatsAndTeams({ signal })
+        return fetchChatsAndTeams({ account: currentAccountContext().account, signal })
       }
       throw err
     }

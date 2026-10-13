@@ -6,6 +6,7 @@
 // the merged list rather than tracked separately, so a stale count can't
 // drift from the visible list.
 
+import { accountRef } from '../account'
 import { getActiveProfile } from '../graph/client'
 import { listActivityFeed, type ActivityItem } from '../graph/teamsActivity'
 import { recordEvent } from '../log'
@@ -76,7 +77,7 @@ export async function refreshActivityFeed(
   const requestProfile = getActiveProfile()
   try {
     const page = await listActivityFeed({
-      profile: requestProfile,
+      account: accountRef(requestProfile),
       syncState: store.get().activitySyncState,
     })
     // Drop the result if the session/profile changed under us.

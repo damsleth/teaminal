@@ -1,3 +1,4 @@
+import { accountRef } from '../account'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
@@ -106,14 +107,14 @@ describe('partitionFromMiddleTier', () => {
 
 describe('ingestAuthzData', () => {
   test('caches the resolved region per profile', () => {
-    ingestAuthzData('demo', {
+    ingestAuthzData(accountRef('demo'), {
       regionGtms: { chatService: 'https://amer.ng.msg.teams.microsoft.com' },
     })
-    expect(getCachedRegion({ profile: 'demo' })).toBe('amer')
+    expect(getCachedRegion({ account: accountRef('demo') })).toBe('amer')
   })
 
   test('caches region + partition into the endpoints map', () => {
-    ingestAuthzData('demo', {
+    ingestAuthzData(accountRef('demo'), {
       region: 'emea',
       partition: 'emea02',
       regionGtms: {
@@ -121,26 +122,28 @@ describe('ingestAuthzData', () => {
         middleTier: 'https://teams.microsoft.com/api/mt/part/emea-02',
       },
     })
-    expect(getCachedEndpoints({ profile: 'demo' })).toEqual({
+    expect(getCachedEndpoints({ account: accountRef('demo') })).toEqual({
       region: 'emea',
       partition: 'emea-02',
     })
   })
 
   test('falls back to {region}-01 partition when middleTier is absent', () => {
-    ingestAuthzData('demo', {
+    ingestAuthzData(accountRef('demo'), {
       regionGtms: { chatService: 'https://apac.ng.msg.teams.microsoft.com' },
     })
-    expect(getCachedEndpoints({ profile: 'demo' })).toEqual({
+    expect(getCachedEndpoints({ account: accountRef('demo') })).toEqual({
       region: 'apac',
       partition: 'apac-01',
     })
   })
 
   test('ignores payloads without a parseable region', () => {
-    ingestAuthzData('demo', { regionGtms: { chatService: 'https://teams.microsoft.com' } })
-    expect(getCachedRegion({ profile: 'demo' })).toBeUndefined()
-    expect(getCachedEndpoints({ profile: 'demo' })).toBeUndefined()
+    ingestAuthzData(accountRef('demo'), {
+      regionGtms: { chatService: 'https://teams.microsoft.com' },
+    })
+    expect(getCachedRegion({ account: accountRef('demo') })).toBeUndefined()
+    expect(getCachedEndpoints({ account: accountRef('demo') })).toBeUndefined()
   })
 })
 
@@ -159,17 +162,17 @@ describe('ingestAuthzData with a real authsvc payload', () => {
   }
 
   test('takes the stated region and the middleTier base verbatim', async () => {
-    ingestAuthzData('norway', norwayAuthz)
-    expect(getCachedRegion({ profile: 'norway' })).toBe('no')
-    expect(getCachedEndpoints({ profile: 'norway' })?.partition).toBe('no01')
-    await expect(resolveMiddleTierBase({ profile: 'norway' })).resolves.toBe(
+    ingestAuthzData(accountRef('norway'), norwayAuthz)
+    expect(getCachedRegion({ account: accountRef('norway') })).toBe('no')
+    expect(getCachedEndpoints({ account: accountRef('norway') })?.partition).toBe('no01')
+    await expect(resolveMiddleTierBase({ account: accountRef('norway') })).resolves.toBe(
       'https://teams.microsoft.com/api/mt/emea',
     )
   })
 
   test('falls back to the part/{region} shape when authsvc never answered', async () => {
     __setRegionForTests('nogtms', 'emea')
-    await expect(resolveMiddleTierBase({ profile: 'nogtms' })).resolves.toBe(
+    await expect(resolveMiddleTierBase({ account: accountRef('nogtms') })).resolves.toBe(
       'https://teams.microsoft.com/api/mt/part/emea',
     )
   })
@@ -181,7 +184,7 @@ describe('resolveRegion', () => {
     setFederationTransport(async () => {
       throw new Error('should not be called')
     })
-    await expect(resolveRegion({ profile: 'demo' })).resolves.toBe('apac')
+    await expect(resolveRegion({ account: accountRef('demo') })).resolves.toBe('apac')
   })
 
   test('triggers an authsvc round-trip on cold cache and caches the result', async () => {
@@ -196,16 +199,16 @@ describe('resolveRegion', () => {
       }
       return jsonResponse({})
     })
-    await expect(resolveRegion({ profile: 'cold' })).resolves.toBe('amer')
+    await expect(resolveRegion({ account: accountRef('cold') })).resolves.toBe('amer')
     expect(authzCalls).toBe(1)
     // Second call hits the cache.
-    await expect(resolveRegion({ profile: 'cold' })).resolves.toBe('amer')
+    await expect(resolveRegion({ account: accountRef('cold') })).resolves.toBe('amer')
     expect(authzCalls).toBe(1)
   })
 
   test('falls back to FALLBACK_REGION when authsvc fails', async () => {
     setFederationTransport(async () => jsonResponse({ error: 'nope' }, { status: 500 }))
-    await expect(resolveRegion({ profile: 'broken' })).resolves.toBe(FALLBACK_REGION)
+    await expect(resolveRegion({ account: accountRef('broken') })).resolves.toBe(FALLBACK_REGION)
   })
 
   test('a 500 stays retryable but a 410 pins the fallback', async () => {
@@ -215,13 +218,13 @@ describe('resolveRegion', () => {
       calls += 1
       return jsonResponse({ errorCode: 'ApiRestricted' }, { status })
     })
-    await expect(resolveRegion({ profile: 'gone' })).resolves.toBe(FALLBACK_REGION)
-    await expect(resolveRegion({ profile: 'gone' })).resolves.toBe(FALLBACK_REGION)
+    await expect(resolveRegion({ account: accountRef('gone') })).resolves.toBe(FALLBACK_REGION)
+    await expect(resolveRegion({ account: accountRef('gone') })).resolves.toBe(FALLBACK_REGION)
     expect(calls).toBe(2)
     status = 410
-    await expect(resolveRegion({ profile: 'gone' })).resolves.toBe(FALLBACK_REGION)
+    await expect(resolveRegion({ account: accountRef('gone') })).resolves.toBe(FALLBACK_REGION)
     expect(calls).toBe(3)
-    await expect(resolveRegion({ profile: 'gone' })).resolves.toBe(FALLBACK_REGION)
+    await expect(resolveRegion({ account: accountRef('gone') })).resolves.toBe(FALLBACK_REGION)
     expect(calls).toBe(3)
   })
 })

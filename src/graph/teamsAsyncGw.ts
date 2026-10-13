@@ -18,9 +18,9 @@
 // signed URL; never write it to disk. The session cookie is treated
 // with the same care as the Skype token.
 
+import { owaProfile, type AccountRef } from '../account'
 import { getToken } from '../auth/owaPiggy'
 import { recordEvent, recordRequest } from '../log'
-import { getActiveProfile } from './client'
 import { getSkypeToken, TEAMS_IC3_SCOPE } from './teamsFederation'
 
 const ASYNCGW_HOST_BY_REGION: Record<string, string> = {
@@ -46,8 +46,8 @@ export class TeamsAsyncGwError extends Error {
 }
 
 export type AsyncGwSession = {
-  /** Profile this session was minted for. */
-  profile: string | undefined
+  /** Account this session was minted for. */
+  account: AccountRef
   /** Regional AsyncGW host the session is valid against. */
   host: string
   /** Bearer/cookie material the server returns from aadtokenauth. */
@@ -59,7 +59,7 @@ export type AsyncGwSession = {
 }
 
 export type AsyncGwOpts = {
-  profile?: string
+  account: AccountRef
   signal?: AbortSignal
   region?: string
 }
@@ -73,8 +73,10 @@ const inFlight = new Map<string, Promise<AsyncGwSession>>()
 
 const SESSION_REFRESH_MARGIN_MS = 60_000
 
-function profileKey(opts?: AsyncGwOpts): string {
-  return opts?.profile ?? getActiveProfile() ?? '<default>'
+// A session is minted with one account's tokens against one regional host,
+// so it is only valid for that pair.
+function sessionKey(opts: AsyncGwOpts): string {
+  return `${opts.account.id}|${hostForRegion(opts.region)}`
 }
 
 function hostForRegion(region: string | undefined): string {
@@ -119,11 +121,11 @@ function cookiePairFromSetCookie(setCookie: string): string {
 // carrying Teams.AccessAsUser.All — the scope aadtokenauth/the object Bearer
 // require, available only to the 5e3ce6c0 Teams web client. Returns the cookie
 // pair, or null so the caller can fall back to aadtokenauth.
-async function authViaSkypeToken(host: string, opts?: AsyncGwOpts): Promise<string | null> {
+async function authViaSkypeToken(host: string, opts: AsyncGwOpts): Promise<string | null> {
   let skypeToken: string
   try {
     skypeToken = await getSkypeToken({
-      profile: opts?.profile,
+      account: opts.account,
       region: opts?.region,
       signal: opts?.signal,
     })
@@ -178,8 +180,8 @@ async function authViaSkypeToken(host: string, opts?: AsyncGwOpts): Promise<stri
 // for a session cookie via `POST {host}/v1/{oid}/aadtokenauth`. Requires the
 // Bearer to carry Teams.AccessAsUser.All (5e3ce6c0); 403s otherwise. Throws on
 // failure since it's the last resort.
-async function authViaAadToken(host: string, oid: string, opts?: AsyncGwOpts): Promise<string> {
-  const token = await getToken({ profile: opts?.profile, scope: TEAMS_IC3_SCOPE })
+async function authViaAadToken(host: string, oid: string, opts: AsyncGwOpts): Promise<string> {
+  const token = await getToken({ profile: owaProfile(opts.account), scope: TEAMS_IC3_SCOPE })
   const url = `${host}/v1/${encodeURIComponent(oid)}/aadtokenauth`
   const startedAt = Date.now()
   let res: Response
@@ -241,8 +243,8 @@ async function authViaAadToken(host: string, oid: string, opts?: AsyncGwOpts): P
 // with Teams.AccessAsUser.All. Cookie expiry isn't surfaced explicitly; we
 // assume a 1h TTL (conservative — Teams web behaves the same way) and refresh
 // on 401.
-export async function bootstrap(opts?: AsyncGwOpts): Promise<AsyncGwSession> {
-  const key = profileKey(opts)
+export async function bootstrap(opts: AsyncGwOpts): Promise<AsyncGwSession> {
+  const key = sessionKey(opts)
   const now = Date.now()
   const cached = sessionCache.get(key)
   if (cached && cached.expAt - now > SESSION_REFRESH_MARGIN_MS) return cached
@@ -251,13 +253,13 @@ export async function bootstrap(opts?: AsyncGwOpts): Promise<AsyncGwSession> {
   const promise = (async (): Promise<AsyncGwSession> => {
     // The object URL is templated with the user's AAD oid; read it from any
     // FOCI token's claims (works regardless of which auth path succeeds).
-    const idToken = await getToken({ profile: opts?.profile, scope: TEAMS_IC3_SCOPE })
+    const idToken = await getToken({ profile: owaProfile(opts.account), scope: TEAMS_IC3_SCOPE })
     const oid = oidFromJwt(idToken)
     if (!oid) throw new TeamsAsyncGwError(0, 'asyncgw bootstrap: token missing oid claim')
     const host = hostForRegion(opts?.region)
     const cookie = (await authViaSkypeToken(host, opts)) ?? (await authViaAadToken(host, oid, opts))
     const session: AsyncGwSession = {
-      profile: opts?.profile,
+      account: opts.account,
       host,
       cookie,
       // 1h TTL — refresh-on-401 below covers premature expiry.
@@ -265,7 +267,7 @@ export async function bootstrap(opts?: AsyncGwOpts): Promise<AsyncGwSession> {
       userOid: oid,
     }
     sessionCache.set(key, session)
-    recordEvent('graph', 'info', `asyncgw session ready for profile=${key}`)
+    recordEvent('graph', 'info', `asyncgw session ready for profile=${opts.account.label}`)
     return session
   })()
   inFlight.set(key, promise)
@@ -291,7 +293,7 @@ function authHeadersForSession(session: AsyncGwSession): Record<string, string> 
 // session cache is invalidated and the call is retried once.
 export async function fetchObjectByUrl(
   url: string,
-  opts?: AsyncGwOpts,
+  opts: AsyncGwOpts,
 ): Promise<{ bytes: Uint8Array; contentType: string }> {
   if (!isAsyncGwUrl(url)) {
     throw new TeamsAsyncGwError(0, `asyncgw fetch: not an asyncgw URL`)
@@ -328,7 +330,7 @@ export async function fetchObjectByUrl(
     if (!res.ok) {
       const status = res.status
       if (status === 401) {
-        sessionCache.delete(profileKey(opts))
+        sessionCache.delete(sessionKey({ ...opts, region }))
       }
       const text = await res.text().catch(() => '')
       throw new TeamsAsyncGwError(
@@ -363,7 +365,7 @@ export async function fetchObjectByUrl(
 // hostedContents endpoint 401s but the object is reachable via asyncgw.
 export async function fetchObjectById(
   objectId: string,
-  opts?: AsyncGwOpts & { view?: string },
+  opts: AsyncGwOpts & { view?: string },
 ): Promise<{ bytes: Uint8Array; contentType: string }> {
   const session = await bootstrap(opts)
   const view = opts?.view ?? 'imgpsh_fullsize'

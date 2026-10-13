@@ -1,3 +1,4 @@
+import { accountRef } from '../account'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests,
@@ -16,6 +17,8 @@ import {
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
 import { __setRegionForTests } from './teamsRegion'
+
+const ACCOUNT = accountRef(undefined)
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -64,7 +67,7 @@ describe('fetchFederatedUsers', () => {
       return jsonResponse([{ mri: '8:orgid:other' }])
     })
 
-    const users = await fetchFederatedUsers(['other'])
+    const users = await fetchFederatedUsers(['other'], { account: ACCOUNT })
 
     expect(users).toEqual([{ mri: '8:orgid:other' }])
     expect(seenUrl).toBe(
@@ -97,7 +100,7 @@ describe('getMsnp24EquivalentConversationId', () => {
     })
 
     await expect(
-      getMsnp24EquivalentConversationId('19:detached@unq.gbl.spaces'),
+      getMsnp24EquivalentConversationId('19:detached@unq.gbl.spaces', { account: ACCOUNT }),
     ).resolves.toBeNull()
   })
 
@@ -115,9 +118,9 @@ describe('getMsnp24EquivalentConversationId', () => {
       return jsonResponse({ conversation: { id: '19:canonical@thread.v2' } })
     })
 
-    await expect(getMsnp24EquivalentConversationId('19:detached@unq.gbl.spaces')).resolves.toBe(
-      '19:canonical@thread.v2',
-    )
+    await expect(
+      getMsnp24EquivalentConversationId('19:detached@unq.gbl.spaces', { account: ACCOUNT }),
+    ).resolves.toBe('19:canonical@thread.v2')
     expect(seenUrl).toBe(
       'https://teams.microsoft.com/api/chatsvc/emea/v1/users/ME/conversations/19%3Adetached%40unq.gbl.spaces?view=msnp24Equivalent',
     )
@@ -134,7 +137,9 @@ describe('conversationExistsInTeams', () => {
       return jsonResponse({ id: '19:canonical@unq.gbl.spaces', consumptionhorizons: [] })
     })
 
-    await expect(conversationExistsInTeams('19:canonical@unq.gbl.spaces')).resolves.toBe(true)
+    await expect(
+      conversationExistsInTeams('19:canonical@unq.gbl.spaces', { account: ACCOUNT }),
+    ).resolves.toBe(true)
 
     expect(seenUrl).toBe(
       'https://teams.microsoft.com/api/chatsvc/emea/v1/threads/19%3Acanonical%40unq.gbl.spaces/consumptionhorizons',
@@ -161,6 +166,7 @@ describe('resolveFederatedEquivalentConversationId', () => {
     const resolved = await resolveFederatedEquivalentConversationId(
       '6555c7ee-7c68-4aa8-9f0c-05164c288c36',
       '0caa699d-79d5-4660-81d0-ce05b8954fc7',
+      { account: ACCOUNT },
     )
 
     expect(resolved).toBeNull()
@@ -193,7 +199,9 @@ describe('resolveFederatedEquivalentConversationId', () => {
       return jsonResponse({}, { status: 404 })
     })
 
-    const resolved = await resolveFederatedEquivalentConversationId(self, selected)
+    const resolved = await resolveFederatedEquivalentConversationId(self, selected, {
+      account: ACCOUNT,
+    })
 
     expect(resolved).toBe(`19:${canonical}_${self}@unq.gbl.spaces`)
     expect(urls[1]).toContain(`19%3A${canonical}_${self}%40unq.gbl.spaces`)
@@ -230,6 +238,7 @@ describe('createOneOnOneThreadViaChatsvc', () => {
     const threadId = await createOneOnOneThreadViaChatsvc(
       '6555c7ee-7c68-4aa8-9f0c-05164c288c36',
       '82568d8b-93c6-478d-94ed-818c97a7dfd0',
+      { account: ACCOUNT },
     )
 
     expect(seenUrl).toBe('https://teams.microsoft.com/api/chatsvc/emea/v1/threads')
@@ -267,7 +276,7 @@ describe('createOneOnOneThreadViaChatsvc', () => {
         { status: 403 },
       )
     })
-    await expect(createOneOnOneThreadViaChatsvc('a', 'b')).rejects.toThrow(
+    await expect(createOneOnOneThreadViaChatsvc('a', 'b', { account: ACCOUNT })).rejects.toThrow(
       /chatsvc create thread 403/,
     )
   })

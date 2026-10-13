@@ -1,3 +1,4 @@
+import { accountRef } from '../account'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetFederation,
@@ -16,6 +17,8 @@ import {
 } from '../auth/owaPiggy'
 import { __setRegionForTests } from './teamsRegion'
 import { setActiveProfile } from './client'
+
+const ACCOUNT = accountRef(undefined)
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -135,7 +138,7 @@ describe('searchExternalUsers', () => {
       })
     })
 
-    const users = await searchExternalUsers('alice@example.com')
+    const users = await searchExternalUsers('alice@example.com', { account: ACCOUNT })
     expect(seenMethod).toBe('POST')
     expect(seenUrl).toContain('https://teams.microsoft.com/api/mt/part/emea/beta/users/searchV2')
     expect(seenUrl).toContain('source=newChat')
@@ -155,7 +158,7 @@ describe('searchExternalUsers', () => {
         { mri: '8:orgid:def-5678', displayName: 'B' },
       ]),
     )
-    const users = await searchExternalUsers('a@b.com')
+    const users = await searchExternalUsers('a@b.com', { account: ACCOUNT })
     expect(users.map((u) => u.displayName)).toEqual(['A', 'B'])
   })
 
@@ -167,9 +170,9 @@ describe('searchExternalUsers', () => {
         { mri: '8:orgid:4bc16140-a25f-46fa-af77-572d8b946c1c', email: 'k@d.no' },
       ])
     })
-    await searchExternalUsers('k@d.no')
-    await searchExternalUsers('k@d.no')
-    await searchExternalUsers('K@D.NO') // case-insensitive cache key
+    await searchExternalUsers('k@d.no', { account: ACCOUNT })
+    await searchExternalUsers('k@d.no', { account: ACCOUNT })
+    await searchExternalUsers('K@D.NO', { account: ACCOUNT }) // case-insensitive cache key
     expect(calls).toBe(1)
   })
 
@@ -181,12 +184,12 @@ describe('searchExternalUsers', () => {
         { mri: '8:orgid:4bc16140-a25f-46fa-af77-572d8b946c1c', email: 'k@d.no' },
       ])
     })
-    await searchExternalUsers('k@d.no', { profile: 'a', region: 'emea' })
-    await searchExternalUsers('k@d.no', { profile: 'b', region: 'emea' })
+    await searchExternalUsers('k@d.no', { account: accountRef('a'), region: 'emea' })
+    await searchExternalUsers('k@d.no', { account: accountRef('b'), region: 'emea' })
     expect(calls).toBe(2)
   })
 
-  test('an account switch mid-search still mints the token for the starting profile', async () => {
+  test('the active account changing mid-search does not move the token off its account', async () => {
     __setRegionForTests('a', 'emea')
     __setRegionForTests('b', 'emea')
     const profiles: (string | undefined)[] = []
@@ -198,7 +201,7 @@ describe('searchExternalUsers', () => {
     __setTransportForTests(async () => jsonResponse([]))
     setActiveProfile('a')
     try {
-      const pending = searchExternalUsers('k@d.no')
+      const pending = searchExternalUsers('k@d.no', { account: accountRef('a') })
       setActiveProfile('b') // switch lands while the search awaits its region
       await pending
     } finally {
@@ -209,12 +212,16 @@ describe('searchExternalUsers', () => {
 
   test('returns empty list on 404', async () => {
     __setTransportForTests(async () => jsonResponse({ message: 'not found' }, { status: 404 }))
-    await expect(searchExternalUsers('nobody@nope.example')).resolves.toEqual([])
+    await expect(searchExternalUsers('nobody@nope.example', { account: ACCOUNT })).resolves.toEqual(
+      [],
+    )
   })
 
   test('throws TeamsExternalSearchError on 500', async () => {
     __setTransportForTests(async () => jsonResponse({ message: 'boom' }, { status: 500 }))
-    await expect(searchExternalUsers('boom@example.com')).rejects.toThrow(/searchV2 500/)
+    await expect(searchExternalUsers('boom@example.com', { account: ACCOUNT })).rejects.toThrow(
+      /searchV2 500/,
+    )
   })
 
   test('returns [] for empty query without hitting the network', async () => {
@@ -223,8 +230,8 @@ describe('searchExternalUsers', () => {
       calls++
       return jsonResponse([])
     })
-    expect(await searchExternalUsers('')).toEqual([])
-    expect(await searchExternalUsers('   ')).toEqual([])
+    expect(await searchExternalUsers('', { account: ACCOUNT })).toEqual([])
+    expect(await searchExternalUsers('   ', { account: ACCOUNT })).toEqual([])
     expect(calls).toBe(0)
   })
 
@@ -237,7 +244,7 @@ describe('searchExternalUsers', () => {
         })),
       ),
     )
-    const users = await searchExternalUsers('many@example.com', { top: 3 })
+    const users = await searchExternalUsers('many@example.com', { account: ACCOUNT, top: 3 })
     expect(users).toHaveLength(3)
   })
 })
@@ -262,7 +269,7 @@ describe('federated fallback', () => {
         { status: 200 },
       )
     })
-    const users = await searchExternalUsers('kim@damsleth.no')
+    const users = await searchExternalUsers('kim@damsleth.no', { account: ACCOUNT })
     expect(seen[1]).toContain('/beta/users/kim%40damsleth.no/externalsearchv3')
     expect(users).toEqual([
       {
@@ -282,7 +289,7 @@ describe('federated fallback', () => {
         return new Response(JSON.stringify({ value: [] }), { status: 200 })
       return new Response('{"errorCode":"BadRequest"}', { status: 400 })
     })
-    expect(await searchExternalUsers('Finn Nordling')).toEqual([])
+    expect(await searchExternalUsers('Finn Nordling', { account: ACCOUNT })).toEqual([])
     expect(seen).toHaveLength(1)
     __resetForTests()
     seen.length = 0
@@ -292,7 +299,7 @@ describe('federated fallback', () => {
         ? new Response(JSON.stringify({ value: [] }), { status: 200 })
         : new Response('{"errorCode":"BadRequest"}', { status: 400 })
     })
-    expect(await searchExternalUsers('ghost@nowhere.example')).toEqual([])
+    expect(await searchExternalUsers('ghost@nowhere.example', { account: ACCOUNT })).toEqual([])
     expect(seen[1]).toContain('/externalsearchv3')
   })
 })

@@ -18,15 +18,15 @@
 // `emea` as a last-resort default only on hard failure so the rest of
 // the app degrades gracefully instead of crashing on a non-emea tenant.
 
+import { accountRef, type AccountRef } from '../account'
 import { recordEvent } from '../log'
-import { getActiveProfile } from './client'
 import { getSkypeToken } from './teamsFederation'
 
 export const FALLBACK_REGION = 'emea'
 export const TEAMS_ORIGIN = 'https://teams.microsoft.com'
 
 export type RegionResolveOpts = {
-  profile?: string
+  account: AccountRef
   signal?: AbortSignal
 }
 
@@ -56,8 +56,8 @@ const partitionCache = new Map<string, string>()
 // trouter transport doesn't have to issue a parallel authsvc call.
 const trouterUrlCache = new Map<string, string>()
 
-function cacheKey(opts?: RegionResolveOpts): string {
-  return opts?.profile ?? getActiveProfile() ?? '<default>'
+function cacheKey(opts: RegionResolveOpts): string {
+  return opts.account.id
 }
 
 // Parse `https://emea.ng.msg.teams.microsoft.com[/...]` → `"emea"`.
@@ -115,11 +115,11 @@ export function partitionFromMiddleTier(url: string | undefined | null): string 
 
 // Populate the cache from authsvc data. Called by getSkypeToken when
 // it sees a fresh authsvc response.
-export function ingestAuthzData(profile: string | undefined, data: unknown): void {
+export function ingestAuthzData(account: AccountRef, data: unknown): void {
   if (!data || typeof data !== 'object') return
   const obj = data as Record<string, unknown>
   const regionGtms = obj.regionGtms as Record<string, unknown> | undefined
-  const key = profile ?? '<default>'
+  const key = account.id
   // authsvc states the region and partition outright (`"region":"no"`,
   // `"partition":"no01"`). Trust those first: regionGtms parsing is a
   // guess that can't express short regions like `no` (HAR-verified for
@@ -130,7 +130,11 @@ export function ingestAuthzData(profile: string | undefined, data: unknown): voi
     const prev = regionCache.get(key)
     regionCache.set(key, region)
     if (prev !== region) {
-      recordEvent('graph', 'info', `teams region resolved to "${region}" for profile ${key}`)
+      recordEvent(
+        'graph',
+        'info',
+        `teams region resolved to "${region}" for profile ${account.label}`,
+      )
     }
   }
   const middleTier =
@@ -147,11 +151,11 @@ export function ingestAuthzData(profile: string | undefined, data: unknown): voi
   if (trouterUrl) trouterUrlCache.set(key, trouterUrl)
 }
 
-export function getCachedRegion(opts?: RegionResolveOpts): string | undefined {
+export function getCachedRegion(opts: RegionResolveOpts): string | undefined {
   return regionCache.get(cacheKey(opts))
 }
 
-export function getCachedTrouterUrl(opts?: RegionResolveOpts): string | undefined {
+export function getCachedTrouterUrl(opts: RegionResolveOpts): string | undefined {
   return trouterUrlCache.get(cacheKey(opts))
 }
 
@@ -160,7 +164,7 @@ export function getCachedTrouterUrl(opts?: RegionResolveOpts): string | undefine
 // guaranteed to route, and its shape varies (`/api/mt/part/emea-02` for
 // some tenants, plain `/api/mt/emea` for others). Falls back to the
 // `part/{region}` shape that has always worked when authsvc is silent.
-export async function resolveMiddleTierBase(opts?: RegionResolveOpts): Promise<string> {
+export async function resolveMiddleTierBase(opts: RegionResolveOpts): Promise<string> {
   const cached = middleTierCache.get(cacheKey(opts))
   if (cached) return cached
   const region = await resolveRegion(opts)
@@ -170,14 +174,14 @@ export async function resolveMiddleTierBase(opts?: RegionResolveOpts): Promise<s
 // Resolves the region for the given profile, triggering an authsvc
 // round-trip via getSkypeToken if the cache is cold. Returns
 // FALLBACK_REGION on hard failure.
-export async function resolveRegion(opts?: RegionResolveOpts): Promise<string> {
+export async function resolveRegion(opts: RegionResolveOpts): Promise<string> {
   const key = cacheKey(opts)
   const cached = regionCache.get(key)
   if (cached) return cached
   try {
     // getSkypeToken's authsvc call will side-effect into the cache via
     // ingestAuthzData. Don't care about the token itself here.
-    await getSkypeToken({ profile: opts?.profile, signal: opts?.signal })
+    await getSkypeToken({ account: opts.account, signal: opts.signal })
   } catch (err) {
     recordEvent(
       'graph',
@@ -205,7 +209,7 @@ function defaultPartition(region: string): string {
   return `${region}-01`
 }
 
-export function getCachedEndpoints(opts?: RegionResolveOpts): TeamsEndpoints | undefined {
+export function getCachedEndpoints(opts: RegionResolveOpts): TeamsEndpoints | undefined {
   const key = cacheKey(opts)
   const region = regionCache.get(key)
   if (!region) return undefined
@@ -218,7 +222,7 @@ export function getCachedEndpoints(opts?: RegionResolveOpts): TeamsEndpoints | u
 // Resolve the full Teams endpoint set for a profile, triggering an authsvc
 // round-trip (via getSkypeToken) if the cache is cold. Falls back to the
 // default region/partition on hard failure.
-export async function resolveEndpoints(opts?: RegionResolveOpts): Promise<TeamsEndpoints> {
+export async function resolveEndpoints(opts: RegionResolveOpts): Promise<TeamsEndpoints> {
   const region = await resolveRegion(opts)
   const key = cacheKey(opts)
   return {
@@ -235,9 +239,9 @@ export function __resetForTests(): void {
 }
 
 export function __setRegionForTests(profile: string | undefined, region: string): void {
-  regionCache.set(profile ?? '<default>', region)
+  regionCache.set(accountRef(profile).id, region)
 }
 
 export function __setPartitionForTests(profile: string | undefined, partition: string): void {
-  partitionCache.set(profile ?? '<default>', partition)
+  partitionCache.set(accountRef(profile).id, partition)
 }
