@@ -3,9 +3,11 @@ import {
   __resetForTests as resetAuth,
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
+import { accountRef } from '../account'
 import {
   __resetForTests,
   __setSleepForTests,
+  createGraphClient,
   __setTransportForTests,
   graph,
   GraphError,
@@ -554,5 +556,120 @@ describe('paginate', () => {
     __setTransportForTests(async () => jsonResponse({ value: [] }))
     const all = await paginateAll<unknown>({ method: 'GET', path: '/x' })
     expect(all).toEqual([])
+  })
+})
+
+describe('bound clients', () => {
+  // Tokens name the profile + audience they were minted for, so each request
+  // can be checked against the account it was meant to run as.
+  const mints: string[] = []
+  function primeTokensPerAccount(): void {
+    mints.length = 0
+    setAuthRunner(async (args) => {
+      const at = (flag: string) => {
+        const i = args.indexOf(flag)
+        return i >= 0 ? args[i + 1] : undefined
+      }
+      mints.push(at('--profile') ?? '-')
+      const token = makeJwt({ exp: FAR_FUTURE, p: at('--profile') ?? '-', aud: at('--audience') })
+      return { stdout: token, stderr: '', exitCode: 0 }
+    })
+  }
+
+  function tokenClaims(init: RequestInit): { p: string; aud: string } {
+    const auth = new Headers(init.headers).get('Authorization') ?? ''
+    const body = auth.replace('Bearer ', '').split('.')[1] ?? ''
+    const { p, aud } = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'))
+    return { p, aud }
+  }
+
+  test('interleaved accounts keep their own token and audience through 401 and 429 retries', async () => {
+    primeTokensPerAccount()
+    const seen: Record<string, { p: string; aud: string }[]> = { '/a': [], '/b': [] }
+    const hits: Record<string, number> = { '/a': 0, '/b': 0 }
+    __setTransportForTests(async (url, init) => {
+      const path = new URL(url).pathname.replace('/v1.0', '')
+      seen[path]!.push(tokenClaims(init))
+      hits[path]! += 1
+      if (path === '/a' && hits[path] === 1) return jsonResponse({}, { status: 401 })
+      if (path === '/b' && hits[path] === 1)
+        return jsonResponse({}, { status: 429, headers: { 'Retry-After': '0' } })
+      return jsonResponse({ ok: path })
+    })
+    // The ambient account changes while B is backing off.
+    __setSleepForTests(async () => {
+      setActiveProfile('z')
+      setAudiencePreference('graph', { fallback: true })
+    })
+    // Same audience on purpose: only the profile separates their tokens.
+    const a = createGraphClient({ account: accountRef('a'), audience: 'graph', fallback: false })
+    const b = createGraphClient({ account: accountRef('b'), audience: 'graph', fallback: false })
+    await Promise.all([
+      a.graph({ method: 'GET', path: '/a' }),
+      b.graph({ method: 'GET', path: '/b' }),
+    ])
+    expect(seen['/a']).toEqual([
+      { p: 'a', aud: 'graph' },
+      { p: 'a', aud: 'graph' },
+    ])
+    expect(seen['/b']).toEqual([
+      { p: 'b', aud: 'graph' },
+      { p: 'b', aud: 'graph' },
+    ])
+    // A's 401 re-minted A's token only; B's cached token survived.
+    expect(mints.filter((m) => m === 'a')).toHaveLength(2)
+    expect(mints.filter((m) => m === 'b')).toHaveLength(1)
+  })
+
+  test('mutating the context object after binding does not move a retry', async () => {
+    primeTokensPerAccount()
+    const ctx = { account: accountRef('a'), audience: 'graph' as const, fallback: false }
+    const seen: string[] = []
+    __setTransportForTests(async (_url, init) => {
+      seen.push(tokenClaims(init).p)
+      if (seen.length === 1)
+        return jsonResponse({}, { status: 429, headers: { 'Retry-After': '0' } })
+      return jsonResponse({})
+    })
+    __setSleepForTests(async () => {
+      ;(ctx as { account: unknown }).account = accountRef('b')
+    })
+    await createGraphClient(ctx).graph({ method: 'GET', path: '/x' })
+    expect(seen).toEqual(['a', 'a'])
+  })
+
+  test('every page of a paginated call runs as the account it started with', async () => {
+    primeTokensPerAccount()
+    const seen: { p: string; aud: string }[] = []
+    __setTransportForTests(async (url, init) => {
+      seen.push(tokenClaims(init))
+      if (url.includes('page2')) return jsonResponse({ value: [2] })
+      // The active account switches between page 1 and page 2.
+      setActiveProfile('z')
+      return jsonResponse({
+        value: [1],
+        '@odata.nextLink': 'https://graph.microsoft.com/v1.0/items?page2=1',
+      })
+    })
+    const a = createGraphClient({ account: accountRef('a'), audience: 'graph', fallback: false })
+    expect(await a.paginateAll<number>({ method: 'GET', path: '/items' })).toEqual([1, 2])
+    expect(seen.map((c) => c.p)).toEqual(['a', 'a'])
+  })
+
+  test('the ambient wrappers pin the account for the whole call', async () => {
+    primeTokensPerAccount()
+    setActiveProfile('a')
+    const seen: string[] = []
+    __setTransportForTests(async (url, init) => {
+      seen.push(tokenClaims(init).p)
+      if (url.includes('page2')) return jsonResponse({ value: [] })
+      setActiveProfile('z')
+      return jsonResponse({
+        value: [],
+        '@odata.nextLink': 'https://graph.microsoft.com/v1.0/items?page2=1',
+      })
+    })
+    await paginateAll({ method: 'GET', path: '/items' })
+    expect(seen).toEqual(['a', 'a'])
   })
 })

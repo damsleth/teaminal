@@ -14,6 +14,7 @@
 // All Graph endpoints in the project go through this module. UI/state code
 // must never call fetch() directly.
 
+import { accountRef, owaProfile, type AccountRef } from '../account'
 import { getToken, invalidate } from '../auth/owaPiggy'
 import { recordRequest } from '../log'
 
@@ -75,7 +76,7 @@ export function getActiveProfile(): string | undefined {
 // persistent 401 the client falls back to the other audience once (when
 // audienceFallback is on). Calls that pass an explicit `scope` are never
 // rewritten — those target a specific audience deliberately.
-type TokenAudience = 'graph' | 'ic3'
+export type TokenAudience = 'graph' | 'ic3'
 let preferredAudience: TokenAudience = 'graph'
 // Off by default: a plain install with no per-account audience preference
 // behaves exactly as before (graph token, single same-audience 401 retry,
@@ -97,6 +98,26 @@ export function getAudiencePreference(): { audience: TokenAudience; fallback: bo
 
 function otherAudience(audience: TokenAudience): TokenAudience {
   return audience === 'graph' ? 'ic3' : 'graph'
+}
+
+// Everything a request needs to know about the account it runs as. Captured
+// once per call, so a 401 retry, a 429 retry and every pagination page use
+// the same account and audience even if the active account changes mid-flight.
+export type AccountContext = Readonly<{
+  account: Readonly<AccountRef>
+  // Audience for default (no explicit `scope`) calls.
+  audience: TokenAudience
+  // Whether a persistent 401 may retry once with the other audience.
+  fallback: boolean
+}>
+
+// M1 shim: the context the ambient globals describe right now.
+export function currentAccountContext(): AccountContext {
+  return {
+    account: accountRef(activeProfile),
+    audience: preferredAudience,
+    fallback: audienceFallback,
+  }
 }
 
 type Transport = (url: string, init: RequestInit) => Promise<Response>
@@ -182,11 +203,11 @@ type RetryState = {
   triedFallback: boolean
 }
 
-function initialRetryState(opts: GraphOpts): RetryState {
+function initialRetryState(opts: GraphOpts, ctx: AccountContext): RetryState {
   return {
     retried401: false,
     retried429Count: 0,
-    audience: opts.scope ? undefined : preferredAudience,
+    audience: opts.scope ? undefined : ctx.audience,
     triedFallback: false,
   }
 }
@@ -194,10 +215,12 @@ function initialRetryState(opts: GraphOpts): RetryState {
 async function executeRequest<T>(
   url: string,
   opts: GraphOpts,
-  state: RetryState = initialRetryState(opts),
+  ctx: AccountContext,
+  state: RetryState = initialRetryState(opts, ctx),
 ): Promise<T> {
   const { retried401, retried429Count, audience } = state
-  const token = await getToken({ profile: activeProfile, scope: opts.scope, audience })
+  const profile = owaProfile(ctx.account)
+  const token = await getToken({ profile, scope: opts.scope, audience })
   const headers = new Headers({
     Accept: 'application/json',
   })
@@ -256,17 +279,17 @@ async function executeRequest<T>(
     // First 401: token may have expired between cache validation and
     // send. Invalidate and retry the same audience once.
     if (!retried401) {
-      invalidate({ profile: activeProfile, scope: opts.scope, audience })
-      return executeRequest<T>(url, opts, { ...state, retried401: true })
+      invalidate({ profile, scope: opts.scope, audience })
+      return executeRequest<T>(url, opts, ctx, { ...state, retried401: true })
     }
     // Persistent 401 on a default (no-explicit-scope) call: fall back to
     // the other audience once, if enabled. Covers the case where the
     // preferred audience is rejected outright (wrong audience / CA gate)
     // but the other one is accepted by this endpoint.
-    if (!opts.scope && audienceFallback && !state.triedFallback) {
-      const fb = otherAudience(audience ?? preferredAudience)
-      invalidate({ profile: activeProfile, audience: fb })
-      return executeRequest<T>(url, opts, {
+    if (!opts.scope && ctx.fallback && !state.triedFallback) {
+      const fb = otherAudience(audience ?? ctx.audience)
+      invalidate({ profile, audience: fb })
+      return executeRequest<T>(url, opts, ctx, {
         retried401: false,
         retried429Count,
         audience: fb,
@@ -291,7 +314,7 @@ async function executeRequest<T>(
     const retryRaw = parseRetryAfter(res.headers.get('Retry-After'), Date.now())
     const waitMs = jitter(retryRaw > 0 ? retryRaw : DEFAULT_429_BACKOFF_MS)
     await sleep(waitMs)
-    return executeRequest<T>(url, opts, { ...state, retried429Count: retried429Count + 1 })
+    return executeRequest<T>(url, opts, ctx, { ...state, retried429Count: retried429Count + 1 })
   }
 
   if (!res.ok) {
@@ -312,25 +335,25 @@ async function executeRequest<T>(
 }
 
 export async function graph<T>(opts: GraphOpts): Promise<T> {
-  const url = buildUrl(opts)
-  return executeRequest<T>(url, opts)
+  return createGraphClient(currentAccountContext()).graph<T>(opts)
 }
 
 // Binary variant of `graph()` for endpoints that return raw bytes
 // (e.g. /hostedContents/{id}/$value). Applies the same 401/429 retry
 // logic as graph<T> but returns the response body as a Uint8Array.
 export async function graphBinary(opts: GraphOpts): Promise<Uint8Array> {
-  const url = buildUrl(opts)
-  return executeBinaryRequest(url, opts)
+  return createGraphClient(currentAccountContext()).graphBinary(opts)
 }
 
 async function executeBinaryRequest(
   url: string,
   opts: GraphOpts,
-  state: RetryState = initialRetryState(opts),
+  ctx: AccountContext,
+  state: RetryState = initialRetryState(opts, ctx),
 ): Promise<Uint8Array> {
   const { retried401, retried429Count, audience } = state
-  const token = await getToken({ profile: activeProfile, scope: opts.scope, audience })
+  const profile = owaProfile(ctx.account)
+  const token = await getToken({ profile, scope: opts.scope, audience })
   const headers = new Headers({ Accept: '*/*' })
   for (const [k, v] of Object.entries(opts.headers ?? {})) {
     if (v === undefined) continue
@@ -371,13 +394,13 @@ async function executeBinaryRequest(
 
   if (res.status === 401) {
     if (!retried401) {
-      invalidate({ profile: activeProfile, scope: opts.scope, audience })
-      return executeBinaryRequest(url, opts, { ...state, retried401: true })
+      invalidate({ profile, scope: opts.scope, audience })
+      return executeBinaryRequest(url, opts, ctx, { ...state, retried401: true })
     }
-    if (!opts.scope && audienceFallback && !state.triedFallback) {
-      const fb = otherAudience(audience ?? preferredAudience)
-      invalidate({ profile: activeProfile, audience: fb })
-      return executeBinaryRequest(url, opts, {
+    if (!opts.scope && ctx.fallback && !state.triedFallback) {
+      const fb = otherAudience(audience ?? ctx.audience)
+      invalidate({ profile, audience: fb })
+      return executeBinaryRequest(url, opts, ctx, {
         retried401: false,
         retried429Count,
         audience: fb,
@@ -394,7 +417,10 @@ async function executeBinaryRequest(
     const retryRaw = parseRetryAfter(res.headers.get('Retry-After'), Date.now())
     const waitMs = jitter(retryRaw > 0 ? retryRaw : DEFAULT_429_BACKOFF_MS)
     await sleep(waitMs)
-    return executeBinaryRequest(url, opts, { ...state, retried429Count: retried429Count + 1 })
+    return executeBinaryRequest(url, opts, ctx, {
+      ...state,
+      retried429Count: retried429Count + 1,
+    })
   }
 
   if (!res.ok) {
@@ -406,16 +432,20 @@ async function executeBinaryRequest(
 
 type PagedResponse<T> = { value: T[]; '@odata.nextLink'?: string }
 
-// Yields successive pages of `value` from a Graph collection endpoint,
-// following `@odata.nextLink` until exhausted. Callers can break out
-// of `for await` to stop early.
-export async function* paginate<T>(opts: GraphOpts): AsyncGenerator<T[], void, unknown> {
+async function* paginateWith<T>(
+  opts: GraphOpts,
+  ctx: AccountContext,
+): AsyncGenerator<T[], void, unknown> {
   let url = buildUrl(opts)
   let firstPage = true
   while (true) {
     const page = firstPage
-      ? await executeRequest<PagedResponse<T>>(url, opts)
-      : await executeRequest<PagedResponse<T>>(url, { ...opts, query: undefined, body: undefined })
+      ? await executeRequest<PagedResponse<T>>(url, opts, ctx)
+      : await executeRequest<PagedResponse<T>>(
+          url,
+          { ...opts, query: undefined, body: undefined },
+          ctx,
+        )
     firstPage = false
     yield page.value ?? []
     const next = page['@odata.nextLink']
@@ -424,14 +454,51 @@ export async function* paginate<T>(opts: GraphOpts): AsyncGenerator<T[], void, u
   }
 }
 
-// Convenience: collect all pages into a single array. Use sparingly - prefer
-// `paginate()` when you can stop early.
-export async function paginateAll<T>(opts: GraphOpts): Promise<T[]> {
+async function paginateAllWith<T>(opts: GraphOpts, ctx: AccountContext): Promise<T[]> {
   const out: T[] = []
-  for await (const page of paginate<T>(opts)) {
+  for await (const page of paginateWith<T>(opts, ctx)) {
     out.push(...page)
   }
   return out
+}
+
+// Yields successive pages of `value` from a Graph collection endpoint,
+// following `@odata.nextLink` until exhausted. Callers can break out
+// of `for await` to stop early.
+export function paginate<T>(opts: GraphOpts): AsyncGenerator<T[], void, unknown> {
+  return paginateWith<T>(opts, currentAccountContext())
+}
+
+// Convenience: collect all pages into a single array. Use sparingly - prefer
+// `paginate()` when you can stop early.
+export function paginateAll<T>(opts: GraphOpts): Promise<T[]> {
+  return paginateAllWith<T>(opts, currentAccountContext())
+}
+
+// A Graph client bound to one account. Nested helpers that receive it cannot
+// fall back to another account's token or audience.
+export type GraphClient = {
+  ctx: AccountContext
+  graph<T>(opts: GraphOpts): Promise<T>
+  graphBinary(opts: GraphOpts): Promise<Uint8Array>
+  paginate<T>(opts: GraphOpts): AsyncGenerator<T[], void, unknown>
+  paginateAll<T>(opts: GraphOpts): Promise<T[]>
+}
+
+export function createGraphClient(context: AccountContext): GraphClient {
+  // Snapshot: mutating the caller's object later must not move an in-flight
+  // retry or the next page onto another account.
+  const ctx: AccountContext = Object.freeze({
+    ...context,
+    account: Object.freeze({ ...context.account }),
+  })
+  return {
+    ctx,
+    graph: (opts) => executeRequest(buildUrl(opts), opts, ctx),
+    graphBinary: (opts) => executeBinaryRequest(buildUrl(opts), opts, ctx),
+    paginate: (opts) => paginateWith(opts, ctx),
+    paginateAll: (opts) => paginateAllWith(opts, ctx),
+  }
 }
 
 // Test-only hooks. Underscore prefix marks them as not part of the public API.
