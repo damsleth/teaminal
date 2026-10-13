@@ -38,12 +38,7 @@
 import { Box, Text, useStdin, useStdout } from 'ink'
 import { useInput } from './useInput'
 import { useEffect, useRef, useState } from 'react'
-import {
-  editChatMessageContent,
-  postChannelReply,
-  sendChannelMessage,
-  sendChatMessage,
-} from '../state/chatActions'
+import { editChatMessageContent, sendMessage } from '../state/chatActions'
 import { focusKey } from '../state/store'
 import type { ChatMessage } from '../types'
 import {
@@ -67,10 +62,6 @@ import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useSessionApi } from './SessionContext'
 
 const MAX_VISIBLE_LINES = 5
-
-function makeTempId(): string {
-  return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
 
 const QUOTE_PREVIEW_MAX = 80
 
@@ -247,71 +238,15 @@ export function Composer() {
     if (focus.kind !== 'chat' && focus.kind !== 'channel' && focus.kind !== 'thread') return
     if (sending) return
 
-    const convForSend = focusKey(focus)
-    if (!convForSend) return
-
-    const tempId = makeTempId()
-    const myId = store.get().me?.id
-    const myName = store.get().me?.displayName ?? 'Me'
-    const optimistic: ChatMessage = {
-      id: tempId,
-      _tempId: tempId,
-      _sending: true,
-      createdDateTime: new Date().toISOString(),
-      body: { contentType: 'text', content: trimmed },
-      from: myId
-        ? { user: { id: myId, displayName: myName } }
-        : { user: { id: 'me', displayName: myName } },
-    }
-
     setSending(true)
     setBuf(emptyBuffer)
-    store.set((s) => {
-      const nextDrafts = { ...s.draftsByConvo }
-      delete nextDrafts[convForSend]
-      return {
-        messagesByConvo: {
-          ...s.messagesByConvo,
-          [convForSend]: [...(s.messagesByConvo[convForSend] ?? []), optimistic],
-        },
-        draftsByConvo: nextDrafts,
-      }
-    })
-
+    const generation = session.generation()
+    // A reply landing after an account switch belongs to the old session.
+    const isStale = () => session.generation() !== generation
     try {
-      const sent =
-        focus.kind === 'chat'
-          ? await sendChatMessage(session.client(), focus.chatId, trimmed)
-          : focus.kind === 'channel'
-            ? await sendChannelMessage(session.client(), focus.teamId, focus.channelId, trimmed)
-            : await postChannelReply(
-                session.client(),
-                focus.teamId,
-                focus.channelId,
-                focus.rootId,
-                trimmed,
-              )
-      store.set((s) => ({
-        messagesByConvo: {
-          ...s.messagesByConvo,
-          [convForSend]: (s.messagesByConvo[convForSend] ?? []).map((m) =>
-            m._tempId === tempId ? sent : m,
-          ),
-        },
-      }))
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'send failed'
+      const result = await sendMessage(session.client(), store, focus, trimmed, { isStale })
       // Restore the buffer so the user can edit + retry.
-      setBuf({ text: trimmed, cursor: trimmed.length })
-      store.set((s) => ({
-        messagesByConvo: {
-          ...s.messagesByConvo,
-          [convForSend]: (s.messagesByConvo[convForSend] ?? []).map((m) =>
-            m._tempId === tempId ? { ...m, _sending: false, _sendError: errorMessage } : m,
-          ),
-        },
-        draftsByConvo: { ...s.draftsByConvo, [convForSend]: trimmed },
-      }))
+      if (!result.ok && !isStale()) setBuf({ text: trimmed, cursor: trimmed.length })
     } finally {
       setSending(false)
     }
