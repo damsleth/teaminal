@@ -39,6 +39,15 @@ function importsMatch(file: string, pattern: RegExp): boolean {
 }
 
 describe('architecture: layer boundaries', () => {
+  test('src/account imports nothing from the rest of src', () => {
+    // Whole-file scan (not line-by-line) so multiline, side-effect and
+    // dynamic imports that reach up a level are all caught.
+    const offenders = filesUnder('account').filter((f) =>
+      /(?:from|import)\s*\(?\s*['"]\.\.\//.test(readFileSync(f, 'utf8')),
+    )
+    expect(offenders.map((f) => relative(REPO_ROOT, f))).toEqual([])
+  })
+
   test('src/auth does not import from graph, state, or ui', () => {
     const offenders = filesUnder('auth').filter((f) =>
       importsMatch(f, /from\s+['"][^'"]*\/(graph|state|ui)\//),
