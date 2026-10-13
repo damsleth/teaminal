@@ -17,10 +17,10 @@
 //
 // See docs/external-user-search.md for the full design rationale.
 
+import { owaProfile, type AccountRef } from '../account'
 import { getToken } from '../auth/owaPiggy'
 import { recordEvent, recordRequest } from '../log'
 import type { DirectoryUser } from '../types'
-import { getActiveProfile } from './client'
 import { TEAMS_SPACES_SCOPE } from './teamsFederation'
 import { resolveMiddleTierBase } from './teamsRegion'
 
@@ -35,7 +35,7 @@ export class TeamsExternalSearchError extends Error {
 }
 
 export type ExternalSearchOpts = {
-  profile?: string
+  account: AccountRef
   region?: string
   signal?: AbortSignal
   /** Hard cap on the number of results returned to the caller. */
@@ -46,13 +46,13 @@ type Transport = (url: string, init: RequestInit) => Promise<Response>
 const realTransport: Transport = (url, init) => fetch(url, init)
 let transport: Transport = realTransport
 
-async function middleTierBase(opts?: ExternalSearchOpts): Promise<string> {
+async function middleTierBase(opts: ExternalSearchOpts): Promise<string> {
   if (opts?.region) return `https://teams.microsoft.com/api/mt/part/${opts.region}`
-  return resolveMiddleTierBase({ profile: opts?.profile, signal: opts?.signal })
+  return resolveMiddleTierBase({ account: opts.account, signal: opts.signal })
 }
 
-function profile(opts?: ExternalSearchOpts): string | undefined {
-  return opts?.profile ?? getActiveProfile()
+function profile(opts: ExternalSearchOpts): string | undefined {
+  return owaProfile(opts.account)
 }
 
 // /api/mt/* endpoints (fetchFederated, searchUsers) use the Teams
@@ -157,7 +157,7 @@ async function searchFederated(
   email: string,
   base: string,
   spacesToken: string,
-  opts?: ExternalSearchOpts,
+  opts: ExternalSearchOpts,
 ): Promise<SkypeSearchUser[]> {
   const url = `${base}/beta/users/${encodeURIComponent(email)}/externalsearchv3?includeTFLUsers=true`
   const startedAt = Date.now()
@@ -233,16 +233,13 @@ function maskEmail(email: string): string {
 
 export async function searchExternalUsers(
   searchTerm: string,
-  searchOpts?: ExternalSearchOpts,
+  opts: ExternalSearchOpts,
 ): Promise<DirectoryUser[]> {
   const trimmed = searchTerm.trim()
   if (!trimmed) return []
-  // Pin the profile once: an account switch mid-await must not mint the
-  // token (or resolve the region) for a different account than the cache key.
-  const opts: ExternalSearchOpts = { ...searchOpts, profile: profile(searchOpts) }
-  // Keyed by profile: hits carry tenant-specific oids/MRIs that must never
+  // Keyed by account: hits carry tenant-specific oids/MRIs that must never
   // be offered (or fed to createOneOnOneChat) in another account.
-  const cacheKey = `${opts.profile ?? ''}::${trimmed.toLowerCase()}`
+  const cacheKey = `${opts.account.id}::${trimmed.toLowerCase()}`
   const cached = cacheGet(cacheKey)
   if (cached) return cached.slice(0, opts?.top ?? cached.length)
 

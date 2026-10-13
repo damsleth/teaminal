@@ -11,7 +11,7 @@
 //     where the user is only a shared-channel member; shared-channel
 //     discovery is parked for after v1
 
-import { graph, paginate } from './client'
+import { currentAccountContext, graph, paginate } from './client'
 import {
   listChannelMessagesViaChatsvc,
   listChannelMessagesViaChatsvcNextPage,
@@ -102,6 +102,7 @@ export async function listChannelMessagesPage(
   // FOCI cannot mint that scope from the OWA refresh token. Always go
   // through the Teams chat service.
   const fallback = await listChannelMessagesViaChatsvc(channelId, {
+    account: currentAccountContext().account,
     pageSize: opts?.top ?? CHANNEL_MESSAGES_TOP_DEFAULT,
     signal: opts?.signal,
   })
@@ -112,7 +113,10 @@ export async function listChannelMessagesNextPage(
   nextLink: string,
   opts?: { signal?: AbortSignal },
 ): Promise<ChannelMessagesPage> {
-  const fallback = await listChannelMessagesViaChatsvcNextPage(nextLink, { signal: opts?.signal })
+  const fallback = await listChannelMessagesViaChatsvcNextPage(nextLink, {
+    account: currentAccountContext().account,
+    signal: opts?.signal,
+  })
   return { messages: fallback.messages, nextLink: fallback.backwardLink }
 }
 
@@ -146,7 +150,10 @@ export async function sendChannelMessage(
 ): Promise<ChannelMessage> {
   // Graph send needs ChannelMessage.Send which FOCI never issues.
   // Route through chatsvc unconditionally.
-  return sendChannelMessageViaChatsvc(channelId, content, { signal: opts?.signal })
+  return sendChannelMessageViaChatsvc(channelId, content, {
+    account: currentAccountContext().account,
+    signal: opts?.signal,
+  })
 }
 
 // --- Channel replies (threaded messages) ---
@@ -185,6 +192,7 @@ export async function listChannelRepliesPage(
   opts?: ListChannelRepliesOpts,
 ): Promise<ChannelRepliesPage> {
   const page = await listChannelRepliesViaChatsvc(channelId, rootId, {
+    account: currentAccountContext().account,
     pageSize: opts?.top ?? CHANNEL_REPLIES_TOP_DEFAULT,
     signal: opts?.signal,
   })
@@ -197,7 +205,10 @@ export async function listChannelRepliesNextPage(
 ): Promise<ChannelRepliesPage> {
   // The Skype backwardLink is absolute; the generic chatsvc follower handles
   // both channel and thread (sub-conversation) pages.
-  const page = await listChannelMessagesViaChatsvcNextPage(nextLink, { signal: opts?.signal })
+  const page = await listChannelMessagesViaChatsvcNextPage(nextLink, {
+    account: currentAccountContext().account,
+    signal: opts?.signal,
+  })
   return { messages: page.messages, nextLink: page.backwardLink }
 }
 
@@ -216,6 +227,7 @@ export async function postChannelReply(
   opts?: SendChannelMessageOpts,
 ): Promise<ChannelMessage> {
   return sendChannelMessageViaChatsvc(channelId, content, {
+    account: currentAccountContext().account,
     replyToId: rootId,
     signal: opts?.signal,
   })

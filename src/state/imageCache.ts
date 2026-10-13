@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { accountRef } from '../account'
 import { getAudiencePreference, graphBinary, GraphError } from '../graph/client'
 import { fetchObjectById, fetchObjectByUrl, isAsyncGwUrl } from '../graph/teamsAsyncGw'
 import { recordEvent } from '../log'
@@ -131,7 +132,7 @@ async function fetchHostedContent(path: string, opts?: FetchImageOpts): Promise<
     graphBinary({ method: 'GET', path, signal: opts?.signal })
   const viaAsyncGw = async (): Promise<Uint8Array> => {
     const { bytes } = await fetchObjectById(objectId!, {
-      profile: opts?.profile,
+      account: accountRef(opts?.profile),
       region: opts?.region,
       signal: opts?.signal,
     })
@@ -190,7 +191,7 @@ export async function fetchAndCacheImage(
       // cookie obtained from aadtokenauth. Route them through the
       // asyncgw client which mints/refreshes the cookie as needed.
       const fetched = await fetchObjectByUrl(path, {
-        profile: opts.profile,
+        account: accountRef(opts.profile),
         signal: opts.signal,
       })
       bytes = fetched.bytes

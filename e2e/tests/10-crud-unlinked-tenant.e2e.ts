@@ -6,6 +6,7 @@ import {
   sendMessage,
   softDeleteMessage,
 } from '../../src/graph/chats'
+import { currentAccountContext } from '../../src/graph/client'
 import { getMe } from '../../src/graph/me'
 import { searchExternalUsers } from '../../src/graph/teamsExternalSearch'
 import type { E2ETest } from '../types'
@@ -53,7 +54,9 @@ const test: E2ETest = {
     }
     ctx.log(`unlinked-tenant peer: ${unlinkedEmail}`)
 
-    const externalHits = await searchExternalUsers(unlinkedEmail)
+    const externalHits = await searchExternalUsers(unlinkedEmail, {
+      account: currentAccountContext().account,
+    })
     if (externalHits.length === 0) {
       throw new Error(`Teams external search returned 0 hits for ${unlinkedEmail}`)
     }

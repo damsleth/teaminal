@@ -20,6 +20,7 @@
 // The most reply-dense scanned channel's raw first page is written to
 // .plans/chatsvc-sample.json for offline field inspection.
 
+import { accountRef } from '../src/account'
 import { setActiveProfile } from '../src/graph/client'
 import { listChannels, listJoinedTeams } from '../src/graph/teams'
 import { getSkypeToken } from '../src/graph/teamsFederation'
@@ -69,8 +70,8 @@ async function fetchRaw(
   channelId: string,
   viewStr: string,
 ): Promise<{ status: number; json: RawResp | null; text: string }> {
-  const region = await resolveRegion({ profile })
-  const token = await getSkypeToken({ profile })
+  const region = await resolveRegion({ account: accountRef(profile) })
+  const token = await getSkypeToken({ account: accountRef(profile) })
   const viewQ = viewStr ? `&view=${encodeURIComponent(viewStr)}` : ''
   const url = `${TEAMS_ORIGIN}/api/chatsvc/${region}/v1/users/ME/conversations/${encodeURIComponent(
     channelId,

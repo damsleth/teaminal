@@ -1,4 +1,5 @@
 import { searchChatUsers } from '../../src/graph/chats'
+import { currentAccountContext } from '../../src/graph/client'
 import { getMe } from '../../src/graph/me'
 import { resolveFederatedEquivalentConversationId } from '../../src/graph/teamsFederation'
 import type { E2ETest } from '../types'
@@ -29,7 +30,9 @@ const test: E2ETest = {
         ctx.log(`SKIP "${email}" - search did not surface an AAD id`)
         continue
       }
-      const resolved = await resolveFederatedEquivalentConversationId(me.id, peer.id)
+      const resolved = await resolveFederatedEquivalentConversationId(me.id, peer.id, {
+        account: currentAccountContext().account,
+      })
       ctx.log(
         resolved
           ? `${email} -> ${resolved}`

@@ -15,9 +15,9 @@
 // each message into the ChannelMessage shape the rest of the app
 // already consumes.
 
+import type { AccountRef } from '../account'
 import { recordEvent, recordRequest } from '../log'
 import type { ChatMessage, Reaction } from '../types'
-import { getActiveProfile } from './client'
 import { getSkypeToken, withSkypeAuth } from './teamsFederation'
 import { resolveRegion } from './teamsRegion'
 
@@ -35,7 +35,7 @@ export class TeamsChatsvcError extends Error {
 }
 
 export type ChatsvcOpts = {
-  profile?: string
+  account: AccountRef
   region?: string
   signal?: AbortSignal
 }
@@ -50,13 +50,9 @@ type Transport = (url: string, init: RequestInit) => Promise<Response>
 const realTransport: Transport = (url, init) => fetch(url, init)
 let transport: Transport = realTransport
 
-async function region(opts?: ChatsvcOpts): Promise<string> {
+async function region(opts: ChatsvcOpts): Promise<string> {
   if (opts?.region) return opts.region
-  return resolveRegion({ profile: opts?.profile, signal: opts?.signal })
-}
-
-function profile(opts?: ChatsvcOpts): string | undefined {
-  return opts?.profile ?? getActiveProfile()
+  return resolveRegion({ account: opts.account, signal: opts.signal })
 }
 
 function chatsvcHeaders(skypeToken: string): Record<string, string> {
@@ -81,9 +77,9 @@ async function safeFullText(res: Response): Promise<string> {
 
 async function chatsvcGet<T>(
   url: string,
-  opts?: ChatsvcOpts,
+  opts: ChatsvcOpts,
 ): Promise<{ status: number; body: T | null; text: string }> {
-  const token = await getSkypeToken({ profile: profile(opts), signal: opts?.signal })
+  const token = await getSkypeToken({ account: opts.account, signal: opts.signal })
   const startedAt = Date.now()
   const path = new URL(url).pathname + new URL(url).search
   let res: Response
@@ -350,7 +346,7 @@ export function __resetChatsvcDiagnosticsForTests(): void {
 
 export async function listChannelMessagesViaChatsvc(
   threadId: string,
-  opts?: ChatsvcOpts & { pageSize?: number },
+  opts: ChatsvcOpts & { pageSize?: number },
 ): Promise<ChatsvcChannelMessagesPage> {
   return withSkypeAuth(async () => {
     const pageSize = opts?.pageSize ?? DEFAULT_PAGE_SIZE
@@ -384,7 +380,7 @@ export async function listChannelMessagesViaChatsvc(
 // link Teams returns is already absolute, so we use it verbatim.
 export async function listChannelMessagesViaChatsvcNextPage(
   backwardLink: string,
-  opts?: ChatsvcOpts,
+  opts: ChatsvcOpts,
 ): Promise<ChatsvcChannelMessagesPage> {
   return withSkypeAuth(async () => {
     const res = await chatsvcGet<SkypeMessagesResponse>(backwardLink, opts)
@@ -419,7 +415,7 @@ export async function listChannelMessagesViaChatsvcNextPage(
 export async function listChannelRepliesViaChatsvc(
   channelId: string,
   rootId: string,
-  opts?: ChatsvcOpts & { pageSize?: number },
+  opts: ChatsvcOpts & { pageSize?: number },
 ): Promise<ChatsvcChannelMessagesPage> {
   return withSkypeAuth(async () => {
     const pageSize = opts?.pageSize ?? DEFAULT_PAGE_SIZE
@@ -451,7 +447,7 @@ export async function listChannelRepliesViaChatsvc(
 // token (default owa-piggy client mints it).
 export async function listChatMessagesViaChatsvc(
   threadId: string,
-  opts?: ChatsvcOpts & { pageSize?: number },
+  opts: ChatsvcOpts & { pageSize?: number },
 ): Promise<ChatsvcChannelMessagesPage> {
   return withSkypeAuth(async () => {
     const pageSize = opts?.pageSize ?? DEFAULT_PAGE_SIZE
@@ -508,7 +504,7 @@ function clientMessageId(): string {
 export async function sendChannelMessageViaChatsvc(
   threadId: string,
   content: string,
-  opts?: SendChatsvcOpts,
+  opts: SendChatsvcOpts,
 ): Promise<ChatMessage> {
   // Generate the cmid outside the retry closure so a 401-retry preserves
   // idempotency: Skype dedupes by clientmessageid, so re-sending with the
@@ -527,7 +523,7 @@ export async function sendChannelMessageViaChatsvc(
       ...(opts?.imdisplayname ? { imdisplayname: opts.imdisplayname } : {}),
       ...(opts?.replyToId ? { properties: { parentmessageid: opts.replyToId } } : {}),
     }
-    const skypeToken = await getSkypeToken({ profile: profile(opts), signal: opts?.signal })
+    const skypeToken = await getSkypeToken({ account: opts.account, signal: opts.signal })
     const startedAt = Date.now()
     const path = new URL(url).pathname
     let res: Response

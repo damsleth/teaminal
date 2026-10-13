@@ -31,6 +31,7 @@ import {
   postChannelReply as postChannelReplyGraph,
   sendChannelMessage as sendChannelMessageGraph,
 } from '../graph/teams'
+import { currentAccountContext } from '../graph/client'
 import { recordEvent } from '../log'
 import type { Chat, ChatMessage, ChatMessageSearchHit, DirectoryUser, IdentityUser } from '../types'
 import {
@@ -52,7 +53,9 @@ export async function resolveFederatedChatId(
   otherUserId: string,
 ): Promise<string | null> {
   try {
-    return await resolveFederatedEquivalentConversationId(selfId, otherUserId)
+    return await resolveFederatedEquivalentConversationId(selfId, otherUserId, {
+      account: currentAccountContext().account,
+    })
   } catch (err) {
     recordEvent(
       'graph',
@@ -277,7 +280,7 @@ export async function searchExternalUsers(
   query: string,
   opts?: { top?: number; signal?: AbortSignal },
 ): Promise<DirectoryUser[]> {
-  return searchExternalUsersGraph(query, opts)
+  return searchExternalUsersGraph(query, { ...opts, account: currentAccountContext().account })
 }
 
 /** Tenant-wide server-side message search (Microsoft Search API). */

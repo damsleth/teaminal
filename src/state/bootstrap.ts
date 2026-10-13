@@ -11,6 +11,7 @@
 // runSession once at startup; the AccountsModal calls it again on
 // switch via the SessionContext.
 
+import { accountRef } from '../account'
 import { getToken } from '../auth/owaPiggy'
 import { probeCapabilities } from '../graph/capabilities'
 import { setActiveProfile, setAudiencePreference } from '../graph/client'
@@ -69,7 +70,7 @@ async function hydrateActivityFeed(
   isStale: () => boolean,
 ): Promise<void> {
   try {
-    const page = await listActivityFeed({ profile, isPrefetch: true })
+    const page = await listActivityFeed({ account: accountRef(profile), isPrefetch: true })
     // Drop the result if the session was torn down (profile switch)
     // while this detached fetch was in flight — otherwise we'd
     // repopulate the next account's wiped feed with this account's items.

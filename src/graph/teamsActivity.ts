@@ -18,8 +18,8 @@
 // 401s flow through withSkypeAuth so a stale cache hit doesn't kill the
 // hydration.
 
+import { owaProfile, type AccountRef } from '../account'
 import { recordEvent, recordRequest } from '../log'
-import { getActiveProfile } from './client'
 import { csaHeaders, getCsaToken, withCsaAuth } from './csaAuth'
 import { resolveRegion, TEAMS_ORIGIN } from './teamsRegion'
 
@@ -74,7 +74,7 @@ export type ActivityPage = {
 }
 
 export type ActivityOpts = {
-  profile?: string
+  account: AccountRef
   region?: string
   signal?: AbortSignal
   /** Set to true on the very first poll of the session; matches what Teams web sends. */
@@ -87,13 +87,13 @@ type Transport = (url: string, init: RequestInit) => Promise<Response>
 const realTransport: Transport = (url, init) => fetch(url, init)
 let transport: Transport = realTransport
 
-async function region(opts?: ActivityOpts): Promise<string> {
+async function region(opts: ActivityOpts): Promise<string> {
   if (opts?.region) return opts.region
-  return resolveRegion({ profile: opts?.profile, signal: opts?.signal })
+  return resolveRegion({ account: opts.account, signal: opts.signal })
 }
 
-function profile(opts?: ActivityOpts): string | undefined {
-  return opts?.profile ?? getActiveProfile()
+function profile(opts: ActivityOpts): string | undefined {
+  return owaProfile(opts.account)
 }
 
 async function safeText(res: Response): Promise<string> {
@@ -253,7 +253,7 @@ function extractItemsArray(body: unknown): unknown[] {
   return []
 }
 
-export async function listActivityFeed(opts?: ActivityOpts): Promise<ActivityPage> {
+export async function listActivityFeed(opts: ActivityOpts): Promise<ActivityPage> {
   return withCsaAuth(async () => {
     const r = await region(opts)
     const params = new URLSearchParams({

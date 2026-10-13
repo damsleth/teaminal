@@ -17,6 +17,7 @@
 // SECURITY: The Skype token is as sensitive as the Graph token. It is
 // cached in-process only, never logged, never written to disk.
 
+import { accountRef } from '../account'
 import { decodeJwtClaims } from '../auth/owaPiggy'
 import { getSkypeToken } from '../graph/teamsFederation'
 import { getCachedTrouterUrl } from '../graph/teamsRegion'
@@ -381,13 +382,14 @@ export class TrouterTransport implements RealtimeTransport {
   private async ensureSkypeToken(): Promise<void> {
     if (!this.skypeTokenUnavailable) {
       const { skypeToken, unavailable } = await resolveSkypeAuth(() =>
-        getSkypeToken({ profile: this.profile }),
+        getSkypeToken({ account: accountRef(this.profile) }),
       )
       this.skypeToken = skypeToken
       this.skypeTokenUnavailable = unavailable
       if (skypeToken) debug('trouter: obtained skype token via shared store')
     }
-    this.trouterUrl = getCachedTrouterUrl({ profile: this.profile }) ?? TROUTER_REGISTER_URL
+    this.trouterUrl =
+      getCachedTrouterUrl({ account: accountRef(this.profile) }) ?? TROUTER_REGISTER_URL
   }
 
   // --- WebSocket ---

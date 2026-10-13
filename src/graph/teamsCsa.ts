@@ -21,9 +21,9 @@
 // Parsing is defensive: unknown / missing fields degrade to sensible
 // defaults rather than throwing, since CSA evolves.
 
+import { owaProfile, type AccountRef } from '../account'
 import { recordEvent, recordRequest } from '../log'
 import type { Channel, Chat, ChatMember, ChatType, LastMessagePreview, Team } from '../types'
-import { getActiveProfile } from './client'
 import { csaHeaders, getCsaToken, withCsaAuth } from './csaAuth'
 import { resolveRegion, TEAMS_ORIGIN } from './teamsRegion'
 
@@ -38,7 +38,7 @@ export class TeamsCsaError extends Error {
 }
 
 export type CsaOpts = {
-  profile?: string
+  account: AccountRef
   region?: string
   signal?: AbortSignal
 }
@@ -53,13 +53,13 @@ type Transport = (url: string, init: RequestInit) => Promise<Response>
 const realTransport: Transport = (url, init) => fetch(url, init)
 let transport: Transport = realTransport
 
-async function region(opts?: CsaOpts): Promise<string> {
+async function region(opts: CsaOpts): Promise<string> {
   if (opts?.region) return opts.region
-  return resolveRegion({ profile: opts?.profile, signal: opts?.signal })
+  return resolveRegion({ account: opts.account, signal: opts.signal })
 }
 
-function profile(opts?: CsaOpts): string | undefined {
-  return opts?.profile ?? getActiveProfile()
+function profile(opts: CsaOpts): string | undefined {
+  return owaProfile(opts.account)
 }
 
 async function safeText(res: Response): Promise<string> {
@@ -244,7 +244,7 @@ export function parseTeamsBootstrap(body: unknown): {
   return { teams, channelsByTeam }
 }
 
-async function csaGet(path: string, opts: CsaOpts | undefined, diagPath: string): Promise<unknown> {
+async function csaGet(path: string, opts: CsaOpts, diagPath: string): Promise<unknown> {
   const token = await getCsaToken(profile(opts))
   const startedAt = Date.now()
   let res: Response
@@ -289,7 +289,7 @@ async function csaGet(path: string, opts: CsaOpts | undefined, diagPath: string)
 
 // Fetch the chat list (with member display names) from the v2 endpoint,
 // following continuationToken up to MAX_CHAT_PAGES.
-export async function fetchChats(opts?: CsaOpts & { pageSize?: number }): Promise<Chat[]> {
+export async function fetchChats(opts: CsaOpts & { pageSize?: number }): Promise<Chat[]> {
   return withCsaAuth(async () => {
     const r = await region(opts)
     const pageSize = opts?.pageSize ?? DEFAULT_CHAT_PAGE_SIZE
@@ -311,7 +311,7 @@ export async function fetchChats(opts?: CsaOpts & { pageSize?: number }): Promis
 
 // Fetch teams + channels from the v1 bootstrap.
 export async function fetchTeams(
-  opts?: CsaOpts,
+  opts: CsaOpts,
 ): Promise<{ teams: Team[]; channelsByTeam: Record<string, Channel[]> }> {
   return withCsaAuth(async () => {
     const r = await region(opts)
@@ -325,7 +325,7 @@ export async function fetchTeams(
 }
 
 // Combined chat + teams list (chats from v2, teams from the bootstrap).
-export async function fetchChatsAndTeams(opts?: CsaOpts): Promise<ChatsAndTeams> {
+export async function fetchChatsAndTeams(opts: CsaOpts): Promise<ChatsAndTeams> {
   const [chats, teamsResult] = await Promise.all([fetchChats(opts), fetchTeams(opts)])
   recordEvent(
     'graph',

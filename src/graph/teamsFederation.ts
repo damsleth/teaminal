@@ -10,9 +10,9 @@
 // if Teams already knows the canonical equivalent conversation, open it
 // instead of creating another detached one.
 
+import { owaProfile, type AccountRef } from '../account'
 import { getToken } from '../auth/owaPiggy'
 import { recordEvent, recordRequest } from '../log'
-import { getActiveProfile } from './client'
 import {
   __resetForTests as resetRegionCacheForTests,
   ingestAuthzData,
@@ -38,7 +38,7 @@ export class TeamsFederationError extends Error {
 }
 
 export type TeamsFederationOpts = {
-  profile?: string
+  account: AccountRef
   region?: string
   signal?: AbortSignal
 }
@@ -56,13 +56,13 @@ type SkypeTokenEntry = { token: string; exp: number }
 const skypeTokenCache = new Map<string, SkypeTokenEntry>()
 const skypeTokenInFlight = new Map<string, Promise<string>>()
 
-async function region(opts?: TeamsFederationOpts): Promise<string> {
+async function region(opts: TeamsFederationOpts): Promise<string> {
   if (opts?.region) return opts.region
-  return resolveRegion({ profile: opts?.profile, signal: opts?.signal })
+  return resolveRegion({ account: opts.account, signal: opts.signal })
 }
 
-function profile(opts?: TeamsFederationOpts): string | undefined {
-  return opts?.profile ?? getActiveProfile()
+function profile(opts: TeamsFederationOpts): string | undefined {
+  return owaProfile(opts.account)
 }
 
 function userMriFromOid(oid: string): string {
@@ -104,7 +104,7 @@ async function requestTeams<T>(
   method: 'GET' | 'POST',
   url: string,
   body: unknown | undefined,
-  opts?: TeamsFederationOpts & { scope?: string },
+  opts: TeamsFederationOpts & { scope?: string },
 ): Promise<{ status: number; body: T | null; text: string }> {
   const token = await getToken({ profile: profile(opts), scope: opts?.scope ?? TEAMS_SPACES_SCOPE })
   const startedAt = Date.now()
@@ -172,8 +172,8 @@ function pickSkypeToken(data: unknown): SkypeTokenResponse | null {
   return null
 }
 
-function skypeCacheKey(opts?: TeamsFederationOpts): string {
-  return profile(opts) ?? '<default>'
+function skypeCacheKey(opts: TeamsFederationOpts): string {
+  return opts.account.id
 }
 
 async function postAuthz(bearerToken: string, signal?: AbortSignal): Promise<Response> {
@@ -214,7 +214,7 @@ async function postAuthz(bearerToken: string, signal?: AbortSignal): Promise<Res
 // Drop the cached Skype token for this profile so the next call mints a
 // fresh one via authsvc. Used by withSkypeAuth() when a chatsvc/federation
 // call fails with 401 (token expired between cache lookup and request).
-export function invalidateSkypeToken(opts?: TeamsFederationOpts): void {
+export function invalidateSkypeToken(opts: TeamsFederationOpts): void {
   skypeTokenCache.delete(skypeCacheKey(opts))
 }
 
@@ -226,7 +226,7 @@ export function invalidateSkypeToken(opts?: TeamsFederationOpts): void {
 // slow DNS, network blip).
 export async function withSkypeAuth<T>(
   fn: () => Promise<T>,
-  opts?: TeamsFederationOpts,
+  opts: TeamsFederationOpts,
 ): Promise<T> {
   try {
     return await fn()
@@ -242,7 +242,7 @@ export async function withSkypeAuth<T>(
   }
 }
 
-export async function getSkypeToken(opts?: TeamsFederationOpts): Promise<string> {
+export async function getSkypeToken(opts: TeamsFederationOpts): Promise<string> {
   const key = skypeCacheKey(opts)
   const now = Date.now() / 1000
   const cached = skypeTokenCache.get(key)
@@ -302,7 +302,7 @@ export async function getSkypeToken(opts?: TeamsFederationOpts): Promise<string>
     // Side-effect: surface regionGtms into the region cache so chatsvc /
     // federation / external-search calls can use the tenant's actual
     // region instead of the hardcoded emea default.
-    ingestAuthzData(profile(opts), raw)
+    ingestAuthzData(opts.account, raw)
     skypeTokenCache.set(key, {
       token: skype.token,
       exp: Date.now() / 1000 + (skype.expiresIn ?? 3600),
@@ -338,7 +338,7 @@ export async function requestChatsvcMe<T>(
   method: 'GET' | 'POST',
   url: string,
   body: unknown | undefined,
-  opts?: TeamsFederationOpts,
+  opts: TeamsFederationOpts,
 ): Promise<{ status: number; body: T | null; text: string }> {
   const token = await getSkypeToken(opts)
   const startedAt = Date.now()
@@ -385,10 +385,10 @@ export class TeamsInTenantLookupError extends TeamsFederationError {
 
 export async function fetchFederatedUsers(
   userOids: string[],
-  opts?: TeamsFederationOpts,
+  opts: TeamsFederationOpts,
 ): Promise<unknown[]> {
   if (userOids.length === 0) return []
-  const base = await resolveMiddleTierBase({ profile: opts?.profile, signal: opts?.signal })
+  const base = await resolveMiddleTierBase({ account: opts.account, signal: opts.signal })
   const url = `${base}/beta/users/fetchFederated?edEnabled=false&includeDisabledAccounts=true`
   const mris = userOids.map(userMriFromOid)
   const res = await requestTeams<unknown[]>('POST', url, mris, opts)
@@ -442,7 +442,7 @@ function orgidOidFromString(value: string): string[] {
 export async function createOneOnOneThreadViaChatsvc(
   selfOid: string,
   otherOid: string,
-  opts?: TeamsFederationOpts,
+  opts: TeamsFederationOpts,
 ): Promise<string> {
   const r = await region(opts)
   const url = `${TEAMS_ORIGIN}/api/chatsvc/${r}/v1/threads`
@@ -517,7 +517,7 @@ function findConversationId(value: unknown): string | null {
 
 export async function getMsnp24EquivalentConversationId(
   conversationId: string,
-  opts?: TeamsFederationOpts,
+  opts: TeamsFederationOpts,
 ): Promise<string | null> {
   const r = await region(opts)
   const url = `${TEAMS_ORIGIN}/api/chatsvc/${r}/v1/users/ME/conversations/${encodeURIComponent(
@@ -536,7 +536,7 @@ export async function getMsnp24EquivalentConversationId(
 
 export async function conversationExistsInTeams(
   conversationId: string,
-  opts?: TeamsFederationOpts,
+  opts: TeamsFederationOpts,
 ): Promise<boolean> {
   const r = await region(opts)
   const url = `${TEAMS_ORIGIN}/api/chatsvc/${r}/v1/threads/${encodeURIComponent(
@@ -559,7 +559,7 @@ export async function conversationExistsInTeams(
 export async function resolveFederatedEquivalentConversationId(
   selfUserId: string,
   otherUserId: string,
-  opts?: TeamsFederationOpts,
+  opts: TeamsFederationOpts,
 ): Promise<string | null> {
   let federatedOids: string[] = []
   try {

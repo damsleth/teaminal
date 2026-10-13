@@ -9,7 +9,13 @@
 //     visible/active chats
 
 import { decodeJwtClaims, getToken } from '../auth/owaPiggy'
-import { getActiveProfile, getAudiencePreference, graph, GraphError } from './client'
+import {
+  currentAccountContext,
+  getActiveProfile,
+  getAudiencePreference,
+  graph,
+  GraphError,
+} from './client'
 import { listChatMessagesViaChatsvc, sendChannelMessageViaChatsvc } from './teamsChatsvc'
 import { createOneOnOneThreadViaChatsvc } from './teamsFederation'
 import { recordEvent } from '../log'
@@ -263,6 +269,7 @@ export async function listMessagesPage(
 // URL). Returning no nextLink simply means "no older page" for now.
 async function chatsvcMessagesPage(chatId: string, opts?: ListMessagesOpts): Promise<MessagesPage> {
   const page = await listChatMessagesViaChatsvc(chatId, {
+    account: currentAccountContext().account,
     ...(opts?.signal ? { signal: opts.signal } : {}),
     ...(opts?.top ? { pageSize: opts.top } : {}),
   })
@@ -304,6 +311,7 @@ export async function sendMessage(
 ): Promise<ChatMessage> {
   const chatsvcSend = (): Promise<ChatMessage> =>
     sendChannelMessageViaChatsvc(chatId, content, {
+      account: currentAccountContext().account,
       ...(opts?.signal ? { signal: opts.signal } : {}),
     })
   const { audience, fallback } = getAudiencePreference()
@@ -605,6 +613,7 @@ export async function createOneOnOneChat(
     // directly with the spaces-Bearer token; we mirror that.
     if (!isUnlinkedPeerCreateRejection(err)) throw err
     const threadId = await createOneOnOneThreadViaChatsvc(selfUserId, otherUserId, {
+      account: currentAccountContext().account,
       signal: opts?.signal,
     })
     return {

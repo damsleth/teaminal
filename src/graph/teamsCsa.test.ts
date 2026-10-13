@@ -1,3 +1,4 @@
+import { accountRef } from '../account'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
@@ -14,6 +15,8 @@ import {
   parseTeamsBootstrap,
 } from './teamsCsa'
 import { __setRegionForTests } from './teamsRegion'
+
+const ACCOUNT = accountRef(undefined)
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -192,7 +195,7 @@ describe('fetchChats', () => {
       return jsonResponse({ items: [groupChat] }) // no token → stop
     })
 
-    const chats = await fetchChats()
+    const chats = await fetchChats({ account: ACCOUNT })
     expect(chats.map((c) => c.id)).toEqual([oneOnOne.id, groupChat.id])
     expect(urls[0]).toStartWith(
       'https://teams.microsoft.com/api/csa/emea/api/v2/teams/users/me/chats',
@@ -204,7 +207,7 @@ describe('fetchChats', () => {
 
   test('throws TeamsCsaError on non-2xx', async () => {
     __setTransportForTests(async () => new Response('nope', { status: 403 }))
-    await expect(fetchChats()).rejects.toMatchObject({ status: 403 })
+    await expect(fetchChats({ account: ACCOUNT })).rejects.toMatchObject({ status: 403 })
   })
 })
 
@@ -223,7 +226,7 @@ describe('fetchTeams', () => {
         ],
       })
     })
-    const { teams, channelsByTeam } = await fetchTeams()
+    const { teams, channelsByTeam } = await fetchTeams({ account: ACCOUNT })
     expect(urls[0]).toBe('https://teams.microsoft.com/api/csa/emea/api/v1/teams/users/me')
     expect(teams).toHaveLength(1)
     expect(channelsByTeam['19:t@thread.tacv2']).toHaveLength(1)
@@ -240,7 +243,7 @@ describe('fetchChatsAndTeams', () => {
         teams: [{ id: '19:t@thread.tacv2', displayName: 'T', channels: [] }],
       })
     })
-    const out = await fetchChatsAndTeams()
+    const out = await fetchChatsAndTeams({ account: ACCOUNT })
     expect(out.chats).toHaveLength(1)
     expect(out.teams).toHaveLength(1)
     expect(out.channelsByTeam['19:t@thread.tacv2']).toEqual([])
@@ -256,7 +259,7 @@ describe('fetchChatsAndTeams', () => {
       }
       return jsonResponse({ teams: [] })
     })
-    const out = await fetchChatsAndTeams()
+    const out = await fetchChatsAndTeams({ account: ACCOUNT })
     expect(out.chats).toHaveLength(1)
     expect(chatsCalls).toBe(2)
   })

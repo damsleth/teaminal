@@ -1,4 +1,5 @@
 import { searchChatUsers } from '../../src/graph/chats'
+import { currentAccountContext } from '../../src/graph/client'
 import { searchExternalUsers } from '../../src/graph/teamsExternalSearch'
 import type { E2ETest } from '../types'
 
@@ -27,7 +28,10 @@ const test: E2ETest = {
         ctx.log(`HIT (Graph)    "${email}" -> ${direct.displayName ?? '(unnamed)'} (${direct.id})`)
         continue
       }
-      const externalHits = await searchExternalUsers(email, { top: 5 })
+      const externalHits = await searchExternalUsers(email, {
+        top: 5,
+        account: currentAccountContext().account,
+      })
       const externalDirect = externalHits.find(
         (m) =>
           m.userPrincipalName?.toLowerCase() === email.toLowerCase() ||
