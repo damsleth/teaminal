@@ -253,9 +253,7 @@ export function summariseToken(token: string): string | null {
 }
 
 export type TrouterFrame =
-  | { type: 'ping' }
-  | { type: 'event'; body: TrouterEventBody }
-  | { type: 'unknown'; raw: string }
+  { type: 'ping' } | { type: 'event'; body: TrouterEventBody } | { type: 'unknown'; raw: string }
 
 export type TrouterEventBody = {
   eventType?: string
@@ -622,8 +620,7 @@ export class TrouterTransport implements RealtimeTransport {
       const chatId = extractChatId(resource) ?? (resourceData.chatId as string | undefined)
       const userId = (resourceData.userId ?? resourceData.fromId) as string | undefined
       const displayName = (resourceData.displayName ?? resourceData.imdisplayname) as
-        | string
-        | undefined
+        string | undefined
       if (chatId && userId) {
         const stopped = eventType.includes('cleartyping') || eventType.includes('typingstopped')
         return [
