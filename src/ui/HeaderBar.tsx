@@ -1,6 +1,5 @@
 import { Box, Text } from 'ink'
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
-import { getActiveProfile } from '../graph/client'
 import { chatLabel } from '../state/selectables'
 import {
   recentUnreadNotifications,
@@ -11,6 +10,7 @@ import {
 } from '../state/store'
 import type { Chat } from '../types'
 import { useAppState, useTheme } from './StoreContext'
+import { useSessionApi } from './SessionContext'
 import type { PresenceColorKey, Theme } from './theme'
 
 const DOT = '●'
@@ -72,6 +72,7 @@ function formatRelative(date: Date | undefined, now: number): string | null {
 }
 
 export function HeaderBar() {
+  const session = useSessionApi()
   const me = useAppState((s) => s.me)
   const nameByUserId = useAppState((s) => s.nameByUserId)
   const myPresence = useAppState((s) => s.myPresence)
@@ -92,7 +93,7 @@ export function HeaderBar() {
     return () => clearInterval(id)
   }, [])
 
-  const profile = getActiveProfile()
+  const profile = session.getActiveProfile()
   const userName = me?.displayName ?? '...'
   const tenant = tenantFromUpn(me?.userPrincipalName)
   // 'tenant' format collapses to just the tenant (falling back to the profile

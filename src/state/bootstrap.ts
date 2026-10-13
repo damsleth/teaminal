@@ -211,6 +211,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
     bridge = startRealtimeBridge({
       bus,
       store,
+      account: sessionAccount,
       getPoller: () => pollerHandleRef.current,
       isStale,
     })

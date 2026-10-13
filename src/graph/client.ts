@@ -66,10 +66,6 @@ export function setActiveProfile(profile: string | undefined): void {
   activeProfile = profile
 }
 
-export function getActiveProfile(): string | undefined {
-  return activeProfile
-}
-
 // Per-account audience preference for the default (no-explicit-scope)
 // Graph calls. 'graph' is the out-of-the-box behavior. When set to
 // 'ic3', default calls request the ic3-audience token first; on a
@@ -334,17 +330,6 @@ async function executeRequest<T>(
   }
 }
 
-export async function graph<T>(opts: GraphOpts): Promise<T> {
-  return createGraphClient(currentAccountContext()).graph<T>(opts)
-}
-
-// Binary variant of `graph()` for endpoints that return raw bytes
-// (e.g. /hostedContents/{id}/$value). Applies the same 401/429 retry
-// logic as graph<T> but returns the response body as a Uint8Array.
-export async function graphBinary(opts: GraphOpts): Promise<Uint8Array> {
-  return createGraphClient(currentAccountContext()).graphBinary(opts)
-}
-
 async function executeBinaryRequest(
   url: string,
   opts: GraphOpts,
@@ -460,19 +445,6 @@ async function paginateAllWith<T>(opts: GraphOpts, ctx: AccountContext): Promise
     out.push(...page)
   }
   return out
-}
-
-// Yields successive pages of `value` from a Graph collection endpoint,
-// following `@odata.nextLink` until exhausted. Callers can break out
-// of `for await` to stop early.
-export function paginate<T>(opts: GraphOpts): AsyncGenerator<T[], void, unknown> {
-  return paginateWith<T>(opts, currentAccountContext())
-}
-
-// Convenience: collect all pages into a single array. Use sparingly - prefer
-// `paginate()` when you can stop early.
-export function paginateAll<T>(opts: GraphOpts): Promise<T[]> {
-  return paginateAllWith<T>(opts, currentAccountContext())
 }
 
 // A Graph client bound to one account. Nested helpers that receive it cannot
