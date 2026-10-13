@@ -355,12 +355,18 @@ function makeSessionApi(): SessionApi {
     client: () =>
       currentSession?.client() ??
       createGraphClient({ account: accountRef(activeProfile), ...getAudiencePreference() }),
+    generation: () => sessionGeneration,
     switchAccount,
   }
 }
 
+// Bumped on every account switch, so async UI work can tell that the store
+// was reset under it (even across A -> B -> A).
+let sessionGeneration = 0
+
 async function switchAccount(nextProfile: string | null): Promise<void> {
   if (currentSession?.profile === nextProfile) return
+  sessionGeneration += 1
   // Tear down the running session first so its loops can't write into
   // the about-to-be-reset store.
   if (currentSession) {

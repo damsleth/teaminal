@@ -16,6 +16,7 @@ import {
   deleteChatById,
   deleteChatMessageById,
   editChatMessageContent,
+  sendMessage,
   toggleReaction,
 } from './chatActions'
 
@@ -216,5 +217,46 @@ describe('deleteChatById', () => {
     })
     await expect(deleteChatById(testClient(), store, 'c1')).rejects.toThrow()
     expect(store.get().chats.map((c) => c.id)).toEqual(['c1'])
+  })
+})
+
+describe('sendMessage', () => {
+  const chat = { kind: 'chat', chatId: 'c1' } as const
+  const json = (body: unknown) =>
+    new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } })
+
+  it('shows the message at once, then swaps in the server copy', async () => {
+    let pendingCheck: ChatMessage[] = []
+    const store = setup(async () => {
+      pendingCheck = convMsgs(store)
+      return json({
+        id: 'server-1',
+        createdDateTime: 'x',
+        body: { contentType: 'text', content: 'hi' },
+      })
+    })
+    store.set({ draftsByConvo: { 'chat:c1': 'hi' } })
+    expect(await sendMessage(testClient(), store, chat, 'hi')).toEqual({ ok: true })
+    expect(pendingCheck.at(-1)?._sending).toBe(true)
+    expect(convMsgs(store).map((m) => m.id)).toEqual(['m1', 'server-1'])
+    expect(store.get().draftsByConvo['chat:c1']).toBeUndefined()
+  })
+
+  it('marks a failed send and puts the text back in the draft', async () => {
+    const store = setup(fail)
+    const result = await sendMessage(testClient(), store, chat, 'hi')
+    expect(result.ok).toBe(false)
+    const row = convMsgs(store).at(-1)!
+    expect(row._sending).toBe(false)
+    expect(row._sendError).toBeTruthy()
+    expect(store.get().draftsByConvo['chat:c1']).toBe('hi')
+  })
+
+  it('writes nothing after the call once the account changed', async () => {
+    const store = setup(async () =>
+      json({ id: 'server-1', createdDateTime: 'x', body: { contentType: 'text', content: 'hi' } }),
+    )
+    await sendMessage(testClient(), store, chat, 'hi', { isStale: () => true })
+    expect(convMsgs(store).some((m) => m.id === 'server-1')).toBe(false)
   })
 })

@@ -41,7 +41,14 @@ import {
   hasReactionType,
   removeReactionType,
 } from './messageMutations'
-import type { AppState, Store } from './store'
+import {
+  focusKey,
+  type AppState,
+  type FocusChannel,
+  type FocusChat,
+  type FocusThread,
+  type Store,
+} from './store'
 
 /**
  * Look up the federated-equivalent conversation id for a 1:1 chat, if
@@ -108,37 +115,77 @@ export async function hydrateChat(client: GraphClient, chatId: string): Promise<
   return getChat(client, chatId, { members: true })
 }
 
-/** Send a message to a 1:1 / group chat. */
-export async function sendChatMessage(
-  client: GraphClient,
-  chatId: string,
-  content: string,
-  opts?: { signal?: AbortSignal },
-): Promise<ChatMessage> {
-  return sendMessageGraph(client, chatId, content, opts)
+function makeTempId(): string {
+  return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-/** Send a top-level message to a channel. */
-export async function sendChannelMessage(
-  client: GraphClient,
-  teamId: string,
-  channelId: string,
-  content: string,
-  opts?: { signal?: AbortSignal },
-): ReturnType<typeof sendChannelMessageGraph> {
-  return sendChannelMessageGraph(client, teamId, channelId, content, opts)
-}
+export type SendResult = { ok: true } | { ok: false; error: string }
 
-/** Post a reply to a channel thread. */
-export async function postChannelReply(
+/**
+ * Send `content` to a chat, channel or thread with an optimistic row: the
+ * message appears at once (marked sending) and its draft is cleared, then the
+ * server copy replaces it, or on failure it is marked failed and the text goes
+ * back into the draft. Writes after the network call are dropped when
+ * `isStale()` reports the account changed underneath the send.
+ */
+export async function sendMessage(
   client: GraphClient,
-  teamId: string,
-  channelId: string,
-  rootId: string,
+  store: Store<AppState>,
+  focus: FocusChat | FocusChannel | FocusThread,
   content: string,
-  opts?: { signal?: AbortSignal },
-): ReturnType<typeof postChannelReplyGraph> {
-  return postChannelReplyGraph(client, teamId, channelId, rootId, content, opts)
+  opts?: { isStale?: () => boolean },
+): Promise<SendResult> {
+  const conv = focusKey(focus)!
+  const tempId = makeTempId()
+  const me = store.get().me
+  const optimistic: ChatMessage = {
+    id: tempId,
+    _tempId: tempId,
+    _sending: true,
+    createdDateTime: new Date().toISOString(),
+    body: { contentType: 'text', content },
+    from: { user: { id: me?.id || 'me', displayName: me?.displayName ?? 'Me' } },
+  }
+  store.set((s) => {
+    const drafts = { ...s.draftsByConvo }
+    delete drafts[conv]
+    return {
+      messagesByConvo: {
+        ...s.messagesByConvo,
+        [conv]: [...(s.messagesByConvo[conv] ?? []), optimistic],
+      },
+      draftsByConvo: drafts,
+    }
+  })
+  const replaceTemp = (s: AppState, next: (m: ChatMessage) => ChatMessage) => ({
+    ...s.messagesByConvo,
+    [conv]: (s.messagesByConvo[conv] ?? []).map((m) => (m._tempId === tempId ? next(m) : m)),
+  })
+  try {
+    const sent =
+      focus.kind === 'chat'
+        ? await sendMessageGraph(client, focus.chatId, content)
+        : focus.kind === 'channel'
+          ? await sendChannelMessageGraph(client, focus.teamId, focus.channelId, content)
+          : await postChannelReplyGraph(
+              client,
+              focus.teamId,
+              focus.channelId,
+              focus.rootId,
+              content,
+            )
+    if (!opts?.isStale?.()) store.set((s) => ({ messagesByConvo: replaceTemp(s, () => sent) }))
+    return { ok: true }
+  } catch (err) {
+    const error = err instanceof Error ? err.message : 'send failed'
+    if (!opts?.isStale?.()) {
+      store.set((s) => ({
+        messagesByConvo: replaceTemp(s, (m) => ({ ...m, _sending: false, _sendError: error })),
+        draftsByConvo: { ...s.draftsByConvo, [conv]: content },
+      }))
+    }
+    return { ok: false, error }
+  }
 }
 
 // --- Write path: reactions, edits, deletes (chat messages only) ---
