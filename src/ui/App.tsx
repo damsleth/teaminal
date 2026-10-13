@@ -81,8 +81,10 @@ export function shouldShowTailPanels(modal: ModalState | null): boolean {
 export type ActivePane = 'list' | 'conversation' | 'composer' | null
 
 // The pane that currently takes input, for the active border. Modals draw
-// their own active border, so no pane is active behind one.
-export function activePane(zone: InputZone, focus: Focus): ActivePane {
+// their own active border, so no pane is active behind one — including
+// modals (e.g. confirm-delete-chat) that open without leaving the list zone.
+export function activePane(zone: InputZone, focus: Focus, modalOpen = false): ActivePane {
+  if (modalOpen) return null
   switch (zone) {
     case 'composer':
       return 'composer'
@@ -499,7 +501,7 @@ export function App() {
   const replaceModal = modal?.kind === 'auth-expired' ? modal : null
   const showTailPanels = shouldShowTailPanels(modal)
   const theme = useTheme()
-  const active = activePane(inputZone, focus)
+  const active = activePane(inputZone, focus, modal !== null)
   const paneBorder = (pane: ActivePane) =>
     pane === active
       ? { borderStyle: theme.borders.active, borderColor: theme.borderActive }
