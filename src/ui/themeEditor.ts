@@ -374,8 +374,7 @@ function clearOverride(
 // A persist instruction the modal routes to the right path: `themeOverrides`
 // replaces the whole override object; `setting` is a normal settings patch.
 export type FieldPatch =
-  | { kind: 'overrides'; overrides: ThemeOverrides }
-  | { kind: 'setting'; patch: Partial<Settings> }
+  { kind: 'overrides'; overrides: ThemeOverrides } | { kind: 'setting'; patch: Partial<Settings> }
 
 export function applyField(
   settings: Settings,
