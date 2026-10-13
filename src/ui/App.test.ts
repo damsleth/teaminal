@@ -43,5 +43,8 @@ describe('activePane', () => {
 
   test('no pane is active behind a modal', () => {
     expect(activePane('menu', chat)).toBeNull()
+    // confirm-delete-chat opens from the list without changing the zone.
+    expect(activePane('list', { kind: 'list' }, true)).toBeNull()
+    expect(activePane('list', chat, true)).toBeNull()
   })
 })
