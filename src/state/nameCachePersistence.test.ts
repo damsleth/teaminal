@@ -28,10 +28,12 @@ describe('getNameCachePath profile scoping', () => {
     )
   })
 
-  test('named profile is slugified into the filename', () => {
-    expect(getNameCachePath({ XDG_CACHE_HOME: '/tmp/cache' }, 'crayon/work')).toBe(
-      '/tmp/cache/teaminal/names.crayon_work.json',
-    )
+  test('a filename-safe profile keeps its name; others get a disambiguating hash', () => {
+    const env = { XDG_CACHE_HOME: '/tmp/cache' }
+    expect(getNameCachePath(env, 'swon')).toBe('/tmp/cache/teaminal/names.swon.json')
+    const odd = getNameCachePath(env, 'crayon/work')
+    expect(odd).toBe('/tmp/cache/teaminal/names.~crayon~2Fwork.json')
+    expect(odd).not.toBe(getNameCachePath(env, 'crayon_work'))
   })
 })
 

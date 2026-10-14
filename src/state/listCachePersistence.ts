@@ -20,8 +20,8 @@
 // shape of messageCachePersistence.ts so the two read the same way.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { debouncedWriter, profileCachePath } from './cacheFiles'
 import type { Channel, Chat, Team } from '../types'
 
 const CACHE_VERSION = 1
@@ -46,20 +46,9 @@ type PersistedFile = {
 }
 
 export function getListCachePath(env: Env = process.env, profile?: string | null): string {
-  const xdg = env.XDG_CACHE_HOME
-  const base =
-    xdg && xdg.length > 0
-      ? xdg
-      : join(env.HOME && env.HOME.length > 0 ? env.HOME : homedir(), '.cache')
-  // Per-profile cache so switching accounts doesn't cross-pollute. The
-  // default (no profile) keeps the bare `list.json` name.
-  const filename =
-    profile && profile.length > 0 ? `list.${slugifyProfile(profile)}.json` : 'list.json'
-  return join(base, 'teaminal', filename)
-}
-
-function slugifyProfile(p: string): string {
-  return p.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 64)
+  // Per-profile file so switching accounts doesn't cross-pollute; the
+  // default profile keeps the bare `list.json` name.
+  return profileCachePath('list', env, profile)
 }
 
 export function loadListCache(path: string = getListCachePath()): ListSnapshot | null {
@@ -128,46 +117,19 @@ export function saveListCacheNow(snapshot: ListSnapshot, path: string = getListC
   }
 }
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null
-let pendingSnapshot: ListSnapshot | null = null
-let pendingPath: string | null = null
+const writer = debouncedWriter<ListSnapshot>((snapshot, target) =>
+  saveListCacheNow(snapshot, target),
+)
 
 export function scheduleListCacheSave(
   snapshot: ListSnapshot,
   delayMs = 2000,
   path: string = getListCachePath(),
 ): void {
-  pendingSnapshot = snapshot
-  pendingPath = path
-  if (saveTimer) return
-  saveTimer = setTimeout(() => {
-    saveTimer = null
-    const snap = pendingSnapshot
-    const target = pendingPath ?? path
-    pendingSnapshot = null
-    pendingPath = null
-    if (!snap) return
-    try {
-      saveListCacheNow(snap, target)
-    } catch {
-      // swallow: persistence is best-effort; no UI impact
-    }
-  }, delayMs)
+  writer.schedule(snapshot, path, delayMs)
 }
 
+// Write every pending snapshot now (all accounts' files).
 export function flushListCache(): void {
-  if (saveTimer) {
-    clearTimeout(saveTimer)
-    saveTimer = null
-  }
-  const snap = pendingSnapshot
-  const target = pendingPath
-  pendingSnapshot = null
-  pendingPath = null
-  if (!snap || !target) return
-  try {
-    saveListCacheNow(snap, target)
-  } catch {
-    // best-effort
-  }
+  writer.flush()
 }

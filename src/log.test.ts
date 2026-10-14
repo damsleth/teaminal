@@ -4,8 +4,11 @@ import {
   debug,
   error,
   getRecentEvents,
+  getRecentRequests,
   recordEvent,
+  recordRequest,
   redactForFile,
+  redactRequestPath,
   subscribeEvents,
   warn,
 } from './log'
@@ -122,5 +125,52 @@ describe('log file redaction', () => {
   test('passthroughs benign lines unchanged', () => {
     const line = '[ts] poller[active]: fetched 3 messages\n'
     expect(redactForFile(line)).toBe(line)
+  })
+})
+
+describe('redactRequestPath', () => {
+  test('replaces chat, thread, message and user ids with :id', () => {
+    expect(redactRequestPath('/chats/19:abc_def@thread.v2/messages/1697000000000')).toBe(
+      '/chats/:id/messages/:id',
+    )
+    expect(
+      redactRequestPath(
+        '/api/chatsvc/emea/v1/users/ME/conversations/19%3Ameeting_x%40thread.v2/messages?view=a&pageSize=50',
+      ),
+    ).toBe('/api/chatsvc/emea/v1/users/ME/conversations/:id/messages')
+    expect(redactRequestPath('/users/4bc16140-a25f-46fa-af77-572d8b946c1c/presence')).toBe(
+      '/users/:id/presence',
+    )
+  })
+
+  test('drops origin and query from absolute nextLink URLs', () => {
+    expect(
+      redactRequestPath(
+        'https://graph.microsoft.com/v1.0/chats/19:x@unq.gbl.spaces/messages?$skiptoken=abc123',
+      ),
+    ).toBe('/v1.0/chats/:id/messages')
+  })
+
+  test('keeps resource words and short region/partition segments', () => {
+    expect(redactRequestPath('/me/joinedTeams')).toBe('/me/joinedTeams')
+    expect(redactRequestPath('/api/mt/part/emea-02/beta/users/searchV2')).toBe(
+      '/api/mt/part/emea-02/beta/users/searchV2',
+    )
+    expect(redactRequestPath('/$batch')).toBe('/$batch')
+  })
+
+  test('recordRequest stores the redacted path', () => {
+    recordRequest({
+      ts: 0,
+      method: 'GET',
+      path: '/chats/19:a@thread.v2/messages',
+      status: 200,
+      durationMs: 1,
+      account: 'swon',
+    })
+    expect(getRecentRequests().at(-1)).toMatchObject({
+      path: '/chats/:id/messages',
+      account: 'swon',
+    })
   })
 })
