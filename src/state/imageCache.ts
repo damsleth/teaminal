@@ -1,15 +1,15 @@
 // Disk-backed cache for image blobs from Teams message attachments.
 //
-// Cache directory: ${XDG_CACHE_HOME:-~/.cache}/teaminal/<safe-profile>/images/
+// Cache directory: ${XDG_CACHE_HOME:-~/.cache}/teaminal/<profile-slug|default>/images/
 // Each entry is two files: <sha1-of-key>.bin (blob) + <sha1-of-key>.meta.json
 // The cache key is messageId::attachmentId - never contains signed URLs or
 // other credentials. Blobs are rejected above MAX_IMAGE_BYTES to bound disk use.
 
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { owaProfile } from '../account'
+import { teaminalCacheDir } from './cacheFiles'
+import { accountRef, owaProfile, profileSlug } from '../account'
 import { GraphError, type GraphClient } from '../graph/client'
 import { fetchObjectById, fetchObjectByUrl, isAsyncGwUrl } from '../graph/teamsAsyncGw'
 import { recordEvent } from '../log'
@@ -32,9 +32,8 @@ export function imageCacheKey(messageId: string, attachmentId: string): string {
 }
 
 function getCacheDir(profile?: string): string {
-  const xdg = process.env.XDG_CACHE_HOME
-  const base = xdg && xdg.length > 0 ? xdg : join(homedir(), '.cache')
-  return join(base, 'teaminal', safeProfileSegment(profile), 'images')
+  const slug = profileSlug(accountRef(profile)) ?? 'default'
+  return join(teaminalCacheDir(), slug, 'images')
 }
 
 /** Absolute path to a profile's on-disk image cache directory. */
@@ -56,12 +55,6 @@ export function clearImageCache(profile?: string | null): string {
   fetchStatus.clear()
   imageDataCache.clear()
   return dir
-}
-
-function safeProfileSegment(profile?: string): string {
-  const raw = profile && profile.length > 0 ? profile : 'default'
-  const safe = raw.replace(/[^A-Za-z0-9._-]/g, '_')
-  return safe.length > 0 ? safe : 'default'
 }
 
 function blobPath(key: string, profile?: string): string {

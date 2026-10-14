@@ -111,7 +111,10 @@ export function __resetEventsForTests(): void {
 export type RequestRecord = {
   ts: number
   method: HttpMethodLite
+  // Redacted by recordRequest: ID segments become `:id`, no query string.
   path: string
+  // Display label of the account the request ran as, when known.
+  account?: string
   status: number | null
   durationMs: number
   retried429?: boolean
@@ -150,7 +153,36 @@ function writeNetworkMirror(line: string): void {
   }
 }
 
-export function recordRequest(rec: RequestRecord): void {
+// Request paths are diagnostics, not data: keep the resource shape, drop
+// identifiers (chat / thread / message / user / object ids) and the query
+// string, which carries filters, cursors and sync tokens.
+export function redactRequestPath(path: string): string {
+  let p = path
+  if (/^https?:\/\//i.test(p)) {
+    try {
+      p = new URL(p).pathname
+    } catch {}
+  }
+  p = p.split('?')[0] ?? ''
+  return p
+    .split('/')
+    .map((seg) => (isIdSegment(seg) ? ':id' : seg))
+    .join('/')
+}
+
+function isIdSegment(seg: string): boolean {
+  let s = seg
+  try {
+    s = decodeURIComponent(seg)
+  } catch {}
+  if (s.includes(':') || s.includes('@')) return true // 19:…@thread.v2, 8:orgid:…
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)) return true // GUIDs
+  if (/^\d{6,}$/.test(s)) return true // epoch-ms message ids
+  return s.length >= 20 && /\d/.test(s) // base64-ish hosted content / object ids
+}
+
+export function recordRequest(input: RequestRecord): void {
+  const rec = { ...input, path: redactRequestPath(input.path) }
   requestRing.push(rec)
   if (requestRing.length > REQUEST_RING_CAPACITY) {
     requestRing.splice(0, requestRing.length - REQUEST_RING_CAPACITY)
@@ -160,8 +192,9 @@ export function recordRequest(rec: RequestRecord): void {
     const status = rec.status === null ? 'ERR' : String(rec.status)
     const flags = rec.retried429 ? ' r429' : rec.retried401 ? ' r401' : ''
     const errSuffix = rec.error ? ` err=${rec.error}` : ''
+    const acct = rec.account ? ` @${rec.account}` : ''
     writeNetworkMirror(
-      `[${ts}] ${rec.method.padEnd(5)} ${status.padStart(3)} ${rec.durationMs}ms ${rec.path}${flags}${errSuffix}\n`,
+      `[${ts}] ${rec.method.padEnd(5)} ${status.padStart(3)} ${rec.durationMs}ms ${rec.path}${acct}${flags}${errSuffix}\n`,
     )
   }
   for (const cb of requestSubscribers) {

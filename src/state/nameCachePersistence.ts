@@ -19,8 +19,8 @@
 // shape of listCachePersistence.ts so the two read the same way.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { debouncedWriter, profileCachePath } from './cacheFiles'
 
 const CACHE_VERSION = 1
 const MAX_NAMES = 5000
@@ -36,20 +36,9 @@ type PersistedFile = {
 }
 
 export function getNameCachePath(env: Env = process.env, profile?: string | null): string {
-  const xdg = env.XDG_CACHE_HOME
-  const base =
-    xdg && xdg.length > 0
-      ? xdg
-      : join(env.HOME && env.HOME.length > 0 ? env.HOME : homedir(), '.cache')
-  // Per-profile cache so switching accounts doesn't cross-pollute. The
-  // default (no profile) keeps the bare `names.json` name.
-  const filename =
-    profile && profile.length > 0 ? `names.${slugifyProfile(profile)}.json` : 'names.json'
-  return join(base, 'teaminal', filename)
-}
-
-function slugifyProfile(p: string): string {
-  return p.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 64)
+  // Per-profile file so switching accounts doesn't cross-pollute; the
+  // default profile keeps the bare `names.json` name.
+  return profileCachePath('names', env, profile)
 }
 
 export function loadNameCache(path: string = getNameCachePath()): NameIndex {
@@ -104,46 +93,17 @@ export function saveNameCacheNow(names: NameIndex, path: string = getNameCachePa
   }
 }
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null
-let pendingNames: NameIndex | null = null
-let pendingPath: string | null = null
+const writer = debouncedWriter<NameIndex>((snapshot, target) => saveNameCacheNow(snapshot, target))
 
 export function scheduleNameCacheSave(
-  names: NameIndex,
+  snapshot: NameIndex,
   delayMs = 2000,
   path: string = getNameCachePath(),
 ): void {
-  pendingNames = names
-  pendingPath = path
-  if (saveTimer) return
-  saveTimer = setTimeout(() => {
-    saveTimer = null
-    const snap = pendingNames
-    const target = pendingPath ?? path
-    pendingNames = null
-    pendingPath = null
-    if (!snap) return
-    try {
-      saveNameCacheNow(snap, target)
-    } catch {
-      // swallow: persistence is best-effort; no UI impact
-    }
-  }, delayMs)
+  writer.schedule(snapshot, path, delayMs)
 }
 
+// Write every pending snapshot now (all accounts' files).
 export function flushNameCache(): void {
-  if (saveTimer) {
-    clearTimeout(saveTimer)
-    saveTimer = null
-  }
-  const snap = pendingNames
-  const target = pendingPath
-  pendingNames = null
-  pendingPath = null
-  if (!snap || !target) return
-  try {
-    saveNameCacheNow(snap, target)
-  } catch {
-    // best-effort
-  }
+  writer.flush()
 }

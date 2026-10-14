@@ -25,15 +25,35 @@ export function accountIdForProfile(profile: string | typeof DEFAULT_PROFILE): A
   ) as AccountId
 }
 
-// Bridge from today's `string | null | undefined` profile (null/undefined =
-// the default profile) to an AccountRef.
+// Bridge from today's `string | null | undefined` profile (null, undefined
+// or '' = the default profile) to an AccountRef.
 export function accountRef(profile: string | null | undefined): AccountRef {
-  const p = profile ?? DEFAULT_PROFILE
+  const p = profile ? profile : DEFAULT_PROFILE
   return {
     id: accountIdForProfile(p),
     profile: p,
     label: p === DEFAULT_PROFILE ? 'default' : p,
   }
+}
+
+// On-disk name segment for an account's cache files: null for the default
+// profile (which keeps the legacy bare names), otherwise the alias itself
+// when it is already filename-safe, so existing caches keep loading.
+// Anything else (`a/b`, spaces, Unicode, >64 chars, `.`/`..`, an alias named
+// "default", which is the default profile's image dir) is encoded
+// reversibly in a namespace literal aliases can't reach: a leading `~` and
+// `~HH` per UTF-8 byte outside [A-Za-z0-9_-]. Literal slugs never contain
+// `~` and the encoding is prefix-free, so the mapping is injective.
+export function profileSlug(ref: AccountRef): string | null {
+  if (ref.profile === DEFAULT_PROFILE) return null
+  const raw = ref.profile
+  if (/^[A-Za-z0-9._-]{1,64}$/.test(raw) && raw !== 'default' && !raw.startsWith('.')) return raw
+  let out = '~'
+  for (const byte of new TextEncoder().encode(raw)) {
+    const ch = String.fromCharCode(byte)
+    out += /[A-Za-z0-9_-]/.test(ch) ? ch : `~${byte.toString(16).toUpperCase().padStart(2, '0')}`
+  }
+  return out
 }
 
 // The owa-piggy `--profile` value: undefined means "no flag" (the default).

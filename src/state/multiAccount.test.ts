@@ -90,6 +90,6 @@ describe('getMessageCachePath profile scoping', () => {
       { HOME: '/tmp/home', XDG_CACHE_HOME: '/tmp/cache' },
       'foo bar/baz',
     )
-    expect(path).toContain('messages.foo_bar_baz.json')
+    expect(path).toContain('messages.~foo~20bar~2Fbaz.json')
   })
 })

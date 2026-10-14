@@ -20,8 +20,8 @@
 // on shutdown to write the latest snapshot synchronously.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { debouncedWriter, profileCachePath } from './cacheFiles'
 import type { ChatMessage } from '../types'
 import type { ConvKey, MessageCache } from './store'
 
@@ -44,21 +44,9 @@ type PersistedFile = {
 }
 
 export function getMessageCachePath(env: Env = process.env, profile?: string | null): string {
-  const xdg = env.XDG_CACHE_HOME
-  const base =
-    xdg && xdg.length > 0
-      ? xdg
-      : join(env.HOME && env.HOME.length > 0 ? env.HOME : homedir(), '.cache')
-  // Per-profile cache so switching accounts doesn't cross-pollute. The
-  // legacy filename `messages.json` is kept as the default-profile name
-  // for back-compat with existing on-disk caches.
-  const filename =
-    profile && profile.length > 0 ? `messages.${slugifyProfile(profile)}.json` : 'messages.json'
-  return join(base, 'teaminal', filename)
-}
-
-function slugifyProfile(p: string): string {
-  return p.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 64)
+  // Per-profile file so switching accounts doesn't cross-pollute; the
+  // default profile keeps the bare `messages.json` name.
+  return profileCachePath('messages', env, profile)
 }
 
 export function loadMessageCache(
@@ -146,46 +134,19 @@ export function saveMessageCacheNow(
   }
 }
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null
-let pendingSnapshot: Record<ConvKey, MessageCache> | null = null
-let pendingPath: string | null = null
+const writer = debouncedWriter<Record<ConvKey, MessageCache>>((snapshot, target) =>
+  saveMessageCacheNow(snapshot, target),
+)
 
 export function scheduleMessageCacheSave(
-  caches: Record<ConvKey, MessageCache>,
+  snapshot: Record<ConvKey, MessageCache>,
   delayMs = 2000,
   path: string = getMessageCachePath(),
 ): void {
-  pendingSnapshot = caches
-  pendingPath = path
-  if (saveTimer) return
-  saveTimer = setTimeout(() => {
-    saveTimer = null
-    const snap = pendingSnapshot
-    const target = pendingPath ?? path
-    pendingSnapshot = null
-    pendingPath = null
-    if (!snap) return
-    try {
-      saveMessageCacheNow(snap, target)
-    } catch {
-      // swallow: persistence is best-effort; no UI impact
-    }
-  }, delayMs)
+  writer.schedule(snapshot, path, delayMs)
 }
 
+// Write every pending snapshot now (all accounts' files).
 export function flushMessageCache(): void {
-  if (saveTimer) {
-    clearTimeout(saveTimer)
-    saveTimer = null
-  }
-  const snap = pendingSnapshot
-  const target = pendingPath
-  pendingSnapshot = null
-  pendingPath = null
-  if (!snap || !target) return
-  try {
-    saveMessageCacheNow(snap, target)
-  } catch {
-    // best-effort
-  }
+  writer.flush()
 }
