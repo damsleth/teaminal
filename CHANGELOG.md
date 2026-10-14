@@ -19,6 +19,16 @@ adheres to [Semantic Versioning](https://semver.org/).
   editor, or with `borderActive` and `themeOverrides.borders.active`.
 - **Space works like Enter in the menu**, including every submenu.
 
+### Changed
+
+- **The Network panel and `--network-log` no longer show chat, message or
+  user IDs.** Request paths keep their shape (`/chats/:id/messages`) without
+  identifiers or query strings, and Graph requests name the account they ran as.
+- **Profiles whose alias isn't a plain file name** (spaces, `/`, non-ASCII,
+  over 64 characters, or literally `default`) now get their own cache files
+  instead of sharing them with a similar alias. Such a profile starts once with
+  an empty cache; ordinary aliases keep their existing caches.
+
 ### Fixed
 
 - **The focus background colors the focused message, not the focus marker.**
