@@ -234,8 +234,8 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const tailDiagnostics = useAppState((s) => s.settings.tailDiagnostics)
   const theme = useTheme()
   const terminalRows = useTerminalRows()
-  // Width of the (non-indented) preview rows: the full list pane minus the
-  // round border and the column container's paddingRight.
+  // Full row width: the list pane minus the round border and the column
+  // container's paddingRight.
   const previewContentWidth = listPaneWidth - 2 - 1
   const hasFilterBanner = inputZone === 'filter' || !!filter
   const anyTailEnabled = tailEvents || tailNetwork || tailDiagnostics
@@ -285,8 +285,8 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     const unreadBadge = hasMention ? ' @' : hasUnread ? ' ●' : ''
     let h = visualLines(label + unreadBadge, cw)
     if (showMessagePreviews && row.item.kind === 'chat') {
-      const preview = previewLineForChat(row.item.chat, previewContentWidth)
-      if (preview) h += visualLines(preview, previewContentWidth)
+      const preview = previewLineForChat(row.item.chat, cw)
+      if (preview) h += visualLines(preview, cw)
     }
     return h
   })
@@ -444,18 +444,18 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
             : ` ${presence.dot} `
           : '   '
         const presenceColor = presence?.color
-        // Non-indented last-message preview, independent of density. Read
+        // Last-message preview, indented to line up under the label. Read
         // chats render in muted gray, unread chats in the unread color.
+        const labelWidth = labelContentWidth(density, showPresence, indent, listPaneWidth)
         const preview =
           showMessagePreviews && row.item.kind === 'chat'
-            ? previewLineForChat(row.item.chat, previewContentWidth)
+            ? previewLineForChat(row.item.chat, labelWidth)
             : ''
         // Background highlight for the selected row. Pad the label to fill
         // its column width so the background renders as a continuous bar
         // rather than only behind glyphs (Ink paints background per text
         // cell, not per Box). Mirror the MenuModal pad-to-width approach.
         const rowBg = isSelected ? (theme.selectedRowBackground ?? undefined) : undefined
-        const labelWidth = labelContentWidth(density, showPresence, indent, listPaneWidth)
         const labelText = label + unreadBadge
         const labelPadded =
           isSelected && rowBg !== undefined
@@ -496,7 +496,11 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
               </Box>
             </Box>
             {preview && (
-              <Box width={previewContentWidth} flexShrink={0}>
+              <Box
+                width={previewContentWidth}
+                flexShrink={0}
+                paddingLeft={previewContentWidth - labelWidth}
+              >
                 <Text
                   color={hasUnread ? theme.unread : theme.mutedText}
                   bold={hasUnread && theme.emphasis.unreadBold}

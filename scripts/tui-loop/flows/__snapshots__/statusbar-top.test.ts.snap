@@ -11,20 +11,20 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
 ││ ◯ > Ada  ││open · q to quit                    ││
 ││     Byro ││                                    ││
 ││     n    ││                                    ││
-││Ada: The  ││                                    ││
-││launch n… ││                                    ││
+││     Ada: ││                                    ││
+││      Th… ││                                    ││
 ││    Desi ││                                    ││
 ││     gn   ││                                    ││
 ││     Sync ││                                    ││
-││Nina:     ││                                    ││
-││Nina      ││                                    ││
-││shared…   ││                                    ││
+││     Nina ││                                    ││
+││     : N… ││                                    ││
 ││    Ops  ││                                    ││
 ││     Chan ││                                    ││
 ││     nel  ││                                    ││
-││Mina:     ││                                    ││
-││Deploy is ││                                    ││
-││ g…       ││                                    ││
+││     Mina ││                                    ││
+││     : D… ││                                    ││
+││          ││                                    ││
+││          ││                                    ││
 ││          ││                                    ││
 ││          ││                                    ││
 ││          ││                                    ││
@@ -232,6 +232,10 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,9": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "6,9": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -260,6 +264,10 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,10": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "6,10": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -364,10 +372,14 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,14": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "6,14": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "7,14": {
+  "10,14": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -392,10 +404,14 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,15": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "6,15": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "6,15": {
+  "10,15": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -423,7 +439,7 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "8,16": {
+  "3,16": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -448,10 +464,6 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,17": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "3,17": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -503,6 +515,14 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 0,
     "fgColor": -1
   },
+  "6,19": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "10,19": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
   "11,19": {
     "fgColorMode": 16777216,
     "fgColor": 6
@@ -524,10 +544,14 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,20": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "6,20": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "7,20": {
+  "10,20": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -552,10 +576,6 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,21": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "10,21": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -580,10 +600,6 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,22": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "4,22": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -711,17 +727,17 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
 │╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
 ││Chats                     ││Select a chat or channel · Enter to open · q to quit                  ││
 ││ ◯ > Ada Byron            ││                                                                      ││
-││Ada: The launch notes are ││                                                                      ││
-││ ready for review.        ││                                                                      ││
+││     Ada: The launch      ││                                                                      ││
+││     notes are ready for  ││                                                                      ││
+││     rev…                 ││                                                                      ││
 ││    Design Sync          ││                                                                      ││
-││Nina: Nina shared two     ││                                                                      ││
-││compact layout options.   ││                                                                      ││
+││     Nina: Nina shared    ││                                                                      ││
+││     two compact layout   ││                                                                      ││
+││     op…                  ││                                                                      ││
 ││    Ops Channel          ││                                                                      ││
-││Mina: Deploy is green in  ││                                                                      ││
-││the EU region.            ││                                                                      ││
-││                          ││                                                                      ││
-││                          ││                                                                      ││
-││                          ││                                                                      ││
+││     Mina: Deploy is      ││                                                                      ││
+││     green in the EU      ││                                                                      ││
+││     region.              ││                                                                      ││
 ││                          ││                                                                      ││
 ││                          ││                                                                      ││
 ││                          ││                                                                      ││
@@ -872,10 +888,14 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 6
   },
   "1,7": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "6,7": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "26,7": {
+  "22,7": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -900,10 +920,14 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 6
   },
   "1,8": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "6,8": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "19,8": {
+  "26,8": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -928,10 +952,14 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 6
   },
   "1,9": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "6,9": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "3,9": {
+  "10,9": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -959,7 +987,7 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "23,10": {
+  "3,10": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -984,6 +1012,10 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 6
   },
   "1,11": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "6,11": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -1012,10 +1044,14 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 6
   },
   "1,12": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "6,12": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "3,12": {
+  "25,12": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -1040,10 +1076,14 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 6
   },
   "1,13": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "6,13": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "26,13": {
+  "9,13": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -1071,7 +1111,7 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "15,14": {
+  "3,14": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -1099,6 +1139,14 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 0,
     "fgColor": -1
   },
+  "6,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "22,15": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
   "27,15": {
     "fgColorMode": 16777216,
     "fgColor": 6
@@ -1123,6 +1171,14 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 0,
     "fgColor": -1
   },
+  "6,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "22,16": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
   "27,16": {
     "fgColorMode": 16777216,
     "fgColor": 6
@@ -1144,6 +1200,14 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 6
   },
   "1,17": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "6,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "13,17": {
     "fgColorMode": 0,
     "fgColor": -1
   },
