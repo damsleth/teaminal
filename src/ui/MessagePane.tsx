@@ -713,7 +713,9 @@ function MessageRow(props: {
           <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
             <Text wrap="truncate-end">
               <Text
-                color={isSelf && !sendError && !isSending ? theme.selfName : color}
+                color={
+                  isSelf && !sendError && !isSending ? theme.selfName : (color ?? theme.sender)
+                }
                 bold={senderName.length > 0 && theme.emphasis.senderBold}
               >
                 {fs(senderName, headerSize(theme.fontSize.sender), theme.fontSize.tightSpacing)}
