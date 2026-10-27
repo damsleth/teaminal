@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **The open chat jumps to new messages.** When a message arrives in the
+  conversation you're viewing, the cursor moves to it and the pane scrolls
+  down, even if you had scrolled back. Turn it off with **Scroll on new
+  messages** in the menu, or `scrollOnNewMessages: false`.
 - **The team list collapses under a "Teams" heading.** With
   `chatListGroupByType` on, teams sit under a `▾ Teams` header that folds the
   same way Direct, Groups and Meetings do: `h` on a collapsed team (or twice

@@ -363,6 +363,9 @@ export type Settings = {
   // users' messages remain left-aligned. Default false (IRC-style uniform
   // left alignment).
   selfMessagesOnRight: boolean
+  // Jump the message cursor (and so the scroll) to a newly arrived message
+  // in the open conversation.
+  scrollOnNewMessages: boolean
   // Inline image rendering for message attachments.
   // 'auto': show images via Kitty graphics protocol when the terminal
   //   supports it (KITTY_WINDOW_ID / TERM=xterm-kitty); fall back to
@@ -494,6 +497,7 @@ export const defaultSettings: Settings = {
   tailNetwork: false,
   tailDiagnostics: false,
   selfMessagesOnRight: false,
+  scrollOnNewMessages: true,
   inlineImages: 'auto',
   inlineImageMaxRows: 10,
   statusBarPosition: 'bottom',

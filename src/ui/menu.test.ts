@@ -216,6 +216,7 @@ describe('ROOT_MENU shape', () => {
       'selfMessagesOnRight',
       'messageFocusIndicatorEnabled',
       'messageFocusIndicatorChar',
+      'scrollOnNewMessages',
       // Notifications (quietHours is a cycle action, not a toggle key)
       'notifyMuted',
       'notifyChatMessages',

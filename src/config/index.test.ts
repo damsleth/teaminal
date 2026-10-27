@@ -440,6 +440,7 @@ describe('Settings ↔ config.json parity', () => {
     tailNetwork: !defaultSettings.tailNetwork,
     tailDiagnostics: !defaultSettings.tailDiagnostics,
     selfMessagesOnRight: !defaultSettings.selfMessagesOnRight,
+    scrollOnNewMessages: !defaultSettings.scrollOnNewMessages,
     inlineImages: 'off',
     inlineImageMaxRows: 7,
     statusBarPosition: 'hidden',
