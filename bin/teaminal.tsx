@@ -32,6 +32,7 @@ import { App } from '../src/ui/App'
 import { ErrorBoundary } from '../src/ui/ErrorBoundary'
 import { startFocusTracker } from '../src/ui/focusTracker'
 import { probeCellAspect } from '../src/ui/kittyGraphics'
+import { installTextSizing, probeTextSizing } from '../src/ui/textSizing'
 import { cleanupImageTempFiles } from '../src/ui/openImageFile'
 import { renderCleanExit } from '../src/ui/shutdown'
 import { PollerProvider } from '../src/ui/PollerContext'
@@ -151,6 +152,9 @@ if (!process.stdin.isTTY && !isSeededMode()) {
 // images against the real cell aspect instead of a 0.5 guess; a terminal
 // that ignores the query keeps the fallback.
 if (!isSeededMode()) await probeCellAspect()
+// Same pre-Ink window: detect kitty text sizing (OSC 66). When present, the
+// theme's per-element font sizes are rewritten into OSC 66 on the way out.
+if (!isSeededMode() && (await probeTextSizing())) installTextSizing(process.stdout)
 
 const store = createAppStore()
 

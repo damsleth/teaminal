@@ -18,11 +18,13 @@ import { dirname, join, resolve } from 'node:path'
 import { warn } from '../log'
 import {
   CHAT_ROUTING_MODES,
+  THEME_FONT_SIZE_KEYS,
   defaultSettings,
   type BorderStyleName,
   type ChatRoutingMode,
   type HeaderElementVisibility,
   type Settings,
+  type ThemeFontSizeKey,
   type ThemeOverrides,
   type ThemePresenceKey,
 } from '../state/store'
@@ -64,6 +66,7 @@ const THEME_KEYS = new Set<keyof ThemeOverrides>([
   'layout',
   'borders',
   'emphasis',
+  'fontSize',
   'dark',
   'light',
 ])
@@ -74,6 +77,7 @@ const NESTED_ONLY_KEYS = new Set<keyof ThemeOverrides>([
   'layout',
   'borders',
   'emphasis',
+  'fontSize',
   'dark',
   'light',
 ])
@@ -392,6 +396,7 @@ function mergeConfigPatch(current: TeaminalConfig, patch: TeaminalConfig): Teami
       ...mergeNestedThemeOverride(current.themeOverrides, patch.themeOverrides, 'layout'),
       ...mergeNestedThemeOverride(current.themeOverrides, patch.themeOverrides, 'borders'),
       ...mergeNestedThemeOverride(current.themeOverrides, patch.themeOverrides, 'emphasis'),
+      ...mergeNestedThemeOverride(current.themeOverrides, patch.themeOverrides, 'fontSize'),
       ...mergeNestedThemeOverride(current.themeOverrides, patch.themeOverrides, 'dark'),
       ...mergeNestedThemeOverride(current.themeOverrides, patch.themeOverrides, 'light'),
     }
@@ -400,7 +405,7 @@ function mergeConfigPatch(current: TeaminalConfig, patch: TeaminalConfig): Teami
 }
 
 function mergeNestedThemeOverride<
-  K extends 'presence' | 'layout' | 'borders' | 'emphasis' | 'dark' | 'light',
+  K extends 'presence' | 'layout' | 'borders' | 'emphasis' | 'fontSize' | 'dark' | 'light',
 >(current: ThemeOverrides | undefined, patch: ThemeOverrides, key: K): Pick<ThemeOverrides, K> {
   return {
     [key]: patch[key]
@@ -441,6 +446,7 @@ function cloneThemeOverrides(overrides: ThemeOverrides): ThemeOverrides {
     layout: overrides.layout ? { ...overrides.layout } : undefined,
     borders: overrides.borders ? { ...overrides.borders } : undefined,
     emphasis: overrides.emphasis ? { ...overrides.emphasis } : undefined,
+    fontSize: overrides.fontSize ? { ...overrides.fontSize } : undefined,
     dark: overrides.dark ? { ...overrides.dark } : undefined,
     light: overrides.light ? { ...overrides.light } : undefined,
   }
@@ -774,6 +780,12 @@ export function validateThemeOverrides(
       continue
     }
 
+    if (key === 'fontSize') {
+      const fontSize = validateFontSizeOverrides(rawValue, warnings)
+      if (fontSize) out.fontSize = fontSize
+      continue
+    }
+
     if (
       (key === 'messageFocusBackground' || key === 'selectedRowBackground') &&
       rawValue === null
@@ -862,6 +874,39 @@ export function validateEmphasisOverrides(
       continue
     }
     ;(out as Record<string, boolean>)[rawKey] = rawValue
+  }
+  return out
+}
+
+export const FONT_SIZE_MIN = 50
+
+export function validateFontSizeOverrides(
+  value: unknown,
+  warnings: string[],
+  scope = 'themeOverrides.fontSize',
+): NonNullable<ThemeOverrides['fontSize']> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    warnings.push(`config: "${scope}" must be a JSON object`)
+    return null
+  }
+  const out: NonNullable<ThemeOverrides['fontSize']> = {}
+  for (const [rawKey, rawValue] of Object.entries(value)) {
+    if (!(THEME_FONT_SIZE_KEYS as readonly string[]).includes(rawKey)) {
+      warnings.push(`config: unknown ${scope} key "${rawKey}" ignored`)
+      continue
+    }
+    if (
+      typeof rawValue !== 'number' ||
+      !Number.isInteger(rawValue) ||
+      rawValue < FONT_SIZE_MIN ||
+      rawValue > 100
+    ) {
+      warnings.push(
+        `config: "${scope}.${rawKey}" must be an integer percent from ${FONT_SIZE_MIN} to 100`,
+      )
+      continue
+    }
+    out[rawKey as ThemeFontSizeKey] = rawValue
   }
   return out
 }

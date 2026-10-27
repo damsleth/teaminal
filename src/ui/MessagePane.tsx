@@ -56,6 +56,7 @@ import { splitBodyLinkSpans } from './bodySpans'
 import { pickerAnchorCol } from './pickerAnchor'
 import { paintInlineImages, type InlineImageSlots } from './inlineImageLayout'
 import { localTime } from './localTime'
+import { fs } from './textSizing'
 
 export { effectiveSenderName, isRenderableMessage } from './renderableMessage'
 
@@ -385,7 +386,9 @@ export function MessagePane(props: {
       >
         {density === 'cozy' && (
           <Box paddingLeft={bodyIndent} marginBottom={1} flexShrink={0}>
-            <Text bold={theme.emphasis.sectionHeadingBold}>{headerLabel}</Text>
+            <Text bold={theme.emphasis.sectionHeadingBold}>
+              {fs(headerLabel, theme.fontSize.paneHeader)}
+            </Text>
           </Box>
         )}
         {searchActive && (
@@ -651,7 +654,7 @@ function MessageRow(props: {
     >
       {bodySpans.map((span, i) =>
         span.kind === 'text' ? (
-          <Text key={i}>{span.text}</Text>
+          <Text key={i}>{fs(span.text, theme.fontSize.messageText)}</Text>
         ) : (
           <Text
             key={i}
@@ -662,7 +665,7 @@ function MessageRow(props: {
               span.kind === 'link-focused' ? (theme.selectedRowBackground ?? undefined) : undefined
             }
           >
-            {span.text}
+            {fs(span.text, theme.fontSize.messageText)}
           </Text>
         ),
       )}
@@ -686,9 +689,11 @@ function MessageRow(props: {
           <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
             <Text wrap="truncate-end">
               <Text color={color} bold={senderName.length > 0 && theme.emphasis.senderBold}>
-                {senderName}
+                {fs(senderName, theme.fontSize.sender)}
               </Text>
-              {props.showTimestamp && <Text color={theme.timestamp}>{`  ${time}`}</Text>}
+              {props.showTimestamp && (
+                <Text color={theme.timestamp}>{fs(`  ${time}`, theme.fontSize.timestamp)}</Text>
+              )}
             </Text>
           </Box>
           {flip && <Box width={markerWidth} flexShrink={0} />}

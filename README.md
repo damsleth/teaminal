@@ -139,7 +139,7 @@ warnings and fall back to defaults.
 | `messageFocusIndicatorChar`    | single character     |     `>` | Marker shown beside the focused message.                                                 |
 | `messageFocusIndicatorColor`   | color or null        |  `null` | Override focused-message marker color.                                                   |
 | `messageFocusBackgroundColor`  | color or null        |  `null` | Optional focused-message background color.                                               |
-| `themeOverrides`               | object               |    `{}` | Override color roles such as `text`, `mutedText`, `unread`, `timestamp`, `presence`, plus `layout` (paddings), `borders` (border styles for `panel`, `modal`, and the `active` pane, which is drawn in `borderActive`), and `emphasis` (per-role bold flags). Colors under `dark` / `light` apply only to that base theme (the theme editor writes there); top-level colors apply to every theme. |
+| `themeOverrides`               | object               |    `{}` | Override color roles such as `text`, `mutedText`, `unread`, `timestamp`, `presence`, plus `layout` (paddings), `borders` (border styles for `panel`, `modal`, and the `active` pane, which is drawn in `borderActive`), `emphasis` (per-role bold flags), and `fontSize` (per-element text size in percent, kitty text sizing protocol only). Colors under `dark` / `light` apply only to that base theme (the theme editor writes there); top-level colors apply to every theme. |
 | `useTeamsPresence`             | boolean              |  `true` | Use the Teams unified presence endpoint (`presence.teams.microsoft.com`) for own presence. Falls back to Graph `/me/presence` automatically on 401/403/404. Set to `false` to force Graph-only in tenants that block public-client access to that host. |
 | `forceAvailableWhenFocused`    | boolean              |  `true` | While the terminal window has focus (DEC focus reporting; CSI ?1004), PUT `forceavailability=Available` to `presence.teams.microsoft.com` so Teams shows you Available, like the desktop client does for an active window. The override expires server-side after ~5 min and is refreshed inside that window. Set to `false` to leave presence to Teams' own desktop client / inactivity timer. |
 | `realtimeEnabled`              | boolean              | `false` | Enables the experimental Teams trouter push transport for typing, read-receipt, presence, and immediate refresh signals. Polling remains the source of truth and fallback. |
@@ -210,6 +210,17 @@ theme layered on top of `dark`; any subset of these keys is accepted:
     "unreadBold": true,
     "senderBold": true,
     "inlineKeyBold": true,
+  },
+  // Per-element font size, percent of the terminal font (50-100, steps of 10).
+  // Needs the kitty text sizing protocol (kitty 0.40+); other terminals ignore it.
+  "fontSize": {
+    "paneHeader": 100,
+    "sender": 100,
+    "timestamp": 70,
+    "messageText": 100,
+    "chatListHeader": 100,
+    "chatListName": 100,
+    "chatListPreview": 80,
   },
 }
 ```

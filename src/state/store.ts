@@ -280,7 +280,21 @@ export type ThemeOverrides = ThemeColorOverrides & {
     senderBold: boolean
     inlineKeyBold: boolean
   }>
+  // Percent of the base font size (50-100) per text type. Rendered through
+  // the kitty text sizing protocol; ignored on terminals without it.
+  fontSize?: Partial<Record<ThemeFontSizeKey, number>>
 }
+
+export const THEME_FONT_SIZE_KEYS = [
+  'timestamp',
+  'sender',
+  'messageText',
+  'paneHeader',
+  'chatListHeader',
+  'chatListName',
+  'chatListPreview',
+] as const
+export type ThemeFontSizeKey = (typeof THEME_FONT_SIZE_KEYS)[number]
 
 export type Settings = {
   theme: ThemeMode

@@ -26,6 +26,7 @@ import { chromeRowsForChatList, computeChatListViewport } from './chatListViewpo
 import { useTerminalRows } from './hooks/useTerminalRows'
 import { useAppState, useTheme } from './StoreContext'
 import type { PresenceColorKey, Theme } from './theme'
+import { fs } from './textSizing'
 
 // Fallback width used when no listPaneWidth prop is supplied. Should
 // not be reached in normal operation — App.tsx always passes the resolved
@@ -326,7 +327,11 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     return (
       <Box flexDirection="column" paddingLeft={0} paddingRight={theme.layout.chatListPaddingRight}>
         {filterBanner}
-        {density === 'cozy' && <Text bold={theme.emphasis.sectionHeadingBold}>Chats</Text>}
+        {density === 'cozy' && (
+          <Text bold={theme.emphasis.sectionHeadingBold}>
+            {fs('Chats', theme.fontSize.chatListHeader)}
+          </Text>
+        )}
         <Text color={theme.mutedText}>
           {filter ? '  no matches' : conn === 'connecting' ? '  loading...' : '  (none)'}
         </Text>
@@ -347,7 +352,9 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         if (row.kind === 'header') {
           return (
             <Box key={`h-${row.label}-${i}`} flexShrink={0}>
-              <Text bold={theme.emphasis.sectionHeadingBold}>{row.label}</Text>
+              <Text bold={theme.emphasis.sectionHeadingBold}>
+                {fs(row.label, theme.fontSize.chatListHeader)}
+              </Text>
             </Box>
           )
         }
@@ -401,7 +408,10 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
                 backgroundColor={hdrBg}
                 wrap="truncate-end"
               >
-                {hdrBg ? hdrLabel.padEnd(previewContentWidth) : hdrLabel}
+                {fs(
+                  hdrBg ? hdrLabel.padEnd(previewContentWidth) : hdrLabel,
+                  theme.fontSize.chatListHeader,
+                )}
               </Text>
             </Box>
           )
@@ -491,7 +501,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
                   }
                   wrap="wrap"
                 >
-                  {labelPadded}
+                  {fs(labelPadded, theme.fontSize.chatListName)}
                 </Text>
               </Box>
             </Box>
@@ -506,7 +516,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
                   bold={hasUnread && theme.emphasis.unreadBold}
                   wrap="wrap"
                 >
-                  {preview}
+                  {fs(preview, theme.fontSize.chatListPreview)}
                 </Text>
               </Box>
             )}

@@ -21,6 +21,7 @@ import {
   settingsToConfig,
   updateConfig,
   updateSettings,
+  validateThemeOverrides,
 } from './index'
 import { defaultSettings, type Settings } from '../state/store'
 
@@ -639,4 +640,14 @@ describe('config dir is a dangling symlink', () => {
     writeFileSync(filePath, 'in the way')
     await expect(updateSettings({ theme: 'dark' }, join(filePath, 'config.json'))).rejects.toThrow()
   })
+})
+
+test('themeOverrides.fontSize keeps known keys in 50-100 and warns on the rest', () => {
+  const warnings: string[] = []
+  const out = validateThemeOverrides(
+    { fontSize: { timestamp: 70, sender: 120, bogus: 80, chatListPreview: 50.5 } },
+    warnings,
+  )
+  expect(out?.fontSize).toEqual({ timestamp: 70 })
+  expect(warnings).toHaveLength(3)
 })
