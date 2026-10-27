@@ -81,6 +81,9 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The Sender color applies.** Other people's names above their messages
+  now use the theme's **Sender** color; it was ignored before.
+
 - **The keybindings overlay scrolls.** When the table is taller than the
   pane it shows a page at a time (j/k or ↓/↑, u/d for half pages) instead
   of spilling over the layout, and long rows truncate in narrow panes.

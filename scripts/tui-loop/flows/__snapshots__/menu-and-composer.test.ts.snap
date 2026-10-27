@@ -780,6 +780,8 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColor": -1
   },
   "31,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 7,
     "bold": 134217728
   },
   "34,11": {
