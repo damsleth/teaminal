@@ -59,6 +59,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The keybindings overlay scrolls.** When the table is taller than the
+  pane it shows a page at a time (j/k or ↓/↑, u/d for half pages) instead
+  of spilling over the layout, and long rows truncate in narrow panes.
+
 - **Message times are shown in local time**, not UTC (they were an hour or
   two off outside GMT). Day separators and search-result times use local
   time too, so a message sent just after midnight lands under the right day.
