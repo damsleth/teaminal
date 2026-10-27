@@ -4,7 +4,7 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
 ╭──────────────────────────────────────────────────╮
 │ j/k move · l/Enter open · / filter · n new chat… │
 │╭────────────────────────────────────────────────╮│
-││  teaminal · You (example.com) · presence ● ?…  ││
+││  teaminal · You (example.com) · presence ● ·…  ││
 │╰────────────────────────────────────────────────╯│
 │╭──────────╮╭────────────────────────────────────╮│
 ││Chats     ││Select a chat or channel · Enter to ││
@@ -722,7 +722,7 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
 ╭────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ j/k move · l/Enter open · / filter · n new chat · ? help · q quit                                  │
 │╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
-││  teaminal · You (example.com) · presence ● ? · graph ● online · 3 chats                          ││
+││  teaminal · You (example.com) · presence ● · graph ● · 3 chats                                   ││
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
 │╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
 ││Chats                     ││Select a chat or channel · Enter to open · q to quit                  ││
@@ -791,15 +791,15 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 8,
     "bold": 0
   },
-  "55,2": {
+  "53,2": {
     "fgColorMode": 16777216,
     "fgColor": 2
   },
-  "56,2": {
+  "54,2": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "73,2": {
+  "64,2": {
     "fgColorMode": 0,
     "fgColor": -1
   },

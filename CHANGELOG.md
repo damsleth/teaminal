@@ -31,6 +31,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The header shows only the status dots** for presence, graph and push;
+  the words (`available`, `online`, `connected`) are gone.
 - **Message previews in the chat list are indented** to line up under the
   chat name instead of starting at the left edge.
 - **The Network panel and `--network-log` no longer show chat, message or

@@ -140,7 +140,6 @@ export function HeaderBar() {
         <>
           <Text color="gray">{'presence '}</Text>
           <Text color={presenceColor(theme, myPresence?.availability)}>{DOT}</Text>
-          <Text color="gray">{` ${(myPresence?.availability ?? '?').toLowerCase()}`}</Text>
         </>
       ),
     )
@@ -150,7 +149,6 @@ export function HeaderBar() {
       <>
         <Text color="gray">{'graph '}</Text>
         <Text color={connColor(conn)}>{DOT}</Text>
-        <Text color="gray">{` ${conn}`}</Text>
       </>,
     )
   }
@@ -166,7 +164,6 @@ export function HeaderBar() {
       <>
         <Text color="gray">{'push '}</Text>
         <Text color={realtimeColor(realtimeState)}>{DOT}</Text>
-        <Text color="gray">{` ${realtimeState}`}</Text>
       </>,
     )
   }
