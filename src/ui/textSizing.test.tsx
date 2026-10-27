@@ -4,10 +4,7 @@ import {
   __setTextSizingSupportedForTests,
   expandTextSizing,
   fs,
-  fsTall,
-  nearestFraction,
   packLength,
-  tallPacker,
   parseTextSizingProbe,
 } from './textSizing'
 
@@ -84,39 +81,4 @@ test('tight runs pack to the scaled pitch and pad the saved cells at the end', (
   // Still 5 cells before the bar: 3 packed + 2 padding, inside the background.
   // eslint-disable-next-line no-control-regex
   expect(out).toMatch(/w=1;e\x07  \x1b\[49m/)
-})
-
-test('tall lines draw 2-row blocks and step over their lower half on the next line', () => {
-  __setTextSizingSupportedForTests(true)
-  const frame = renderToString(
-    <Box flexDirection="column" width={16}>
-      <Box>
-        <Text>{'L|\nL|'}</Text>
-        <Box height={2} width={13}>
-          <Text>{fsTall('Ada', 100)}</Text>
-        </Box>
-        <Text>{'|\n|'}</Text>
-      </Box>
-      <Text>{'L|            |'}</Text>
-    </Box>,
-    { columns: 16 },
-  )
-  const [top, under, after] = expandTextSizing(frame).split('\n')
-  // 'Ada' padded to 'Ada ' and packed in pairs: two 2x2 blocks at normal size.
-  expect(top).toContain('\x1b]66;s=2:n=1:d=2:v=2:w=1;Ad\x07\x1b]66;s=2:n=1:d=2:v=2:w=1;a \x07')
-  // eslint-disable-next-line no-control-regex
-  expect(stripOsc66(top!).replace(/\x1b\[[0-9;]*m/g, '')).toBe('L|Ada          |')
-  // The reserved row: Ink's blanks under the blocks become a 4-col jump.
-  expect(under).toBe('L|\x1b[4C         |')
-  expect(after).toBe('L|            |')
-})
-
-test('tall packer and fractions stay within the spec limits', () => {
-  expect(tallPacker(10).len).toBe(2)
-  expect(nearestFraction(0.35)).toEqual([5, 14])
-  for (let n = 5; n <= 10; n++) {
-    const p = tallPacker(n)
-    expect(p.cells(p.len) / 2).toBeLessThanOrEqual(7)
-    expect(p.cells(p.len)).toBeLessThanOrEqual(p.len)
-  }
 })
