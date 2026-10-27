@@ -71,6 +71,10 @@ export type ThemeLayout = {
   chatListPaddingRight: number
   // ChatList: blank rows after each chat/channel row.
   chatListGap: number
+  // MessagePane: columns of background color on each side of a message body
+  // (focus / self-message background). Reserved on every body so focusing
+  // one doesn't shift its text.
+  textBackgroundPaddingX: number
 }
 
 export type ThemeBorders = {
@@ -163,6 +167,7 @@ const LAYOUT_DEFAULT: ThemeLayout = {
   tailGap: 1,
   chatListPaddingRight: 1,
   chatListGap: 0,
+  textBackgroundPaddingX: 0,
 }
 
 const BORDERS_DEFAULT: ThemeBorders = { panel: 'round', modal: 'round', active: 'round' }

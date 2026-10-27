@@ -200,6 +200,7 @@ theme layered on top of `dark`; any subset of these keys is accepted:
     "tailGap": 1,
     "chatListPaddingRight": 1,
     "chatListGap": 0, // blank rows between chats in the list
+    "textBackgroundPaddingX": 0, // bg-colored columns around focused / own message bodies
   },
   // Border styles (none | single | double | round | bold | classic | singleDouble | doubleSingle | arrow):
   "borders": { "panel": "single", "modal": "double", "active": "bold" },

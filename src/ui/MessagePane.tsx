@@ -226,7 +226,11 @@ export function MessagePane(props: {
   // Body wrap width estimate for the viewport budget: pane content (terminal
   // minus the chat-list pane and its border) minus the body indent. Bodies now
   // start near the left edge instead of after a deep sender column.
-  const messageTextColumns = Math.max(12, terminalSize.columns - listPaneWidth - 2 - bodyIndent)
+  const bgPadX = theme.layout.textBackgroundPaddingX
+  const messageTextColumns = Math.max(
+    12,
+    terminalSize.columns - listPaneWidth - 2 - bodyIndent - 2 * bgPadX,
+  )
   // Cell budget for an inline image (message pane minus the gutter columns).
   const imgCols = Math.max(12, terminalSize.columns - listPaneWidth - 20)
   // Rows a message's inline images occupy: each loaded image takes its fitted
@@ -365,7 +369,7 @@ export function MessagePane(props: {
     const focusedRow = rows[idx]
     const focusedMsg = focusedRow?.kind === 'message' ? focusedRow.message : null
     const bodyText = focusedMsg ? messageBodyText(focusedMsg) : ''
-    const bodyStartCol = messageBodyTerminalColumn({ bodyIndent, listPaneWidth })
+    const bodyStartCol = messageBodyTerminalColumn({ bodyIndent: bodyIndent + bgPadX, listPaneWidth })
     const fallbackCol = listPaneWidth + 3
     const col = pickerAnchorCol({
       bodyText,
@@ -660,18 +664,17 @@ function MessageRow(props: {
     </Box>
   )
 
-  const bodyNode = (
+  const bodyBg = props.focused
+    ? (theme.messageFocusBackground ?? undefined)
+    : isSelf && !isDeleted
+      ? (theme.selfMessageBackground ?? undefined)
+      : undefined
+  const bodyTextNode = (
     <Text
       color={
         isDeleted ? theme.mutedText : props.focused ? (theme.messageFocusText ?? color) : color
       }
-      backgroundColor={
-        props.focused
-          ? (theme.messageFocusBackground ?? undefined)
-          : isSelf && !isDeleted
-            ? (theme.selfMessageBackground ?? undefined)
-            : undefined
-      }
+      backgroundColor={bodyBg}
       italic={isDeleted}
       bold={props.focused && !isDeleted}
       wrap="wrap"
@@ -697,6 +700,17 @@ function MessageRow(props: {
       {reactionLine && <Text color={theme.mutedText}> {`(${reactionLine})`}</Text>}
     </Text>
   )
+  // Ink paints a Box background over its padding and the ragged ends of
+  // wrapped lines, so the padded body reads as one solid block.
+  const bgPadX = theme.layout.textBackgroundPaddingX
+  const bodyNode =
+    bgPadX > 0 ? (
+      <Box paddingX={bgPadX} backgroundColor={bodyBg}>
+        {bodyTextNode}
+      </Box>
+    ) : (
+      bodyTextNode
+    )
 
   // System and deleted rows have no sender header — the marker line carries
   // their single line of text directly.

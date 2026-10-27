@@ -42,10 +42,15 @@ function render(
   focusedMessageId: string | null = null,
   search: string | null = null,
   focusBackground: string | null = null,
+  bgPadX = 0,
 ): string {
   const store = createAppStore()
   store.set({
-    settings: { ...store.get().settings, messageFocusBackgroundColor: focusBackground },
+    settings: {
+      ...store.get().settings,
+      messageFocusBackgroundColor: focusBackground,
+      themeOverrides: { layout: { textBackgroundPaddingX: bgPadX } },
+    },
     focus: { kind: 'chat', chatId: 'c1' },
     messagesByConvo: { 'chat:c1': MESSAGES },
     ...(search !== null
@@ -82,6 +87,15 @@ test('the focus background colors the message body, not the focus marker', () =>
   const bg = body.indexOf('48;2;255;0;0')
   expect(bg).toBeGreaterThan(-1)
   expect(body.indexOf('>')).toBeLessThan(bg)
+})
+
+test('text background padding paints bg columns around the body', () => {
+  const body = render(40, 'm4', null, '#ff0000', 2)
+    .split('\n')
+    .find((l) => l.includes('second day, second message'))!
+  // Two red cells, then the text.
+  // eslint-disable-next-line no-control-regex
+  expect(body).toMatch(/48;2;255;0;0m(\x1b\[[0-9;]*m)*  (\x1b\[[0-9;]*m)*second day/)
 })
 
 test('the focus marker sits on the message body line, not the sender name', () => {
