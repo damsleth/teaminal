@@ -183,6 +183,7 @@ if (themeResult.source === 'file') {
 }
 for (const w of themeResult.warnings) warn(w)
 let activeProfile: string | null = cliProfile ?? configResult.settings.activeAccount ?? null
+store.set({ account: accountRef(activeProfile) })
 const resolvedLogFile = cliLogFile ?? configResult.settings.logFile ?? null
 if (resolvedLogFile) setLogFile(resolvedLogFile)
 if (cliNetworkLog) setNetworkLog(cliNetworkLog)
@@ -359,17 +360,10 @@ function makeSessionApi(): SessionApi {
     client: () =>
       currentSession?.client() ??
       createGraphClient({ account: accountRef(activeProfile), ...getAudiencePreference() }),
-    generation: () => sessionGeneration,
+    generation: () => store.get().accountGeneration,
     switchAccount,
   }
 }
-
-// Bumped when a switch resets the store, so async UI work can tell its
-// write would land in another account's state (even across A -> B -> A).
-// Bumped at the reset itself, not at the start of the switch: work begun
-// during teardown still holds the old session's client and must count as
-// stale too.
-let sessionGeneration = 0
 
 async function switchAccount(nextProfile: string | null): Promise<void> {
   if (currentSession?.profile === nextProfile) return
@@ -402,8 +396,12 @@ async function switchAccount(nextProfile: string | null): Promise<void> {
   activeCachePath = getMessageCachePath(process.env, activeProfile)
   activeListCachePath = getListCachePath(process.env, activeProfile)
   activeNameCachePath = getNameCachePath(process.env, activeProfile)
-  sessionGeneration += 1
-  resetAccountScopedState(store)
+  // The reset bumps store.accountGeneration (SessionApi.generation()), so
+  // async UI work can tell its write would land in another account's state
+  // (even across A -> B -> A). Bumped at the reset itself, not at the start
+  // of the switch: work begun during teardown still holds the old session's
+  // client and must count as stale too.
+  resetAccountScopedState(store, accountRef(activeProfile))
   if (persistCaches) {
     hydrateNameCache(activeProfile)
     hydrateCache(activeProfile)

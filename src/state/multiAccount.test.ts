@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { accountRef } from '../account'
 import { createAppStore, resetAccountScopedState } from '../state/store'
 import { getMessageCachePath } from '../state/messageCachePersistence'
 
@@ -45,7 +46,7 @@ describe('resetAccountScopedState', () => {
       customTheme: { name: 'mine', data: { fg: '#fff' } },
     })
 
-    resetAccountScopedState(store)
+    resetAccountScopedState(store, accountRef('next'))
 
     const s = store.get()
     expect(s.me).toBeUndefined()
