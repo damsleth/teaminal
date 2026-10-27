@@ -14,6 +14,7 @@
 // All store mutations go through the store seam passed in by the
 // poller; this module never imports the store factory directly.
 
+import type { AccountStore } from '../accountStore'
 import { listMessagesNextPage, listMessagesPage } from '../../graph/chats'
 import type { GraphClient } from '../../graph/client'
 import { listChannelMessagesNextPage } from '../../graph/teams'
@@ -21,9 +22,8 @@ import {
   cacheMessagesFromLegacy,
   emptyMessageCache,
   focusKey,
-  type AppState,
   type ConvKey,
-  type Store,
+  type Focus,
 } from '../store'
 import { indexNamesFromMessages } from '../nameIndex'
 import { isAbortError } from './intervals'
@@ -39,7 +39,9 @@ export type LoadOlderMessagesResult = {
 }
 
 export type LoadOlderDeps = {
-  store: Store<AppState>
+  store: AccountStore
+  // The conversation to page, captured by the caller.
+  focus: Focus
   getClient: () => GraphClient
   reportError: (err: Error) => void
   // Session stop signal: aborts the fetch, and a page that lands after stop
@@ -48,8 +50,7 @@ export type LoadOlderDeps = {
 }
 
 export async function loadOlderMessages(deps: LoadOlderDeps): Promise<LoadOlderMessagesResult> {
-  const { store, reportError, signal } = deps
-  const focus = store.get().focus
+  const { store, focus, reportError, signal } = deps
   const conv = focusKey(focus)
   if (!conv) return { conv: null, added: 0, fullyLoaded: true }
 

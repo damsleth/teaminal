@@ -6,10 +6,9 @@
 // the merged list rather than tracked separately, so a stale count can't
 // drift from the visible list.
 
-import type { AccountRef } from '../account'
+import type { AccountStore } from './accountStore'
 import { listActivityFeed, type ActivityItem } from '../graph/teamsActivity'
 import { recordEvent } from '../log'
-import type { AppState, Store } from './store'
 
 const ACTIVITY_FEED_CAP = 200
 
@@ -41,7 +40,7 @@ export function mergeActivityItems(
 // Record a notification teaminal fired so it shows in the Notifications
 // view next to the server-side activity feed.
 export function recordNotification(
-  store: Store<AppState>,
+  store: AccountStore,
   item: Omit<ActivityItem, 'id' | 'isRead'> & { messageId: string },
 ): void {
   store.set((s) => {
@@ -63,23 +62,14 @@ export function countUnreadMentions(items: ActivityItem[]): number {
 // State-layer wrapper around listActivityFeed. UI components can call
 // this to trigger an on-demand refresh (e.g. when the activity modal
 // opens) without violating the ui → graph layering rule. Always
-// best-effort: a failure is logged and the cached feed remains.
-//
-// `isStale` must report whether the session that asked was torn down
-// (account switch) while the fetch was in flight — otherwise the resolved
-// page would repopulate the new account's wiped feed with the old
-// account's items.
-export async function refreshActivityFeed(
-  store: Store<AppState>,
-  account: AccountRef,
-  isStale: () => boolean,
-): Promise<void> {
+// best-effort: a failure is logged and the cached feed remains. A page
+// that resolves after an account switch is dropped by the AccountStore.
+export async function refreshActivityFeed(store: AccountStore): Promise<void> {
   try {
     const page = await listActivityFeed({
-      account,
+      account: store.ref,
       syncState: store.get().activitySyncState,
     })
-    if (isStale()) return
     if (page.items.length === 0 && !page.syncState) return
     store.set((s) => {
       const merged = mergeActivityItems(s.activityFeed, page.items)

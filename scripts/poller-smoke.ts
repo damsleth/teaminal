@@ -9,6 +9,7 @@ import { setActiveProfile } from '../src/graph/client'
 import { probeCapabilities } from '../src/graph/capabilities'
 import { getMe } from '../src/graph/me'
 import { startPoller, type MentionEvent } from '../src/state/poller'
+import { accountStore } from '../src/state/accountStore'
 import { createAppStore } from '../src/state/store'
 
 const testClient = () => createGraphClient(currentAccountContext())
@@ -16,7 +17,7 @@ const testClient = () => createGraphClient(currentAccountContext())
 const profile = Bun.argv[2]
 if (profile) setActiveProfile(profile)
 
-const store = createAppStore()
+const store = createAppStore(currentAccountContext().account)
 const me = await getMe(testClient())
 store.set({ me })
 const capabilities = await probeCapabilities(testClient())
@@ -32,7 +33,7 @@ const errors: { loop: string; msg: string }[] = []
 
 const handle = startPoller({
   getClient: testClient,
-  store,
+  store: accountStore(store),
   intervals: { activeMs: 5_000, listMs: 5_000, presenceMs: 8_000 },
   onMention: (e) => mentions.push(e),
   onError: (loop, err) => errors.push({ loop, msg: err.message }),

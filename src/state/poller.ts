@@ -25,10 +25,11 @@
 // Focus change wakes the active loop's interruptable sleep and aborts any
 // in-flight active fetch so opening a chat is responsive even mid-poll.
 
+import type { AccountStore } from './accountStore'
 import type { GraphClient } from '../graph/client'
 import type { ChatMessage } from '../types'
 import { recordEvent } from '../log'
-import { type AppState, type ConvKey, focusKey, type Store } from './store'
+import { type ConvKey, type Focus, focusKey } from './store'
 import {
   ACTIVE_DEFAULT_MS,
   LIST_DEFAULT_MS,
@@ -67,7 +68,7 @@ export type MentionEvent = {
 }
 
 export type PollerOpts = {
-  store: Store<AppState>
+  store: AccountStore
   // Bound Graph client for the session's account. Called per request so a
   // routing change for this account applies to the next call.
   getClient: () => GraphClient
@@ -98,8 +99,9 @@ export type PollerHandle = {
   // escape hatch for a stale/stuck UI: the next list/active iterations
   // rebuild state from Graph rather than preserving old slices.
   hardRefresh: () => void
-  // Fetch one older page for the currently-focused conversation, if any.
-  loadOlderMessages: () => Promise<LoadOlderMessagesResult>
+  // Fetch one older page for `focus` (captured by the caller, so a focus
+  // change mid-fetch can't redirect the page to another conversation).
+  loadOlderMessages: (focus: Focus) => Promise<LoadOlderMessagesResult>
 }
 
 export function startPoller(opts: PollerOpts): PollerHandle {
@@ -171,9 +173,10 @@ export function startPoller(opts: PollerOpts): PollerHandle {
     onError?.(loop, err instanceof Error ? err : new Error(String(err)))
   }
 
-  function loadOlderMessages(): Promise<LoadOlderMessagesResult> {
+  function loadOlderMessages(focus: Focus): Promise<LoadOlderMessagesResult> {
     return loadOlderMessagesImpl({
       store,
+      focus,
       getClient,
       reportError: (err) => reportError('active', err),
       signal: sessionAbort.signal,

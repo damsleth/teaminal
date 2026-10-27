@@ -10,6 +10,7 @@
 // imperative-action counterpart. Both modules sit in state/ for the
 // same reason: they own the graph call sites for their lane.
 
+import type { AccountStore } from './accountStore'
 import {
   createOneOnOneChat as createOneOnOneChatGraph,
   hideChat as hideChatGraph,
@@ -47,7 +48,6 @@ import {
   type FocusChannel,
   type FocusChat,
   type FocusThread,
-  type Store,
 } from './store'
 
 /**
@@ -82,7 +82,7 @@ export async function resolveFederatedChatId(
  */
 export async function materializeChat(
   client: GraphClient,
-  store: Store<AppState>,
+  store: AccountStore,
   chatId: string,
 ): Promise<Chat> {
   const local = store.get().chats.find((c) => c.id === chatId)
@@ -125,15 +125,14 @@ export type SendResult = { ok: true } | { ok: false; error: string }
  * Send `content` to a chat, channel or thread with an optimistic row: the
  * message appears at once (marked sending) and its draft is cleared, then the
  * server copy replaces it, or on failure it is marked failed and the text goes
- * back into the draft. Writes after the network call are dropped when
- * `isStale()` reports the account changed underneath the send.
+ * back into the draft. Writes after the network call are dropped by the
+ * AccountStore when the account changed underneath the send.
  */
 export async function sendMessage(
   client: GraphClient,
-  store: Store<AppState>,
+  store: AccountStore,
   focus: FocusChat | FocusChannel | FocusThread,
   content: string,
-  opts?: { isStale?: () => boolean },
 ): Promise<SendResult> {
   const conv = focusKey(focus)!
   const tempId = makeTempId()
@@ -174,16 +173,14 @@ export async function sendMessage(
               focus.rootId,
               content,
             )
-    if (!opts?.isStale?.()) store.set((s) => ({ messagesByConvo: replaceTemp(s, () => sent) }))
+    store.set((s) => ({ messagesByConvo: replaceTemp(s, () => sent) }))
     return { ok: true }
   } catch (err) {
     const error = err instanceof Error ? err.message : 'send failed'
-    if (!opts?.isStale?.()) {
-      store.set((s) => ({
-        messagesByConvo: replaceTemp(s, (m) => ({ ...m, _sending: false, _sendError: error })),
-        draftsByConvo: { ...s.draftsByConvo, [conv]: content },
-      }))
-    }
+    store.set((s) => ({
+      messagesByConvo: replaceTemp(s, (m) => ({ ...m, _sending: false, _sendError: error })),
+      draftsByConvo: { ...s.draftsByConvo, [conv]: content },
+    }))
     return { ok: false, error }
   }
 }
@@ -197,7 +194,7 @@ export async function sendMessage(
 
 const chatConvKey = (chatId: string): string => `chat:${chatId}`
 
-function setConvMessages(store: Store<AppState>, convKey: string, next: ChatMessage[]): void {
+function setConvMessages(store: AccountStore, convKey: string, next: ChatMessage[]): void {
   store.set((s) => ({
     messagesByConvo: { ...s.messagesByConvo, [convKey]: next },
   }))
@@ -206,7 +203,7 @@ function setConvMessages(store: Store<AppState>, convKey: string, next: ChatMess
 // Run an optimistic mutation against a chat conversation, then a Graph call.
 // Restores the snapshot if the call throws so a failed write never sticks.
 async function withOptimisticChatUpdate(
-  store: Store<AppState>,
+  store: AccountStore,
   chatId: string,
   mutate: (messages: ChatMessage[]) => ChatMessage[],
   commit: () => Promise<void>,
@@ -237,7 +234,7 @@ async function withOptimisticChatUpdate(
  */
 export async function toggleReaction(
   client: GraphClient,
-  store: Store<AppState>,
+  store: AccountStore,
   chatId: string,
   messageId: string,
   reactionType: string,
@@ -265,7 +262,7 @@ export async function toggleReaction(
 /** Edit the content of one of the user's own chat messages. */
 export async function editChatMessageContent(
   client: GraphClient,
-  store: Store<AppState>,
+  store: AccountStore,
   chatId: string,
   messageId: string,
   content: string,
@@ -284,7 +281,7 @@ export async function editChatMessageContent(
 /** Soft-delete one of the user's own chat messages (renders as a tombstone). */
 export async function deleteChatMessageById(
   client: GraphClient,
-  store: Store<AppState>,
+  store: AccountStore,
   chatId: string,
   messageId: string,
 ): Promise<void> {
@@ -305,7 +302,7 @@ export async function deleteChatMessageById(
  */
 export async function deleteChatById(
   client: GraphClient,
-  store: Store<AppState>,
+  store: AccountStore,
   chatId: string,
 ): Promise<void> {
   const before = store.get().chats
@@ -313,12 +310,8 @@ export async function deleteChatById(
   if (!removed) return
   const selfId = store.get().me?.id
   if (!selfId) throw new Error('cannot delete chat before /me is loaded')
-  store.set((s) => ({
-    chats: s.chats.filter((c) => c.id !== chatId),
-    ...(s.focus.kind === 'chat' && s.focus.chatId === chatId
-      ? { focus: { kind: 'list' as const }, inputZone: 'list' as const }
-      : {}),
-  }))
+  // Moving focus off the deleted chat is the caller's (global UI) write.
+  store.set((s) => ({ chats: s.chats.filter((c) => c.id !== chatId) }))
   try {
     await hideChatGraph(client, chatId, selfId)
     recordEvent('graph', 'info', `deleted chat ${chatId}`)

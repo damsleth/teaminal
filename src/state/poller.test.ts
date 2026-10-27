@@ -1,3 +1,5 @@
+import { accountRef } from '../account'
+import { accountStore } from './accountStore'
 import { createGraphClient, currentAccountContext } from '../graph/client'
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
@@ -179,13 +181,13 @@ describe('active loop', () => {
         chatMessages: () => jsonResponse({ value: messages }),
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME, focus: { kind: 'chat', chatId: 'c1' } })
 
     const events: MentionEvent[] = []
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 30, listMs: 99_999, presenceMs: 99_999 },
       onMention: (e) => events.push(e),
     })
@@ -221,13 +223,13 @@ describe('active loop', () => {
         chatMessages: () => jsonResponse({ value: returnNew ? [...seed, newMention] : seed }),
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME, focus: { kind: 'chat', chatId: 'c1' } })
 
     const events: MentionEvent[] = []
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 30, listMs: 99_999, presenceMs: 99_999 },
       onMention: (e) => events.push(e),
     })
@@ -262,13 +264,13 @@ describe('active loop', () => {
         },
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME, focus: { kind: 'chat', chatId: 'c1' } })
 
     const events: MentionEvent[] = []
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 30, listMs: 99_999, presenceMs: 99_999 },
       onMention: (e) => events.push(e),
     })
@@ -296,12 +298,12 @@ describe('active loop', () => {
         },
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME, focus: { kind: 'chat', chatId: 'c1' } })
 
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 9_999, listMs: 99_999, presenceMs: 99_999 },
       onMention: () => {},
     })
@@ -323,11 +325,11 @@ describe('active loop', () => {
         },
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME, focus: { kind: 'list' } })
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 20, listMs: 99_999, presenceMs: 99_999 },
     })
     await Bun.sleep(150)
@@ -363,7 +365,7 @@ describe('active loop', () => {
           }),
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({
       me: ME,
       focus: { kind: 'chat', chatId: 'c1' },
@@ -372,7 +374,7 @@ describe('active loop', () => {
 
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 99_999 },
     })
     await waitFor(
@@ -429,16 +431,16 @@ describe('active loop', () => {
         },
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME, focus: { kind: 'chat', chatId: 'c1' } })
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 99_999 },
     })
     await waitFor(() => store.get().messageCacheByConvo['chat:c1']?.nextLink !== undefined)
 
-    const result = await activeHandle.loadOlderMessages()
+    const result = await activeHandle.loadOlderMessages(store.get().focus)
 
     expect(result).toMatchObject({ conv: 'chat:c1', added: 1, fullyLoaded: true })
     expect(result.anchorMessageId).toBe('m-mid')
@@ -477,16 +479,16 @@ describe('active loop', () => {
         },
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME, focus: { kind: 'chat', chatId: 'c1' } })
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 99_999 },
     })
     await waitFor(() => store.get().messageCacheByConvo['chat:c1']?.nextLink !== undefined)
 
-    const result = await activeHandle.loadOlderMessages()
+    const result = await activeHandle.loadOlderMessages(store.get().focus)
 
     expect(result.error?.message).toContain('Graph 502')
     const cache = store.get().messageCacheByConvo['chat:c1']
@@ -508,10 +510,10 @@ describe('list loop', () => {
         '/chats': () => jsonResponse({ value: [chat] }),
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
     await waitFor(() => store.get().chats.length > 0)
@@ -557,10 +559,10 @@ describe('list loop', () => {
         teams: [{ id: '19:t@thread.tacv2', displayName: 'ONE Team', channels: [] }],
       })
     })
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
     await waitFor(() => store.get().chats.length > 0)
@@ -586,10 +588,10 @@ describe('list loop', () => {
       csaCalls++
       return jsonResponse({ items: [] })
     })
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
     await waitFor(() => store.get().conn === 'authError')
@@ -634,10 +636,10 @@ describe('list loop', () => {
       }
       return jsonResponse({ teams: [] })
     })
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
     await waitFor(() => store.get().chats[0]?.id === 'graph-chat')
@@ -659,10 +661,10 @@ describe('list loop', () => {
           }),
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
     await waitFor(() => store.get().lastListPollAt !== undefined)
@@ -680,10 +682,10 @@ describe('list loop', () => {
       }),
     )
     const errors: { loop: string; err: Error }[] = []
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
       onError: (loop, err) => errors.push({ loop, err }),
     })
@@ -713,11 +715,11 @@ describe('list loop', () => {
           }),
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME })
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
     await waitFor(() => store.get().unreadByChatId.c1 !== undefined)
@@ -752,11 +754,11 @@ describe('list loop', () => {
         },
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME })
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
     await waitFor(() => store.get().unreadByChatId.c1 !== undefined)
@@ -790,11 +792,11 @@ describe('list loop', () => {
           }),
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME, focus: { kind: 'chat', chatId: 'active-chat' } })
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
     await waitFor(() => store.get().unreadByChatId['active-chat'] !== undefined)
@@ -808,7 +810,7 @@ describe('presence loop', () => {
   test('updates myPresence when capability is ok', async () => {
     primeAuth()
     installTransport(makeHandlers())
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     const caps: Capabilities = {
       me: { ok: true },
       chats: { ok: true },
@@ -824,7 +826,7 @@ describe('presence loop', () => {
     })
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 30 },
     })
     await waitFor(() => store.get().myPresence !== undefined)
@@ -846,7 +848,7 @@ describe('presence loop', () => {
         },
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     const caps: Capabilities = {
       me: { ok: true },
       chats: { ok: true },
@@ -859,7 +861,7 @@ describe('presence loop', () => {
     })
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 30 },
     })
     await Bun.sleep(120)
@@ -882,7 +884,7 @@ describe('presence loop', () => {
         },
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     const caps: Capabilities = {
       me: { ok: true },
       chats: { ok: true },
@@ -900,7 +902,7 @@ describe('presence loop', () => {
     })
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 30 },
     })
     await Bun.sleep(120)
@@ -943,11 +945,11 @@ describe('presence loop', () => {
         { status: 200, headers: { 'content-type': 'application/json' } },
       )
     })
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME, capabilities: { presence: { ok: true } } as Capabilities })
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 30 },
     })
     await waitFor(() => store.get().myPresence?.availability === 'Busy')
@@ -982,11 +984,11 @@ describe('presence loop', () => {
       })
     })
     const errors: { loop: string; err: Error }[] = []
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME, capabilities: { presence: { ok: true } } as Capabilities })
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 25 },
       onError: (loop, err) => errors.push({ loop, err }),
     })
@@ -1024,7 +1026,7 @@ describe('presence loop', () => {
         headers: { 'content-type': 'application/json' },
       })
     })
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({
       me: ME,
       capabilities: { presence: { ok: true } } as Capabilities,
@@ -1032,7 +1034,7 @@ describe('presence loop', () => {
     })
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 30 },
     })
     await waitFor(() => store.get().myPresence?.availability === 'Away')
@@ -1053,10 +1055,10 @@ describe('stop', () => {
         },
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     const handle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
     await waitFor(() => chatsCalls >= 1)
@@ -1124,12 +1126,12 @@ describe('cross-chat mention detection', () => {
     primeAuth()
     phase = 'before'
     setupChatList()
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME, focus: { kind: 'list' } })
     const events: MentionEvent[] = []
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
       onMention: (e) => events.push(e),
     })
@@ -1170,12 +1172,12 @@ describe('cross-chat mention detection', () => {
         },
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME, focus: { kind: 'list' } })
     const events: MentionEvent[] = []
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
       onMention: (e) => events.push(e),
     })
@@ -1220,12 +1222,12 @@ describe('cross-chat mention detection', () => {
           }),
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME, focus: { kind: 'chat', chatId: 'active-chat' } })
     const events: MentionEvent[] = []
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
       onMention: (e) => events.push(e),
     })
@@ -1261,11 +1263,11 @@ describe('member hydration', () => {
           }),
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME })
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
     await waitFor(() => (store.get().chats[0]?.members?.length ?? 0) > 0)
@@ -1298,11 +1300,11 @@ describe('member hydration', () => {
         },
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME })
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
     await waitFor(() => (store.get().chats[0]?.members?.length ?? 0) > 0)
@@ -1341,11 +1343,11 @@ describe('member hydration', () => {
         },
       }),
     )
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     store.set({ me: ME })
     activeHandle = startPoller({
       getClient: testClient,
-      store,
+      store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
     await waitFor(() => store.get().chats.length > 0)

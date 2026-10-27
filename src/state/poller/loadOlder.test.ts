@@ -1,3 +1,5 @@
+import { accountRef } from '../../account'
+import { accountStore } from '../accountStore'
 import { createGraphClient, currentAccountContext } from '../../graph/client'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { __resetForTests, __setTransportForTests } from '../../graph/client'
@@ -6,7 +8,7 @@ import {
   __setRunnerForTests as setAuthRunner,
 } from '../../auth/owaPiggy'
 import type { ChatMessage } from '../../types'
-import { createAppStore, type ConvKey } from '../store'
+import { createAppStore, resetAccountScopedState, type ConvKey } from '../store'
 import { loadOlderMessages } from './loadOlder'
 
 const testClient = () => createGraphClient(currentAccountContext())
@@ -54,8 +56,13 @@ afterEach(() => {
 
 describe('loadOlderMessages', () => {
   test('returns conv=null with fullyLoaded=true when nothing is focused', async () => {
-    const store = createAppStore()
-    const result = await loadOlderMessages({ getClient: testClient, store, reportError: () => {} })
+    const store = createAppStore(accountRef('test'))
+    const result = await loadOlderMessages({
+      getClient: testClient,
+      store: accountStore(store),
+      focus: store.get().focus,
+      reportError: () => {},
+    })
     expect(result).toEqual({ conv: null, added: 0, fullyLoaded: true })
   })
 
@@ -65,7 +72,7 @@ describe('loadOlderMessages', () => {
       calls++
       return jsonResponse({ value: [] })
     })
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     const conv: ConvKey = 'chat:c1'
     store.set({
       focus: { kind: 'chat', chatId: 'c1' },
@@ -73,7 +80,12 @@ describe('loadOlderMessages', () => {
         [conv]: { messages: [msg('m1', 'x')], loadingOlder: false, fullyLoaded: true },
       },
     })
-    const result = await loadOlderMessages({ getClient: testClient, store, reportError: () => {} })
+    const result = await loadOlderMessages({
+      getClient: testClient,
+      store: accountStore(store),
+      focus: store.get().focus,
+      reportError: () => {},
+    })
     expect(result.fullyLoaded).toBe(true)
     expect(calls).toBe(0)
   })
@@ -84,7 +96,7 @@ describe('loadOlderMessages', () => {
       calls++
       return jsonResponse({ value: [] })
     })
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     const conv: ConvKey = 'chat:c1'
     store.set({
       focus: { kind: 'chat', chatId: 'c1' },
@@ -92,7 +104,12 @@ describe('loadOlderMessages', () => {
         [conv]: { messages: [msg('m1', 'x')], loadingOlder: true, fullyLoaded: false },
       },
     })
-    const result = await loadOlderMessages({ getClient: testClient, store, reportError: () => {} })
+    const result = await loadOlderMessages({
+      getClient: testClient,
+      store: accountStore(store),
+      focus: store.get().focus,
+      reportError: () => {},
+    })
     expect(result.added).toBe(0)
     expect(calls).toBe(0)
   })
@@ -104,7 +121,7 @@ describe('loadOlderMessages', () => {
       stop.abort()
       return jsonResponse({ value: [msg('older-1', '2026-01-01T00:00:00Z')] })
     })
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     const conv: ConvKey = 'chat:c1'
     store.set({
       focus: { kind: 'chat', chatId: 'c1' },
@@ -118,7 +135,8 @@ describe('loadOlderMessages', () => {
     })
     const result = await loadOlderMessages({
       getClient: testClient,
-      store,
+      store: accountStore(store),
+      focus: store.get().focus,
       reportError: () => {},
       signal: stop.signal,
     })
@@ -132,7 +150,7 @@ describe('loadOlderMessages', () => {
       calls++
       return jsonResponse({ value: [] })
     })
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     const conv: ConvKey = 'channel:t1:ch1'
     store.set({
       focus: { kind: 'channel', teamId: 't1', channelId: 'ch1' },
@@ -140,7 +158,12 @@ describe('loadOlderMessages', () => {
         [conv]: { messages: [msg('m1', 'x')], loadingOlder: false, fullyLoaded: false },
       },
     })
-    const result = await loadOlderMessages({ getClient: testClient, store, reportError: () => {} })
+    const result = await loadOlderMessages({
+      getClient: testClient,
+      store: accountStore(store),
+      focus: store.get().focus,
+      reportError: () => {},
+    })
     expect(result.fullyLoaded).toBe(true)
     expect(calls).toBe(0)
     expect(store.get().messageCacheByConvo[conv]?.fullyLoaded).toBe(true)
@@ -154,7 +177,7 @@ describe('loadOlderMessages', () => {
         value: [msg('older-2', '2026-01-01T00:00:01Z'), msg('older-1', '2026-01-01T00:00:00Z')],
       })
     })
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     const conv: ConvKey = 'chat:c1'
     store.set({
       focus: { kind: 'chat', chatId: 'c1' },
@@ -166,7 +189,12 @@ describe('loadOlderMessages', () => {
         },
       },
     })
-    const result = await loadOlderMessages({ getClient: testClient, store, reportError: () => {} })
+    const result = await loadOlderMessages({
+      getClient: testClient,
+      store: accountStore(store),
+      focus: store.get().focus,
+      reportError: () => {},
+    })
     expect(seenUrl).toContain('/v1.0/chats/c1/messages')
     expect(seenUrl.replace(/\+/g, ' ')).toContain('createdDateTime lt')
     expect(result.added).toBe(2)
@@ -176,7 +204,7 @@ describe('loadOlderMessages', () => {
 
   test('records the error and clears loadingOlder on a fetch failure', async () => {
     __setTransportForTests(async () => new Response('boom', { status: 500 }))
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     const conv: ConvKey = 'chat:c1'
     store.set({
       focus: { kind: 'chat', chatId: 'c1' },
@@ -191,7 +219,8 @@ describe('loadOlderMessages', () => {
     const errors: Error[] = []
     const result = await loadOlderMessages({
       getClient: testClient,
-      store,
+      store: accountStore(store),
+      focus: store.get().focus,
       reportError: (e) => errors.push(e),
     })
     expect(result.error).toBeInstanceOf(Error)
@@ -199,5 +228,38 @@ describe('loadOlderMessages', () => {
     const cache = store.get().messageCacheByConvo[conv]
     expect(cache?.loadingOlder).toBe(false)
     expect(cache?.error).toBeDefined()
+  })
+
+  test('a page that resolves after a restart of the same alias is dropped', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    __setTransportForTests(async () => {
+      await gate
+      return jsonResponse({ value: [msg('m0', '2025-12-31T00:00:00Z')] })
+    })
+    const store = createAppStore(accountRef('a'))
+    const conv: ConvKey = 'chat:c1'
+    store.set({
+      focus: { kind: 'chat', chatId: 'c1' },
+      messageCacheByConvo: {
+        [conv]: {
+          messages: [msg('m1', '2026-01-01T00:00:00Z')],
+          loadingOlder: false,
+          fullyLoaded: false,
+        },
+      },
+    })
+    const pending = loadOlderMessages({
+      getClient: testClient,
+      store: accountStore(store),
+      focus: store.get().focus,
+      reportError: () => {},
+    })
+    // stop + restart of the same alias: same account id, new generation
+    resetAccountScopedState(store, accountRef('a'))
+    release()
+    await pending
+    expect(store.get().messageCacheByConvo).toEqual({})
+    expect(store.get().messagesByConvo).toEqual({})
   })
 })

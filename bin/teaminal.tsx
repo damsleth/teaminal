@@ -360,7 +360,6 @@ function makeSessionApi(): SessionApi {
     client: () =>
       currentSession?.client() ??
       createGraphClient({ account: accountRef(activeProfile), ...getAudiencePreference() }),
-    generation: () => store.get().accountGeneration,
     switchAccount,
   }
 }
@@ -396,8 +395,8 @@ async function switchAccount(nextProfile: string | null): Promise<void> {
   activeCachePath = getMessageCachePath(process.env, activeProfile)
   activeListCachePath = getListCachePath(process.env, activeProfile)
   activeNameCachePath = getNameCachePath(process.env, activeProfile)
-  // The reset bumps store.accountGeneration (SessionApi.generation()), so
-  // async UI work can tell its write would land in another account's state
+  // The reset bumps store.accountGeneration, so every accountStore() handle
+  // held by async work drops its writes instead of landing in another account
   // (even across A -> B -> A). Bumped at the reset itself, not at the start
   // of the switch: work begun during teardown still holds the old session's
   // client and must count as stale too.

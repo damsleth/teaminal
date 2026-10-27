@@ -14,9 +14,9 @@ import { inkBorder } from './theme'
 import { useInput } from './useInput'
 import { useEffect } from 'react'
 import type { ActivityItem } from '../graph/teamsActivity'
+import { accountStore } from '../state/accountStore'
 import { countUnreadMentions, markActivityRead, refreshActivityFeed } from '../state/activityFeed'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
-import { useSessionApi } from './SessionContext'
 import { localDate } from './localTime'
 
 export function openActivity(store: ReturnType<typeof useAppStore>): void {
@@ -63,7 +63,6 @@ const VISIBLE_ROWS = 14
 export function ActivityModal() {
   const { exit } = useApp()
   const store = useAppStore()
-  const session = useSessionApi()
   const modal = useAppState((s) => s.modal)
   const items = useAppState((s) => s.activityFeed)
   const theme = useTheme()
@@ -74,13 +73,8 @@ export function ActivityModal() {
   // any items that arrived between the last reconcile and now.
   useEffect(() => {
     if (!isOpen) return
-    const generation = session.generation()
-    void refreshActivityFeed(
-      store,
-      session.client().ctx.account,
-      () => session.generation() !== generation,
-    )
-  }, [isOpen, store, session])
+    void refreshActivityFeed(accountStore(store))
+  }, [isOpen, store])
 
   useInput(
     (input, key) => {

@@ -25,6 +25,7 @@ import { Box, useApp, useStdin, useStdout } from 'ink'
 import { inkBorder } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useRef, useState } from 'react'
+import { accountStore } from '../state/accountStore'
 import { createOneOnOneChat, materializeChat, resolveFederatedChatId } from '../state/chatActions'
 import { indexNameFromDirectoryUser } from '../state/nameIndex'
 import { clampCursor } from '../state/selectables'
@@ -188,7 +189,11 @@ export function App() {
     void (async () => {
       const federatedChatId = await resolveFederatedChatId(session.client(), me.id, otherUserId)
       if (!federatedChatId || federatedChatId === focus.chatId || cancelled) return
-      const canonical = await materializeChat(session.client(), store, federatedChatId)
+      const canonical = await materializeChat(
+        session.client(),
+        accountStore(store),
+        federatedChatId,
+      )
       if (cancelled) return
       store.set((s) => ({
         chats: [canonical, ...s.chats.filter((c) => c.id !== canonical.id)],
@@ -287,10 +292,7 @@ export function App() {
 
   function tryLoadOlder(): void {
     if (loadOlderState !== 'idle') return
-    const handle = pollerRef.current as
-      | (typeof pollerRef.current & { loadOlderMessages?: (focus: Focus) => void | Promise<void> })
-      | null
-    void handle?.loadOlderMessages?.(focus)
+    void pollerRef.current?.loadOlderMessages(focus)
   }
 
   function openNewChatPrompt(query = ''): void {
@@ -328,7 +330,7 @@ export function App() {
     }
     const federatedChatId = await resolveFederatedChatId(session.client(), selfId, user.id)
     if (federatedChatId) {
-      const chat = await materializeChat(session.client(), store, federatedChatId)
+      const chat = await materializeChat(session.client(), accountStore(store), federatedChatId)
       setNewChatPrompt(null)
       store.set((s) => ({
         chats: [chat, ...s.chats.filter((c) => c.id !== chat.id)],

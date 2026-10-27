@@ -8,15 +8,15 @@
 // every list poll is wasted work — the `hydrated` set tracks which
 // chats we've already issued a getChat($expand=members) call for.
 
+import type { AccountStore } from '../accountStore'
 import { getChatsBatch } from '../../graph/chats'
 import type { GraphClient } from '../../graph/client'
 import type { Chat } from '../../types'
 import { indexNamesFromChats } from '../nameIndex'
-import type { AppState, Store } from '../store'
 import { isAbortError } from './intervals'
 
 export type HydrateMembersDeps = {
-  store: Store<AppState>
+  store: AccountStore
   // Bound Graph client for this session's account.
   getClient: () => GraphClient
   // Set of chat IDs we've already issued a hydration call for (mutated).

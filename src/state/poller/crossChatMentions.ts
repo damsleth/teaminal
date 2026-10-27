@@ -12,18 +12,11 @@
 // Concurrency-capped at 5 in flight to bound cost against Graph
 // throttles when many chats change between polls.
 
+import type { AccountStore } from '../accountStore'
 import { listMessages } from '../../graph/chats'
 import type { GraphClient } from '../../graph/client'
 import type { Chat } from '../../types'
-import {
-  bumpChatMention,
-  focusKey,
-  markChatRead,
-  markChatUnread,
-  type AppState,
-  type ConvKey,
-  type Store,
-} from '../store'
+import { bumpChatMention, focusKey, markChatRead, markChatUnread, type ConvKey } from '../store'
 import { isAbortError } from './intervals'
 import { notifyKind } from './mentions'
 import type { MentionEvent } from '../poller'
@@ -32,7 +25,7 @@ const PROBE_TOP = 5
 const CONCURRENCY = 5
 
 export type CrossChatMentionDeps = {
-  store: Store<AppState>
+  store: AccountStore
   // Bound Graph client for this session's account.
   getClient: () => GraphClient
   // Seen-message-ID set keyed by ConvKey, shared with the active loop.

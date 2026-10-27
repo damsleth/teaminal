@@ -1,3 +1,5 @@
+import { accountRef } from '../account'
+import { accountStore } from './accountStore'
 import { createGraphClient, currentAccountContext } from '../graph/client'
 import { afterEach, describe, expect, it } from 'bun:test'
 import {
@@ -11,7 +13,7 @@ import {
 } from '../graph/client'
 import { __resetChatMessageFallbackForTests } from '../graph/chats'
 import type { ChatMessage, IdentityUser } from '../types'
-import { createAppStore } from './store'
+import { createAppStore, resetAccountScopedState } from './store'
 import {
   deleteChatById,
   deleteChatMessageById,
@@ -40,7 +42,7 @@ function setup(transport: (url: string, init: RequestInit) => Promise<Response>)
     exitCode: 0,
   }))
   setClientTransport(transport)
-  const store = createAppStore()
+  const store = createAppStore(accountRef('test'))
   const msg: ChatMessage = {
     id: 'm1',
     createdDateTime: '2026-05-29T10:00:00Z',
@@ -69,7 +71,7 @@ describe('toggleReaction', () => {
       path = url
       return ok()
     })
-    await toggleReaction(testClient(), store, 'c1', 'm1', 'like', me)
+    await toggleReaction(testClient(), accountStore(store), 'c1', 'm1', 'like', me)
     expect(path).toContain('/messages/m1/setReaction')
     expect(convMsgs(store)[0]!.reactions?.[0]!.reactionType).toBe('like')
   })
@@ -83,7 +85,7 @@ describe('toggleReaction', () => {
       body = init.body ? JSON.parse(String(init.body)) : undefined
       return ok()
     })
-    await toggleReaction(testClient(), store, 'c1', 'm1', 'heart', me)
+    await toggleReaction(testClient(), accountStore(store), 'c1', 'm1', 'heart', me)
     expect(body).toEqual({ reactionType: '❤️' })
     expect(convMsgs(store)[0]!.reactions?.[0]!.reactionType).toBe('heart')
   })
@@ -101,7 +103,7 @@ describe('toggleReaction', () => {
         ],
       },
     })
-    await toggleReaction(testClient(), store, 'c1', 'm1', 'like', me)
+    await toggleReaction(testClient(), accountStore(store), 'c1', 'm1', 'like', me)
     expect(path).toContain('/messages/m1/unsetReaction')
     expect(convMsgs(store)[0]!.reactions).toEqual([])
   })
@@ -120,7 +122,7 @@ describe('toggleReaction', () => {
         ],
       },
     })
-    await toggleReaction(testClient(), store, 'c1', 'm1', 'heart', me)
+    await toggleReaction(testClient(), accountStore(store), 'c1', 'm1', 'heart', me)
     // Should have called setReaction (not unset).
     expect(paths[0]).toContain('/messages/m1/setReaction')
     // Both reactions must be present.
@@ -145,14 +147,16 @@ describe('toggleReaction', () => {
         ],
       },
     })
-    await toggleReaction(testClient(), store, 'c1', 'm1', 'like', me)
+    await toggleReaction(testClient(), accountStore(store), 'c1', 'm1', 'like', me)
     const reactions = convMsgs(store)[0]!.reactions!
     expect(reactions.map((r) => r.reactionType)).toEqual(['heart'])
   })
 
   it('rolls back the optimistic reaction on failure', async () => {
     const store = setup(fail)
-    await expect(toggleReaction(testClient(), store, 'c1', 'm1', 'like', me)).rejects.toThrow()
+    await expect(
+      toggleReaction(testClient(), accountStore(store), 'c1', 'm1', 'like', me),
+    ).rejects.toThrow()
     expect(convMsgs(store)[0]!.reactions ?? []).toEqual([])
   })
 })
@@ -160,14 +164,14 @@ describe('toggleReaction', () => {
 describe('editChatMessageContent', () => {
   it('updates the body on success', async () => {
     const store = setup(ok)
-    await editChatMessageContent(testClient(), store, 'c1', 'm1', 'edited')
+    await editChatMessageContent(testClient(), accountStore(store), 'c1', 'm1', 'edited')
     expect(convMsgs(store)[0]!.body.content).toBe('edited')
   })
 
   it('rolls back to the original body on failure', async () => {
     const store = setup(fail)
     await expect(
-      editChatMessageContent(testClient(), store, 'c1', 'm1', 'edited'),
+      editChatMessageContent(testClient(), accountStore(store), 'c1', 'm1', 'edited'),
     ).rejects.toThrow()
     expect(convMsgs(store)[0]!.body.content).toBe('hello')
   })
@@ -176,13 +180,15 @@ describe('editChatMessageContent', () => {
 describe('deleteChatMessageById', () => {
   it('tombstones the message on success', async () => {
     const store = setup(ok)
-    await deleteChatMessageById(testClient(), store, 'c1', 'm1')
+    await deleteChatMessageById(testClient(), accountStore(store), 'c1', 'm1')
     expect(convMsgs(store)[0]!.deletedDateTime).toBeTruthy()
   })
 
   it('restores the message on failure', async () => {
     const store = setup(fail)
-    await expect(deleteChatMessageById(testClient(), store, 'c1', 'm1')).rejects.toThrow()
+    await expect(
+      deleteChatMessageById(testClient(), accountStore(store), 'c1', 'm1'),
+    ).rejects.toThrow()
     expect(convMsgs(store)[0]!.deletedDateTime).toBeUndefined()
   })
 })
@@ -202,11 +208,11 @@ describe('deleteChatById', () => {
       ],
       focus: { kind: 'chat', chatId: 'c1' },
     })
-    await deleteChatById(testClient(), store, 'c1')
+    await deleteChatById(testClient(), accountStore(store), 'c1')
     expect(seen[0]).toContain('/chats/c1/hideForUser')
     expect(store.get().chats.map((c) => c.id)).toEqual(['c2'])
-    // the open chat was the deleted one, so focus falls back to the list
-    expect(store.get().focus).toEqual({ kind: 'list' })
+    // focus is global UI state: moving it off the deleted chat is the caller's job
+    expect(store.get().focus).toEqual({ kind: 'chat', chatId: 'c1' })
   })
 
   it('puts the chat back when the hide call fails', async () => {
@@ -215,7 +221,7 @@ describe('deleteChatById', () => {
       me: { id: 'me-1', displayName: 'Me', userPrincipalName: 'me@x', mail: null },
       chats: [{ id: 'c1', chatType: 'oneOnOne', createdDateTime: '2026-01-01T00:00:00Z' }],
     })
-    await expect(deleteChatById(testClient(), store, 'c1')).rejects.toThrow()
+    await expect(deleteChatById(testClient(), accountStore(store), 'c1')).rejects.toThrow()
     expect(store.get().chats.map((c) => c.id)).toEqual(['c1'])
   })
 })
@@ -236,7 +242,7 @@ describe('sendMessage', () => {
       })
     })
     store.set({ draftsByConvo: { 'chat:c1': 'hi' } })
-    expect(await sendMessage(testClient(), store, chat, 'hi')).toEqual({ ok: true })
+    expect(await sendMessage(testClient(), accountStore(store), chat, 'hi')).toEqual({ ok: true })
     expect(pendingCheck.at(-1)?._sending).toBe(true)
     expect(convMsgs(store).map((m) => m.id)).toEqual(['m1', 'server-1'])
     expect(store.get().draftsByConvo['chat:c1']).toBeUndefined()
@@ -244,7 +250,7 @@ describe('sendMessage', () => {
 
   it('marks a failed send and puts the text back in the draft', async () => {
     const store = setup(fail)
-    const result = await sendMessage(testClient(), store, chat, 'hi')
+    const result = await sendMessage(testClient(), accountStore(store), chat, 'hi')
     expect(result.ok).toBe(false)
     const row = convMsgs(store).at(-1)!
     expect(row._sending).toBe(false)
@@ -253,10 +259,20 @@ describe('sendMessage', () => {
   })
 
   it('writes nothing after the call once the account changed', async () => {
-    const store = setup(async () =>
-      json({ id: 'server-1', createdDateTime: 'x', body: { contentType: 'text', content: 'hi' } }),
-    )
-    await sendMessage(testClient(), store, chat, 'hi', { isStale: () => true })
-    expect(convMsgs(store).some((m) => m.id === 'server-1')).toBe(false)
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const store = setup(async () => {
+      await gate
+      return json({
+        id: 'server-1',
+        createdDateTime: 'x',
+        body: { contentType: 'text', content: 'hi' },
+      })
+    })
+    const pending = sendMessage(testClient(), accountStore(store), chat, 'hi')
+    resetAccountScopedState(store, accountRef('other'))
+    release()
+    await pending
+    expect(convMsgs(store)).toEqual([])
   })
 })

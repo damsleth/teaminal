@@ -38,6 +38,7 @@
 import { Box, Text, useStdin, useStdout } from 'ink'
 import { useInput } from './useInput'
 import { useEffect, useRef, useState } from 'react'
+import { accountStore } from '../state/accountStore'
 import { editChatMessageContent, sendMessage } from '../state/chatActions'
 import { focusKey } from '../state/store'
 import type { ChatMessage } from '../types'
@@ -240,13 +241,13 @@ export function Composer() {
 
     setSending(true)
     setBuf(emptyBuffer)
-    const generation = session.generation()
-    // A reply landing after an account switch belongs to the old session.
-    const isStale = () => session.generation() !== generation
+    // A reply landing after an account switch belongs to the old session:
+    // the handle drops its writes, and the buffer is left alone.
+    const acc = accountStore(store)
     try {
-      const result = await sendMessage(session.client(), store, focus, trimmed, { isStale })
+      const result = await sendMessage(session.client(), acc, focus, trimmed)
       // Restore the buffer so the user can edit + retry.
-      if (!result.ok && !isStale()) setBuf({ text: trimmed, cursor: trimmed.length })
+      if (!result.ok && acc.isCurrent()) setBuf({ text: trimmed, cursor: trimmed.length })
     } finally {
       setSending(false)
     }
@@ -264,7 +265,7 @@ export function Composer() {
     try {
       // editChatMessageContent updates the message optimistically and rolls
       // back on failure; restore the buffer so the user can retry.
-      await editChatMessageContent(session.client(), store, focus.chatId, id, trimmed)
+      await editChatMessageContent(session.client(), accountStore(store), focus.chatId, id, trimmed)
     } catch {
       setBuf({ text: trimmed, cursor: trimmed.length })
       store.set({ editingMessageId: id, inputZone: 'composer' })

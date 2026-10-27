@@ -11,6 +11,7 @@
 // downgrade conn to authError / rateLimited / offline so the StatusBar
 // can surface the state.
 
+import type { AccountStore } from '../accountStore'
 import { listChats } from '../../graph/chats'
 import { GraphError, RateLimitError, type GraphClient } from '../../graph/client'
 import { fetchChatsAndTeams } from '../../graph/teamsCsa'
@@ -23,13 +24,13 @@ import { fetchTeamsAndChannels } from './teamsAndChannels'
 import { hydrateMissingMembers } from './hydrateMembers'
 import { backoff, isAbortError, jitter } from './intervals'
 import type { Sleeper } from './sleeper'
-import { seedChatActivity, type AppState, type ConvKey, type Store } from '../store'
+import { seedChatActivity, type ConvKey } from '../store'
 import type { MentionEvent } from '../poller'
 
 type ChatsTeams = { chats: Chat[]; teams: Team[]; channelsByTeam: Record<string, Channel[]> }
 
 export type ListLoopDeps = {
-  store: Store<AppState>
+  store: AccountStore
   // Bound Graph client for this session's account.
   getClient: () => GraphClient
   sleeper: Sleeper
