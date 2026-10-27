@@ -270,6 +270,7 @@ export type ThemeOverrides = ThemeColorOverrides & {
     tailGap: number
     chatListPaddingRight: number
     chatListGap: number
+    textBackgroundPaddingX: number
   }>
   borders?: Partial<{
     panel: BorderStyleName

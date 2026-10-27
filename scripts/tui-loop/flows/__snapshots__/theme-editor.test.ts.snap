@@ -17,7 +17,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 ││     op…                  ││  │       Tail strip gap        1                                  │  ││
 ││    Ops Channel          ││  │       Chat list pad R       1                                  │  ││
 ││     Mina: Deploy is      ││  │       Chat list gap         0                                  │  ││
-││     green in the EU      ││  │      ↓ 41 more                                                 │  ││
+││     green in the EU      ││  │      ↓ 42 more                                                 │  ││
 ││     region.              ││  │                                                                │  ││
 ││                          ││  │   ╭────────────────────────────────────────────────────────╮   │  ││
 ││                          ││  │   │Ada  Sample message body  12:34                         │   │  ││
