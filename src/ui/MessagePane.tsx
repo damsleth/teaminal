@@ -56,7 +56,7 @@ import { splitBodyLinkSpans } from './bodySpans'
 import { pickerAnchorCol } from './pickerAnchor'
 import { paintInlineImages, type InlineImageSlots } from './inlineImageLayout'
 import { localTime } from './localTime'
-import { fs, textSizingSupported } from './textSizing'
+import { fs, fsTall, textSizingSupported } from './textSizing'
 
 export { effectiveSenderName, isRenderableMessage } from './renderableMessage'
 
@@ -180,13 +180,14 @@ export function MessagePane(props: {
   // Repurposed theme.layout knobs: left indent of the sender-name/body block,
   // and the blank rows inserted after each message group.
   const bodyIndent = theme.layout.paneHeaderPaddingLeft
-  // A .5 gap draws the sender header at half size (kitty text sizing), which
-  // sits at the bottom of its row: half a row of air above the name, none
-  // between name and body. A terminal row can't be split any other way.
+  // A .5 gap draws sender headers as tall (2-row) kitty text-sizing lines:
+  // the name at 1.5x size sits at the bottom, half a row of air above it and
+  // none before the body. The sender font size scales it down from there.
   // Without OSC 66 the gap rounds to whole rows.
   const rawGap = theme.layout.paneHeaderMarginBottom
-  const halfGapHeaders = rawGap % 1 !== 0 && textSizingSupported()
-  const messageGap = halfGapHeaders ? Math.floor(rawGap) : Math.round(rawGap)
+  const tallHeaders = rawGap % 1 !== 0 && textSizingSupported()
+  const messageGap = tallHeaders ? Math.floor(rawGap) : Math.round(rawGap)
+  const headerRows = tallHeaders ? 2 : 1
   const cache = messageCacheByConvo[conv]
   const headerLabel = isListFocus
     ? ''
@@ -259,6 +260,7 @@ export function MessagePane(props: {
     imageRowsForMessage,
     messageTextColumns,
     messageGap,
+    headerRows,
     reactionDisplayMode,
     rowBudget,
     previousStart: windowStartRef.current,
@@ -269,6 +271,7 @@ export function MessagePane(props: {
     imageRowsForMessage,
     messageTextColumns,
     messageGap,
+    headerRows,
     reactionDisplayMode,
     rowBudget,
   })
@@ -350,6 +353,7 @@ export function MessagePane(props: {
       imageRowsForMessage,
       messageTextColumns,
       messageGap,
+      headerRows,
       reactionDisplayMode,
     }
     let rowsBefore = 0
@@ -475,7 +479,7 @@ export function MessagePane(props: {
                     selfMessagesOnRight={selfMessagesOnRight}
                     bodyIndent={bodyIndent}
                     messageGap={messageGap}
-                    halfGapHeader={halfGapHeaders}
+                    tallHeader={tallHeaders}
                     shortNames={shortNames}
                     showTimestamp={showTimestamps}
                     theme={theme}
@@ -511,7 +515,7 @@ function TimelineRow(props: {
   selfMessagesOnRight: boolean
   bodyIndent: number
   messageGap: number
-  halfGapHeader: boolean
+  tallHeader: boolean
   shortNames: boolean
   showTimestamp: boolean
   theme: Theme
@@ -555,7 +559,7 @@ function TimelineRow(props: {
       selfMessagesOnRight={props.selfMessagesOnRight}
       bodyIndent={props.bodyIndent}
       messageGap={props.messageGap}
-      halfGapHeader={props.halfGapHeader}
+      tallHeader={props.tallHeader}
       shortNames={props.shortNames}
       showTimestamp={props.showTimestamp}
       theme={props.theme}
@@ -579,7 +583,7 @@ function MessageRow(props: {
   selfMessagesOnRight: boolean
   bodyIndent: number
   messageGap: number
-  halfGapHeader: boolean
+  tallHeader: boolean
   shortNames: boolean
   showTimestamp: boolean
   theme: Theme
@@ -587,7 +591,6 @@ function MessageRow(props: {
 }) {
   const { theme } = props
   const m = props.message
-  const headerSize = (pct: number) => (props.halfGapHeader ? Math.min(pct, 50) : pct)
   const isSelf = !!props.myUserId && m.from?.user?.id === props.myUserId
   const flip = props.selfMessagesOnRight && isSelf
   const time = localTime(m.createdDateTime)
@@ -722,7 +725,7 @@ function MessageRow(props: {
   return (
     <>
       {hasHeader ? (
-        <Box flexDirection="row">
+        <Box flexDirection="row" height={props.tallHeader ? 2 : undefined}>
           {!flip && <Box width={markerWidth} flexShrink={0} />}
           <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
             <Text wrap="truncate-end">
@@ -732,15 +735,15 @@ function MessageRow(props: {
                 }
                 bold={senderName.length > 0 && theme.emphasis.senderBold}
               >
-                {fs(senderName, headerSize(theme.fontSize.sender), theme.fontSize.tightSpacing)}
+                {props.tallHeader
+                  ? fsTall(senderName, theme.fontSize.sender)
+                  : fs(senderName, theme.fontSize.sender, theme.fontSize.tightSpacing)}
               </Text>
               {props.showTimestamp && (
                 <Text color={theme.timestamp}>
-                  {fs(
-                    `  ${time}`,
-                    headerSize(theme.fontSize.timestamp),
-                    theme.fontSize.tightSpacing,
-                  )}
+                  {props.tallHeader
+                    ? fsTall(`  ${time}`, theme.fontSize.timestamp)
+                    : fs(`  ${time}`, theme.fontSize.timestamp, theme.fontSize.tightSpacing)}
                 </Text>
               )}
             </Text>

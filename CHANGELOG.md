@@ -20,10 +20,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 - **Half-row message gaps in kitty.** **Message gap** now steps by 0.5
   (`themeOverrides.layout.paneHeaderMarginBottom`). A .5 value draws the
-  sender name and timestamp at half size at the bottom of their row, so
-  there is half a row of space above the name and none between the name and
-  the message. Terminals without the kitty text sizing protocol round to
+  sender name and timestamp at 1.5x size at the bottom of a two-row header,
+  so there is half a row of space above the name and none between the name
+  and the message. Lower the sender / timestamp font size to shrink them
+  from there. Terminals without the kitty text sizing protocol round to
   whole rows.
+
+- **Text background padding.** **Text bg padding X**
+  (`themeOverrides.layout.textBackgroundPaddingX`, 0-3) adds columns of
+  background color on each side of message bodies, so the focus and
+  self-message backgrounds read as solid blocks.
 
 - **Self name and self message background colors.** New theme tokens
   `selfName` (your name above your own messages, separate from the
