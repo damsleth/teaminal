@@ -55,6 +55,8 @@ const THEME_KEYS = new Set<keyof ThemeOverrides>([
   'timestamp',
   'sender',
   'selfMessage',
+  'selfName',
+  'selfMessageBackground',
   'systemEvent',
   'errorText',
   'warnText',
@@ -788,7 +790,9 @@ export function validateThemeOverrides(
     }
 
     if (
-      (key === 'messageFocusBackground' || key === 'selectedRowBackground') &&
+      (key === 'messageFocusBackground' ||
+        key === 'selectedRowBackground' ||
+        key === 'selfMessageBackground') &&
       rawValue === null
     ) {
       ;(out[key] as string | null) = null

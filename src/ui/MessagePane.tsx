@@ -647,7 +647,13 @@ function MessageRow(props: {
   const bodyNode = (
     <Text
       color={isDeleted ? theme.mutedText : props.focused ? theme.messageFocusIndicator : color}
-      backgroundColor={props.focused ? (theme.messageFocusBackground ?? undefined) : undefined}
+      backgroundColor={
+        props.focused
+          ? (theme.messageFocusBackground ?? undefined)
+          : isSelf && !isDeleted
+            ? (theme.selfMessageBackground ?? undefined)
+            : undefined
+      }
       italic={isDeleted}
       bold={props.focused && !isDeleted}
       wrap="wrap"
@@ -688,7 +694,10 @@ function MessageRow(props: {
           {!flip && <Box width={markerWidth} flexShrink={0} />}
           <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
             <Text wrap="truncate-end">
-              <Text color={color} bold={senderName.length > 0 && theme.emphasis.senderBold}>
+              <Text
+                color={isSelf && !sendError && !isSending ? theme.selfName : color}
+                bold={senderName.length > 0 && theme.emphasis.senderBold}
+              >
                 {fs(senderName, theme.fontSize.sender, theme.fontSize.tightSpacing)}
               </Text>
               {props.showTimestamp && (

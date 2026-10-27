@@ -174,6 +174,8 @@ export const FIELDS: readonly EditableField[] = [
   color('timestamp', 'Timestamp'),
   color('sender', 'Sender'),
   color('selfMessage', 'Self message'),
+  color('selfName', 'Self name'),
+  color('selfMessageBackground', 'Self message bg', true),
   color('systemEvent', 'System event'),
   color('errorText', 'Error text'),
   color('warnText', 'Warn text'),

@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Self name and self message background colors.** New theme tokens
+  `selfName` (your name above your own messages, separate from the
+  `selfMessage` body color) and `selfMessageBackground` (a background behind
+  your own message bodies, `null` for none), both in the theme editor.
+
 - **Chat list gap.** A **Chat list gap** spacing setting (theme editor, or
   `themeOverrides.layout.chatListGap`, 0-3) adds blank rows between chats so
   each chat and its preview read as one block.

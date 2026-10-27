@@ -63,6 +63,7 @@ const COLOR_KEYS = new Set([
   'timestamp',
   'sender',
   'selfMessage',
+  'selfName',
   'systemEvent',
   'errorText',
   'warnText',
@@ -70,7 +71,11 @@ const COLOR_KEYS = new Set([
   'messageFocusIndicator',
 ])
 
-const NULLABLE_COLOR_KEYS = new Set(['messageFocusBackground', 'selectedRowBackground'])
+const NULLABLE_COLOR_KEYS = new Set([
+  'messageFocusBackground',
+  'selectedRowBackground',
+  'selfMessageBackground',
+])
 
 const PRESENCE_KEYS = new Set([
   'Available',
