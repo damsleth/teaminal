@@ -11,6 +11,7 @@
 // canonical surface, the tails are for users who want a live feed.
 
 import { Box, Text } from 'ink'
+import { inkBorder } from './theme'
 import { useEffect, useState } from 'react'
 import {
   getRecentEvents,
@@ -184,7 +185,7 @@ export function TailPanels() {
   return (
     <Box
       flexDirection="row"
-      borderStyle={theme.borders.panel}
+      borderStyle={inkBorder(theme.borders.panel)}
       borderColor={theme.border}
       flexShrink={0}
     >

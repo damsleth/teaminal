@@ -6,6 +6,7 @@
 // Mirrors ConfirmDeleteModal / ReactionPickerModal in structure and theming.
 
 import { Box, Text, useApp } from 'ink'
+import { inkBorder } from './theme'
 import { useInput } from './useInput'
 import { useState } from 'react'
 import { toggleReaction } from '../state/chatActions'
@@ -80,7 +81,7 @@ export function EditReactionsModal() {
   return (
     <Box
       flexDirection="column"
-      borderStyle={theme.borders.modal}
+      borderStyle={inkBorder(theme.borders.modal)}
       borderColor={theme.borderActive}
       backgroundColor={theme.background}
       paddingX={theme.layout.modalPaddingX}

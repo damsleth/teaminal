@@ -22,6 +22,7 @@
 // list / chat / filter zones plus a few app-wide shortcuts.
 
 import { Box, useApp, useStdin, useStdout } from 'ink'
+import { inkBorder } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useRef, useState } from 'react'
 import { createOneOnOneChat, materializeChat, resolveFederatedChatId } from '../state/chatActions'
@@ -148,6 +149,7 @@ export function App() {
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
   const me = useAppState((s) => s.me)
   const inputZone = useAppState((s) => s.inputZone)
+  const chatListCollapsed = useAppState((s) => s.chatListCollapsed)
   const filter = useAppState((s) => s.filter)
   const modal = useAppState((s) => s.modal)
   const messagesByConvo = useAppState((s) => s.messagesByConvo)
@@ -375,6 +377,10 @@ export function App() {
         store.set({ inputZone: 'resize' })
         return
       }
+      if (key.ctrl && input === 'b') {
+        store.set((s) => ({ chatListCollapsed: !s.chatListCollapsed }))
+        return
+      }
       if (key.tab && focus.kind !== 'list') {
         store.set({ inputZone: 'composer' })
         return
@@ -506,23 +512,36 @@ export function App() {
   const active = activePane(inputZone, focus, modal !== null)
   const paneBorder = (pane: ActivePane) =>
     pane === active
-      ? { borderStyle: theme.borders.active, borderColor: theme.borderActive }
-      : { borderStyle: theme.borders.panel, borderColor: theme.border }
+      ? { borderStyle: inkBorder(theme.borders.active), borderColor: theme.borderActive }
+      : { borderStyle: inkBorder(theme.borders.panel), borderColor: theme.border }
+  // Collapsed: one pane, showing the list while it has focus, else the chat.
+  const showList = !chatListCollapsed || active === 'list'
+  const showConversation = !chatListCollapsed || !showList
+  const listWidth = chatListCollapsed ? terminalCols : resolvedChatListWidth
+  const conversationListWidth = chatListCollapsed ? 0 : resolvedChatListWidth
   return (
     <Box flexDirection="column" height={terminalRows}>
       {statusBarPosition === 'top' && <StatusBar />}
       <Box
-        borderStyle={theme.borders.panel}
+        borderStyle={inkBorder(theme.borders.panel)}
         borderColor={theme.border}
         paddingX={theme.layout.panePaddingX}
       >
         <HeaderBar />
       </Box>
       <Box flexDirection="row" flexGrow={1}>
-        <Box width={resolvedChatListWidth} flexShrink={0} {...paneBorder('list')}>
-          <ChatList listPaneWidth={resolvedChatListWidth} />
-        </Box>
-        <Box flexGrow={1} flexShrink={1} minWidth={0} {...paneBorder('conversation')}>
+        {showList && (
+          <Box width={listWidth} flexShrink={0} {...paneBorder('list')}>
+            <ChatList listPaneWidth={listWidth} />
+          </Box>
+        )}
+        <Box
+          display={showConversation ? 'flex' : 'none'}
+          flexGrow={1}
+          flexShrink={1}
+          minWidth={0}
+          {...paneBorder('conversation')}
+        >
           {newChatPrompt !== null ? (
             <NewChatPrompt
               initialQuery={newChatPrompt}
@@ -544,7 +563,7 @@ export function App() {
                 focusedMessageId={focusedMessageId}
                 focusIndicatorActive={focus.kind !== 'list' && inputZone === 'list'}
                 loadOlderState={loadOlderState}
-                listPaneWidth={resolvedChatListWidth}
+                listPaneWidth={conversationListWidth}
                 composerRows={resolvedComposerHeight}
               />
               {overlayModalKind && (

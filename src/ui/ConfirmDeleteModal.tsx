@@ -3,6 +3,7 @@
 // (ctrl+d). `y` / Enter confirms, `n` / Esc cancels.
 
 import { Box, Text, useApp } from 'ink'
+import { inkBorder } from './theme'
 import { useInput } from './useInput'
 import { deleteChatById, deleteChatMessageById } from '../state/chatActions'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
@@ -51,7 +52,7 @@ export function ConfirmDeleteModal() {
   return (
     <Box
       flexDirection="column"
-      borderStyle={theme.borders.modal}
+      borderStyle={inkBorder(theme.borders.modal)}
       borderColor={theme.borderActive}
       backgroundColor={theme.background}
       paddingX={theme.layout.modalPaddingX}

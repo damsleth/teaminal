@@ -200,7 +200,7 @@ theme layered on top of `dark`; any subset of these keys is accepted:
     "tailGap": 1,
     "chatListPaddingRight": 1,
   },
-  // Border styles (single | double | round | bold | classic | singleDouble | doubleSingle | arrow):
+  // Border styles (none | single | double | round | bold | classic | singleDouble | doubleSingle | arrow):
   "borders": { "panel": "single", "modal": "double", "active": "bold" },
   // Per-role bold (true/false):
   "emphasis": {
@@ -257,6 +257,7 @@ The in-app Settings menu persists changes back to `config.json`.
 | `/`            | chat / channel    | Search messages in the open conversation.                               |
 | Ctrl+A         | any               | Open notifications (also in the Esc menu).                              |
 | Ctrl+X         | list              | Enter resize mode (h/l chat list, j/k composer, 0 reset, Esc done).     |
+| Ctrl+B         | list / chat       | Hide/show the chat list; list and chat then share one pane (h / l).     |
 | `?`            | list              | Show keybindings.                                                       |
 | `r`            | any               | Refresh now.                                                            |
 | `Shift+R`      | any               | Hard refresh: clear visible data and reload from Graph.                 |

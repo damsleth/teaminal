@@ -38,7 +38,7 @@ import {
   type EditableField,
   type FieldPatch,
 } from './themeEditor'
-import { resolveBaseName } from './theme'
+import { resolveBaseName, inkBorder } from './theme'
 import { useTerminalRows } from './hooks/useTerminalRows'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
@@ -228,7 +228,7 @@ export function ThemeEditorModal() {
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
       <Box
         flexDirection="column"
-        borderStyle={theme.borders.modal}
+        borderStyle={inkBorder(theme.borders.modal)}
         borderColor={theme.borderActive}
         backgroundColor={bg}
         paddingX={theme.layout.modalPaddingX}
@@ -364,7 +364,7 @@ function ThemePreview(props: { theme: ReturnType<typeof useTheme> }): ReactEleme
     <Box
       flexDirection="column"
       marginTop={1}
-      borderStyle={theme.borders.panel}
+      borderStyle={inkBorder(theme.borders.panel)}
       borderColor={theme.border}
       backgroundColor={bg}
     >

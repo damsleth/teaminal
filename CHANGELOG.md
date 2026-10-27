@@ -8,6 +8,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Ctrl+B hides the chat list.** The list and the conversation then share
+  one full-width pane: `h`/Left from a chat shows the list, `l`/Right (or
+  Enter) on a chat opens it. Ctrl+B again restores the side-by-side layout.
+- **Borders can be `none`.** Panel, modal and active-pane borders accept
+  `none` (theme editor or `themeOverrides.borders.*`); the border is drawn
+  blank, so the layout doesn't shift.
 - **The open chat jumps to new messages.** When a message arrives in the
   conversation you're viewing, the cursor moves to it and the pane scrolls
   down, even if you had scrolled back. Turn it off with **Scroll on new
