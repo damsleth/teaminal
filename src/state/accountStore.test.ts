@@ -53,18 +53,19 @@ describe('accountStore', () => {
     expect(() => accountStore(createAppStore())).toThrow()
   })
 
-  test('subscribe fires on account-field changes only, and stops when stale', () => {
+  test('subscribe fires on any change while current, and stops when stale', () => {
     const store = storeFor('a')
     const acc = accountStore(store)
     let calls = 0
     acc.subscribe(() => calls++)
-    store.set({ filter: 'x' })
-    expect(calls).toBe(0)
+    // global keys too: the poller wakes on focus changes
+    store.set({ focus: { kind: 'chat', chatId: 'c1' } })
     acc.set({ unreadMentionCount: 3 })
-    expect(calls).toBe(1)
+    expect(calls).toBe(2)
     resetAccountScopedState(store, accountRef('b'))
+    calls = 0
     store.set({ unreadMentionCount: 5 })
-    expect(calls).toBe(1)
+    expect(calls).toBe(0)
   })
 })
 
