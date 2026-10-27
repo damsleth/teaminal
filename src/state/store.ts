@@ -245,6 +245,8 @@ export type ThemeColorOverrides = {
   timestamp?: string
   sender?: string
   selfMessage?: string
+  selfName?: string
+  selfMessageBackground?: string | null
   systemEvent?: string
   errorText?: string
   warnText?: string

@@ -115,6 +115,10 @@ export type Theme = {
   timestamp: string
   sender: string
   selfMessage: string
+  // Sender name on your own messages (body uses selfMessage).
+  selfName: string
+  // Background behind your own message bodies; null = none.
+  selfMessageBackground: string | null
   systemEvent: string
   errorText: string
   warnText: string
@@ -202,6 +206,8 @@ const DARK: Theme = {
   timestamp: '#1c1c1c',
   sender: 'white',
   selfMessage: 'blue',
+  selfName: 'blue',
+  selfMessageBackground: null,
   systemEvent: 'gray',
   errorText: 'red',
   warnText: 'yellow',
@@ -237,6 +243,8 @@ const LIGHT: Theme = {
   timestamp: '#e6e6e6',
   sender: '#1c1c1c',
   selfMessage: 'blue',
+  selfName: 'blue',
+  selfMessageBackground: null,
   systemEvent: 'gray',
   errorText: 'red',
   warnText: 'yellow',
@@ -276,6 +284,8 @@ export type PartialTheme = {
   timestamp?: string
   sender?: string
   selfMessage?: string
+  selfName?: string
+  selfMessageBackground?: string | null
   systemEvent?: string
   errorText?: string
   warnText?: string
