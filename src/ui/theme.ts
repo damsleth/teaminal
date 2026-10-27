@@ -13,6 +13,7 @@ import type {
   Settings,
   SystemAppearance,
   ThemeColorOverrides,
+  ThemeFontSizeKey,
   ThemeOverrides,
   ThemePresenceKey,
 } from '../state/store'
@@ -95,6 +96,9 @@ export type ThemeEmphasis = {
   inlineKeyBold: boolean
 }
 
+// Percent of the base font size per text type (see src/ui/textSizing.ts).
+export type ThemeFontSize = Record<ThemeFontSizeKey, number>
+
 export type Theme = {
   background: string
   text: string
@@ -119,6 +123,7 @@ export type Theme = {
   layout: ThemeLayout
   borders: ThemeBorders
   emphasis: ThemeEmphasis
+  fontSize: ThemeFontSize
 }
 
 const PRESENCE_DARK: PresenceMap = {
@@ -158,6 +163,16 @@ const EMPHASIS_DEFAULT: ThemeEmphasis = {
   inlineKeyBold: true,
 }
 
+const FONT_SIZE_DEFAULT: ThemeFontSize = {
+  timestamp: 100,
+  sender: 100,
+  messageText: 100,
+  paneHeader: 100,
+  chatListHeader: 100,
+  chatListName: 100,
+  chatListPreview: 100,
+}
+
 // Concrete base themes only. `auto` is a mode (resolves to one of these from
 // the OS appearance) and is intentionally not listed here.
 export const BUILTIN_THEME_NAMES = ['dark', 'light'] as const
@@ -193,6 +208,7 @@ const DARK: Theme = {
   layout: LAYOUT_DEFAULT,
   borders: BORDERS_DEFAULT,
   emphasis: EMPHASIS_DEFAULT,
+  fontSize: FONT_SIZE_DEFAULT,
 }
 
 // The light theme uses explicit hex values for its background and dark-text
@@ -227,6 +243,7 @@ const LIGHT: Theme = {
   layout: LAYOUT_DEFAULT,
   borders: BORDERS_DEFAULT,
   emphasis: EMPHASIS_DEFAULT,
+  fontSize: FONT_SIZE_DEFAULT,
 }
 
 export const builtinThemes: Record<BuiltinThemeName, Theme> = {
@@ -265,6 +282,7 @@ export type PartialTheme = {
   layout?: Partial<ThemeLayout>
   borders?: Partial<ThemeBorders>
   emphasis?: Partial<ThemeEmphasis>
+  fontSize?: Partial<ThemeFontSize>
 }
 
 // Built-in base a theme setting renders on: 'auto' follows the OS, a user
@@ -300,7 +318,7 @@ export function resolveTheme(
 }
 
 function mergePartial(theme: Theme, partial: PartialTheme): Theme {
-  const { presence, layout, borders, emphasis, ...flat } = partial
+  const { presence, layout, borders, emphasis, fontSize, ...flat } = partial
   for (const [key, value] of Object.entries(flat) as [keyof PartialTheme, unknown][]) {
     if (value !== undefined) {
       ;(theme as Record<string, unknown>)[key] = value
@@ -310,6 +328,7 @@ function mergePartial(theme: Theme, partial: PartialTheme): Theme {
   if (layout) theme.layout = { ...theme.layout, ...layout }
   if (borders) theme.borders = { ...theme.borders, ...borders }
   if (emphasis) theme.emphasis = { ...theme.emphasis, ...emphasis }
+  if (fontSize) theme.fontSize = { ...theme.fontSize, ...fontSize }
   return theme
 }
 
@@ -318,7 +337,7 @@ function applyOverrides(
   overrides: ThemeOverrides,
   baseName: BuiltinThemeName,
 ): Theme {
-  const { presence, layout, borders, emphasis, dark, light, ...flat } = overrides
+  const { presence, layout, borders, emphasis, fontSize, dark, light, ...flat } = overrides
   // Global (legacy) colors first, then the active base's own colors.
   applyColors(theme, flat)
   applyColors(theme, baseName === 'light' ? light : dark)
@@ -326,6 +345,7 @@ function applyOverrides(
   if (layout) theme.layout = { ...theme.layout, ...layout }
   if (borders) theme.borders = { ...theme.borders, ...borders }
   if (emphasis) theme.emphasis = { ...theme.emphasis, ...emphasis }
+  if (fontSize) theme.fontSize = { ...theme.fontSize, ...fontSize }
   return theme
 }
 
@@ -347,6 +367,7 @@ function cloneTheme(input: Theme): Theme {
     layout: { ...input.layout },
     borders: { ...input.borders },
     emphasis: { ...input.emphasis },
+    fontSize: { ...input.fontSize },
   }
 }
 

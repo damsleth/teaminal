@@ -8,6 +8,13 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Per-element font sizes in kitty.** The theme editor has a **Font size**
+  section (and `themeOverrides.fontSize.*`) to shrink the chat header,
+  sender, timestamp, message text, chat list headers, chat names and
+  previews to 50-90% of the terminal font. Uses the kitty text sizing
+  protocol (OSC 66), detected at startup; other terminals render as before.
+  Text only gets smaller: larger sizes would need two rows per line.
+
 - **Ctrl+B hides the chat list.** The list and the conversation then share
   one full-width pane: `h`/Left from a chat shows the list, `l`/Right (or
   Enter) on a chat opens it. Ctrl+B again restores the side-by-side layout.

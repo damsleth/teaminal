@@ -13,6 +13,7 @@
 //   layout    - settings.themeOverrides.layout.<key>   (ThemeLayout)
 //   borders   - settings.themeOverrides.borders.<key>  (ThemeBorders)
 //   emphasis  - settings.themeOverrides.emphasis.<key> (ThemeEmphasis)
+//   fontSize  - settings.themeOverrides.fontSize.<key> (ThemeFontSize)
 //   setting   - a top-level Settings key (e.g. inlineImageMaxRows)
 //
 // Theme-token edits persist by REPLACING settings.themeOverrides wholesale
@@ -24,8 +25,9 @@ import { defaultSettings, type Settings, type ThemeOverrides } from '../state/st
 import { BORDER_STYLES, type BuiltinThemeName, type Theme } from './theme'
 
 export type FieldKind = 'numeric' | 'color' | 'enum' | 'boolean'
-export type FieldGroup = 'color' | 'layout' | 'borders' | 'emphasis' | 'setting'
-export type EditorSection = 'Spacing / Layout' | 'Colors' | 'Borders' | 'Emphasis' | 'Images'
+export type FieldGroup = 'color' | 'layout' | 'borders' | 'emphasis' | 'fontSize' | 'setting'
+export type EditorSection =
+  'Spacing / Layout' | 'Colors' | 'Borders' | 'Emphasis' | 'Font size' | 'Images'
 
 export type FieldValue = string | number | boolean | null
 
@@ -105,7 +107,7 @@ const color = (key: string, label: string, nullable = false): ColorField => ({
   nullable,
 })
 const num = (
-  group: 'layout' | 'setting',
+  group: 'layout' | 'fontSize' | 'setting',
   key: string,
   label: string,
   section: EditorSection,
@@ -183,6 +185,14 @@ export const FIELDS: readonly EditableField[] = [
   bool('unreadBold', 'Unread bold'),
   bool('senderBold', 'Sender bold'),
   bool('inlineKeyBold', 'Inline key bold'),
+  // — Font size (% of base; kitty text sizing protocol only) —
+  num('fontSize', 'paneHeader', 'Chat header', 'Font size', 50, 100, 10),
+  num('fontSize', 'sender', 'Sender', 'Font size', 50, 100, 10),
+  num('fontSize', 'timestamp', 'Timestamp', 'Font size', 50, 100, 10),
+  num('fontSize', 'messageText', 'Message text', 'Font size', 50, 100, 10),
+  num('fontSize', 'chatListHeader', 'Chat list header', 'Font size', 50, 100, 10),
+  num('fontSize', 'chatListName', 'Chat list name', 'Font size', 50, 100, 10),
+  num('fontSize', 'chatListPreview', 'Chat list preview', 'Font size', 50, 100, 10),
   // — Images —
   num('setting', 'inlineImageMaxRows', 'Inline image max rows', 'Images', 1, 50),
   {
@@ -209,6 +219,8 @@ export function fieldValue(field: EditableField, theme: Theme, settings: Setting
       return (theme.borders as unknown as Record<string, string>)[field.key]!
     case 'emphasis':
       return (theme.emphasis as unknown as Record<string, boolean>)[field.key]!
+    case 'fontSize':
+      return (theme.fontSize as unknown as Record<string, number>)[field.key]!
     case 'setting':
       return (settings as unknown as Record<string, FieldValue>)[field.key]!
   }
@@ -235,6 +247,8 @@ export function isOverridden(
       return (ov.borders as Record<string, unknown> | undefined)?.[field.key] !== undefined
     case 'emphasis':
       return (ov.emphasis as Record<string, unknown> | undefined)?.[field.key] !== undefined
+    case 'fontSize':
+      return (ov.fontSize as Record<string, unknown> | undefined)?.[field.key] !== undefined
     case 'setting': {
       const k = field.key as keyof Settings
       return JSON.stringify(settings[k]) !== JSON.stringify(defaultSettings[k])
@@ -293,6 +307,7 @@ function cloneOverrides(ov: ThemeOverrides): ThemeOverrides {
   if (ov.layout) next.layout = { ...ov.layout }
   if (ov.borders) next.borders = { ...ov.borders }
   if (ov.emphasis) next.emphasis = { ...ov.emphasis }
+  if (ov.fontSize) next.fontSize = { ...ov.fontSize }
   if (ov.dark) next.dark = { ...ov.dark }
   if (ov.light) next.light = { ...ov.light }
   return next
@@ -300,7 +315,7 @@ function cloneOverrides(ov: ThemeOverrides): ThemeOverrides {
 
 // Drop an empty sub-object so cleared overrides round-trip back to {} rather
 // than leaving "layout": {} cruft in config.json.
-function pruneEmpty<K extends 'layout' | 'borders' | 'emphasis' | BuiltinThemeName>(
+function pruneEmpty<K extends 'layout' | 'borders' | 'emphasis' | 'fontSize' | BuiltinThemeName>(
   ov: ThemeOverrides,
   key: K,
 ): void {
@@ -330,6 +345,9 @@ function setOverride(
     }
     case 'emphasis':
       next.emphasis = { ...next.emphasis, [field.key]: value as boolean }
+      break
+    case 'fontSize':
+      next.fontSize = { ...next.fontSize, [field.key]: value as number }
       break
   }
   return next
@@ -366,6 +384,12 @@ function clearOverride(
       if (next.emphasis) {
         delete (next.emphasis as Record<string, unknown>)[field.key]
         pruneEmpty(next, 'emphasis')
+      }
+      break
+    case 'fontSize':
+      if (next.fontSize) {
+        delete (next.fontSize as Record<string, unknown>)[field.key]
+        pruneEmpty(next, 'fontSize')
       }
       break
   }

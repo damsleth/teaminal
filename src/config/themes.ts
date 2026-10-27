@@ -15,6 +15,7 @@ import { join } from 'node:path'
 import {
   validateBordersOverrides,
   validateEmphasisOverrides,
+  validateFontSizeOverrides,
   validateLayoutOverrides,
 } from './index'
 
@@ -175,6 +176,11 @@ function validatePartialTheme(
     if (key === 'emphasis') {
       const emphasis = validateEmphasisOverrides(value, warnings, 'theme.emphasis')
       if (emphasis && Object.keys(emphasis).length > 0) out.emphasis = emphasis
+      continue
+    }
+    if (key === 'fontSize') {
+      const fontSize = validateFontSizeOverrides(value, warnings, 'theme.fontSize')
+      if (fontSize && Object.keys(fontSize).length > 0) out.fontSize = fontSize
       continue
     }
     if (NULLABLE_COLOR_KEYS.has(key)) {
