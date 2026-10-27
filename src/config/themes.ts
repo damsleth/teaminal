@@ -75,6 +75,7 @@ const NULLABLE_COLOR_KEYS = new Set([
   'messageFocusBackground',
   'selectedRowBackground',
   'selfMessageBackground',
+  'messageFocusText',
 ])
 
 const PRESENCE_KEYS = new Set([

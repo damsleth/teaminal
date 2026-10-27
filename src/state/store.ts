@@ -252,6 +252,7 @@ export type ThemeColorOverrides = {
   warnText?: string
   infoText?: string
   messageFocusIndicator?: string
+  messageFocusText?: string | null
   messageFocusBackground?: string | null
   selectedRowBackground?: string | null
 }

@@ -62,6 +62,7 @@ const THEME_KEYS = new Set<keyof ThemeOverrides>([
   'warnText',
   'infoText',
   'messageFocusIndicator',
+  'messageFocusText',
   'messageFocusBackground',
   'selectedRowBackground',
   'presence',
@@ -792,7 +793,8 @@ export function validateThemeOverrides(
     if (
       (key === 'messageFocusBackground' ||
         key === 'selectedRowBackground' ||
-        key === 'selfMessageBackground') &&
+        key === 'selfMessageBackground' ||
+        key === 'messageFocusText') &&
       rawValue === null
     ) {
       ;(out[key] as string | null) = null

@@ -662,7 +662,9 @@ function MessageRow(props: {
 
   const bodyNode = (
     <Text
-      color={isDeleted ? theme.mutedText : props.focused ? theme.messageFocusIndicator : color}
+      color={
+        isDeleted ? theme.mutedText : props.focused ? (theme.messageFocusText ?? color) : color
+      }
       backgroundColor={
         props.focused
           ? (theme.messageFocusBackground ?? undefined)
