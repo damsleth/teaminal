@@ -165,6 +165,28 @@ afterEach(async () => {
 })
 
 describe('active loop', () => {
+  test('a focus change wakes the sleeping active loop', async () => {
+    primeAuth()
+    const messages: ChatMessage[] = [
+      {
+        id: 'm-1',
+        createdDateTime: '2026-04-29T09:00:00Z',
+        body: { contentType: 'text', content: 'hi' },
+      },
+    ]
+    installTransport(makeHandlers({ chatMessages: () => jsonResponse({ value: messages }) }))
+    const store = createAppStore(accountRef('test'))
+    store.set({ me: ME })
+    activeHandle = startPoller({
+      getClient: testClient,
+      store: accountStore(store),
+      intervals: { activeMs: 99_999, listMs: 99_999, presenceMs: 99_999 },
+    })
+    await new Promise((r) => setTimeout(r, 300))
+    store.set({ focus: { kind: 'chat', chatId: 'c1' } })
+    await waitFor(() => (store.get().messagesByConvo['chat:c1']?.length ?? 0) > 0, 1_000)
+  })
+
   test('seeds the seen-set on first fetch and emits no notifications', async () => {
     primeAuth()
     const messages: ChatMessage[] = [

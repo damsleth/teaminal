@@ -31,16 +31,21 @@ export function ConfirmDeleteModal() {
         return
       }
       if (key.return || ch === 'y') {
-        store.set({ modal: null, inputZone: 'list' })
+        const focus = store.get().focus
+        const deletingFocused =
+          modal.kind === 'confirm-delete-chat' &&
+          focus.kind === 'chat' &&
+          focus.chatId === modal.chatId
+        store.set({
+          modal: null,
+          inputZone: 'list',
+          ...(deletingFocused ? { focus: { kind: 'list' } } : {}),
+        })
         // Both actions log + roll back on failure; swallow the rejection so a
         // Graph error never escapes as an unhandled rejection and tears down
         // the TUI.
         const acc = accountStore(store)
         if (modal.kind === 'confirm-delete-chat') {
-          const focus = store.get().focus
-          if (focus.kind === 'chat' && focus.chatId === modal.chatId) {
-            store.set({ focus: { kind: 'list' } })
-          }
           void deleteChatById(session.client(), acc, modal.chatId).catch(() => {})
         } else if (modal.kind === 'confirm-delete') {
           void deleteChatMessageById(session.client(), acc, modal.chatId, modal.messageId).catch(

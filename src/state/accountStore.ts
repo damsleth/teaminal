@@ -12,8 +12,8 @@
 //                UI/environment state (focus, settings, terminalFocused, ...).
 //   set(patch)   account fields only; other keys are ignored. Returns false
 //                and does nothing when the handle is stale.
-//   subscribe(l) fires only when one of the account's fields changed, and
-//                only while the handle is current.
+//   subscribe(l) fires on every store change (listeners also watch global
+//                state such as focus), but only while the handle is current.
 //   isCurrent()  true while the store still belongs to this incarnation.
 //
 // Global UI/environment writes go through the Store itself, explicitly.
@@ -67,12 +67,8 @@ export function accountStore(store: Store<AppState>): AccountStore {
       return true
     },
     subscribe(listener) {
-      let prev = store.get()
       return store.subscribe((s) => {
-        const before = prev
-        prev = s
-        if (!isCurrent()) return
-        if (ACCOUNT_KEYS.some((k) => s[k] !== before[k])) listener(s)
+        if (isCurrent()) listener(s)
       })
     },
   }
