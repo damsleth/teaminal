@@ -64,7 +64,8 @@ export type EditableField = NumericField | ColorField | EnumField | BooleanField
 // Palette cycled by ←/→ on color fields. Named ANSI colors first (these
 // round-trip through any terminal palette), then a few useful hex shades so
 // backgrounds/tints can be dialed in without dropping to hex-entry mode.
-// Hex-entry mode ('e') still accepts any #rgb / #rrggbb value.
+// Hex-entry mode ('e') accepts #rgb / #rrggbb, plus #rgba / #rrggbbaa
+// with opacity (blended onto the theme background, see blendAlpha).
 export const COLOR_PALETTE: readonly string[] = [
   'black',
   'red',
@@ -91,7 +92,7 @@ export const COLOR_PALETTE: readonly string[] = [
   '#ffffff',
 ]
 
-const HEX_RE = /^#(?:[0-9a-fA-F]{3}){1,2}$/
+const HEX_RE = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/
 
 export function isHexColor(value: string): boolean {
   return HEX_RE.test(value)
@@ -221,7 +222,11 @@ export const FIELDS: readonly EditableField[] = [
 export function fieldValue(field: EditableField, theme: Theme, settings: Settings): FieldValue {
   switch (field.group) {
     case 'color':
-      return (theme as unknown as Record<string, string | null>)[field.key] ?? null
+      return (
+        theme.rawColors?.[field.key] ??
+        (theme as unknown as Record<string, string | null>)[field.key] ??
+        null
+      )
     case 'layout':
       return (theme.layout as unknown as Record<string, number>)[field.key]!
     case 'borders':
