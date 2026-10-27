@@ -387,7 +387,7 @@ export function MessagePane(props: {
         {density === 'cozy' && (
           <Box paddingLeft={bodyIndent} marginBottom={1} flexShrink={0}>
             <Text bold={theme.emphasis.sectionHeadingBold}>
-              {fs(headerLabel, theme.fontSize.paneHeader)}
+              {fs(headerLabel, theme.fontSize.paneHeader, theme.fontSize.tightSpacing)}
             </Text>
           </Box>
         )}
@@ -689,10 +689,12 @@ function MessageRow(props: {
           <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
             <Text wrap="truncate-end">
               <Text color={color} bold={senderName.length > 0 && theme.emphasis.senderBold}>
-                {fs(senderName, theme.fontSize.sender)}
+                {fs(senderName, theme.fontSize.sender, theme.fontSize.tightSpacing)}
               </Text>
               {props.showTimestamp && (
-                <Text color={theme.timestamp}>{fs(`  ${time}`, theme.fontSize.timestamp)}</Text>
+                <Text color={theme.timestamp}>
+                  {fs(`  ${time}`, theme.fontSize.timestamp, theme.fontSize.tightSpacing)}
+                </Text>
               )}
             </Text>
           </Box>

@@ -329,7 +329,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         {filterBanner}
         {density === 'cozy' && (
           <Text bold={theme.emphasis.sectionHeadingBold}>
-            {fs('Chats', theme.fontSize.chatListHeader)}
+            {fs('Chats', theme.fontSize.chatListHeader, theme.fontSize.tightSpacing)}
           </Text>
         )}
         <Text color={theme.mutedText}>
@@ -353,7 +353,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
           return (
             <Box key={`h-${row.label}-${i}`} flexShrink={0}>
               <Text bold={theme.emphasis.sectionHeadingBold}>
-                {fs(row.label, theme.fontSize.chatListHeader)}
+                {fs(row.label, theme.fontSize.chatListHeader, theme.fontSize.tightSpacing)}
               </Text>
             </Box>
           )
@@ -411,6 +411,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
                 {fs(
                   hdrBg ? hdrLabel.padEnd(previewContentWidth) : hdrLabel,
                   theme.fontSize.chatListHeader,
+                  theme.fontSize.tightSpacing,
                 )}
               </Text>
             </Box>
@@ -501,7 +502,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
                   }
                   wrap="wrap"
                 >
-                  {fs(labelPadded, theme.fontSize.chatListName)}
+                  {fs(labelPadded, theme.fontSize.chatListName, theme.fontSize.tightSpacing)}
                 </Text>
               </Box>
             </Box>
@@ -516,7 +517,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
                   bold={hasUnread && theme.emphasis.unreadBold}
                   wrap="wrap"
                 >
-                  {fs(preview, theme.fontSize.chatListPreview)}
+                  {fs(preview, theme.fontSize.chatListPreview, theme.fontSize.tightSpacing)}
                 </Text>
               </Box>
             )}

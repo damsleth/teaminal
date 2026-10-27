@@ -891,6 +891,11 @@ export function validateFontSizeOverrides(
   }
   const out: NonNullable<ThemeOverrides['fontSize']> = {}
   for (const [rawKey, rawValue] of Object.entries(value)) {
+    if (rawKey === 'tightSpacing') {
+      if (typeof rawValue === 'boolean') out.tightSpacing = rawValue
+      else warnings.push(`config: "${scope}.tightSpacing" must be a boolean`)
+      continue
+    }
     if (!(THEME_FONT_SIZE_KEYS as readonly string[]).includes(rawKey)) {
       warnings.push(`config: unknown ${scope} key "${rawKey}" ignored`)
       continue
