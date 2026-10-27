@@ -31,6 +31,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **New messages show up in the open chat right away with push connected.**
+  A push signal that arrived while a fetch was in flight was dropped, and the
+  fetch a push triggered often ran before Graph had the message, so the chat
+  waited for the next 60s poll (or the next message, or leaving and
+  re-entering it). Push wakes are no longer lost, and teaminal re-fetches once
+  more a few seconds after each push.
 - **The focus background colors the focused message, not the focus marker.**
   The marker keeps its own color on the plain background.
 - **Switching Theme between dark, light and auto works again.** Colors tuned

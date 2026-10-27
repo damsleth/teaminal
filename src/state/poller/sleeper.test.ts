@@ -21,9 +21,17 @@ describe('makeSleeper', () => {
     expect(elapsed).toBeLessThan(200)
   })
 
-  test('wake() with no active sleep is a no-op', () => {
+  test('wake() with no active sleep makes the next sleep return immediately', async () => {
+    // A push wake landing mid-fetch must not be lost.
     const s = makeSleeper()
-    expect(() => s.wake()).not.toThrow()
+    s.wake()
+    const start = Date.now()
+    await s.sleep(10_000)
+    expect(Date.now() - start).toBeLessThan(50)
+    // Only once: the following sleep runs its full duration.
+    const t = Date.now()
+    await s.sleep(20)
+    expect(Date.now() - t).toBeGreaterThanOrEqual(15)
   })
 
   test('subsequent sleep after wake works normally', async () => {

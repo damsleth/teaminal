@@ -1,5 +1,5 @@
 import { accountRef } from '../account'
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, jest, test } from 'bun:test'
 import { RealtimeEventBus } from '../realtime/events'
 import { createAppStore } from './store'
 import { startRealtimeBridge } from './realtimeBridge'
@@ -35,6 +35,25 @@ describe('realtimeBridge', () => {
     bus.emit({ kind: 'new-message', chatId: 'c1' })
     expect(getRefreshCount()).toBe(1)
     bridge.stop()
+  })
+
+  test('new-message burst re-wakes the poller once after Graph catch-up', () => {
+    // Push arrives before Graph serves the message; the immediate fetch
+    // can miss it, so a trailing refresh must follow.
+    jest.useFakeTimers()
+    try {
+      const { bus, bridge, getRefreshCount } = setup()
+      bus.emit({ kind: 'new-message', chatId: 'c1' })
+      bus.emit({ kind: 'new-message', chatId: 'c1' })
+      expect(getRefreshCount()).toBe(2)
+      jest.advanceTimersByTime(3_000)
+      expect(getRefreshCount()).toBe(3)
+      jest.advanceTimersByTime(10_000)
+      expect(getRefreshCount()).toBe(3)
+      bridge.stop()
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   test('chat-updated event wakes the poller', () => {

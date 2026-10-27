@@ -1,8 +1,8 @@
 // Bridge between the RealtimeEventBus and the app store / poller.
 //
 // Responsibilities:
-//   - On 'new-message': wake the poller's active or list sleeper so Graph
-//     is re-fetched immediately (< 1s latency instead of 5–30s).
+//   - On 'new-message': wake the poller's active and list sleepers so Graph
+//     is re-fetched immediately, then again once Graph has caught up.
 //   - On 'typing' / 'typing-stopped': update typingByConvo in the store.
 //   - On 'presence-changed': update myPresence or memberPresence.
 //   - On 'read-receipt': track each user's latest seen message.
@@ -46,30 +46,33 @@ export function startRealtimeBridge(opts: RealtimeBridgeOpts): RealtimeBridgeHan
   const unsubs: (() => void)[] = []
 
   // --- New-message acceleration ---
-  unsubs.push(
-    bus.onKind('new-message', (event) => {
-      if (event.kind !== 'new-message') return
-      const poller = getPoller()
-      if (!poller) return
-      // Wake both sleepers. The active loop will re-fetch if the chat
-      // matches the current focus; the list loop picks up preview changes.
-      poller.refresh()
-    }),
-  )
-
-  // Also accelerate on chat-updated, chat-created, message-edited, message-deleted.
+  // Push usually beats Graph: an immediate re-fetch often comes back
+  // without the message that triggered it, and the next poll is 60s
+  // out. So wake the poller now (the active loop re-fetches the focused
+  // chat, the list loop picks up preview changes) and once more after
+  // Graph has caught up.
+  // ponytail: one fixed trailing retry; poll-until-present if 3s proves short.
+  const GRAPH_CATCHUP_MS = 3_000
+  let catchupTimer: ReturnType<typeof setTimeout> | null = null
+  const accelerate = (): void => {
+    const poller = getPoller()
+    if (!poller) return
+    poller.refresh()
+    if (catchupTimer) clearTimeout(catchupTimer)
+    catchupTimer = setTimeout(() => {
+      catchupTimer = null
+      getPoller()?.refresh()
+    }, GRAPH_CATCHUP_MS)
+  }
   for (const kind of [
+    'new-message',
     'chat-updated',
     'chat-created',
     'message-edited',
     'message-deleted',
     'reaction-added',
   ] as const) {
-    unsubs.push(
-      bus.onKind(kind, () => {
-        getPoller()?.refresh()
-      }),
-    )
+    unsubs.push(bus.onKind(kind, accelerate))
   }
 
   // --- CSA activity feed reconcile ---
@@ -217,6 +220,7 @@ export function startRealtimeBridge(opts: RealtimeBridgeOpts): RealtimeBridgeHan
   return {
     stop() {
       clearInterval(cleanupTimer)
+      if (catchupTimer) clearTimeout(catchupTimer)
       if (pendingActivityTimer) {
         clearTimeout(pendingActivityTimer)
         pendingActivityTimer = null

@@ -3,6 +3,11 @@
 // out the full interval. Used for focus-driven activeLoop refresh and
 // for the user-facing manual-refresh key.
 //
+// A wake() that lands while no sleep is in flight (the loop is mid-fetch)
+// is remembered: the next sleep() returns immediately. Otherwise a push
+// signal arriving during a fetch is swallowed and the loop sits out the
+// full (60s when push is connected) interval.
+//
 // close() is the stop-time variant: it wakes the in-flight sleep AND
 // latches a 'closed' flag so any future sleep() call returns
 // immediately. Without this latch, stop() can race with a loop whose
@@ -23,9 +28,13 @@ export type Sleeper = {
 export function makeSleeper(): Sleeper {
   let waker: (() => void) | null = null
   let closed = false
+  let pending = false
   return {
     sleep(ms: number) {
-      if (closed) return Promise.resolve()
+      if (closed || pending) {
+        pending = false
+        return Promise.resolve()
+      }
       return new Promise<void>((resolve) => {
         const id = setTimeout(() => {
           waker = null
@@ -39,7 +48,8 @@ export function makeSleeper(): Sleeper {
       })
     },
     wake() {
-      waker?.()
+      if (waker) waker()
+      else pending = true
     },
     close() {
       closed = true
