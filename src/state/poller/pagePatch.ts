@@ -4,7 +4,14 @@
 
 import type { ChatMessage } from '../../types'
 import { indexNamesFromMessages } from '../nameIndex'
-import { type AppState, type ConvKey, type Focus, emptyMessageCache, markChatRead } from '../store'
+import {
+  type AccountSlice,
+  type AppState,
+  type ConvKey,
+  type Focus,
+  emptyMessageCache,
+  markChatRead,
+} from '../store'
 import { mergeWithOptimistic, newestMessageId, sameMessageList } from './merge'
 
 export type MessagesPage = {
@@ -27,7 +34,7 @@ export function mergeActivePagePatch(
   conv: ConvKey,
   page: MessagesPage,
   focus: Focus,
-): Partial<AppState> {
+): Partial<AccountSlice> {
   const cache = state.messageCacheByConvo[conv]
   const legacyMessages = state.messagesByConvo[conv] ?? []
   // When a cache exists, prefer it, but pick up any optimistic
@@ -70,7 +77,7 @@ export function mergeActivePagePatch(
   // Build the patch key by key, omitting anything that did not actually
   // change. Store.set compares by reference, so an unconditional spread here
   // reads as a change and notifies every listener even on an identical poll.
-  const patch: Partial<AppState> = {}
+  const patch: Partial<AccountSlice> = {}
 
   const cacheUnchanged =
     cache !== undefined &&

@@ -1,3 +1,4 @@
+import { accountStore } from './accountStore'
 import { accountRef } from '../account'
 import { describe, expect, jest, test } from 'bun:test'
 import { RealtimeEventBus } from '../realtime/events'
@@ -6,7 +7,7 @@ import { startRealtimeBridge } from './realtimeBridge'
 
 function setup() {
   const bus = new RealtimeEventBus()
-  const store = createAppStore()
+  const store = createAppStore(accountRef('test'))
   let refreshCount = 0
   const fakePoller = {
     refresh: () => {
@@ -21,9 +22,8 @@ function setup() {
     }),
   }
   const bridge = startRealtimeBridge({
-    account: accountRef(null),
     bus,
-    store,
+    store: accountStore(store),
     getPoller: () => fakePoller,
   })
   return { bus, store, bridge, getRefreshCount: () => refreshCount }
@@ -179,11 +179,10 @@ describe('realtimeBridge', () => {
 
   test('tolerates null poller during bootstrap', () => {
     const bus = new RealtimeEventBus()
-    const store = createAppStore()
+    const store = createAppStore(accountRef('test'))
     const bridge = startRealtimeBridge({
-      account: accountRef(null),
       bus,
-      store,
+      store: accountStore(store),
       getPoller: () => null,
     })
 

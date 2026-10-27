@@ -10,18 +10,18 @@
 // so we don't keep slamming a 401/403/404 path every 60s; the next
 // teaminal launch retries.
 
+import type { AccountStore } from '../accountStore'
 import { owaProfile } from '../../account'
 import type { GraphClient } from '../../graph/client'
 import { getMyPresence } from '../../graph/presence'
 import { getMyTeamsPresence, TeamsPresenceError } from '../../graph/teamsPresence'
 import type { Presence } from '../../types'
-import type { AppState, Store } from '../store'
 import { backoff, isAbortError, jitter, MEMBER_PRESENCE_LIMIT } from './intervals'
 import { fetchMemberPresence } from './memberPresence'
 import type { Sleeper } from './sleeper'
 
 export type PresenceLoopDeps = {
-  store: Store<AppState>
+  store: AccountStore
   // Bound Graph client for this session's account.
   getClient: () => GraphClient
   sleeper: Sleeper

@@ -19,8 +19,6 @@ export type SessionApi = {
    * at the moment they run, so an action never borrows another account.
    */
   client: () => GraphClient
-  /** Changes on every account switch; compare before writing after an await. */
-  generation: () => number
   /**
    * Tear down the running session, reset account-scoped state, hydrate
    * the new profile's message cache, and bring up a new session against

@@ -12,10 +12,10 @@
 // uses them as "something changed" signals that trigger authoritative
 // Graph fetches through the existing poller.
 
-import type { AccountRef } from '../account'
+import type { AccountStore } from './accountStore'
 import type { RealtimeEventBus } from '../realtime/events'
 import { refreshActivityFeed } from './activityFeed'
-import type { AppState, ConvKey, Store, TypingIndicator } from './store'
+import type { AppState, ConvKey, TypingIndicator } from './store'
 import type { PollerHandle } from './poller'
 
 const TYPING_TTL_MS = 8_000
@@ -23,18 +23,10 @@ const TYPING_CLEANUP_INTERVAL_MS = 2_000
 
 export type RealtimeBridgeOpts = {
   bus: RealtimeEventBus
-  store: Store<AppState>
-  /** The session's account; activity refreshes run as it. */
-  account: AccountRef
+  // Writes after an account switch are dropped by the handle itself.
+  store: AccountStore
   /** Set once the poller is started; the bridge tolerates null during bootstrap. */
   getPoller: () => PollerHandle | null
-  /**
-   * Returns true once the owning session has been torn down. Detached
-   * async work (the activity-feed refresh) checks this before writing to
-   * the store so a fetch resolving after a profile switch can't
-   * repopulate the next account's state. Optional for tests.
-   */
-  isStale?: () => boolean
 }
 
 export type RealtimeBridgeHandle = {
@@ -42,7 +34,7 @@ export type RealtimeBridgeHandle = {
 }
 
 export function startRealtimeBridge(opts: RealtimeBridgeOpts): RealtimeBridgeHandle {
-  const { bus, store, account, getPoller, isStale = () => false } = opts
+  const { bus, store, getPoller } = opts
   const unsubs: (() => void)[] = []
 
   // --- New-message acceleration ---
@@ -90,7 +82,7 @@ export function startRealtimeBridge(opts: RealtimeBridgeOpts): RealtimeBridgeHan
     pendingActivityTimer = setTimeout(() => {
       pendingActivityTimer = null
       lastActivityRefreshAt = Date.now()
-      void refreshActivityFeed(store, account, isStale)
+      void refreshActivityFeed(store)
     }, wait)
   }
 

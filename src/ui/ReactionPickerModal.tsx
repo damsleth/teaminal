@@ -10,6 +10,7 @@
 import { useApp } from 'ink'
 import { useInput } from './useInput'
 import { useEffect } from 'react'
+import { accountStore } from '../state/accountStore'
 import { toggleReaction } from '../state/chatActions'
 import { openSystemEmojiPicker } from './emojiPicker'
 import { isEmojiGlyph } from './reactions'
@@ -49,9 +50,14 @@ export function ReactionPickerModal() {
       // swallow the rejection so a Graph error never escapes as an unhandled
       // rejection and tears down the TUI.
       if (me)
-        void toggleReaction(session.client(), store, chatId, messageId, input.trim(), me).catch(
-          () => {},
-        )
+        void toggleReaction(
+          session.client(),
+          accountStore(store),
+          chatId,
+          messageId,
+          input.trim(),
+          me,
+        ).catch(() => {})
     },
     { isActive: isOpen },
   )

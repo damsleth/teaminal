@@ -934,7 +934,7 @@ export const ACCOUNT_KEYS = [
 ] as const satisfies readonly (keyof AppState)[]
 
 export type AccountKey = (typeof ACCOUNT_KEYS)[number]
-type GlobalKey =
+export type GlobalKey =
   | 'account'
   | 'accountGeneration'
   // UI
@@ -1010,8 +1010,8 @@ export function initialAppState(): AppState {
   }
 }
 
-export function createAppStore(): Store<AppState> {
-  return new Store<AppState>(initialAppState())
+export function createAppStore(account: AccountRef | null = null): Store<AppState> {
+  return new Store<AppState>({ ...initialAppState(), account })
 }
 
 /**

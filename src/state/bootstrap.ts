@@ -33,6 +33,7 @@ import { TrouterTransport } from '../realtime/trouter'
 import { htmlToText } from '../text/html'
 import { mergeActivityItems, countUnreadMentions, recordNotification } from './activityFeed'
 import { startPoller, type PollerHandleRef } from './poller'
+import { accountStore, type AccountStore } from './accountStore'
 import { startRealtimeBridge } from './realtimeBridge'
 import { chatLabel } from './selectables'
 import {
@@ -74,13 +75,9 @@ export type RunSessionOpts = {
   onFatal: (kind: 'unauthorized', message: string) => void
 }
 
-async function hydrateActivityFeed(
-  store: Store<AppState>,
-  account: AccountRef,
-  isStale: () => boolean,
-): Promise<void> {
+async function hydrateActivityFeed(store: AccountStore, isStale: () => boolean): Promise<void> {
   try {
-    const page = await listActivityFeed({ account, isPrefetch: true })
+    const page = await listActivityFeed({ account: store.ref, isPrefetch: true })
     // Drop the result if the session was torn down (profile switch)
     // while this detached fetch was in flight — otherwise we'd
     // repopulate the next account's wiped feed with this account's items.
@@ -104,8 +101,15 @@ async function hydrateActivityFeed(
 }
 
 export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
-  const { store, profile, pollerHandleRef, onFatal } = opts
+  const { profile, pollerHandleRef, onFatal } = opts
   const sessionAccount = accountRef(profile)
+  // Everything this session writes goes through a handle bound to the
+  // store's current (account, generation); the caller resets the store for
+  // this account before starting the session.
+  const store = accountStore(opts.store)
+  if (store.ref.id !== sessionAccount.id) {
+    throw new Error('runSession: store is bound to another account')
+  }
   // Every Graph call this session makes runs as sessionAccount. The audience
   // comes from the account's routing (applied below) and is read per call so
   // a routing change in the Accounts modal applies to the next request.
@@ -134,7 +138,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
   // resolves after a profile switch can't repopulate the next account's
   // wiped state.
   let stopped = false
-  const isStale = (): boolean => stopped
+  const isStale = (): boolean => stopped || !store.isCurrent()
 
   try {
     recordEvent('app', 'info', `session starting profile=${profile ?? '(default)'}`)
@@ -211,9 +215,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
     bridge = startRealtimeBridge({
       bus,
       store,
-      account: sessionAccount,
       getPoller: () => pollerHandleRef.current,
-      isStale,
     })
 
     if (store.get().settings.realtimeEnabled) {
@@ -241,7 +243,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
       transport.onStateChange((state) => {
         // A late state from a pending connect/reconnect must not land in
         // the next account's store after a switch.
-        if (stopped) return
+        if (isStale()) return
         store.set({
           realtimeState:
             state === 'disconnected'
@@ -267,7 +269,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
     // Initial CSA activity feed hydrate. Best-effort: if the endpoint
     // 404s on a tenant or auth shape we haven't seen, log and continue —
     // the rest of the app doesn't depend on it.
-    void hydrateActivityFeed(store, sessionAccount, isStale)
+    void hydrateActivityFeed(store, isStale)
   } catch (err) {
     // Roll back partial bootstrap so the caller can retry / switch.
     try {

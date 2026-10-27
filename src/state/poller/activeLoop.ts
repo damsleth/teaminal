@@ -9,13 +9,14 @@
 // we were in flight, we drop the result rather than poison the next
 // conversation's view with the previous one's messages.
 
+import type { AccountStore } from '../accountStore'
 import { listMessagesPage } from '../../graph/chats'
 import { GraphError, type GraphClient } from '../../graph/client'
 import { listChannelMessagesPage, listChannelRepliesPage } from '../../graph/teams'
 import { recordEvent, isDebugEnabled } from '../../log'
 import { logMessageImageShape } from './imageDebug'
 import type { ChatMessage } from '../../types'
-import { focusKey, type AppState, type ConvKey, type Focus, type Store } from '../store'
+import { focusKey, type ConvKey, type Focus } from '../store'
 import type { MentionEvent } from '../poller'
 import { backoff, isAbortError, jitter } from './intervals'
 import { notifyKind, type NotifyKind } from './mentions'
@@ -23,7 +24,7 @@ import { mergeActivePagePatch, type MessagesPage } from './pagePatch'
 import type { Sleeper } from './sleeper'
 
 export type ActiveLoopDeps = {
-  store: Store<AppState>
+  store: AccountStore
   // Bound Graph client for this session's account.
   getClient: () => GraphClient
   sleeper: Sleeper

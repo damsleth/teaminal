@@ -18,15 +18,20 @@
 //
 // Global UI/environment writes go through the Store itself, explicitly.
 //
-// ponytail: one account per store, so get() returns the flat AppState. When
-// the store splits into accountsById (D.2) get() returns that slice merged
-// with the globals; callers don't change.
+// ponytail: one account per store, so get() returns the flat AppState. With
+// concurrent accounts (Phase E) the flat fields stay the *foreground*
+// account's and background accounts get a side map; this handle routes each
+// write to wherever its account lives, so callers don't change. Focus and
+// modal payloads carry no account id because they always belong to
+// store.account: a foreground switch must save/restore or close them.
 
 import type { AccountRef } from '../account'
-import { ACCOUNT_KEYS, type AccountSlice, type AppState, type Store } from './store'
+import { ACCOUNT_KEYS, type AccountSlice, type AppState, type GlobalKey, type Store } from './store'
 
 export type AccountView = Readonly<AppState>
-export type AccountPatch = Partial<AccountSlice>
+// Global keys are typed `never` so an updater that returns one fails to
+// compile (TS skips excess-property checks on function results).
+export type AccountPatch = Partial<AccountSlice> & Partial<Record<GlobalKey, never>>
 
 export type AccountStore = {
   readonly ref: AccountRef

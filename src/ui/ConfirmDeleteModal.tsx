@@ -5,6 +5,7 @@
 import { Box, Text, useApp } from 'ink'
 import { inkBorder } from './theme'
 import { useInput } from './useInput'
+import { accountStore } from '../state/accountStore'
 import { deleteChatById, deleteChatMessageById } from '../state/chatActions'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useSessionApi } from './SessionContext'
@@ -34,10 +35,15 @@ export function ConfirmDeleteModal() {
         // Both actions log + roll back on failure; swallow the rejection so a
         // Graph error never escapes as an unhandled rejection and tears down
         // the TUI.
+        const acc = accountStore(store)
         if (modal.kind === 'confirm-delete-chat') {
-          void deleteChatById(session.client(), store, modal.chatId).catch(() => {})
+          const focus = store.get().focus
+          if (focus.kind === 'chat' && focus.chatId === modal.chatId) {
+            store.set({ focus: { kind: 'list' } })
+          }
+          void deleteChatById(session.client(), acc, modal.chatId).catch(() => {})
         } else if (modal.kind === 'confirm-delete') {
-          void deleteChatMessageById(session.client(), store, modal.chatId, modal.messageId).catch(
+          void deleteChatMessageById(session.client(), acc, modal.chatId, modal.messageId).catch(
             () => {},
           )
         }

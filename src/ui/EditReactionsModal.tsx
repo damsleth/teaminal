@@ -9,6 +9,7 @@ import { Box, Text, useApp } from 'ink'
 import { inkBorder } from './theme'
 import { useInput } from './useInput'
 import { useState } from 'react'
+import { accountStore } from '../state/accountStore'
 import { toggleReaction } from '../state/chatActions'
 import { ownReactionTypes } from '../state/messageMutations'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
@@ -70,7 +71,14 @@ export function EditReactionsModal() {
           // Move cursor up if it was at the end.
           setCursor((c) => Math.min(myReactionTypes.length - 2, c))
         }
-        void toggleReaction(session.client(), store, chatId, messageId, type, me).catch(() => {})
+        void toggleReaction(
+          session.client(),
+          accountStore(store),
+          chatId,
+          messageId,
+          type,
+          me,
+        ).catch(() => {})
       }
     },
     { isActive: isOpen },
