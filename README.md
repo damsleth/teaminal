@@ -196,7 +196,7 @@ theme layered on top of `dark`; any subset of these keys is accepted:
     "modalPaddingX": 3,
     "modalPaddingY": 1,
     "paneHeaderPaddingLeft": 1,
-    "paneHeaderMarginBottom": 1,
+    "paneHeaderMarginBottom": 1, // message gap; 0.5 steps give half-row gaps in kitty
     "tailGap": 1,
     "chatListPaddingRight": 1,
     "chatListGap": 0, // blank rows between chats in the list

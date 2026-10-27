@@ -156,7 +156,7 @@ export const FIELDS: readonly EditableField[] = [
   num('layout', 'modalPaddingX', 'Modal padding X', 'Spacing / Layout', 0, 8),
   num('layout', 'modalPaddingY', 'Modal padding Y', 'Spacing / Layout', 0, 4),
   num('layout', 'paneHeaderPaddingLeft', 'Message body indent', 'Spacing / Layout', 0, 6),
-  num('layout', 'paneHeaderMarginBottom', 'Message gap', 'Spacing / Layout', 0, 4),
+  num('layout', 'paneHeaderMarginBottom', 'Message gap', 'Spacing / Layout', 0, 4, 0.5),
   num('layout', 'tailGap', 'Tail strip gap', 'Spacing / Layout', 0, 6),
   num('layout', 'chatListPaddingRight', 'Chat list pad R', 'Spacing / Layout', 0, 6),
   num('layout', 'chatListGap', 'Chat list gap', 'Spacing / Layout', 0, 3),
@@ -266,7 +266,7 @@ export function isOverridden(
 }
 
 export function clampNumeric(field: NumericField, value: number): number {
-  const v = Math.round(value)
+  const v = Math.round(value / field.step) * field.step
   if (Number.isNaN(v)) return field.min
   return Math.max(field.min, Math.min(field.max, v))
 }
