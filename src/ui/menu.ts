@@ -46,6 +46,7 @@ export type ToggleKey =
   | 'inlineImages'
   | 'messageFocusIndicatorEnabled'
   | 'messageFocusIndicatorChar'
+  | 'scrollOnNewMessages'
   | 'selfMessagesOnRight'
   | 'forceAvailableWhenFocused'
   | 'useTeamsPresence'
@@ -271,6 +272,11 @@ export const ROOT_MENU: MenuItem[] = [
         label: 'Focused message marker char',
         action: { kind: 'toggle-setting', key: 'messageFocusIndicatorChar' },
       },
+      {
+        id: 'scrollOnNewMessages',
+        label: 'Scroll on new messages',
+        action: { kind: 'toggle-setting', key: 'scrollOnNewMessages' },
+      },
       // — Notifications —
       {
         id: 'notifyMuted',
@@ -466,6 +472,7 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
     case 'selfMessagesOnRight':
+    case 'scrollOnNewMessages':
     case 'forceAvailableWhenFocused':
     case 'useTeamsPresence':
     case 'realtimeEnabled':
@@ -521,6 +528,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
     case 'selfMessagesOnRight':
+    case 'scrollOnNewMessages':
     case 'forceAvailableWhenFocused':
     case 'useTeamsPresence':
     case 'realtimeEnabled':

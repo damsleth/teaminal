@@ -290,6 +290,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     tailNetwork: settings.tailNetwork,
     tailDiagnostics: settings.tailDiagnostics,
     selfMessagesOnRight: settings.selfMessagesOnRight,
+    scrollOnNewMessages: settings.scrollOnNewMessages,
     inlineImages: settings.inlineImages,
     inlineImageMaxRows: settings.inlineImageMaxRows,
     statusBarPosition: settings.statusBarPosition,
@@ -525,6 +526,7 @@ function validateAndAssign(
     case 'tailNetwork':
     case 'tailDiagnostics':
     case 'selfMessagesOnRight':
+    case 'scrollOnNewMessages':
     case 'statusBarShowKeyHints':
       if (typeof value === 'boolean') {
         out[key] = value

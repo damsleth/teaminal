@@ -110,6 +110,7 @@ warnings and fall back to defaults.
   "tailNetwork": false,
   "tailDiagnostics": false,
   "selfMessagesOnRight": false,
+  "scrollOnNewMessages": true,
   "chatListSort": "recent",
   "chatListGroupByType": false,
   "inlineImages": "auto",
@@ -152,6 +153,7 @@ warnings and fall back to defaults.
 | `tailNetwork`                  | boolean              | `false` | Show an always-on network-log tail panel above the composer.                             |
 | `tailDiagnostics`              | boolean              | `false` | Show an always-on diagnostics tail panel above the composer.                             |
 | `selfMessagesOnRight`          | boolean              | `false` | When `true`, your own messages are right-aligned in the message pane (body on the right, sender/timestamp on the left of the body). Other users' messages remain left-aligned. |
+| `scrollOnNewMessages`          | boolean              |  `true` | Jump to a new message when it arrives in the open conversation. `false` keeps the cursor where it is. Also in the menu as **Scroll on new messages**. |
 | `inlineImages`                 | `auto`, `off`        |  `auto` | `auto` renders message images inline in Kitty-compatible terminals, bounded to `inlineImageMaxRows` tall and the width of the message pane, so an image never overlaps neighbouring messages. `off` — and any terminal without Kitty graphics — renders one focusable `[img] name` row per image instead, reserving no picture rows. Space opens the focused image either way. |
 | `inlineImageMaxRows`           | integer 1-50         |    `10` | Maximum terminal rows reserved for a single inline image.                                |
 | `statusBarPosition`            | `bottom`, `hidden`   | `bottom` | Where the status bar renders. `hidden` suppresses it entirely, freeing one row of vertical space in the message pane. |
