@@ -651,3 +651,13 @@ test('themeOverrides.fontSize keeps known keys in 50-100 and warns on the rest',
   expect(out?.fontSize).toEqual({ timestamp: 70 })
   expect(warnings).toHaveLength(3)
 })
+
+test('layout message gap takes halves, other layout keys stay integers', () => {
+  const warnings: string[] = []
+  const out = validateThemeOverrides(
+    { layout: { paneHeaderMarginBottom: 0.5, tailGap: 0.5 } },
+    warnings,
+  )
+  expect(out?.layout).toEqual({ paneHeaderMarginBottom: 0.5 })
+  expect(warnings).toHaveLength(1)
+})

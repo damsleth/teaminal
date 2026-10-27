@@ -8,6 +8,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Half-row message gaps in kitty.** **Message gap** now steps by 0.5
+  (`themeOverrides.layout.paneHeaderMarginBottom`). A .5 value draws each
+  sender name as a two-row kitty text-sizing line with the name centred, so
+  there is half a row of space above the name and half a row before the
+  message. Terminals without the protocol round to whole rows.
+
 - **Self name and self message background colors.** New theme tokens
   `selfName` (your name above your own messages, separate from the
   `selfMessage` body color) and `selfMessageBackground` (a background behind

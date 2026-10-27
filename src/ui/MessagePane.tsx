@@ -56,7 +56,7 @@ import { splitBodyLinkSpans } from './bodySpans'
 import { pickerAnchorCol } from './pickerAnchor'
 import { paintInlineImages, type InlineImageSlots } from './inlineImageLayout'
 import { localTime } from './localTime'
-import { fs } from './textSizing'
+import { fs, fsTall, textSizingSupported } from './textSizing'
 
 export { effectiveSenderName, isRenderableMessage } from './renderableMessage'
 
@@ -180,7 +180,13 @@ export function MessagePane(props: {
   // Repurposed theme.layout knobs: left indent of the sender-name/body block,
   // and the blank rows inserted after each message group.
   const bodyIndent = theme.layout.paneHeaderPaddingLeft
-  const messageGap = theme.layout.paneHeaderMarginBottom
+  // A .5 gap draws sender headers as tall (2-row) kitty text-sizing lines:
+  // half a row of air above and below the name. Without OSC 66 the gap
+  // rounds to whole rows.
+  const rawGap = theme.layout.paneHeaderMarginBottom
+  const tallHeaders = rawGap % 1 !== 0 && textSizingSupported()
+  const messageGap = tallHeaders ? Math.floor(rawGap) : Math.round(rawGap)
+  const headerRows = tallHeaders ? 2 : 1
   const cache = messageCacheByConvo[conv]
   const headerLabel = isListFocus
     ? ''
@@ -249,6 +255,7 @@ export function MessagePane(props: {
     imageRowsForMessage,
     messageTextColumns,
     messageGap,
+    headerRows,
     reactionDisplayMode,
     rowBudget,
     previousStart: windowStartRef.current,
@@ -259,6 +266,7 @@ export function MessagePane(props: {
     imageRowsForMessage,
     messageTextColumns,
     messageGap,
+    headerRows,
     reactionDisplayMode,
     rowBudget,
   })
@@ -336,7 +344,13 @@ export function MessagePane(props: {
       (r) => r.kind === 'message' && r.message.id === props.focusedMessageId,
     )
     if (idx < 0) return
-    const heightOpts = { imageRowsForMessage, messageTextColumns, messageGap, reactionDisplayMode }
+    const heightOpts = {
+      imageRowsForMessage,
+      messageTextColumns,
+      messageGap,
+      headerRows,
+      reactionDisplayMode,
+    }
     let rowsBefore = 0
     for (let i = 0; i < idx; i++) rowsBefore += messageRenderRowHeight(rows[i]!, heightOpts)
     // Chrome above the pane content: header bar (3) + message-pane top border
@@ -460,6 +474,7 @@ export function MessagePane(props: {
                     selfMessagesOnRight={selfMessagesOnRight}
                     bodyIndent={bodyIndent}
                     messageGap={messageGap}
+                    tallHeader={tallHeaders}
                     shortNames={shortNames}
                     showTimestamp={showTimestamps}
                     theme={theme}
@@ -495,6 +510,7 @@ function TimelineRow(props: {
   selfMessagesOnRight: boolean
   bodyIndent: number
   messageGap: number
+  tallHeader: boolean
   shortNames: boolean
   showTimestamp: boolean
   theme: Theme
@@ -538,6 +554,7 @@ function TimelineRow(props: {
       selfMessagesOnRight={props.selfMessagesOnRight}
       bodyIndent={props.bodyIndent}
       messageGap={props.messageGap}
+      tallHeader={props.tallHeader}
       shortNames={props.shortNames}
       showTimestamp={props.showTimestamp}
       theme={props.theme}
@@ -561,6 +578,7 @@ function MessageRow(props: {
   selfMessagesOnRight: boolean
   bodyIndent: number
   messageGap: number
+  tallHeader: boolean
   shortNames: boolean
   showTimestamp: boolean
   theme: Theme
@@ -690,7 +708,7 @@ function MessageRow(props: {
   return (
     <>
       {hasHeader ? (
-        <Box flexDirection="row">
+        <Box flexDirection="row" height={props.tallHeader ? 2 : undefined}>
           {!flip && <Box width={markerWidth} flexShrink={0} />}
           <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
             <Text wrap="truncate-end">
@@ -698,11 +716,15 @@ function MessageRow(props: {
                 color={isSelf && !sendError && !isSending ? theme.selfName : color}
                 bold={senderName.length > 0 && theme.emphasis.senderBold}
               >
-                {fs(senderName, theme.fontSize.sender, theme.fontSize.tightSpacing)}
+                {props.tallHeader
+                  ? fsTall(senderName, theme.fontSize.sender)
+                  : fs(senderName, theme.fontSize.sender, theme.fontSize.tightSpacing)}
               </Text>
               {props.showTimestamp && (
                 <Text color={theme.timestamp}>
-                  {fs(`  ${time}`, theme.fontSize.timestamp, theme.fontSize.tightSpacing)}
+                  {props.tallHeader
+                    ? fsTall(`  ${time}`, theme.fontSize.timestamp)
+                    : fs(`  ${time}`, theme.fontSize.timestamp, theme.fontSize.tightSpacing)}
                 </Text>
               )}
             </Text>

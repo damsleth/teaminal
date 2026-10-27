@@ -824,8 +824,12 @@ export function validateLayoutOverrides(
       warnings.push(`config: unknown ${scope} key "${rawKey}" ignored`)
       continue
     }
-    if (typeof rawValue !== 'number' || !Number.isInteger(rawValue) || rawValue < 0) {
-      warnings.push(`config: "${scope}.${rawKey}" must be a non-negative integer`)
+    // The message gap also takes halves (tall headers, kitty text sizing).
+    const step = rawKey === 'paneHeaderMarginBottom' ? 0.5 : 1
+    if (typeof rawValue !== 'number' || !Number.isInteger(rawValue / step) || rawValue < 0) {
+      warnings.push(
+        `config: "${scope}.${rawKey}" must be a non-negative ${step === 1 ? 'integer' : 'multiple of 0.5'}`,
+      )
       continue
     }
     ;(out as Record<string, number>)[rawKey] = rawValue
