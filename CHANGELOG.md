@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Chat list gap.** A **Chat list gap** spacing setting (theme editor, or
+  `themeOverrides.layout.chatListGap`, 0-3) adds blank rows between chats so
+  each chat and its preview read as one block.
+
 - **Per-element font sizes in kitty.** The theme editor has a **Font size**
   section (and `themeOverrides.fontSize.*`) to shrink the chat header,
   sender, timestamp, message text, chat list headers, chat names and

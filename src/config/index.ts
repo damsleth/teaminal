@@ -90,6 +90,7 @@ const LAYOUT_KEYS = new Set<keyof NonNullable<ThemeOverrides['layout']>>([
   'paneHeaderMarginBottom',
   'tailGap',
   'chatListPaddingRight',
+  'chatListGap',
 ])
 
 const BORDERS_KEYS = new Set<keyof NonNullable<ThemeOverrides['borders']>>([

@@ -69,6 +69,8 @@ export type ThemeLayout = {
   tailGap: number
   // ChatList right-side gutter.
   chatListPaddingRight: number
+  // ChatList: blank rows after each chat/channel row.
+  chatListGap: number
 }
 
 export type ThemeBorders = {
@@ -151,6 +153,7 @@ const LAYOUT_DEFAULT: ThemeLayout = {
   paneHeaderMarginBottom: 1,
   tailGap: 1,
   chatListPaddingRight: 1,
+  chatListGap: 0,
 }
 
 const BORDERS_DEFAULT: ThemeBorders = { panel: 'round', modal: 'round', active: 'round' }
