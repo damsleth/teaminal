@@ -5,6 +5,7 @@ import { extractFileAttachments } from '../text/fileAttachments'
 import { extractInlineImages } from '../text/inlineImages'
 import { reactionsSummary } from './reactions'
 import { getQuotedReply, isMessageEdited, messageBodyText } from './renderableMessage'
+import { localDate } from './localTime'
 
 export type LoadMoreState = 'idle' | 'loading' | 'error' | 'unavailable'
 
@@ -80,7 +81,7 @@ export function buildMessageRows(
 
   let lastDateKey: string | null = null
   for (const message of messages) {
-    const dateKey = message.createdDateTime.slice(0, 10)
+    const dateKey = localDate(message.createdDateTime)
     if (dateKey && dateKey !== lastDateKey) {
       rows.push({
         kind: 'date',

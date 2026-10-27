@@ -6,6 +6,7 @@ import { describeSystemEvent } from './systemEvent'
 import { htmlToText } from '../text/html'
 import { extractInlineImages } from '../text/inlineImages'
 import { shortName } from '../state/selectables'
+import { localTime } from './localTime'
 
 const QUOTED_REPLY_PREVIEW_MAX = 60
 
@@ -124,7 +125,7 @@ export function isMessageDeleted(m: ChatMessage): boolean {
 export function messageBodyText(m: ChatMessage): string {
   if (isMessageDeleted(m)) {
     const senderName = m.from?.user?.displayName ?? 'someone'
-    const time = m.createdDateTime.slice(11, 16)
+    const time = localTime(m.createdDateTime)
     return `(message deleted by ${senderName} \u00b7 ${time})`
   }
   if (m.messageType === 'systemEventMessage') {

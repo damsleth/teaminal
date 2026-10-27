@@ -55,6 +55,7 @@ import { messageFocusables } from './messageFocusables'
 import { splitBodyLinkSpans } from './bodySpans'
 import { pickerAnchorCol } from './pickerAnchor'
 import { paintInlineImages, type InlineImageSlots } from './inlineImageLayout'
+import { localTime } from './localTime'
 
 export { effectiveSenderName, isRenderableMessage } from './renderableMessage'
 
@@ -566,7 +567,7 @@ function MessageRow(props: {
   const m = props.message
   const isSelf = !!props.myUserId && m.from?.user?.id === props.myUserId
   const flip = props.selfMessagesOnRight && isSelf
-  const time = m.createdDateTime.slice(11, 16)
+  const time = localTime(m.createdDateTime)
   const isSystem = m.messageType === 'systemEventMessage'
   // The sender name now gets its own line above the body, so it is shown in
   // full (the header line truncates only if it overruns the pane). System

@@ -17,6 +17,7 @@ import type { ActivityItem } from '../graph/teamsActivity'
 import { countUnreadMentions, markActivityRead, refreshActivityFeed } from '../state/activityFeed'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useSessionApi } from './SessionContext'
+import { localDate } from './localTime'
 
 export function openActivity(store: ReturnType<typeof useAppStore>): void {
   store.set({ modal: { kind: 'activity', cursor: 0 }, inputZone: 'menu' })
@@ -54,7 +55,7 @@ function relativeTime(iso: string, now: number): string {
   if (hours < 24) return `${hours}h`
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}d`
-  return new Date(t).toISOString().slice(0, 10)
+  return localDate(new Date(t).toISOString())
 }
 
 const VISIBLE_ROWS = 14

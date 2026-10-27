@@ -29,7 +29,7 @@ function topConfigDir(): string {
 test.describe('statusbar-top wide', () => {
   test.use({
     program: { file: 'bun', args: ['run', 'bin/teaminal.tsx'] },
-    env: { TEAMINAL_SEED: 'fixtures', XDG_CONFIG_HOME: topConfigDir() },
+    env: { TEAMINAL_SEED: 'fixtures', TZ: 'UTC', XDG_CONFIG_HOME: topConfigDir() },
     rows: 30,
     columns: 100,
   })
@@ -46,7 +46,7 @@ test.describe('statusbar-top wide', () => {
 test.describe('statusbar-top narrow', () => {
   test.use({
     program: { file: 'bun', args: ['run', 'bin/teaminal.tsx'] },
-    env: { TEAMINAL_SEED: 'fixtures', XDG_CONFIG_HOME: topConfigDir() },
+    env: { TEAMINAL_SEED: 'fixtures', TZ: 'UTC', XDG_CONFIG_HOME: topConfigDir() },
     rows: 30,
     columns: 50,
   })

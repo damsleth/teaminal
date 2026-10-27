@@ -32,7 +32,7 @@ const CFG_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'teaminal-tui-theme-'))
 
 test.use({
   program: { file: 'bun', args: ['run', 'bin/teaminal.tsx'] },
-  env: { TEAMINAL_SEED: 'fixtures', XDG_CONFIG_HOME: CFG_DIR },
+  env: { TEAMINAL_SEED: 'fixtures', TZ: 'UTC', XDG_CONFIG_HOME: CFG_DIR },
   rows: ROWS,
   columns: COLS,
 })
