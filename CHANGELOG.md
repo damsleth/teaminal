@@ -25,6 +25,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Message previews in the chat list are indented** to line up under the
+  chat name instead of starting at the left edge.
 - **The Network panel and `--network-log` no longer show chat, message or
   user IDs.** Request paths keep their shape (`/chats/:id/messages`) without
   identifiers or query strings, and Graph requests name the account they ran as.
