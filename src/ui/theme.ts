@@ -97,7 +97,8 @@ export type ThemeEmphasis = {
 }
 
 // Percent of the base font size per text type (see src/ui/textSizing.ts).
-export type ThemeFontSize = Record<ThemeFontSizeKey, number>
+// tightSpacing: one-line elements pack letters to the scaled pitch.
+export type ThemeFontSize = Record<ThemeFontSizeKey, number> & { tightSpacing: boolean }
 
 export type Theme = {
   background: string
@@ -171,6 +172,7 @@ const FONT_SIZE_DEFAULT: ThemeFontSize = {
   chatListHeader: 100,
   chatListName: 100,
   chatListPreview: 100,
+  tightSpacing: true,
 }
 
 // Concrete base themes only. `auto` is a mode (resolves to one of these from

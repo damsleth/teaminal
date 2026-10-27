@@ -4,6 +4,7 @@ import {
   __setTextSizingSupportedForTests,
   expandTextSizing,
   fs,
+  packLength,
   parseTextSizingProbe,
 } from './textSizing'
 
@@ -58,4 +59,26 @@ test('probe reply: scale support only when the s=2 draw moves the cursor', () =>
   expect(parseTextSizingProbe('\x1b[5;1R\x1b[5;3R\x1b[5;5R')).toBe(true)
   expect(parseTextSizingProbe('\x1b[5;1R\x1b[5;1R\x1b[5;1R')).toBe(false)
   expect(parseTextSizingProbe('\x1b[5;1R\x1b[5;3R')).toBeNull()
+})
+
+test('pack length picks the least wasteful chunk, none at 90%', () => {
+  expect([5, 6, 7, 8, 9].map(packLength)).toEqual([2, 5, 10, 5, null])
+})
+
+test('tight runs pack to the scaled pitch and pad the saved cells at the end', () => {
+  __setTextSizingSupportedForTests(true)
+  const frame = renderToString(
+    <Box width={12}>
+      <Text>
+        <Text backgroundColor="blue">{fs('abcde', 50, true)}</Text>|
+      </Text>
+    </Box>,
+    { columns: 12 },
+  )
+  const out = expandTextSizing(frame)
+  expect(out).toContain('\x1b]66;n=5:d=10:v=1:w=1;ab\x07\x1b]66;n=5:d=10:v=1:w=1;cd\x07')
+  expect(out).toContain('\x1b]66;n=5:d=10:v=1:w=1;e\x07  ')
+  // Still 5 cells before the bar: 3 packed + 2 padding, inside the background.
+  // eslint-disable-next-line no-control-regex
+  expect(out).toMatch(/w=1;e\x07  \x1b\[49m/)
 })

@@ -221,6 +221,9 @@ theme layered on top of `dark`; any subset of these keys is accepted:
     "chatListHeader": 100,
     "chatListName": 100,
     "chatListPreview": 80,
+    // Pack shrunk one-line text (all but messageText) to the smaller letter
+    // pitch; the cells saved become blank space at the end of the text.
+    "tightSpacing": true,
   },
 }
 ```

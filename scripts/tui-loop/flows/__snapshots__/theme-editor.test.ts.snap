@@ -18,7 +18,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 ││    Ops Channel          ││  │       Chat list pad R       1                                  │  ││
 ││     Mina: Deploy is      ││  │   ── Colors                                                    │  ││
 ││     green in the EU      ││  │       Background            ██ black                           │  ││
-││     region.              ││  │      ↓ 36 more                                                 │  ││
+││     region.              ││  │      ↓ 37 more                                                 │  ││
 ││                          ││  │                                                                │  ││
 ││                          ││  │   ╭────────────────────────────────────────────────────────╮   │  ││
 ││                          ││  │   │Ada  Sample message body  12:34                         │   │  ││

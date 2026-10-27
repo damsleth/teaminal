@@ -134,12 +134,17 @@ const border = (key: 'panel' | 'modal' | 'active', label: string): EnumField => 
   key,
   options: BORDER_STYLES,
 })
-const bool = (key: string, label: string): BooleanField => ({
+const bool = (
+  key: string,
+  label: string,
+  group: 'emphasis' | 'fontSize' = 'emphasis',
+  section: EditorSection = 'Emphasis',
+): BooleanField => ({
   kind: 'boolean',
-  id: `emphasis.${key}`,
+  id: `${group}.${key}`,
   label,
-  section: 'Emphasis',
-  group: 'emphasis',
+  section,
+  group,
   key,
 })
 
@@ -193,6 +198,7 @@ export const FIELDS: readonly EditableField[] = [
   num('fontSize', 'chatListHeader', 'Chat list header', 'Font size', 50, 100, 10),
   num('fontSize', 'chatListName', 'Chat list name', 'Font size', 50, 100, 10),
   num('fontSize', 'chatListPreview', 'Chat list preview', 'Font size', 50, 100, 10),
+  bool('tightSpacing', 'Tight spacing', 'fontSize', 'Font size'),
   // — Images —
   num('setting', 'inlineImageMaxRows', 'Inline image max rows', 'Images', 1, 50),
   {
@@ -220,7 +226,7 @@ export function fieldValue(field: EditableField, theme: Theme, settings: Setting
     case 'emphasis':
       return (theme.emphasis as unknown as Record<string, boolean>)[field.key]!
     case 'fontSize':
-      return (theme.fontSize as unknown as Record<string, number>)[field.key]!
+      return (theme.fontSize as unknown as Record<string, number | boolean>)[field.key]!
     case 'setting':
       return (settings as unknown as Record<string, FieldValue>)[field.key]!
   }
@@ -347,7 +353,7 @@ function setOverride(
       next.emphasis = { ...next.emphasis, [field.key]: value as boolean }
       break
     case 'fontSize':
-      next.fontSize = { ...next.fontSize, [field.key]: value as number }
+      next.fontSize = { ...next.fontSize, [field.key]: value as number | boolean }
       break
   }
   return next

@@ -14,6 +14,9 @@ adheres to [Semantic Versioning](https://semver.org/).
   previews to 50-90% of the terminal font. Uses the kitty text sizing
   protocol (OSC 66), detected at startup; other terminals render as before.
   Text only gets smaller: larger sizes would need two rows per line.
+  **Tight spacing** (on by default) also packs the letters of one-line
+  elements to the smaller pitch, leaving the saved space at the end; message
+  text keeps full-cell spacing so wrapping stays correct.
 
 - **Ctrl+B hides the chat list.** The list and the conversation then share
   one full-width pane: `h`/Left from a chat shows the list, `l`/Right (or

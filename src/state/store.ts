@@ -282,7 +282,8 @@ export type ThemeOverrides = ThemeColorOverrides & {
   }>
   // Percent of the base font size (50-100) per text type. Rendered through
   // the kitty text sizing protocol; ignored on terminals without it.
-  fontSize?: Partial<Record<ThemeFontSizeKey, number>>
+  // tightSpacing packs shrunk one-line text to the scaled letter pitch.
+  fontSize?: Partial<Record<ThemeFontSizeKey, number> & { tightSpacing: boolean }>
 }
 
 export const THEME_FONT_SIZE_KEYS = [
