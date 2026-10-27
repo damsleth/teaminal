@@ -266,6 +266,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const selectableCount = items.length + (syntheticNewChatQuery ? 1 : 0)
   const safeCursor = clampCursor(cursor, selectableCount)
   const rows = buildRows(items, density, syntheticNewChatQuery, chatListGroupByType)
+  const chatListGap = theme.layout.chatListGap
 
   // Visual height per logical row. Long chat names wrap onto multiple
   // visual lines, and unread previews add another line in cozy density;
@@ -289,7 +290,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
       const preview = previewLineForChat(row.item.chat, cw)
       if (preview) h += visualLines(preview, cw)
     }
-    return h
+    return row.item.kind === 'team' || row.item.kind === 'section' ? h : h + chatListGap
   })
 
   // Anchor the viewport on the cursor row, then fill the visual-line
@@ -473,7 +474,12 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
             ? labelText + ' '.repeat(Math.max(0, labelWidth - labelText.length))
             : labelText
         return (
-          <Box key={`${row.item.kind}-${row.index}`} flexDirection="column" flexShrink={0}>
+          <Box
+            key={`${row.item.kind}-${row.index}`}
+            flexDirection="column"
+            flexShrink={0}
+            marginBottom={chatListGap}
+          >
             <Box flexDirection="row" backgroundColor={rowBg}>
               {showGutter && (
                 <Box width={3} flexShrink={0}>

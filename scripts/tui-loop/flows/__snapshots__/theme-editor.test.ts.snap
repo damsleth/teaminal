@@ -16,10 +16,9 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 ││     two compact layout   ││  │       Message gap           1                                  │  ││
 ││     op…                  ││  │       Tail strip gap        1                                  │  ││
 ││    Ops Channel          ││  │       Chat list pad R       1                                  │  ││
-││     Mina: Deploy is      ││  │   ── Colors                                                    │  ││
-││     green in the EU      ││  │       Background            ██ black                           │  ││
-││     region.              ││  │      ↓ 37 more                                                 │  ││
-││                          ││  │                                                                │  ││
+││     Mina: Deploy is      ││  │       Chat list gap         0                                  │  ││
+││     green in the EU      ││  │      ↓ 38 more                                                 │  ││
+││     region.              ││  │                                                                │  ││
 ││                          ││  │   ╭────────────────────────────────────────────────────────╮   │  ││
 ││                          ││  │   │Ada  Sample message body  12:34                         │   │  ││
 ││                          ││  │   │  Selected chat row                                     │   │  ││
@@ -27,9 +26,10 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 ││                          ││  │   │You  · joined the chat                                  │   │  ││
 ││                          ││  │   │error warn info                                         │   │  ││
 ││                          ││  │   ╰────────────────────────────────────────────────────────╯   │  ││
-│╰──────────────────────────╯╰──│   ↑↓ field · ←→ adjust · e hex · r reset · R reset all · esc   │──╯│
+││                          ││  │   ↑↓ field · ←→ adjust · e hex · r reset · R reset all · esc   │  ││
+│╰──────────────────────────╯╰──│                                                                │──╯│
 │╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
-││ open a chat to compose       ╰────────────────────────────────────────────────────────────────╯  ││
+││ open a chat to compose                                                                           ││
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
 │ menu open                                                                                          │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -703,7 +703,15 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "87,14": {
+  "37,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 3
+  },
+  "39,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "62,14": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -755,23 +763,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "37,15": {
-    "fgColorMode": 16777216,
-    "fgColor": 3
-  },
-  "39,15": {
-    "fgColorMode": 16777216,
-    "fgColor": 7
-  },
-  "61,15": {
-    "fgColorMode": 16777216,
-    "fgColor": 0
-  },
-  "63,15": {
-    "fgColorMode": 16777216,
-    "fgColor": 7
-  },
-  "69,15": {
+  "87,15": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -819,14 +811,6 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "35,16": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "87,16": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
   "96,16": {
     "bgColorMode": 0,
     "bgColor": -1,
@@ -858,6 +842,18 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": 6
   },
   "32,17": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "35,17": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "93,17": {
     "bgColorMode": 16777216,
     "bgColor": 0,
     "fgColorMode": 0,
@@ -900,6 +896,30 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": -1
   },
   "35,18": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "36,18": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 16777216,
+    "fgColor": 7,
+    "bold": 134217728
+  },
+  "41,18": {
+    "bold": 0
+  },
+  "62,18": {
+    "fgColorMode": 33554432,
+    "fgColor": 234
+  },
+  "67,18": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "92,18": {
     "bgColorMode": 0,
     "bgColor": -1,
     "fgColorMode": 16777216,
@@ -954,22 +974,18 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": 8
   },
   "36,19": {
-    "bgColorMode": 16777216,
-    "bgColor": 0,
+    "bgColorMode": 33554432,
+    "bgColor": 235,
     "fgColorMode": 16777216,
-    "fgColor": 7,
+    "fgColor": 6,
     "bold": 134217728
   },
-  "41,19": {
-    "bold": 0
-  },
-  "62,19": {
-    "fgColorMode": 33554432,
-    "fgColor": 234
-  },
-  "67,19": {
+  "88,19": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
     "fgColorMode": 0,
-    "fgColor": -1
+    "fgColor": -1,
+    "bold": 0
   },
   "92,19": {
     "bgColorMode": 0,
@@ -1026,15 +1042,13 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": 8
   },
   "36,20": {
-    "bgColorMode": 33554432,
-    "bgColor": 235,
+    "bgColorMode": 16777216,
+    "bgColor": 0,
     "fgColorMode": 16777216,
-    "fgColor": 6,
+    "fgColor": 3,
     "bold": 134217728
   },
   "88,20": {
-    "bgColorMode": 16777216,
-    "bgColor": 0,
     "fgColorMode": 0,
     "fgColor": -1,
     "bold": 0
@@ -1097,13 +1111,15 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "bgColorMode": 16777216,
     "bgColor": 0,
     "fgColorMode": 16777216,
-    "fgColor": 3,
-    "bold": 134217728
+    "fgColor": 4
   },
-  "88,21": {
+  "41,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "58,21": {
     "fgColorMode": 0,
-    "fgColor": -1,
-    "bold": 0
+    "fgColor": -1
   },
   "92,21": {
     "bgColorMode": 0,
@@ -1163,13 +1179,17 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "bgColorMode": 16777216,
     "bgColor": 0,
     "fgColorMode": 16777216,
-    "fgColor": 4
+    "fgColor": 1
   },
-  "41,22": {
+  "42,22": {
+    "fgColorMode": 16777216,
+    "fgColor": 3
+  },
+  "47,22": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "58,22": {
+  "51,22": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -1227,30 +1247,6 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "36,23": {
-    "bgColorMode": 16777216,
-    "bgColor": 0,
-    "fgColorMode": 16777216,
-    "fgColor": 1
-  },
-  "42,23": {
-    "fgColorMode": 16777216,
-    "fgColor": 3
-  },
-  "47,23": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "51,23": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "92,23": {
-    "bgColorMode": 0,
-    "bgColor": -1,
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
   "93,23": {
     "bgColorMode": 16777216,
     "bgColor": 0,
@@ -1294,14 +1290,10 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": -1
   },
   "35,24": {
-    "bgColorMode": 0,
-    "bgColor": -1,
     "fgColorMode": 16777216,
     "fgColor": 8
   },
   "93,24": {
-    "bgColorMode": 16777216,
-    "bgColor": 0,
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -1329,14 +1321,6 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "35,25": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "93,25": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
   "96,25": {
     "bgColorMode": 0,
     "bgColor": -1,
@@ -1356,14 +1340,6 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": 8
   },
   "24,27": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "31,27": {
-    "fgColorMode": 16777216,
-    "fgColor": 6
-  },
-  "97,27": {
     "fgColorMode": 0,
     "fgColor": -1
   },
