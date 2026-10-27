@@ -30,6 +30,8 @@ export type MessageRowHeightOpts = {
   // Counted here so the viewport budget and the out-of-band Kitty image
   // offsets agree with what's actually painted.
   messageGap?: number
+  // Rows the sender header takes: 2 when headers render tall (half-row gap).
+  headerRows?: number
   // Total rows the message's inline images occupy, resolved dynamically from
   // the loaded image's fitted height (loaded → fitted rows, no label;
   // pending → one `[img]` label row). When omitted, falls back to the static
@@ -121,7 +123,7 @@ export function messageRenderRowHeight(row: MessageRenderRow, opts?: MessageRowH
   const isSystem = message.messageType === 'systemEventMessage'
   const hasSenderHeader = !isSystem && !message.deletedDateTime
   let height =
-    (hasSenderHeader ? 1 : 0) +
+    (hasSenderHeader ? (opts?.headerRows ?? 1) : 0) +
     estimateWrappedRows(messageTextForHeight(row, opts), opts?.messageTextColumns)
   if (message._sendError) height++
   // Reply preview row (only present for chat-pane quoted replies).
