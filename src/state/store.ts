@@ -6,6 +6,7 @@
 // careful inside listeners not to call `set` again unconditionally
 // (would recurse).
 
+import type { AccountRef } from '../account'
 import type { Capabilities } from '../graph/capabilities'
 import type { Me } from '../graph/me'
 import type { ActivityItem } from '../graph/teamsActivity'
@@ -788,6 +789,12 @@ export type ReadReceipt = {
 }
 
 export type AppState = {
+  // The account whose data the per-account fields below hold, and a counter
+  // bumped by every resetAccountScopedState. One account per store until the
+  // store splits into accountsById (Phase D.2); accountStore() captures both
+  // so a write from a previous incarnation is dropped.
+  account: AccountRef | null
+  accountGeneration: number
   me?: Me
   capabilities?: Capabilities
   chats: Chat[]
@@ -898,8 +905,76 @@ export type AppState = {
   nameByUserId: Record<string, string>
 }
 
+// Fields owned by one account. Everything else in AppState is global UI or
+// environment state (GlobalKey). The check below fails to compile when a new
+// AppState field is not classified as one or the other.
+export const ACCOUNT_KEYS = [
+  'me',
+  'capabilities',
+  'chats',
+  'teams',
+  'channelsByTeam',
+  'messageCacheByConvo',
+  'messagesByConvo',
+  'draftsByConvo',
+  'messageCursorByConvo',
+  'unreadByChatId',
+  'expandedChatSections',
+  'myPresence',
+  'memberPresence',
+  'conn',
+  'realtimeState',
+  'typingByConvo',
+  'readReceiptsByConvo',
+  'lastListPollAt',
+  'activityFeed',
+  'unreadMentionCount',
+  'activitySyncState',
+  'nameByUserId',
+] as const satisfies readonly (keyof AppState)[]
+
+export type AccountKey = (typeof ACCOUNT_KEYS)[number]
+type GlobalKey =
+  | 'account'
+  | 'accountGeneration'
+  // UI
+  | 'focus'
+  | 'inputZone'
+  | 'cursor'
+  | 'focusedAttachmentIndex'
+  | 'filter'
+  | 'chatListCollapsed'
+  | 'messageSearchQuery'
+  | 'messageSearchFocusedId'
+  | 'modal'
+  | 'editingMessageId'
+  // environment
+  | 'terminalFocused'
+  | 'focusReportingHealthy'
+  | 'customTheme'
+  | 'systemAppearance'
+  | 'settings'
+const _everyKeyClassified: [Exclude<keyof AppState, AccountKey | GlobalKey>] extends [never]
+  ? true
+  : never = true
+const _noKeyInBoth: [Extract<AccountKey, GlobalKey>] extends [never] ? true : never = true
+void _everyKeyClassified
+void _noKeyInBoth
+
+export type AccountSlice = Pick<AppState, AccountKey>
+export type AccountState = AccountSlice & { ref: AccountRef }
+
+export function initialAccountState(ref: AccountRef): AccountState {
+  const fresh = initialAppState()
+  const out = { ref } as AccountState
+  for (const k of ACCOUNT_KEYS) (out as Record<string, unknown>)[k] = fresh[k]
+  return out
+}
+
 export function initialAppState(): AppState {
   return {
+    account: null,
+    accountGeneration: 0,
     chats: [],
     teams: [],
     channelsByTeam: {},
@@ -947,11 +1022,15 @@ export function createAppStore(): Store<AppState> {
  *
  * Used when switching the active owa-piggy profile: the new account
  * has its own me/chats/teams/messages and re-fetches them from scratch,
- * but the user's UI preferences should persist across the switch.
+ * but the user's UI preferences should persist across the switch. Bumps
+ * accountGeneration, so every accountStore() captured before the reset
+ * goes stale.
  */
-export function resetAccountScopedState(store: Store<AppState>): void {
+export function resetAccountScopedState(store: Store<AppState>, account: AccountRef): void {
   const prev = store.get()
   const fresh = initialAppState()
+  fresh.account = account
+  fresh.accountGeneration = prev.accountGeneration + 1
   // Preserve UI preferences and hardware-level state.
   fresh.settings = prev.settings
   fresh.terminalFocused = prev.terminalFocused
