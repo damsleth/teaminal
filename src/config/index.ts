@@ -954,6 +954,6 @@ function validatePresenceOverrides(
 function isColor(value: unknown): value is string {
   return (
     typeof value === 'string' &&
-    (NAMED_COLORS.has(value) || /^#(?:[0-9a-fA-F]{3}){1,2}$/.test(value))
+    (NAMED_COLORS.has(value) || /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value))
   )
 }

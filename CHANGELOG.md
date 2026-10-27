@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Colors with opacity.** Theme colors accept `#rgba` / `#rrggbbaa`
+  (theme editor `e`, config, theme files). Terminals have no alpha, so the
+  color is blended onto the theme background; the editor keeps showing what
+  you typed.
+
 - **Half-row message gaps in kitty.** **Message gap** now steps by 0.5
   (`themeOverrides.layout.paneHeaderMarginBottom`). A .5 value draws each
   sender name as a two-row kitty text-sizing line with the name centred, so

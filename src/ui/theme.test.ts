@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { defaultSettings } from '../state/store'
-import { builtinThemes, getTheme, resolveTheme } from './theme'
+import { blendAlpha, builtinThemes, getTheme, resolveTheme } from './theme'
 
 describe('getTheme', () => {
   test('returns clones of built-in themes', () => {
@@ -148,5 +148,25 @@ describe('resolveTheme', () => {
       { selectedRowBackground: '#1a1a1a' },
     )
     expect(theme.selectedRowBackground).toBe('#1a1a1a')
+  })
+})
+
+describe('alpha colors', () => {
+  test('blendAlpha mixes #rrggbbaa / #rgba onto the background', () => {
+    expect(blendAlpha('#ffffff80', 'black')).toBe('#808080')
+    expect(blendAlpha('#0000ff80', '#ffffff')).toBe('#7f7fff')
+    expect(blendAlpha('#f008', '#000000')).toBe('#880000')
+    expect(blendAlpha('#123456', 'black')).toBe('#123456')
+    expect(blendAlpha('red', 'black')).toBe('red')
+  })
+
+  test('resolveTheme flattens alpha tokens and keeps the raw value for the editor', () => {
+    const theme = resolveTheme({
+      ...defaultSettings,
+      theme: 'light',
+      themeOverrides: { light: { selfMessageBackground: '#0000ff33' } },
+    })
+    expect(theme.selfMessageBackground).toBe('#ccccff')
+    expect(theme.rawColors).toEqual({ selfMessageBackground: '#0000ff33' })
   })
 })

@@ -371,10 +371,13 @@ describe('formatFieldValue / isHexColor', () => {
     expect(formatFieldValue('round')).toBe('round')
   })
 
-  test('isHexColor accepts #rgb and #rrggbb only', () => {
+  test('isHexColor accepts #rgb, #rgba, #rrggbb and #rrggbbaa', () => {
     expect(isHexColor('#abc')).toBe(true)
+    expect(isHexColor('#abcd')).toBe(true)
     expect(isHexColor('#aabbcc')).toBe(true)
-    expect(isHexColor('#abcd')).toBe(false)
+    expect(isHexColor('#ffffffff')).toBe(true)
+    expect(isHexColor('#abcde')).toBe(false)
+    expect(isHexColor('#aabbccd')).toBe(false)
     expect(isHexColor('magenta')).toBe(false)
     expect(isHexColor('#')).toBe(false)
   })

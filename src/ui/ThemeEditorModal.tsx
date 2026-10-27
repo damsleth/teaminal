@@ -38,7 +38,7 @@ import {
   type EditableField,
   type FieldPatch,
 } from './themeEditor'
-import { resolveBaseName, inkBorder } from './theme'
+import { blendAlpha, resolveBaseName, inkBorder } from './theme'
 import { useTerminalRows } from './hooks/useTerminalRows'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
@@ -137,7 +137,7 @@ export function ThemeEditorModal() {
           setHexEdit((h) => (h ? { buffer: h.buffer.slice(0, -1) || '#' } : h))
           return
         }
-        if (/^[0-9a-fA-F]$/.test(input) && hexEdit.buffer.length < 7) {
+        if (/^[0-9a-fA-F]$/.test(input) && hexEdit.buffer.length < 9) {
           setHexEdit((h) => (h ? { buffer: h.buffer + input } : h))
         }
         return
@@ -287,7 +287,10 @@ function FieldRow(props: {
     valueText = `${hexBuffer}_`
     valueNode = (
       <>
-        <Text color={isHexColor(hexBuffer) ? hexBuffer : theme.errorText} backgroundColor={bg}>
+        <Text
+          color={isHexColor(hexBuffer) ? blendAlpha(hexBuffer, theme.background) : theme.errorText}
+          backgroundColor={bg}
+        >
           {hexBuffer}
         </Text>
         <Text color="gray" backgroundColor={bg}>
@@ -308,7 +311,7 @@ function FieldRow(props: {
       valueText = `██ ${name}`
       valueNode = (
         <>
-          <Text color={name} backgroundColor={bg}>
+          <Text color={blendAlpha(name, theme.background)} backgroundColor={bg}>
             ██
           </Text>
           <Text color={labelColor} backgroundColor={bg}>

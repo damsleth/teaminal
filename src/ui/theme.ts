@@ -131,6 +131,9 @@ export type Theme = {
   borders: ThemeBorders
   emphasis: ThemeEmphasis
   fontSize: ThemeFontSize
+  // Colors given with opacity (#rrggbbaa), as written. The tokens above hold
+  // them blended onto the background, since terminals have no alpha.
+  rawColors?: Record<string, string>
 }
 
 const PRESENCE_DARK: PresenceMap = {
@@ -329,7 +332,55 @@ export function resolveTheme(
     merged.messageFocusBackground = settings.messageFocusBackgroundColor
   }
 
-  return merged
+  return flattenAlpha(merged)
+}
+
+const ALPHA_HEX = /^#(?:[0-9a-f]{4}|[0-9a-f]{8})$/i
+
+function rgbOf(color: string | null): [number, number, number] | null {
+  if (!color) return null
+  if (color === 'black') return [0, 0, 0]
+  if (color === 'white' || color === 'whiteBright') return [255, 255, 255]
+  let hex = color.slice(1)
+  if (!color.startsWith('#') || !/^[0-9a-f]+$/i.test(hex)) return null
+  if (hex.length === 3 || hex.length === 4) hex = [...hex].map((c) => c + c).join('')
+  if (hex.length !== 6 && hex.length !== 8) return null
+  return [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number]
+}
+
+// Terminal colors have no alpha: mix #rgba / #rrggbbaa onto `background`.
+// ponytail: named backgrounds other than black/white blend as black, since
+// their real RGB is the terminal palette's business.
+export function blendAlpha(color: string, background: string | null): string {
+  if (!ALPHA_HEX.test(color)) return color
+  const hex = color.length === 5 ? [...color.slice(1)].map((c) => c + c).join('') : color.slice(1)
+  const a = parseInt(hex.slice(6, 8), 16) / 255
+  const fg = rgbOf(`#${hex.slice(0, 6)}`)!
+  const bg = rgbOf(background && !ALPHA_HEX.test(background) ? background : null) ?? [0, 0, 0]
+  return `#${fg
+    .map((c, i) =>
+      Math.round(c * a + bg[i]! * (1 - a))
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`
+}
+
+function flattenAlpha(theme: Theme): Theme {
+  const raw: Record<string, string> = {}
+  const flat = (key: string, value: string): string => {
+    if (!ALPHA_HEX.test(value)) return value
+    raw[key] = value
+    return blendAlpha(value, key === 'background' ? null : theme.background)
+  }
+  for (const [key, value] of Object.entries(theme)) {
+    if (typeof value === 'string') (theme as Record<string, unknown>)[key] = flat(key, value)
+  }
+  for (const [key, value] of Object.entries(theme.presence)) {
+    theme.presence[key as keyof PresenceMap] = flat(`presence.${key}`, value)
+  }
+  if (Object.keys(raw).length > 0) theme.rawColors = raw
+  return theme
 }
 
 function mergePartial(theme: Theme, partial: PartialTheme): Theme {
