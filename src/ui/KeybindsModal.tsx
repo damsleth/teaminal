@@ -8,6 +8,7 @@
 // [key, when, action]. Group rows with a divider when sections grow.
 
 import { Box, Text, useApp } from 'ink'
+import { inkBorder } from './theme'
 import { useInput } from './useInput'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
@@ -21,6 +22,7 @@ const BINDINGS: Binding[] = [
   { keys: 'h / ←', when: 'list', action: 'collapse section (chat type / team / Teams)' },
   { keys: 'n', when: 'list', action: 'new chat prompt' },
   { keys: 'Ctrl+D', when: 'list / chat', action: 'delete chat (confirm y/n)' },
+  { keys: 'Ctrl+B', when: 'list / chat', action: 'hide / show chat list (single pane)' },
   { keys: 'j / ↓', when: 'chat / channel', action: 'next message / attachment' },
   { keys: 'k / ↑', when: 'chat / channel', action: 'prev message / attachment / older' },
   { keys: 'Space', when: 'chat / channel', action: 'open focused image / link' },
@@ -90,7 +92,7 @@ export function KeybindsModal() {
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
       <Box
         flexDirection="column"
-        borderStyle={theme.borders.modal}
+        borderStyle={inkBorder(theme.borders.modal)}
         borderColor={theme.borderActive}
         backgroundColor={theme.background}
         paddingX={theme.layout.modalPaddingX}

@@ -6,6 +6,7 @@
 // create a new one.
 
 import { Box, Text, useApp } from 'ink'
+import { inkBorder } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
 import { searchChatUsers, searchExternalUsers } from '../state/chatActions'
@@ -186,7 +187,7 @@ export function NewChatPrompt(props: {
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
       <Box
         flexDirection="column"
-        borderStyle={theme.borders.modal}
+        borderStyle={inkBorder(theme.borders.modal)}
         borderColor={theme.borderActive}
         backgroundColor={theme.background}
         paddingX={theme.layout.modalPaddingX}

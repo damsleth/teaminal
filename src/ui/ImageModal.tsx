@@ -19,6 +19,7 @@
 // Keys: o = open the image, Space / Esc = close.
 
 import { Box, Text, useApp } from 'ink'
+import { inkBorder } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
 import { ensureImageFetched, getImageData } from '../state/imageCache'
@@ -124,7 +125,7 @@ export function ImageModal() {
   return (
     <Box
       flexDirection="column"
-      borderStyle={theme.borders.modal}
+      borderStyle={inkBorder(theme.borders.modal)}
       borderColor={theme.borderActive}
       backgroundColor={theme.background}
       paddingX={theme.layout.modalPaddingX}

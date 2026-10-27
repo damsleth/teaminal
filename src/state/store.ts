@@ -184,7 +184,15 @@ export type ThemeMode = string
 export type SystemAppearance = 'dark' | 'light'
 export type ChatListDensity = 'cozy' | 'compact'
 export type BorderStyleName =
-  'single' | 'double' | 'round' | 'bold' | 'classic' | 'singleDouble' | 'doubleSingle' | 'arrow'
+  | 'none'
+  | 'single'
+  | 'double'
+  | 'round'
+  | 'bold'
+  | 'classic'
+  | 'singleDouble'
+  | 'doubleSingle'
+  | 'arrow'
 export type ReactionDisplayMode = 'off' | 'current' | 'all'
 
 // Toggleable HeaderBar segments. The keys are also the HEADER_ELEMENT order
@@ -792,6 +800,10 @@ export type AppState = {
   // Grouped chat sections the user expanded past CHAT_SECTION_CAP via the
   // `… N more` row. Ephemeral: a fresh session starts capped again.
   expandedChatSections: Record<string, boolean>
+  // Ctrl+B hides the chat list: list and conversation then share one pane,
+  // showing whichever has focus (h/Left reveals the list, l/Right opens the
+  // chat). Ephemeral.
+  chatListCollapsed: boolean
   // In-conversation message search (S1). Empty query closes the bar.
   // focusedHitMessageId tracks the message the search bar last jumped
   // to so n can step relative to it across re-renders.
@@ -882,6 +894,7 @@ export function initialAppState(): AppState {
     focusedAttachmentIndex: 0,
     filter: '',
     expandedChatSections: {},
+    chatListCollapsed: false,
     messageSearchQuery: '',
     messageSearchFocusedId: null,
     memberPresence: {},

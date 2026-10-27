@@ -20,8 +20,10 @@ import type {
 export type PresenceMap = Record<ThemePresenceKey, string>
 
 // Ink supports these border styles. We don't expose a separate
-// "thickness" abstraction — pick the style directly.
+// "thickness" abstraction — pick the style directly. 'none' is ours: see
+// inkBorder.
 export const BORDER_STYLES = [
+  'none',
   'single',
   'double',
   'round',
@@ -32,6 +34,22 @@ export const BORDER_STYLES = [
   'arrow',
 ] as const
 export type BorderStyle = (typeof BORDER_STYLES)[number]
+
+// ponytail: 'none' draws a blank border instead of dropping it, so pane
+// geometry (and every width/height computed from it) stays identical.
+const BLANK_BORDER = {
+  topLeft: ' ',
+  top: ' ',
+  topRight: ' ',
+  right: ' ',
+  bottomRight: ' ',
+  bottom: ' ',
+  bottomLeft: ' ',
+  left: ' ',
+}
+export function inkBorder(style: BorderStyle): Exclude<BorderStyle, 'none'> | typeof BLANK_BORDER {
+  return style === 'none' ? BLANK_BORDER : style
+}
 
 export type ThemeLayout = {
   // paddingX on the App outer box, Composer, HeaderBar, StatusBar,

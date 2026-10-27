@@ -10,6 +10,7 @@
 // cursor; then it stays put until they hit g to jump to the bottom.
 
 import { Box, Text, useApp } from 'ink'
+import { inkBorder } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
 import { getRecentEvents, subscribeEvents, type EventRecord } from '../log'
@@ -121,7 +122,7 @@ export function EventsModal() {
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
       <Box
         flexDirection="column"
-        borderStyle={theme.borders.modal}
+        borderStyle={inkBorder(theme.borders.modal)}
         borderColor={theme.borderActive}
         backgroundColor={theme.background}
         paddingX={theme.layout.modalPaddingX}
