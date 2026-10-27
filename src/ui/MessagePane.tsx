@@ -373,7 +373,10 @@ export function MessagePane(props: {
     const focusedRow = rows[idx]
     const focusedMsg = focusedRow?.kind === 'message' ? focusedRow.message : null
     const bodyText = focusedMsg ? messageBodyText(focusedMsg) : ''
-    const bodyStartCol = messageBodyTerminalColumn({ bodyIndent: bodyIndent + bgPadX, listPaneWidth })
+    const bodyStartCol = messageBodyTerminalColumn({
+      bodyIndent: bodyIndent + bgPadX,
+      listPaneWidth,
+    })
     const fallbackCol = listPaneWidth + 3
     const col = pickerAnchorCol({
       bodyText,
