@@ -3,7 +3,7 @@
 exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = String.raw`
 ╭────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
-││  teaminal · You (example.com) · presence ● ? · graph ● online · 3 chats                          ││
+││  teaminal · You (example.com) · presence ● · graph ● · 3 chats                                   ││
 │╰──────────────────────────────╭────────────────────────────────────────────────────────────────╮──╯│
 │╭──────────────────────────╮╭──│                                                                │──╮│
 ││Chats                     ││Se│   Theme editor · dark colors                                   │  ││
@@ -61,15 +61,15 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": 8,
     "bold": 0
   },
-  "55,1": {
+  "53,1": {
     "fgColorMode": 16777216,
     "fgColor": 2
   },
-  "56,1": {
+  "54,1": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "73,1": {
+  "64,1": {
     "fgColorMode": 0,
     "fgColor": -1
   },
