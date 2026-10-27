@@ -31,4 +31,10 @@ export function ensureIsolatedConfig(): string {
   return TUI_CONFIG_HOME
 }
 
-export const TUI_ENV = { TEAMINAL_SEED: 'fixtures', XDG_CONFIG_HOME: TUI_CONFIG_HOME } as const
+// TZ pins message timestamps (rendered in local time) so snapshots match on
+// any machine.
+export const TUI_ENV = {
+  TEAMINAL_SEED: 'fixtures',
+  XDG_CONFIG_HOME: TUI_CONFIG_HOME,
+  TZ: 'UTC',
+} as const

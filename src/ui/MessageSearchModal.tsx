@@ -16,6 +16,7 @@ import type { AppState, Store } from '../state/store'
 import type { ChatMessageSearchHit } from '../types'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useSessionApi } from './SessionContext'
+import { localDate, localTime } from './localTime'
 
 const DEBOUNCE_MS = 350
 const RESULT_LIMIT = 25
@@ -144,7 +145,9 @@ export function MessageSearchModal() {
         {visible.map((hit, i) => {
           const idx = top + i
           const selected = idx === safeCursor
-          const time = hit.createdDateTime ? hit.createdDateTime.slice(0, 16).replace('T', ' ') : ''
+          const time = hit.createdDateTime
+            ? `${localDate(hit.createdDateTime)} ${localTime(hit.createdDateTime)}`
+            : ''
           const sender = hit.senderDisplayName ?? '(unknown)'
           const jumpable = !!hit.chatId
           return (

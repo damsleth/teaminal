@@ -45,6 +45,9 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Message times are shown in local time**, not UTC (they were an hour or
+  two off outside GMT). Day separators and search-result times use local
+  time too, so a message sent just after midnight lands under the right day.
 - **New messages show up in the open chat right away with push connected.**
   A push signal that arrived while a fetch was in flight was dropped, and the
   fetch a push triggered often ran before Graph had the message, so the chat
