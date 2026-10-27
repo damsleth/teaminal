@@ -124,6 +124,8 @@ export type Theme = {
   warnText: string
   infoText: string
   messageFocusIndicator: string
+  // Text color of the focused message body; null keeps its normal color.
+  messageFocusText: string | null
   messageFocusBackground: string | null
   selectedRowBackground: string | null
   presence: PresenceMap
@@ -216,6 +218,7 @@ const DARK: Theme = {
   warnText: 'yellow',
   infoText: 'gray',
   messageFocusIndicator: 'cyan',
+  messageFocusText: 'cyan',
   messageFocusBackground: null,
   selectedRowBackground: '#262626',
   presence: PRESENCE_DARK,
@@ -253,6 +256,7 @@ const LIGHT: Theme = {
   warnText: 'yellow',
   infoText: '#1c1c1c',
   messageFocusIndicator: 'blue',
+  messageFocusText: 'blue',
   messageFocusBackground: null,
   selectedRowBackground: '#e6e6e6',
   presence: PRESENCE_DARK,
@@ -294,6 +298,7 @@ export type PartialTheme = {
   warnText?: string
   infoText?: string
   messageFocusIndicator?: string
+  messageFocusText?: string | null
   messageFocusBackground?: string | null
   selectedRowBackground?: string | null
   presence?: Partial<PresenceMap>

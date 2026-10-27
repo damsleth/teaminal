@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Separate focus text color.** **Focus text** (`messageFocusText`) sets
+  the color of the focused message's text, apart from **Focus marker**
+  (`messageFocusIndicator`), which now only colors the marker. `none`
+  (`null`) keeps the message's normal color.
+
 - **Colors with opacity.** Theme colors accept `#rgba` / `#rrggbbaa`
   (theme editor `e`, config, theme files). Terminals have no alpha, so the
   color is blended onto the theme background; the editor keeps showing what

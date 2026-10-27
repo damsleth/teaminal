@@ -49,7 +49,7 @@ export type NumericField = BaseField & {
 }
 export type ColorField = BaseField & {
   kind: 'color'
-  // Nullable color tokens (messageFocusBackground, selectedRowBackground)
+  // Nullable color tokens (messageFocusBackground, messageFocusText, ...)
   // accept null ("none") in addition to a named/hex color.
   nullable: boolean
 }
@@ -182,6 +182,7 @@ export const FIELDS: readonly EditableField[] = [
   color('warnText', 'Warn text'),
   color('infoText', 'Info text'),
   color('messageFocusIndicator', 'Focus marker'),
+  color('messageFocusText', 'Focus text', true),
   color('messageFocusBackground', 'Focus background', true),
   // — Borders —
   border('panel', 'Panel border'),
