@@ -1,13 +1,16 @@
 // Keybindings reference overlay.
 //
 // Triggered by '?' from the chat list (or by Help -> Keybindings in the
-// menu). Esc closes and returns to the previous state. Read-only - no
+// menu). Esc closes and returns to the previous state. j/k (↓/↑) and u/d
+// scroll when the table is taller than the pane. Read-only - no
 // configuration here in v1.
 //
 // To add a keybind row, append to the BINDINGS table; columns are
 // [key, when, action]. Group rows with a divider when sections grow.
 
 import { Box, Text, useApp } from 'ink'
+import { useState } from 'react'
+import { useTerminalRows } from './hooks/useTerminalRows'
 import { inkBorder } from './theme'
 import { useInput } from './useInput'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
@@ -67,14 +70,27 @@ export function KeybindsModal() {
   const modal = useAppState((s) => s.modal)
   const theme = useTheme()
   const isOpen = modal?.kind === 'keybinds'
+  const termRows = useTerminalRows()
+  const [offset, setOffset] = useState(0)
+  // ponytail: the overlay sits in the message pane; header, composer, status
+  // bar and pane border take ~9 rows, the modal's own chrome 6 + paddingY.
+  const capacity = Math.max(3, termRows - 15 - 2 * theme.layout.modalPaddingY)
+  const maxOffset = Math.max(0, BINDINGS.length - capacity)
+  const top = Math.min(offset, maxOffset)
+  const scrollBy = (delta: number) => setOffset(Math.max(0, Math.min(maxOffset, top + delta)))
 
   useInput(
     (input, key) => {
       const ch = input.toLowerCase()
       if (key.escape || key.return) {
+        setOffset(0)
         store.set({ modal: null, inputZone: 'list' })
         return
       }
+      if (ch === 'j' || key.downArrow) return scrollBy(1)
+      if (ch === 'k' || key.upArrow) return scrollBy(-1)
+      if (ch === 'd' || key.pageDown) return scrollBy(Math.ceil(capacity / 2))
+      if (ch === 'u' || key.pageUp) return scrollBy(-Math.ceil(capacity / 2))
       if (key.ctrl && ch === 'c') {
         exit()
       }
@@ -98,18 +114,23 @@ export function KeybindsModal() {
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
         width={80}
+        maxWidth="100%"
       >
         <Text bold={theme.emphasis.modalTitleBold}>Keybindings</Text>
         <Box height={1} />
-        {BINDINGS.map((b, i) => (
-          <Text key={i}>
+        {BINDINGS.slice(top, top + capacity).map((b, i) => (
+          <Text key={top + i} wrap="truncate-end">
             <Text color={theme.selected}>{b.keys.padEnd(keyW)}</Text>
             <Text color="gray">{b.when.padEnd(whenW)}</Text>
             <Text>{b.action}</Text>
           </Text>
         ))}
         <Box height={1} />
-        <Text color="gray">esc / enter to close</Text>
+        <Text color="gray" wrap="truncate-end">
+          {maxOffset > 0
+            ? `${top + 1}-${Math.min(top + capacity, BINDINGS.length)} of ${BINDINGS.length} · j/k u/d scroll · esc / enter to close`
+            : 'esc / enter to close'}
+        </Text>
       </Box>
     </Box>
   )
