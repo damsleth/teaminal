@@ -40,6 +40,7 @@ import { useTerminalRows } from './hooks/useTerminalRows'
 import { useSessionApi } from './SessionContext'
 import { openThemeEditor } from './ThemeEditorModal'
 import { openActivity } from './ActivityModal'
+import { editSettingsFile, editThemeFile } from './openInEditor'
 import { clearProfileCaches } from '../state/cacheClear'
 import { updateSettings } from '../config'
 import { recordEvent, warn } from '../log'
@@ -109,6 +110,10 @@ export function MenuModal() {
         }
         return
       }
+
+      // Ctrl+O / Ctrl+T: edit the settings / theme file in $VISUAL.
+      if (key.ctrl && ch === 'o') return editSettingsFile(store)
+      if (key.ctrl && ch === 't') return editThemeFile(store)
 
       if (ch === 'q' && m.path.length === 0) {
         store.set({ modal: null, inputZone: 'list' })
@@ -324,7 +329,7 @@ export function MenuModal() {
         </Box>
         <Text backgroundColor={modalBg(theme)}>{pad('')}</Text>
         <Text color="gray" backgroundColor={modalBg(theme)}>
-          {pad('↑/↓ navigate · enter select · esc back')}
+          {pad('↑/↓ navigate · enter select · esc back · ^O config · ^T theme')}
         </Text>
       </Box>
     </Box>
