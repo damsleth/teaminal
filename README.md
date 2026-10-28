@@ -207,7 +207,8 @@ A preset also saves the look-related Settings menu toggles under
 `"settings"`: status bar and header options, chat list options (sort,
 grouping, short names, preview lines, presence dots) and message options
 (chat name header, short names, timestamps, sender names, reactions,
-images, right-aligned own messages, focus marker, centered dates). Loading the preset
+images, right-aligned own messages, focus marker, centered dates), and the
+profile pictures and chat list thumbnails sizes. Loading the preset
 applies them. Built-in themes carry none, so switching to one leaves them
 as they are. Behavior settings (notifications, presence, scrolling, Enter
 sends) are not part of a preset.

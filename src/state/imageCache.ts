@@ -114,8 +114,9 @@ export type FetchImageOpts = {
   // AsyncGW region (`emea`, `amer`, `apac`, `ind`) when known from the
   // original asm/asyncgw object URL.
   region?: string
-  // A 404 is an expected "nothing here" (profile photos): don't log it.
-  quietNotFound?: boolean
+  // A profile photo / team picture: a 404 means "no photo" (not logged), and
+  // any other failure turns photos off for the account (see ensureUserPhoto).
+  photo?: boolean
 }
 
 // Whether `path` is something graphBinary can actually fetch (a Graph-relative
@@ -210,12 +211,17 @@ export async function fetchAndCacheImage(
       bytes = await fetchHostedContent(path, opts)
     }
   } catch (err) {
-    if (!(opts.quietNotFound && err instanceof GraphError && err.status === 404))
-      recordEvent(
-        'graph',
-        'warn',
-        `image fetch failed for ${meta.name}: ${err instanceof Error ? err.message : String(err)}`,
-      )
+    const message = err instanceof Error ? err.message : String(err)
+    if (opts.photo) {
+      if (err instanceof GraphError && err.status === 404) return null
+      const account = opts.client.ctx.account.id
+      if (!photosUnavailable.has(account)) {
+        photosUnavailable.add(account)
+        recordEvent('graph', 'info', `profile photos unavailable for this account: ${message}`)
+      }
+      return null
+    }
+    recordEvent('graph', 'warn', `image fetch failed for ${meta.name}: ${message}`)
     return null
   }
 
@@ -305,6 +311,16 @@ export function ensureImageFetched(
     })
 }
 
+// Accounts whose photo requests fail for a reason other than "no photo"
+// (no Graph access, e.g. Teams-service-only accounts, or a 401 / 403):
+// photos stay off for them this session and initials show instead.
+// ponytail: a one-off network error also turns them off until restart.
+const photosUnavailable = new Set<AccountId>()
+
+export function __resetPhotoAvailabilityForTests(): void {
+  photosUnavailable.clear()
+}
+
 // Profile photos and team pictures share the image cache under these keys.
 // Graph serves them as JPEG. A user without a photo 404s; that lands as
 // 'error' in memory, so it's asked once per session.
@@ -327,11 +343,12 @@ export function ensureUserPhoto(
   px: number,
   opts: { client: GraphClient; onChange: () => void },
 ): void {
+  if (photosUnavailable.has(opts.client.ctx.account.id)) return
   ensureImageFetched(
     `/users/${encodeURIComponent(userId)}/photos/${px}x${px}/$value`,
     userPhotoKey(userId, px),
     { contentType: 'image/jpeg', name: `photo of ${userId}` },
-    { ...opts, quietNotFound: true },
+    { ...opts, photo: true },
   )
 }
 
@@ -339,10 +356,11 @@ export function ensureTeamPhoto(
   teamId: string,
   opts: { client: GraphClient; onChange: () => void },
 ): void {
+  if (photosUnavailable.has(opts.client.ctx.account.id)) return
   ensureImageFetched(
     `/teams/${encodeURIComponent(teamId)}/photo/$value`,
     teamPhotoKey(teamId),
     { contentType: 'image/jpeg', name: `team photo ${teamId}` },
-    { ...opts, quietNotFound: true },
+    { ...opts, photo: true },
   )
 }

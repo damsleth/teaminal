@@ -26,7 +26,10 @@ import {
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
 import {
+  __resetPhotoAvailabilityForTests,
   clearImageCache,
+  ensureTeamPhoto,
+  ensureUserPhoto,
   ensureImageFetched,
   fetchAndCacheImage,
   getImageCacheDir,
@@ -465,5 +468,40 @@ describe('image ownership across accounts', () => {
     clearImageCache('alpha')
     expect(getImageData(a.id, key)).toBeUndefined()
     expect(getImageData(b.id, key)).toEqual(pngB)
+  })
+})
+
+describe('profile photos', () => {
+  const realXdg = process.env.XDG_CACHE_HOME
+  afterEach(() => {
+    resetClient()
+    resetAuth()
+    __resetPhotoAvailabilityForTests()
+    if (realXdg === undefined) delete process.env.XDG_CACHE_HOME
+    else process.env.XDG_CACHE_HOME = realXdg
+  })
+
+  it('a 403 turns photos off for the account: later photos make no request', async () => {
+    process.env.XDG_CACHE_HOME = join(tmpdir(), `teaminal-cache-${Date.now()}-photo`)
+    setAudiencePreference('graph', { fallback: false })
+    const exp = Math.floor(Date.now() / 1000) + 3600
+    const jwt = `${Buffer.from('{"alg":"none"}').toString('base64url')}.${Buffer.from(
+      JSON.stringify({ exp, oid: 'oid-self' }),
+    ).toString('base64url')}.sig`
+    setAuthRunner(async () => ({ stdout: jwt, stderr: '', exitCode: 0 }))
+    const urls: string[] = []
+    setClientTransport(async (url) => {
+      urls.push(String(url))
+      return new Response('{"error":{"code":"Forbidden"}}', { status: 403 })
+    })
+    let changes = 0
+    const opts = { client: testClient(), onChange: () => changes++ }
+    ensureUserPhoto(`u-${Date.now()}`, 48, opts)
+    for (let i = 0; i < 50 && changes === 0; i++) await new Promise((r) => setTimeout(r, 5))
+    expect(urls.filter((u) => u.includes('/photos/'))).toHaveLength(1)
+    ensureUserPhoto(`u2-${Date.now()}`, 48, opts)
+    ensureTeamPhoto(`t-${Date.now()}`, opts)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(urls.filter((u) => u.includes('/photo'))).toHaveLength(1)
   })
 })
