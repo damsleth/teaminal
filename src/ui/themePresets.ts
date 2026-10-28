@@ -6,8 +6,16 @@
 // preset file and clears them, so the look doesn't change. Loading only
 // switches the theme: unsaved edits stay on top, as they do on any theme
 // switch.
+//
+// A preset also carries the look-related Settings-menu toggles
+// (PRESET_SETTING_KEYS): saving snapshots them, loading applies them.
 
-import { replaceThemeOverrides, updateSettings } from '../config'
+import {
+  pickPresetSettings,
+  replaceThemeOverrides,
+  updateSettings,
+  validatePresetSettings,
+} from '../config'
 import {
   deleteThemePreset,
   isBuiltinThemeName,
@@ -50,10 +58,16 @@ export async function loadThemePreset(store: Store<AppState>, name: string): Pro
     const loaded = loadThemeFile(name)
     for (const w of loaded.warnings) warn(w)
     if (!loaded.data) return
+    // Already validated by loadThemeFile; re-checked for the typed shape.
+    const ui = loaded.data.settings ? (validatePresetSettings(loaded.data.settings, []) ?? {}) : {}
     store.set((s) => ({
-      settings: { ...s.settings, theme: name },
+      settings: { ...s.settings, ...ui, theme: name },
       customTheme: { name, data: loaded.data! },
     }))
+    await updateSettings({ ...ui, theme: name }).catch((err) =>
+      warn('config: failed to persist theme:', errMessage(err)),
+    )
+    return
   }
   await updateSettings({ theme: name }).catch((err) =>
     warn('config: failed to persist theme:', errMessage(err)),
@@ -75,7 +89,10 @@ export async function saveThemePresetAs(
   const s = store.get()
   const base = activeBase(s)
   const custom = activeCustomThemeData(s.settings.theme, s.customTheme)
-  const data = bakeTheme(custom, s.settings.themeOverrides, base)
+  const data = {
+    ...bakeTheme(custom, s.settings.themeOverrides, base),
+    settings: pickPresetSettings(s.settings),
+  }
   try {
     writeThemePreset(trimmed, data as Record<string, unknown>)
   } catch (err) {

@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Theme presets carry UI settings.** Saving a preset also stores the
+  look-related Settings menu toggles (status bar, header, chat list and
+  message display options) in its `settings` block, and loading it
+  applies them.
+
 - **Enter sends.** Menu → **Enter sends (Shift/Ctrl+Enter newline)**
   (`enterSends`, default off) flips the composer keys: Enter sends and
   Shift+Enter, Ctrl+Enter or Ctrl+J insert a newline. Only offered (and

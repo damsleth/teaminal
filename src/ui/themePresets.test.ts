@@ -9,8 +9,10 @@ import {
   loadThemeFile,
   writeThemePreset,
 } from '../config/themes'
-import { defaultSettings, type ThemeOverrides } from '../state/store'
+import { pickPresetSettings } from '../config'
+import { createAppStore, defaultSettings, type ThemeOverrides } from '../state/store'
 import { bakeTheme, remainingOverrides, resolveTheme, type PartialTheme } from './theme'
+import { loadThemePreset } from './themePresets'
 
 const OVERRIDES: ThemeOverrides = {
   text: '#111111',
@@ -70,5 +72,47 @@ describe('theme preset files', () => {
       expect(isValidPresetName(bad)).toBe(false)
     expect(() => writeThemePreset('../evil', {}, env())).toThrow()
     expect(isValidPresetName('Solarized-2 v1.0')).toBe(true)
+  })
+})
+
+describe('preset UI settings', () => {
+  test('a preset round-trips its settings block, dropping invalid and non-UI keys', async () => {
+    const e = { XDG_CONFIG_HOME: mkdtempSync(join(tmpdir(), 'teaminal-presets-')) }
+    const ui = pickPresetSettings({
+      ...defaultSettings,
+      selfMessagesOnRight: true,
+      showTimestampsInPane: false,
+    })
+    expect(ui.selfMessagesOnRight).toBe(true)
+    expect('notifyMuted' in ui).toBe(false)
+    writeThemePreset(
+      'ui',
+      { text: 'red', settings: { ...ui, chatListPreviewLines: 9, notifyMuted: true } },
+      e,
+    )
+    const loaded = loadThemeFile('ui', e)
+    const settings = loaded.data?.settings as Record<string, unknown>
+    expect(settings.selfMessagesOnRight).toBe(true)
+    expect(settings.showTimestampsInPane).toBe(false)
+    expect('chatListPreviewLines' in settings).toBe(false)
+    expect('notifyMuted' in settings).toBe(false)
+    expect(loaded.warnings.length).toBe(2)
+    // Loading applies the block to Settings (and persists it).
+    const prev = process.env.XDG_CONFIG_HOME
+    process.env.XDG_CONFIG_HOME = e.XDG_CONFIG_HOME
+    try {
+      const store = createAppStore()
+      await loadThemePreset(store, 'ui')
+      expect(store.get().settings.theme).toBe('ui')
+      expect(store.get().settings.selfMessagesOnRight).toBe(true)
+      expect(store.get().settings.showTimestampsInPane).toBe(false)
+      expect(store.get().settings.chatListPreviewLines).toBe(defaultSettings.chatListPreviewLines)
+    } finally {
+      if (prev === undefined) delete process.env.XDG_CONFIG_HOME
+      else process.env.XDG_CONFIG_HOME = prev
+    }
+    // The settings block never leaks into the resolved theme.
+    const theme = resolveTheme({ ...defaultSettings, theme: 'ui' }, loaded.data as PartialTheme)
+    expect('settings' in theme).toBe(false)
   })
 })

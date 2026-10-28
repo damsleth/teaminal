@@ -1,7 +1,8 @@
 // Loader for user theme files at ~/.config/teaminal/themes/<name>.json.
 //
 // A theme file is a partial Theme: any subset of color tokens, the
-// `presence`, `layout`, `borders`, `emphasis` sub-objects. It is layered
+// `presence`, `layout`, `borders`, `emphasis` sub-objects, plus a `settings`
+// block of UI settings applied when the preset loads. It is layered
 // between the built-in base ('dark') and Settings.themeOverrides during
 // resolution (see src/ui/theme.ts:resolveTheme).
 //
@@ -25,6 +26,7 @@ import {
   validateEmphasisOverrides,
   validateFontSizeOverrides,
   validateLayoutOverrides,
+  validatePresetSettings,
 } from './index'
 
 type Env = Record<string, string | undefined>
@@ -247,6 +249,12 @@ function validatePartialTheme(
     if (key === 'fontSize') {
       const fontSize = validateFontSizeOverrides(value, warnings, 'theme.fontSize')
       if (fontSize && Object.keys(fontSize).length > 0) out.fontSize = fontSize
+      continue
+    }
+    // UI settings (Settings menu toggles) the preset applies when loaded.
+    if (key === 'settings') {
+      const settings = validatePresetSettings(value, warnings)
+      if (settings && Object.keys(settings).length > 0) out.settings = settings
       continue
     }
     if (NULLABLE_COLOR_KEYS.has(key)) {
