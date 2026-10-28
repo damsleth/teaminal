@@ -25,7 +25,7 @@ export type FilterKeysCtx = {
 export function handleFilterKeys({ input, key }: RawKey, ctx: FilterKeysCtx): KeyResult {
   const { store } = ctx
   if (key.escape) {
-    store.set({ filter: '', inputZone: 'list', cursor: 0 })
+    store.set({ filter: '', inputZone: 'list', cursor: 0, cursorKey: null })
     return 'handled'
   }
   if (key.return) {
@@ -38,7 +38,7 @@ export function handleFilterKeys({ input, key }: RawKey, ctx: FilterKeysCtx): Ke
         return 'handled'
       }
     }
-    store.set({ inputZone: 'list', cursor: 0 })
+    store.set({ inputZone: 'list', cursor: 0, cursorKey: null })
     return 'handled'
   }
   if (key.backspace || key.delete) {

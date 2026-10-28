@@ -18,12 +18,14 @@ import {
   buildSelectableList,
   clampCursor,
   collapseKeyFor,
+  cursorAt,
   firstSelectableIndex,
   headerIndexForKey,
   isSelectable,
   itemMatchesFilter,
   nextSelectableIndex,
   parentCollapseKey,
+  resolveCursor,
 } from '../../state/selectables'
 import { updateSettings } from '../../config/index'
 import { warn } from '../../log'
@@ -51,6 +53,7 @@ export type ListKeysCtx = {
   filter: string
   expandedChatSections: Record<string, boolean>
   cursor: number
+  cursorKey?: string | null
   focus: Focus
   exit: () => void
   refresh: () => void
@@ -90,7 +93,7 @@ function deleteTarget(ctx: ListKeysCtx): { chat: Chat; label: string } | null {
   if (ctx.focus.kind !== 'list') return null
   const items = buildSelectableList(ctx)
   const visible = ctx.filter ? items.filter((it) => itemMatchesFilter(it, ctx.filter)) : items
-  const it = visible[clampCursor(ctx.cursor, visible.length)]
+  const it = visible[resolveCursor(visible, visible.length, ctx.cursorKey ?? null, ctx.cursor)]
   return it && it.kind === 'chat' ? { chat: it.chat, label: it.label } : null
 }
 
@@ -183,7 +186,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
     if (ch === 'm') {
       const items = buildSelectableList(ctx)
       const visible = ctx.filter ? items.filter((it) => itemMatchesFilter(it, ctx.filter)) : items
-      const safe = clampCursor(ctx.cursor, visible.length + (syntheticNewChatQuery ? 1 : 0))
+      const safe = resolveCursor(visible, selectableCount, ctx.cursorKey ?? null, ctx.cursor)
       const it = visible[safe]
       if (it && it.kind === 'chat') {
         const chat = it.chat
@@ -205,7 +208,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
     // If the stored cursor happens to land on a team (e.g. just after a
     // filter change reordered the list), advance forward to the next
     // selectable item first.
-    let safe = clampCursor(ctx.cursor, selectableCount)
+    let safe = resolveCursor(visible, selectableCount, ctx.cursorKey ?? null, ctx.cursor)
     if (safe < visible.length && !isSelectable(visible[safe]!)) {
       safe = nextSelectableIndex(visible, safe, +1)
       if (safe < visible.length && !isSelectable(visible[safe]!)) {
@@ -215,12 +218,12 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
     if (ch === 'j' || key.downArrow) {
       const next = nextSelectableIndex(visible, safe, +1)
       const max = selectableCount - 1
-      store.set({ cursor: clampCursor(Math.min(next, max), selectableCount) })
+      store.set(cursorAt(visible, clampCursor(Math.min(next, max), selectableCount)))
       return 'handled'
     }
     if (ch === 'k' || key.upArrow) {
       const next = nextSelectableIndex(visible, safe, -1)
-      store.set({ cursor: clampCursor(next, selectableCount) })
+      store.set(cursorAt(visible, clampCursor(next, selectableCount)))
       return 'handled'
     }
     if (ch === 'u' || (key as typeof key & { pageUp?: boolean }).pageUp) {
@@ -230,7 +233,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
         const at = visible[target]
         if (at && !isSelectable(at)) target = firstSelectableIndex(visible)
       }
-      store.set({ cursor: clampCursor(target, selectableCount) })
+      store.set(cursorAt(visible, clampCursor(target, selectableCount)))
       return 'handled'
     }
     if (ch === 'd' || (key as typeof key & { pageDown?: boolean }).pageDown) {
@@ -243,7 +246,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
           target = nextSelectableIndex(visible, target, -1)
         }
       }
-      store.set({ cursor: clampCursor(target, selectableCount) })
+      store.set(cursorAt(visible, clampCursor(target, selectableCount)))
       return 'handled'
     }
     if (ch === 'h' || key.leftArrow) {
@@ -262,7 +265,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
         // The header may be filtered out of the current view; then there is
         // nothing to move the cursor onto.
         const header = headerIndexForKey(visible, collapseKey)
-        if (header !== null) store.set({ cursor: header })
+        if (header !== null) store.set(cursorAt(visible, header))
       }
       return 'handled'
     }
@@ -286,16 +289,16 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
             chatListCollapsedSections: store.get().settings.chatListCollapsedSections,
           },
         })
-        store.set({ cursor: nextSelectableIndex(expanded, safe, +1) })
+        store.set(cursorAt(expanded, nextSelectableIndex(expanded, safe, +1)))
         return 'handled'
       }
       if (it.kind === 'more') {
         // Expanding replaces the `… N more` row with the first hidden chat,
         // so the cursor stays where it is and lands on real content.
         const section = it.section
-        store.set((s) => ({
-          expandedChatSections: { ...s.expandedChatSections, [section]: true },
-        }))
+        const expandedChatSections = { ...store.get().expandedChatSections, [section]: true }
+        store.set({ expandedChatSections })
+        store.set(cursorAt(buildSelectableList({ ...ctx, expandedChatSections }), safe))
         return 'handled'
       }
       if (it.kind === 'chat') {

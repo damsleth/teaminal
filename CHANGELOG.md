@@ -116,6 +116,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Chat list cursor stays on its chat.** When a new message moves a chat
+  up the list, the cursor now follows the chat it was on instead of
+  landing on whichever chat took its place (so Enter, `m` and ctrl+d act
+  on the chat you selected).
+
 - **The Sender color applies.** Other people's names above their messages
   now use the theme's **Sender** color; it was ignored before.
 

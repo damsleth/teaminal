@@ -822,7 +822,11 @@ export type AppState = {
   // channels). The selectable list is computed on demand from chats + teams
   // + channelsByTeam; the cursor is bounded against it at render time so
   // a stale value is not a bug, just a clamp.
+  // `cursorKey` (selectableKey of the row) is what the cursor follows: list
+  // refreshes reorder rows, so readers resolve the key first and fall back to
+  // the `cursor` index only when that row went away. Set both via cursorAt().
   cursor: number
+  cursorKey: string | null
   // Focus within the message under the pane cursor. 0 = the message body;
   // > 0 indexes into that message's attachments (images then links), per
   // src/ui/messageFocusables.ts. Reset to 0 whenever the message cursor or
@@ -948,6 +952,7 @@ export type GlobalKey =
   | 'focus'
   | 'inputZone'
   | 'cursor'
+  | 'cursorKey'
   | 'focusedAttachmentIndex'
   | 'filter'
   | 'chatListCollapsed'
@@ -993,6 +998,7 @@ export function initialAppState(): AppState {
     inputZone: 'list',
     messageCursorByConvo: {},
     cursor: 0,
+    cursorKey: null,
     focusedAttachmentIndex: 0,
     filter: '',
     expandedChatSections: {},

@@ -8,9 +8,12 @@ import {
   parentCollapseKey,
   chatLabel,
   clampCursor,
+  cursorAt,
   firstSelectableIndex,
   itemMatchesFilter,
   nextSelectableIndex,
+  NEW_CHAT_ROW,
+  resolveCursor,
   shortName,
   type SelectableItem,
 } from './selectables'
@@ -553,5 +556,28 @@ describe('nextSelectableIndex', () => {
   test('firstSelectableIndex returns 0 when first item is selectable', () => {
     const items = [c('a'), t('T1'), ch('g')]
     expect(firstSelectableIndex(items)).toBe(0)
+  })
+})
+
+describe('cursor keys', () => {
+  const list = (ids: string[]) =>
+    buildSelectableList({ ...initialAppState(), chats: ids.map((id) => chat(id, { topic: id })) })
+
+  test('the cursor follows its row when a refresh reorders the list', () => {
+    const { cursor, cursorKey } = cursorAt(list(['a', 'b', 'c']), 1)
+    expect(cursorKey).toBe('chat:b')
+    // b moved to the top (new message): the cursor goes with it.
+    expect(resolveCursor(list(['b', 'a', 'c']), 3, cursorKey, cursor)).toBe(0)
+  })
+
+  test('falls back to the stored index when the row went away', () => {
+    const { cursor, cursorKey } = cursorAt(list(['a', 'b', 'c']), 2)
+    expect(resolveCursor(list(['a', 'b']), 2, cursorKey, cursor)).toBe(1)
+    expect(resolveCursor(list(['a', 'b', 'd']), 3, cursorKey, cursor)).toBe(2)
+  })
+
+  test('the synthetic new-chat row has its own key', () => {
+    expect(cursorAt([], 0).cursorKey).toBe(NEW_CHAT_ROW)
+    expect(resolveCursor([], 1, NEW_CHAT_ROW, 5)).toBe(0)
   })
 })
