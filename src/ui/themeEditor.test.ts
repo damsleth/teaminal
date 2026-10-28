@@ -82,7 +82,7 @@ describe('FIELDS descriptor list', () => {
 })
 
 describe('clampNumeric', () => {
-  const f = field('layout.senderIndent') as NumericField // 0..6
+  const f = field('layout.senderIndent') as NumericField // 0..40
 
   test('clamps below min and above max', () => {
     expect(clampNumeric(f, -3)).toBe(f.min)

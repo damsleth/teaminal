@@ -206,6 +206,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   with timestamps, both kinds of message body with their backgrounds and
   rounded frames, the focused message, system events and status colors. On
   wide windows the preview sits beside the fields.
+  Body indent and sender indent now go up to 40 columns (was 6).
 
 - **Preview lines in chat list.** `showMessagePreviews` is replaced by
   `chatListPreviewLines` (menu → Settings → Preview lines in chat list):
