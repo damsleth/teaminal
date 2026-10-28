@@ -60,6 +60,13 @@ test('account-collision: switching accounts with identical ids shows only the ne
   await expect(terminal.getByText('Ada Byron')).toBeVisible()
   terminal.submit() // open Ada's chat
   await expect(terminal.getByText('The launch notes are ready for review.')).toBeVisible()
+  // Leave an unsent draft in alpha's chat; beta's chat has the same id.
+  terminal.write('\t')
+  await pause()
+  terminal.write('alpha-only draft')
+  await expect(terminal.getByText('alpha-only draft')).toBeVisible()
+  terminal.keyEscape()
+  await pause()
 
   await switchTo(terminal, 1)
   await expect(terminal.getByText('ADA BYRON')).toBeVisible()
@@ -68,6 +75,7 @@ test('account-collision: switching accounts with identical ids shows only the ne
   const beta = screen(terminal)
   expect(beta).not.toContain('Ada Byron')
   expect(beta).not.toContain('The launch notes are ready for review.')
+  expect(beta).not.toContain('alpha-only draft')
 
   await switchTo(terminal, 0)
   await expect(terminal.getByText('Ada Byron')).toBeVisible()
@@ -76,4 +84,20 @@ test('account-collision: switching accounts with identical ids shows only the ne
   const alpha = screen(terminal)
   expect(alpha).not.toContain('ADA BYRON')
   expect(alpha).not.toContain('THE LAUNCH NOTES')
+
+  // Removing the running account (alpha, row 0) moves to the next one.
+  // Last step on purpose: it rewrites the flow's config.
+  terminal.keyEscape()
+  await expect(terminal.getByText('Accounts')).toBeVisible()
+  terminal.write('j')
+  await pause()
+  terminal.submit()
+  await expect(terminal.getByText('beta')).toBeVisible()
+  terminal.write('d')
+  await pause()
+  terminal.write('y')
+  await pause()
+  terminal.keyEscape()
+  await expect(terminal.getByText('ADA BYRON')).toBeVisible()
+  expect(screen(terminal)).not.toContain('Ada Byron')
 })
