@@ -332,13 +332,15 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     const hasMention = !!unread && unread.mentionCount > 0
     const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
     const unreadBadge = hasMention ? ' @' : hasUnread ? ' ●' : ''
+    // Team / section headers render truncated to one row.
+    if (row.item.kind === 'team' || row.item.kind === 'section') return 1
     let h = visualLines(label + unreadBadge, cw)
     if (row.item.kind === 'chat') {
       const preview = previewLineForChat(row.item.chat, cw, previewLines)
       if (preview) h += preview.split('\n').length
     }
     if (hasPictureColumn(row.item)) h = Math.max(h, thumbRows)
-    return row.item.kind === 'team' || row.item.kind === 'section' ? h : h + rowFrame + chatListGap
+    return h + rowFrame + chatListGap
   })
 
   // Anchor the viewport on the cursor row, then fill the visual-line

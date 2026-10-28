@@ -40,12 +40,12 @@ import {
   type EditableField,
   type FieldPatch,
 } from './themeEditor'
-import { blendAlpha, resolveBaseName, inkBorder, modalBg } from './theme'
+import { reservedBorder, blendAlpha, resolveBaseName, inkBorder, modalBg } from './theme'
 import { useTerminalRows } from './hooks/useTerminalRows'
 import { activeCustomThemeData, useAppState, useAppStore, useTheme } from './StoreContext'
 import { openThemePresets } from './ThemePresetsModal'
 import { activePresetName, saveThemePresetAs } from './themePresets'
-import { BUBBLE_BORDER } from './MessagePane'
+import { bodyFrame } from './MessagePane'
 import { fs } from './textSizing'
 import type { Settings } from '../state/store'
 
@@ -463,7 +463,6 @@ function ThemePreview(props: {
   const listIndent = ' '.repeat(Math.max(0, theme.layout.chatListIndent))
   const senderIndent = Math.max(0, theme.layout.senderIndent)
   const bodyIndent = Math.max(1, theme.layout.paneHeaderPaddingLeft)
-  const rounded = theme.layout.textBackgroundRadius > 0
   const marker = settings.messageFocusIndicatorChar.slice(0, 1) || '>'
 
   // One message body: indent / focus marker column, then the text in its
@@ -472,8 +471,15 @@ function ThemePreview(props: {
     text: string,
     color: string | undefined,
     background: string | null,
-    opts: { focused?: boolean } = {},
+    opts: { focused?: boolean; self?: boolean } = {},
   ) => {
+    // Same frame as MessagePane draws for this kind of body.
+    const frame = bodyFrame(theme, {
+      focused: opts.focused ?? false,
+      self: opts.self ?? false,
+      plain: false,
+      background: background ?? undefined,
+    })
     const textNode = (
       <Text
         color={color}
@@ -484,15 +490,15 @@ function ThemePreview(props: {
       </Text>
     )
     const framed =
-      rounded ||
+      frame ||
       theme.layout.textBackgroundPaddingX > 0 ||
       theme.layout.textBackgroundPaddingY > 0 ? (
         <Box
           paddingX={theme.layout.textBackgroundPaddingX}
           paddingY={theme.layout.textBackgroundPaddingY}
           backgroundColor={background ?? undefined}
-          borderStyle={rounded && background ? BUBBLE_BORDER : undefined}
-          borderColor={background ?? undefined}
+          borderStyle={frame?.style}
+          borderColor={frame?.color}
         >
           {textNode}
         </Box>
@@ -501,7 +507,7 @@ function ThemePreview(props: {
       )
     return (
       <Box flexDirection="row">
-        <Box width={bodyIndent} flexShrink={0} paddingTop={rounded && background ? 1 : 0}>
+        <Box width={bodyIndent} flexShrink={0} paddingTop={frame ? 1 : 0}>
           <Text color={theme.messageFocusIndicator}>{opts.focused ? marker : ' '}</Text>
         </Box>
         {framed}
@@ -533,14 +539,20 @@ function ThemePreview(props: {
       <Text color={theme.text} bold={theme.emphasis.sectionHeadingBold}>
         {fs('Chats', theme.fontSize.chatListHeader, tight)}
       </Text>
-      <Text
-        color={theme.selectedRow}
+      <Box
         backgroundColor={theme.selectedRowBackground ?? undefined}
-        bold={theme.emphasis.selectedBold}
+        borderStyle={reservedBorder(theme.borders.selectedRow, true)}
+        borderColor={theme.selectedRowBorder ?? theme.borderActive}
       >
-        {`●${listIndent}`}
-        {fs('Ada Byron', theme.fontSize.chatListName, tight)}
-      </Text>
+        <Text
+          color={theme.selectedRow}
+          backgroundColor={theme.selectedRowBackground ?? undefined}
+          bold={theme.emphasis.selectedBold}
+        >
+          {`●${listIndent}`}
+          {fs('Ada Byron', theme.fontSize.chatListName, tight)}
+        </Text>
+      </Box>
       <Text color={theme.unreadRow} bold={theme.emphasis.unreadBold}>
         {`●${listIndent}`}
         {fs('Design Sync', theme.fontSize.chatListName, tight)}
@@ -570,7 +582,9 @@ function ThemePreview(props: {
         theme.senderMessageBackground,
       )}
       {senderLine('You', theme.selfName, '12:36')}
-      {body('Looks good, shipping', theme.selfMessage ?? theme.text, theme.selfMessageBackground)}
+      {body('Looks good, shipping', theme.selfMessage ?? theme.text, theme.selfMessageBackground, {
+        self: true,
+      })}
       {body(
         'Focused message',
         theme.messageFocusText ?? theme.senderMessage ?? theme.text,
