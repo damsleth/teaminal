@@ -276,7 +276,7 @@ export function Composer() {
 
   if (focus.kind === 'list') {
     return (
-      <Box paddingX={theme.layout.panePaddingX}>
+      <Box paddingX={1}>
         <Text color={theme.mutedText} wrap="truncate-end">
           open a chat to compose
         </Text>
@@ -300,7 +300,7 @@ export function Composer() {
   const quote = focus.kind === 'thread' ? findRootQuote(focus, messagesByConvo) : null
 
   return (
-    <Box paddingX={theme.layout.panePaddingX} flexDirection="column">
+    <Box paddingX={1} flexDirection="column">
       {editingMessageId && (
         <Box>
           <Text color={theme.warnText} wrap="truncate-end">

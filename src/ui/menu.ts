@@ -60,6 +60,7 @@ export type ToggleKey =
   | 'tailDiagnostics'
   | 'statusBarPosition'
   | 'statusBarShowKeyHints'
+  | 'headerBarCentered'
 
 export type MenuAction =
   | { kind: 'resume' }
@@ -152,6 +153,11 @@ export const ROOT_MENU: MenuItem[] = [
         label: 'Status bar key hints',
         action: { kind: 'toggle-setting', key: 'statusBarShowKeyHints' },
         hint: 'off = link/image actions only',
+      },
+      {
+        id: 'headerBarCentered',
+        label: 'Center header bar',
+        action: { kind: 'toggle-setting', key: 'headerBarCentered' },
       },
       {
         id: 'headerBar',
@@ -491,6 +497,7 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'tailNetwork':
     case 'tailDiagnostics':
     case 'statusBarShowKeyHints':
+    case 'headerBarCentered':
       return !current as Settings[K]
     case 'messageFocusIndicatorChar':
       return cycleMessageFocusIndicatorChar(current as string) as Settings[K]
@@ -548,6 +555,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'tailNetwork':
     case 'tailDiagnostics':
     case 'statusBarShowKeyHints':
+    case 'headerBarCentered':
       return value ? 'on' : 'off'
     case 'messageFocusIndicatorChar':
       return String(value)

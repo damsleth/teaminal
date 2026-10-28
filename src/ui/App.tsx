@@ -542,11 +542,7 @@ export function App() {
       backgroundColor={theme.appBackground ?? undefined}
     >
       {statusBarPosition === 'top' && <StatusBar />}
-      <Box
-        borderStyle={inkBorder(theme.borders.panel)}
-        borderColor={theme.border}
-        paddingX={theme.layout.panePaddingX}
-      >
+      <Box borderStyle={inkBorder(theme.borders.panel)} borderColor={theme.border} paddingX={1}>
         <HeaderBar />
       </Box>
       <Box flexDirection="row" flexGrow={1}>

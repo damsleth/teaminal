@@ -201,6 +201,7 @@ describe('ROOT_MENU shape', () => {
       'theme',
       'statusBarPosition',
       'statusBarShowKeyHints',
+      'headerBarCentered',
       // Chat list
       'chatListDensity',
       'chatListSort',

@@ -9,15 +9,15 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 ││Chats                     ││Se│   Theme editor · dark colors                                   │  ││
 ││ ◯ > Ada Byron            ││  │   • = overridden · adjust live, persists to config             │  ││
 ││     Ada: The launch      ││  │   ── Spacing / Layout                                          │  ││
-││     notes are ready for  ││  │   >   Pane padding X        1 (0–6)                            │  ││
-││     rev…                 ││  │       Modal padding X       3                                  │  ││
-││    Design Sync          ││  │       Modal padding Y       1                                  │  ││
-││     Nina: Nina shared    ││  │       Message body indent   2                                  │  ││
-││     two compact layout   ││  │       Sender indent         2                                  │  ││
-││     op…                  ││  │       Message gap           1                                  │  ││
-││    Ops Channel          ││  │       Tail strip gap        1                                  │  ││
-││     Mina: Deploy is      ││  │       Chat list pad R       1                                  │  ││
-││     green in the EU      ││  │      ↓ 45 more                                                 │  ││
+││     notes are ready for  ││  │   >   Modal padding X       3 (0–8)                            │  ││
+││     rev…                 ││  │       Modal padding Y       1                                  │  ││
+││    Design Sync          ││  │       Message body indent   2                                  │  ││
+││     Nina: Nina shared    ││  │       Sender indent         2                                  │  ││
+││     two compact layout   ││  │       Message gap           1                                  │  ││
+││     op…                  ││  │       Tail strip gap        1                                  │  ││
+││    Ops Channel          ││  │       Chat list pad R       1                                  │  ││
+││     Mina: Deploy is      ││  │       Chat list gap         0                                  │  ││
+││     green in the EU      ││  │      ↓ 44 more                                                 │  ││
 ││     region.              ││  │                                                                │  ││
 ││                          ││  │   ╭────────────────────────────────────────────────────────╮   │  ││
 ││                          ││  │   │Ada  Sample message body  12:34                         │   │  ││

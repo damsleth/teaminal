@@ -165,6 +165,7 @@ warnings and fall back to defaults.
 | `headerElements`               | object               | all `true` | Per-segment visibility for the header bar. Keys: `app`, `user`, `presence`, `graph`, `chats`, `unread`, `push`, `updated`. Omitted keys keep their default. |
 | `headerUserFormat`             | `full`, `tenant`     |  `full` | Header identity format: `full` shows `user (tenant)`, `tenant` shows the tenant only. |
 | `statusBarShowKeyHints`        | boolean              |  `true` | Show the keybinding hints line in the status bar. |
+| `headerBarCentered`            | boolean              | `false` | Center the header bar segments. Off keeps them left-aligned. |
 | `chatListCollapsedSections`    | object               |    `{}` | Collapsed sidebar headers, keyed by section (`oneOnOne`, `group`, `meeting`, `other`, `teams`) or `team:<id>`. Maintained by `h`/`l` in the list; a collapsed header hides its rows and shows `▸` plus the hidden count. |
 | `chatListWidth`                | integer or null      |  `null` | Explicit chat-list panel width in columns. `null` = automatic (~28% of terminal, clamped 18–60). Adjusted interactively with Ctrl-X resize mode. |
 | `composerHeight`               | integer or null      |  `null` | Explicit composer height in rows. `null` = automatic (from draft line count, clamped 3–10). Adjusted interactively with Ctrl-X resize mode. |
@@ -195,7 +196,6 @@ theme layered on top of `dark`; any subset of these keys is accepted:
   "presence": { "Available": "greenBright", "DoNotDisturb": "red" },
   // Paddings / margins (non-negative integers):
   "layout": {
-    "panePaddingX": 1,
     "modalPaddingX": 3,
     "modalPaddingY": 1,
     "paneHeaderPaddingLeft": 1, // message body indent

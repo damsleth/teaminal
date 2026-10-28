@@ -68,7 +68,7 @@ function EventsTail({ theme }: { theme: Theme }) {
   }, [])
   const tail = records.slice(-TAIL_ROWS)
   return (
-    <Box flexDirection="column" paddingX={theme.layout.panePaddingX}>
+    <Box flexDirection="column" paddingX={1}>
       <Text bold={theme.emphasis.sectionHeadingBold} color={theme.mutedText}>
         events ({records.length})
       </Text>
@@ -99,7 +99,7 @@ function NetworkTail({ theme }: { theme: Theme }) {
   }, [])
   const tail = records.slice(-TAIL_ROWS)
   return (
-    <Box flexDirection="column" paddingX={theme.layout.panePaddingX}>
+    <Box flexDirection="column" paddingX={1}>
       <Text bold={theme.emphasis.sectionHeadingBold} color={theme.mutedText}>
         network ({records.length})
       </Text>
@@ -128,7 +128,7 @@ function DiagnosticsTail({ theme }: { theme: Theme }) {
   const lastListPollAt = useAppState((s) => s.lastListPollAt)
   const chats = useAppState((s) => s.chats)
   return (
-    <Box flexDirection="column" paddingX={theme.layout.panePaddingX}>
+    <Box flexDirection="column" paddingX={1}>
       <Text bold={theme.emphasis.sectionHeadingBold} color={theme.mutedText}>
         diagnostics
       </Text>

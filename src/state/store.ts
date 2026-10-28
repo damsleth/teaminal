@@ -264,7 +264,6 @@ export type ThemeOverrides = ThemeColorOverrides & {
   light?: ThemeColorOverrides
   presence?: Partial<Record<ThemePresenceKey, string>>
   layout?: Partial<{
-    panePaddingX: number
     modalPaddingX: number
     modalPaddingY: number
     paneHeaderPaddingLeft: number
@@ -427,6 +426,8 @@ export type Settings = {
   // When false, the status bar drops its keyboard-shortcut hints and is used
   // only to surface the focused link/image context action. Default true.
   statusBarShowKeyHints: boolean
+  // Center the HeaderBar segments. Off pins them left. Default false.
+  headerBarCentered: boolean
   // Per-account chat routing mode, keyed by profile/account name. Controls
   // both which owa-piggy token audience is minted for default Graph calls
   // and whether chat message reads/sends use graph.microsoft.com or the
@@ -549,6 +550,7 @@ export const defaultSettings: Settings = {
   },
   headerUserFormat: 'full',
   statusBarShowKeyHints: true,
+  headerBarCentered: false,
   chatRoutingByAccount: {},
   chatListWidth: null,
   composerHeight: null,

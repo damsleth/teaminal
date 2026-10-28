@@ -100,7 +100,7 @@ describe('resolveTheme', () => {
     // themeOverrides wins over the custom theme
     expect(theme.layout.modalPaddingY).toBe(3)
     // Untouched keys fall back to the built-in base
-    expect(theme.layout.panePaddingX).toBe(builtinThemes.dark.layout.panePaddingX)
+    expect(theme.layout.senderIndent).toBe(builtinThemes.dark.layout.senderIndent)
     expect(theme.borders.panel).toBe('round')
     expect(theme.emphasis.modalTitleBold).toBe(true)
   })

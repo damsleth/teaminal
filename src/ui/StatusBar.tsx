@@ -49,7 +49,7 @@ export function StatusBar() {
   if (!showKeyHints) hint = attachmentHint ?? ''
 
   return (
-    <Box paddingX={theme.layout.panePaddingX}>
+    <Box paddingX={1}>
       <Text color={theme.mutedText} wrap="truncate-end">
         {hint}
         {filter && inputZone !== 'filter' ? ` · / ${filter}` : ''}

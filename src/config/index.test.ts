@@ -335,7 +335,7 @@ describe('replaceThemeOverrides', () => {
         themeOverrides: {
           selected: 'cyan',
           timestamp: 'gray',
-          layout: { modalPaddingX: 3, panePaddingX: 2 },
+          layout: { modalPaddingX: 3 },
         },
       }),
     )
@@ -463,6 +463,7 @@ describe('Settings ↔ config.json parity', () => {
     },
     headerUserFormat: 'tenant',
     statusBarShowKeyHints: !defaultSettings.statusBarShowKeyHints,
+    headerBarCentered: !defaultSettings.headerBarCentered,
     chatRoutingByAccount: { 'profile-a': 'ic3-only', 'profile-b': 'graph+ic3' },
     chatListCollapsedSections: { meeting: true, 'team:t1': true },
     chatListWidth: 36,

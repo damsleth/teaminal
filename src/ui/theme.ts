@@ -53,9 +53,6 @@ export function inkBorder(style: BorderStyle): Exclude<BorderStyle, 'none'> | ty
 }
 
 export type ThemeLayout = {
-  // paddingX on the App outer box, Composer, HeaderBar, StatusBar,
-  // TailPanels strips, ErrorBoundary.
-  panePaddingX: number
   // paddingX/paddingY on every modal frame and the new-chat prompt.
   modalPaddingX: number
   modalPaddingY: number
@@ -166,7 +163,6 @@ const PRESENCE_DARK: PresenceMap = {
 // Default layout matches today's rendered values after normalizing the
 // EventsModal/NetworkModal padding drift (2 → 3).
 const LAYOUT_DEFAULT: ThemeLayout = {
-  panePaddingX: 1,
   modalPaddingX: 3,
   modalPaddingY: 1,
   // Message body indent (cols) and gap between message groups (rows).
