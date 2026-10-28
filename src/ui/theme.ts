@@ -52,6 +52,17 @@ export function inkBorder(style: BorderStyle): Exclude<BorderStyle, 'none'> | ty
   return style === 'none' ? BLANK_BORDER : style
 }
 
+// Border for an element framed only when `style` isn't 'none': the frame
+// when `active`, a blank one of the same size otherwise (so selection moves
+// don't shift text), nothing at all for 'none'.
+export function reservedBorder(
+  style: BorderStyle,
+  active: boolean,
+): Exclude<BorderStyle, 'none'> | typeof BLANK_BORDER | undefined {
+  if (style === 'none') return undefined
+  return active ? style : BLANK_BORDER
+}
+
 export type ThemeLayout = {
   // paddingX/paddingY on every modal frame and the new-chat prompt.
   modalPaddingX: number
@@ -96,6 +107,14 @@ export type ThemeBorders = {
   // The pane that has input (chat list, conversation, composer), paired with
   // theme.borderActive. Inactive panes keep `panel` + theme.border.
   active: BorderStyle
+  // Frames around elements with a background, each paired with its own
+  // border color token. 'none' (default) draws no frame and takes no space;
+  // any other style reserves the frame on every chat row / message body so
+  // moving the selection or focus doesn't shift text.
+  selectedRow: BorderStyle
+  focusedMessage: BorderStyle
+  selfMessage: BorderStyle
+  senderMessage: BorderStyle
 }
 
 export type ThemeEmphasis = {
@@ -146,6 +165,12 @@ export type Theme = {
   senderMessage: string | null
   // Background behind other people's message bodies; null = none.
   senderMessageBackground: string | null
+  // Frame colors for the borders.* frames; null = theme.borderActive for the
+  // selected row / focused message, theme.border for message bodies.
+  selectedRowBorder: string | null
+  messageFocusBorder: string | null
+  selfMessageBorder: string | null
+  senderMessageBorder: string | null
   // Chat list last-message previews of read chats; null = muted text.
   chatListPreviewText: string | null
   systemEvent: string
@@ -201,7 +226,15 @@ const LAYOUT_DEFAULT: ThemeLayout = {
   avatarIndent: 0,
 }
 
-const BORDERS_DEFAULT: ThemeBorders = { panel: 'round', modal: 'round', active: 'round' }
+const BORDERS_DEFAULT: ThemeBorders = {
+  panel: 'round',
+  modal: 'round',
+  active: 'round',
+  selectedRow: 'none',
+  focusedMessage: 'none',
+  selfMessage: 'none',
+  senderMessage: 'none',
+}
 
 const EMPHASIS_DEFAULT: ThemeEmphasis = {
   modalTitleBold: true,
@@ -255,6 +288,10 @@ const DARK: Theme = {
   selfMessageBackground: null,
   senderMessage: null,
   senderMessageBackground: null,
+  selectedRowBorder: null,
+  messageFocusBorder: null,
+  selfMessageBorder: null,
+  senderMessageBorder: null,
   chatListPreviewText: null,
   systemEvent: 'gray',
   dateMarker: 'gray',
@@ -298,6 +335,10 @@ const LIGHT: Theme = {
   selfMessageBackground: null,
   senderMessage: null,
   senderMessageBackground: null,
+  selectedRowBorder: null,
+  messageFocusBorder: null,
+  selfMessageBorder: null,
+  senderMessageBorder: null,
   chatListPreviewText: null,
   systemEvent: 'gray',
   dateMarker: 'gray',
@@ -332,28 +373,32 @@ export type PartialTheme = {
   base?: BuiltinThemeName
   appBackground?: string | null
   modalBackground?: string | null
-  text?: string
-  mutedText?: string
-  border?: string
-  borderActive?: string
-  selected?: string
-  selectedRow?: string
-  unread?: string
-  unreadRow?: string
-  timestamp?: string
-  sender?: string
+  text?: string | null
+  mutedText?: string | null
+  border?: string | null
+  borderActive?: string | null
+  selected?: string | null
+  selectedRow?: string | null
+  unread?: string | null
+  unreadRow?: string | null
+  timestamp?: string | null
+  sender?: string | null
   selfMessage?: string | null
-  selfName?: string
+  selfName?: string | null
   selfMessageBackground?: string | null
   senderMessage?: string | null
   senderMessageBackground?: string | null
+  selectedRowBorder?: string | null
+  messageFocusBorder?: string | null
+  selfMessageBorder?: string | null
+  senderMessageBorder?: string | null
   chatListPreviewText?: string | null
-  systemEvent?: string
-  dateMarker?: string
-  errorText?: string
-  warnText?: string
-  infoText?: string
-  messageFocusIndicator?: string
+  systemEvent?: string | null
+  dateMarker?: string | null
+  errorText?: string | null
+  warnText?: string | null
+  infoText?: string | null
+  messageFocusIndicator?: string | null
   messageFocusText?: string | null
   messageFocusBackground?: string | null
   selectedRowBackground?: string | null
@@ -397,6 +442,9 @@ export function resolveTheme(
     merged.messageFocusBackground = settings.messageFocusBackgroundColor
   }
 
+  for (const key of PLAIN_COLOR_KEYS) {
+    if ((merged as unknown as Record<string, unknown>)[key] === null) merged[key] = TERMINAL_DEFAULT
+  }
   return flattenAlpha(merged)
 }
 
@@ -535,6 +583,30 @@ export function remainingOverrides(
   const other = base === 'light' ? 'dark' : 'light'
   return overrides[other] ? { [other]: overrides[other] } : {}
 }
+
+// Color tokens that are always drawn with some color. "none" (null) on them
+// means the terminal's own color: a name chalk doesn't know, so Ink writes
+// the text unstyled.
+export const TERMINAL_DEFAULT = 'terminal-default'
+const PLAIN_COLOR_KEYS = [
+  'text',
+  'mutedText',
+  'border',
+  'borderActive',
+  'selected',
+  'selectedRow',
+  'unread',
+  'unreadRow',
+  'timestamp',
+  'sender',
+  'selfName',
+  'systemEvent',
+  'dateMarker',
+  'errorText',
+  'warnText',
+  'infoText',
+  'messageFocusIndicator',
+] as const
 
 function applyColors(theme: Theme, colors: ThemeColorOverrides | undefined): void {
   for (const [key, value] of Object.entries(colors ?? {}) as [

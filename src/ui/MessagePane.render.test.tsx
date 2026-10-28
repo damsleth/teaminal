@@ -388,6 +388,37 @@ test('profile pictures: a column per message, initials at the start of each run'
   }
 })
 
+test('message border styles frame the focused body; other bodies reserve the space', () => {
+  const out = (overrides: object, focused: string | null) => {
+    const store = createAppStore()
+    store.set({
+      settings: { ...store.get().settings, themeOverrides: overrides },
+      focus: { kind: 'chat', chatId: 'c1' },
+      messagesByConvo: { 'chat:c1': MESSAGES },
+    })
+    return plain(
+      renderToString(
+        <StoreProvider store={store}>
+          <SessionProvider api={session}>
+            <Box flexDirection="column" height={60}>
+              <MessagePane focusedMessageId={focused} focusIndicatorActive />
+            </Box>
+          </SessionProvider>
+        </StoreProvider>,
+        { columns: 80 },
+      ),
+    ).split('\n')
+  }
+  const framed = out({ borders: { focusedMessage: 'single' } }, 'm6')
+  const body = framed.findIndex((l) => l.includes('third day, newest message'))
+  expect(framed[body - 1]).toContain('┌')
+  expect(framed[body]).toMatch(/│.*third day, newest message.*│/)
+  // Unfocused bodies: blank frame, no lines.
+  const other = framed.findIndex((l) => l.includes('third day, first message'))
+  expect(framed[other]).not.toContain('│')
+  expect(framed.filter((l) => l.includes('┌'))).toHaveLength(1)
+})
+
 test('the search bar stays intact above an overflowing timeline', () => {
   const out = lines(8, null, 'newest')
   expect(out.filter((l) => l.includes('hit(s)'))).toHaveLength(1)

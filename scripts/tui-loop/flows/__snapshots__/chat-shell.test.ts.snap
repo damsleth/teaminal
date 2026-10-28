@@ -132,6 +132,8 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColor": 6
   },
   "1,5": {
+    "bgColorMode": 33554432,
+    "bgColor": 235,
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -140,6 +142,8 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColor": 8
   },
   "26,5": {
+    "bgColorMode": 0,
+    "bgColor": -1,
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -810,6 +814,8 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColor": 6
   },
   "1,5": {
+    "bgColorMode": 33554432,
+    "bgColor": 235,
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -818,6 +824,8 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColor": 8
   },
   "26,5": {
+    "bgColorMode": 0,
+    "bgColor": -1,
     "fgColorMode": 0,
     "fgColor": -1
   },

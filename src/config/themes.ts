@@ -82,7 +82,13 @@ const COLOR_KEYS = new Set([
   'messageFocusIndicator',
 ])
 
+// Every color takes null ("none"); these also have no plain default.
 const NULLABLE_COLOR_KEYS = new Set([
+  ...COLOR_KEYS,
+  'selectedRowBorder',
+  'messageFocusBorder',
+  'selfMessageBorder',
+  'senderMessageBorder',
   'chatListPreviewText',
   'selfMessage',
   'modalBackground',

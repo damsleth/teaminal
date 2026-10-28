@@ -22,7 +22,7 @@
 // wired in ThemeEditorModal.
 
 import { defaultSettings, type Settings, type ThemeOverrides } from '../state/store'
-import { BORDER_STYLES, type BuiltinThemeName, type Theme } from './theme'
+import { BORDER_STYLES, TERMINAL_DEFAULT, type BuiltinThemeName, type Theme } from './theme'
 
 export type FieldKind = 'numeric' | 'color' | 'enum' | 'boolean'
 export type FieldGroup = 'color' | 'layout' | 'borders' | 'emphasis' | 'fontSize' | 'setting'
@@ -54,6 +54,9 @@ export type NumericField = BaseField & {
   min: number
   max: number
   step: number
+  // When set, null is a value too (shown as this label, e.g. "auto"):
+  // stepping below `min` reaches it, stepping up from it lands on `min`.
+  nullLabel?: string
 }
 export type ColorField = BaseField & {
   kind: 'color'
@@ -140,11 +143,7 @@ const num = (
   max,
   step,
 })
-const border = (
-  key: 'panel' | 'modal' | 'active',
-  label: string,
-  section: EditorSection,
-): EnumField => ({
+const border = (key: keyof Theme['borders'], label: string, section: EditorSection): EnumField => ({
   kind: 'enum',
   id: `borders.${key}`,
   label,
@@ -173,10 +172,10 @@ const bool = (
 export const FIELDS: readonly EditableField[] = [
   // — General —
   color('appBackground', 'Background', 'General', true),
-  color('text', 'Text', 'General'),
-  color('mutedText', 'Muted text', 'General'),
-  color('border', 'Border', 'General'),
-  color('borderActive', 'Active border', 'General'),
+  color('text', 'Text', 'General', true),
+  color('mutedText', 'Muted text', 'General', true),
+  color('border', 'Border', 'General', true),
+  color('borderActive', 'Active border', 'General', true),
   border('panel', 'Panel border', 'General'),
   border('active', 'Active pane border', 'General'),
   bool('sectionHeadingBold', 'Section heading bold', 'General'),
@@ -189,35 +188,49 @@ export const FIELDS: readonly EditableField[] = [
   bool('modalTitleBold', 'Modal title bold', 'Modals'),
   bool('inlineKeyBold', 'Inline key bold', 'Modals'),
   // — Chat list —
-  color('selected', 'Selected', 'Chat list'),
-  color('selectedRow', 'Selected row', 'Chat list'),
+  color('selected', 'Selected', 'Chat list', true),
+  color('selectedRow', 'Selected row', 'Chat list', true),
   color('selectedRowBackground', 'Selected row bg', 'Chat list', true),
   bool('selectedBold', 'Selected bold', 'Chat list'),
-  color('unread', 'Unread', 'Chat list'),
-  color('unreadRow', 'Unread row', 'Chat list'),
+  color('unread', 'Unread', 'Chat list', true),
+  color('unreadRow', 'Unread row', 'Chat list', true),
   bool('unreadBold', 'Unread bold', 'Chat list'),
+  border('selectedRow', 'Selected row border', 'Chat list'),
+  color('selectedRowBorder', 'Selected row border color', 'Chat list', true),
   color('chatListPreviewText', 'Preview text', 'Chat list', true),
   num('layout', 'chatListIndent', 'Indent', 'Chat list', 0, 6),
   num('layout', 'chatListGap', 'Gap', 'Chat list', 0, 3),
   num('fontSize', 'chatListHeader', 'Header size', 'Chat list', 50, 100, 10),
   num('fontSize', 'chatListName', 'Name size', 'Chat list', 50, 100, 10),
   num('fontSize', 'chatListPreview', 'Preview size', 'Chat list', 50, 100, 10),
+  {
+    kind: 'numeric',
+    id: 'setting.chatListWidth',
+    label: 'Width',
+    section: 'Chat list',
+    group: 'setting',
+    key: 'chatListWidth',
+    min: 16,
+    max: 60,
+    step: 2,
+    nullLabel: 'auto',
+  },
   // — Sender & time —
   num('fontSize', 'paneHeader', 'Chat header size', 'Sender & time', 50, 100, 10),
-  color('sender', 'Sender', 'Sender & time'),
-  color('selfName', 'Self name', 'Sender & time'),
+  color('sender', 'Sender', 'Sender & time', true),
+  color('selfName', 'Self name', 'Sender & time', true),
   bool('senderBold', 'Sender bold', 'Sender & time'),
   num('fontSize', 'sender', 'Sender size', 'Sender & time', 50, 100, 10),
   num('layout', 'senderIndent', 'Sender indent', 'Sender & time', 0, 40),
   num('layout', 'avatarIndent', 'Picture indent', 'Sender & time', 0, 40),
-  color('timestamp', 'Timestamp', 'Sender & time'),
+  color('timestamp', 'Timestamp', 'Sender & time', true),
   num('fontSize', 'timestamp', 'Timestamp size', 'Sender & time', 50, 100, 10),
   // — Message text —
   color('senderMessage', 'Sender message', 'Message text', true),
   color('senderMessageBackground', 'Sender message bg', 'Message text', true),
   color('selfMessage', 'Self message', 'Message text', true),
   color('selfMessageBackground', 'Self message bg', 'Message text', true),
-  color('systemEvent', 'System event', 'Message text'),
+  color('systemEvent', 'System event', 'Message text', true),
   num('fontSize', 'messageText', 'Text size', 'Message text', 50, 100, 10),
   num('layout', 'paneHeaderPaddingLeft', 'Body indent', 'Message text', 0, 40),
   num('layout', 'paneHeaderMarginBottom', 'Message gap', 'Message text', 0, 4, 0.5),
@@ -225,20 +238,26 @@ export const FIELDS: readonly EditableField[] = [
   num('layout', 'textBackgroundPaddingX', 'Bg padding X', 'Message text', 0, 3),
   num('layout', 'textBackgroundPaddingY', 'Bg padding Y', 'Message text', 0, 2),
   num('layout', 'textBackgroundRadius', 'Bg rounded', 'Message text', 0, 1),
+  border('senderMessage', 'Sender message border', 'Message text'),
+  color('senderMessageBorder', 'Sender message border color', 'Message text', true),
+  border('selfMessage', 'Self message border', 'Message text'),
+  color('selfMessageBorder', 'Self message border color', 'Message text', true),
   // — Focused message —
-  color('messageFocusIndicator', 'Focus marker', 'Focused message'),
+  color('messageFocusIndicator', 'Focus marker', 'Focused message', true),
   color('messageFocusText', 'Focus text', 'Focused message', true),
   color('messageFocusBackground', 'Focus background', 'Focused message', true),
   bool('focusedBold', 'Focused bold', 'Focused message'),
+  border('focusedMessage', 'Focus border', 'Focused message'),
+  color('messageFocusBorder', 'Focus border color', 'Focused message', true),
   // — Date markers —
-  color('dateMarker', 'Date marker', 'Date markers'),
+  color('dateMarker', 'Date marker', 'Date markers', true),
   bool('dateMarkerBold', 'Date marker bold', 'Date markers'),
   num('layout', 'dateMarkerIndent', 'Date marker indent', 'Date markers', 0, 12),
   num('fontSize', 'dateMarker', 'Date marker size', 'Date markers', 50, 100, 10),
   // — Status text —
-  color('errorText', 'Error text', 'Status text'),
-  color('warnText', 'Warn text', 'Status text'),
-  color('infoText', 'Info text', 'Status text'),
+  color('errorText', 'Error text', 'Status text', true),
+  color('warnText', 'Warn text', 'Status text', true),
+  color('infoText', 'Info text', 'Status text', true),
   // — Images —
   num('setting', 'inlineImageMaxRows', 'Inline image max rows', 'Images', 1, 50),
   {
@@ -257,12 +276,14 @@ export const FIELDS: readonly EditableField[] = [
 // preview.
 export function fieldValue(field: EditableField, theme: Theme, settings: Settings): FieldValue {
   switch (field.group) {
-    case 'color':
-      return (
+    case 'color': {
+      const value =
         theme.rawColors?.[field.key] ??
         (theme as unknown as Record<string, string | null>)[field.key] ??
         null
-      )
+      // "none" on an always-drawn token resolves to the terminal default.
+      return value === TERMINAL_DEFAULT ? null : value
+    }
     case 'layout':
       return (theme.layout as unknown as Record<string, number>)[field.key]!
     case 'borders':
@@ -335,6 +356,10 @@ export function cycleEnum(field: EnumField, current: FieldValue, dir: 1 | -1): s
 export function nextFieldValue(field: EditableField, current: FieldValue, dir: 1 | -1): FieldValue {
   switch (field.kind) {
     case 'numeric':
+      if (field.nullLabel !== undefined) {
+        if (current === null) return dir > 0 ? field.min : null
+        if (typeof current === 'number' && dir < 0 && current <= field.min) return null
+      }
       return clampNumeric(
         field,
         (typeof current === 'number' ? current : field.min) + dir * field.step,

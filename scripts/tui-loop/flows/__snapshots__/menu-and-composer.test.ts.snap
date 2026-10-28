@@ -110,6 +110,8 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColor": 8
   },
   "1,5": {
+    "bgColorMode": 33554432,
+    "bgColor": 235,
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -118,6 +120,8 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColor": 8
   },
   "26,5": {
+    "bgColorMode": 0,
+    "bgColor": -1,
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -708,6 +712,8 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColor": 8
   },
   "1,5": {
+    "bgColorMode": 33554432,
+    "bgColor": 235,
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -716,6 +722,8 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColor": 8
   },
   "26,5": {
+    "bgColorMode": 0,
+    "bgColor": -1,
     "fgColorMode": 0,
     "fgColor": -1
   },

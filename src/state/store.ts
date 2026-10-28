@@ -246,28 +246,32 @@ export type ThemePresenceKey =
 export type ThemeColorOverrides = {
   appBackground?: string | null
   modalBackground?: string | null
-  text?: string
-  mutedText?: string
-  border?: string
-  borderActive?: string
-  selected?: string
-  selectedRow?: string
-  unread?: string
-  unreadRow?: string
-  timestamp?: string
-  sender?: string
+  text?: string | null
+  mutedText?: string | null
+  border?: string | null
+  borderActive?: string | null
+  selected?: string | null
+  selectedRow?: string | null
+  unread?: string | null
+  unreadRow?: string | null
+  timestamp?: string | null
+  sender?: string | null
   selfMessage?: string | null
-  selfName?: string
+  selfName?: string | null
   selfMessageBackground?: string | null
   senderMessage?: string | null
   senderMessageBackground?: string | null
+  selectedRowBorder?: string | null
+  messageFocusBorder?: string | null
+  selfMessageBorder?: string | null
+  senderMessageBorder?: string | null
   chatListPreviewText?: string | null
-  systemEvent?: string
-  dateMarker?: string
-  errorText?: string
-  warnText?: string
-  infoText?: string
-  messageFocusIndicator?: string
+  systemEvent?: string | null
+  dateMarker?: string | null
+  errorText?: string | null
+  warnText?: string | null
+  infoText?: string | null
+  messageFocusIndicator?: string | null
   messageFocusText?: string | null
   messageFocusBackground?: string | null
   selectedRowBackground?: string | null
@@ -296,6 +300,10 @@ export type ThemeOverrides = ThemeColorOverrides & {
     panel: BorderStyleName
     modal: BorderStyleName
     active: BorderStyleName
+    selectedRow: BorderStyleName
+    focusedMessage: BorderStyleName
+    selfMessage: BorderStyleName
+    senderMessage: BorderStyleName
   }>
   emphasis?: Partial<{
     modalTitleBold: boolean

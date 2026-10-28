@@ -29,7 +29,7 @@ import {
   initialsKey,
   isGeneratedKey,
 } from './avatarImage'
-import { rgbOf } from './theme'
+import { reservedBorder, rgbOf } from './theme'
 import type { InlineImageSlots } from './inlineImageLayout'
 import { isKittyCapable } from './kittyGraphics'
 import { requestKittyPaint, setKittyOwner } from './kittyPainter'
@@ -279,9 +279,12 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const rows = buildRows(items, syntheticNewChatQuery)
   const chatListGap = theme.layout.chatListGap
   const chatListIndent = theme.layout.chatListIndent
+  // A selected-row border style frames the selected row; every row reserves
+  // the frame's columns / rows so moving the cursor doesn't shift the list.
+  const rowFrame = theme.borders.selectedRow !== 'none' ? 2 : 0
   const labelWidthFor = Math.max(
     1,
-    labelContentWidth(showPresence, chatListIndent, listPaneWidth) - thumbColumn,
+    labelContentWidth(showPresence, chatListIndent, listPaneWidth) - thumbColumn - rowFrame,
   )
   // Picture for a row: the other person's photo for 1:1 chats, the team
   // picture for channels. Group / meeting chats have no picture in Graph, so
@@ -335,7 +338,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
       if (preview) h += preview.split('\n').length
     }
     if (hasPictureColumn(row.item)) h = Math.max(h, thumbRows)
-    return row.item.kind === 'team' || row.item.kind === 'section' ? h : h + chatListGap
+    return row.item.kind === 'team' || row.item.kind === 'section' ? h : h + rowFrame + chatListGap
   })
 
   // Anchor the viewport on the cursor row, then fill the visual-line
@@ -526,13 +529,18 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
             : labelText
         const withPicture = hasPictureColumn(row.item)
         const picture = withPicture ? pictureFor(row.item) : null
-        const rowWidth = previewContentWidth - (withPicture ? thumbColumn : 0)
+        const rowWidth = previewContentWidth - rowFrame - (withPicture ? thumbColumn : 0)
+        // The selected background covers the whole element: picture column,
+        // name line and preview.
         return (
           <Box
             key={`${row.item.kind}-${row.index}`}
             flexDirection="row"
             flexShrink={0}
             marginBottom={chatListGap}
+            backgroundColor={rowBg}
+            borderStyle={reservedBorder(theme.borders.selectedRow, isSelected)}
+            borderColor={theme.selectedRowBorder ?? theme.borderActive}
           >
             {withPicture && (
               <Box width={thumbColumn} flexShrink={0}>
@@ -559,7 +567,9 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
               <Box flexDirection="row" backgroundColor={rowBg}>
                 {showPresence && (
                   <Box width={GLYPH_WIDTH + chatListIndent} flexShrink={0}>
-                    <Text color={presenceColor}>{presenceText}</Text>
+                    <Text color={presenceColor} backgroundColor={rowBg}>
+                      {presenceText}
+                    </Text>
                   </Box>
                 )}
                 <Box width={labelWidth} flexShrink={0} backgroundColor={rowBg}>
@@ -583,6 +593,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
                       hasUnread ? theme.unread : (theme.chatListPreviewText ?? theme.mutedText)
                     }
                     bold={hasUnread && theme.emphasis.unreadBold}
+                    backgroundColor={rowBg}
                     wrap="wrap"
                   >
                     {fs(preview, theme.fontSize.chatListPreview, theme.fontSize.tightSpacing)}

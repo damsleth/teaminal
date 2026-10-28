@@ -405,7 +405,10 @@ function FieldRow(props: {
       )
     }
   } else {
-    const base = formatFieldValue(value)
+    const base =
+      value === null && field.kind === 'numeric' && field.nullLabel
+        ? field.nullLabel
+        : formatFieldValue(value)
     const hint = selected && field.kind === 'numeric' ? ` (${field.min}–${field.max})` : ''
     valueText = base + hint
     valueNode = (

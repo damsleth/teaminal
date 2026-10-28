@@ -59,6 +59,10 @@ const THEME_KEYS = new Set<keyof ThemeOverrides>([
   'selfMessageBackground',
   'senderMessage',
   'senderMessageBackground',
+  'selectedRowBorder',
+  'messageFocusBorder',
+  'selfMessageBorder',
+  'senderMessageBorder',
   'chatListPreviewText',
   'appBackground',
   'systemEvent',
@@ -110,6 +114,10 @@ const BORDERS_KEYS = new Set<keyof NonNullable<ThemeOverrides['borders']>>([
   'panel',
   'modal',
   'active',
+  'selectedRow',
+  'focusedMessage',
+  'selfMessage',
+  'senderMessage',
 ])
 
 const EMPHASIS_KEYS = new Set<keyof NonNullable<ThemeOverrides['emphasis']>>([
@@ -512,6 +520,7 @@ export const PRESET_SETTING_KEYS = [
   'inlineImages',
   'inlineImageMaxRows',
   'messageAvatars',
+  'chatListWidth',
   'selfMessagesOnRight',
   'showOwnNameInPane',
   'messageFocusIndicatorEnabled',
@@ -907,19 +916,9 @@ export function validateThemeOverrides(
       continue
     }
 
-    if (
-      (key === 'modalBackground' ||
-        key === 'appBackground' ||
-        key === 'messageFocusBackground' ||
-        key === 'selectedRowBackground' ||
-        key === 'selfMessageBackground' ||
-        key === 'senderMessage' ||
-        key === 'selfMessage' ||
-        key === 'senderMessageBackground' ||
-        key === 'chatListPreviewText' ||
-        key === 'messageFocusText') &&
-      rawValue === null
-    ) {
+    // Every color takes null ("none"): the terminal's own color, or no
+    // background / frame color for the nullable ones.
+    if (rawValue === null) {
       ;(out[key] as string | null) = null
       continue
     }

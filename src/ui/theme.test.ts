@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 import { defaultSettings } from '../state/store'
-import { blendAlpha, builtinThemes, getTheme, modalBg, resolveTheme } from './theme'
+import {
+  blendAlpha,
+  builtinThemes,
+  getTheme,
+  modalBg,
+  resolveTheme,
+  TERMINAL_DEFAULT,
+} from './theme'
 
 describe('getTheme', () => {
   test('returns clones of built-in themes', () => {
@@ -181,5 +188,19 @@ describe('modalBg', () => {
     const fill = modalBg({ ...dark, modalBackground: null, appBackground: null })
     expect(fill).toBeTruthy()
     expect(fill in (require('chalk').default as object)).toBe(false)
+  })
+})
+
+describe('"none" colors', () => {
+  test('none on an always-drawn color resolves to the terminal default', () => {
+    const theme = resolveTheme({
+      ...defaultSettings,
+      theme: 'dark',
+      themeOverrides: { dark: { text: null, border: null } },
+    })
+    expect(theme.text).toBe(TERMINAL_DEFAULT)
+    expect(theme.border).toBe(TERMINAL_DEFAULT)
+    // Nullable tokens keep null (their own meaning: no background etc.).
+    expect(theme.selectedRowBorder).toBeNull()
   })
 })
