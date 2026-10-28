@@ -124,6 +124,7 @@ export function DiagnosticsModal() {
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
         width={80}
+        maxWidth="100%"
       >
         <Text bold={theme.emphasis.modalTitleBold}>Diagnostics</Text>
         <Box height={1} />
