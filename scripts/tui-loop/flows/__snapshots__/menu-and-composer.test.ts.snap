@@ -7,14 +7,14 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
 │╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
 ││ ◯ Ada Byron              ││Select a chat or channel · Enter to open · q to quit                  ││
-││   Ada: The launch notes  ││                                                                      ││
-││   are ready for review.  ││                                                                      ││
+││   Ada: The launch notes… ││                                                                      ││
 ││  Design Sync            ││                                                                      ││
-││   Nina: Nina shared two  ││                                                                      ││
-││   compact layout option… ││                                                                      ││
-││  Ops╭────────────────────────────────────────────────────────────────────────────────────╮      ││
-││   Min│                                                                                    │      ││
-││   in │   Notifications                                                                    │      ││
+││   Nina: Nina shared two… ││                                                                      ││
+││  Ops Channel            ││                                                                      ││
+││   Mina: Deploy is green… ││                                                                      ││
+││      ╭────────────────────────────────────────────────────────────────────────────────────╮      ││
+││      │                                                                                    │      ││
+││      │   Notifications                                                                    │      ││
 ││      │                                                                                    │      ││
 ││      │   (no notifications)                                                               │      ││
 ││      │                                                                                    │      ││
@@ -133,15 +133,7 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,6": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "4,6": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "25,6": {
+  "2,6": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -157,7 +149,15 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "2,7": {
+  "1,7": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "26,7": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -173,15 +173,7 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,8": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "4,8": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "26,8": {
+  "2,8": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -221,7 +213,7 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "2,10": {
+  "1,10": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -240,10 +232,6 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
   "1,11": {
     "fgColorMode": 0,
     "fgColor": -1
-  },
-  "4,11": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
   },
   "7,11": {
     "fgColorMode": 16777216,
@@ -272,10 +260,6 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
   "1,12": {
     "fgColorMode": 0,
     "fgColor": -1
-  },
-  "4,12": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
   },
   "7,12": {
     "fgColorMode": 16777216,
@@ -613,14 +597,14 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
 │╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
 ││ ◯ Ada Byron              ││ Older history unavailable until poller pagination is wired           ││
-││   Ada: The launch notes  ││ Fri, May 29                                                          ││
-││   are ready for review.  ││  You  09:00                                                          ││
-││  Design Sync            ││  I will read them now.                                               ││
-││   Nina: Nina shared two  ││                                                                      ││
-││   compact layout option… ││  Ada  09:01                                                          ││
-││  Ops Channel            ││  The launch notes are ready for review.                              ││
-││   Mina: Deploy is green  ││                                                                      ││
-││   in the EU region.      ││                                                                      ││
+││   Ada: The launch notes… ││ Fri, May 29                                                          ││
+││  Design Sync            ││  You  09:00                                                          ││
+││   Nina: Nina shared two… ││  I will read them now.                                               ││
+││  Ops Channel            ││                                                                      ││
+││   Mina: Deploy is green… ││  Ada  09:01                                                          ││
+││                          ││  The launch notes are ready for review.                              ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
 ││                          ││                                                                      ││
 ││                          ││                                                                      ││
 ││                          ││                                                                      ││
@@ -757,15 +741,7 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,6": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "4,6": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "25,6": {
+  "2,6": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -795,7 +771,15 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "2,7": {
+  "1,7": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "26,7": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -819,15 +803,7 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,8": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "4,8": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "26,8": {
+  "2,8": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -881,7 +857,7 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "2,10": {
+  "1,10": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -901,14 +877,6 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "4,11": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "26,11": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
   "27,11": {
     "fgColorMode": 16777216,
     "fgColor": 8
@@ -922,14 +890,6 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColor": 8
   },
   "1,12": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "4,12": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "21,12": {
     "fgColorMode": 0,
     "fgColor": -1
   },

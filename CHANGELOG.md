@@ -128,6 +128,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Preview lines in chat list.** `showMessagePreviews` is replaced by
+  `chatListPreviewLines` (menu → Settings → Preview lines in chat list):
+  off, 1, 2 or 3 lines, default 1. Previews now wrap on words and never run
+  past that many lines (two-line previews could spill onto a third). An
+  existing `showMessagePreviews: false` reads as off.
+
 - **Modals overlay the whole app.** Menus, Notifications (Ctrl+A), the theme
   editor and the other overlays center over both the chat list and the
   conversation instead of only the conversation pane, so they fit without

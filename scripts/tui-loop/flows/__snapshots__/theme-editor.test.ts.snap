@@ -8,13 +8,13 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 │╭────────────────│                                                                │────────────────╮│
 ││ ◯ Ada Byron    │   Theme editor · dark colors                                   │                ││
 ││   Ada: The laun│   • = overridden · adjust live, persists to config             │                ││
-││   are ready for│   ── Spacing / Layout                                          │                ││
-││  Design Sync  │   >   Modal padding X       3 (0–8)                            │                ││
-││   Nina: Nina sh│       Modal padding Y       1                                  │                ││
-││   compact layou│       Message body indent   2                                  │                ││
-││  Ops Channel  │       Sender indent         2                                  │                ││
-││   Mina: Deploy │       Message gap           1                                  │                ││
-││   in the EU reg│       Chat list indent      1                                  │                ││
+││  Design Sync  │   ── Spacing / Layout                                          │                ││
+││   Nina: Nina sh│   >   Modal padding X       3 (0–8)                            │                ││
+││  Ops Channel  │       Modal padding Y       1                                  │                ││
+││   Mina: Deploy │       Message body indent   2                                  │                ││
+││                │       Sender indent         2                                  │                ││
+││                │       Message gap           1                                  │                ││
+││                │       Chat list indent      1                                  │                ││
 ││                │       Chat list gap         0                                  │                ││
 ││                │       Text bg padding X     0                                  │                ││
 ││                │      ↓ 43 more                                                 │                ││
@@ -189,13 +189,9 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,6": {
+  "2,6": {
     "fgColorMode": 0,
     "fgColor": -1
-  },
-  "4,6": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
   },
   "17,6": {
     "fgColorMode": 16777216,
@@ -229,9 +225,13 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "2,7": {
+  "1,7": {
     "fgColorMode": 0,
     "fgColor": -1
+  },
+  "4,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
   },
   "17,7": {
     "fgColorMode": 16777216,
@@ -281,13 +281,9 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,8": {
+  "2,8": {
     "fgColorMode": 0,
     "fgColor": -1
-  },
-  "4,8": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
   },
   "17,8": {
     "fgColorMode": 16777216,
@@ -377,7 +373,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "2,10": {
+  "1,10": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -425,10 +421,6 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "4,11": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
   "17,11": {
     "fgColorMode": 16777216,
     "fgColor": 6
@@ -472,10 +464,6 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
   "1,12": {
     "fgColorMode": 0,
     "fgColor": -1
-  },
-  "4,12": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
   },
   "17,12": {
     "fgColorMode": 16777216,

@@ -279,7 +279,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     chatListGroupByType: settings.chatListGroupByType,
     chatListSectionCap: settings.chatListSectionCap,
     chatListShortNames: settings.chatListShortNames,
-    showMessagePreviews: settings.showMessagePreviews,
+    chatListPreviewLines: settings.chatListPreviewLines,
     messagePaneShortNames: settings.messagePaneShortNames,
     showChatNameHeader: settings.showChatNameHeader,
     showPresenceInList: settings.showPresenceInList,
@@ -322,6 +322,11 @@ export function mergeSettings(input: Record<string, unknown>, warnings: string[]
   for (const [key, value] of Object.entries(input)) {
     // Removed settings (chatListDensity is pinned to compact).
     if (key === 'windowHeight' || key === 'chatListDensity') {
+      continue
+    }
+    // Legacy boolean, replaced by chatListPreviewLines (which wins if set).
+    if (key === 'showMessagePreviews') {
+      if (value === false && !('chatListPreviewLines' in input)) out.chatListPreviewLines = 0
       continue
     }
     // Legacy key (pre chatRoutingByAccount): the binary audience preference.
@@ -521,7 +526,6 @@ function validateAndAssign(
     case 'chatListGroupByType':
     case 'chatListSectionCap':
     case 'chatListShortNames':
-    case 'showMessagePreviews':
     case 'messagePaneShortNames':
     case 'showChatNameHeader':
     case 'showPresenceInList':
@@ -611,6 +615,13 @@ function validateAndAssign(
         return true
       }
       warnings.push('config: "inlineImages" must be "auto" or "off"')
+      return false
+    case 'chatListPreviewLines':
+      if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 3) {
+        out.chatListPreviewLines = value
+        return true
+      }
+      warnings.push('config: "chatListPreviewLines" must be an integer between 0 and 3')
       return false
     case 'inlineImageMaxRows':
       if (typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 50) {

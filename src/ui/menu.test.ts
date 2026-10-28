@@ -201,7 +201,7 @@ describe('ROOT_MENU shape', () => {
       'chatListGroupByType',
       'chatListSectionCap',
       'chatListShortNames',
-      'showMessagePreviews',
+      'chatListPreviewLines',
       'showPresenceInList',
       // Messages
       'showChatNameHeader',

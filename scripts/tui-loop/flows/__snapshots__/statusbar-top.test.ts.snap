@@ -9,17 +9,17 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
 │╭──────────╮╭────────────────────────────────────╮│
 ││ ◯ Ada    ││Select a chat or channel · Enter to ││
 ││   Byron  ││open · q to quit                    ││
-││   Ada:   ││                                    ││
-││   The    ││                                    ││
-││   la…    ││                                    ││
+││   Ada:…  ││                                    ││
 ││  Design ││                                    ││
 ││    Sync  ││                                    ││
-││   Nina:  ││                                    ││
-││   Nina…  ││                                    ││
+││   Nina:… ││                                    ││
 ││  Ops Ch ││                                    ││
 ││   annel  ││                                    ││
-││   Mina:  ││                                    ││
-││   Deplo… ││                                    ││
+││   Mina:… ││                                    ││
+││          ││                                    ││
+││          ││                                    ││
+││          ││                                    ││
+││          ││                                    ││
 ││          ││                                    ││
 ││          ││                                    ││
 ││          ││                                    ││
@@ -202,14 +202,10 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,8": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "4,8": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "8,8": {
+  "2,8": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -237,14 +233,6 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "4,9": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "7,9": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
   "11,9": {
     "fgColorMode": 16777216,
     "fgColor": 6
@@ -266,10 +254,14 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,10": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,10": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "2,10": {
+  "10,10": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -294,6 +286,10 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "2,11": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -318,14 +314,6 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,12": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "4,12": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "10,12": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -357,7 +345,7 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "9,13": {
+  "10,13": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -382,10 +370,6 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,14": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "2,14": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -437,14 +421,6 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "4,16": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "10,16": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
   "11,16": {
     "fgColorMode": 16777216,
     "fgColor": 6
@@ -466,14 +442,6 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,17": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "4,17": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "10,17": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -720,14 +688,14 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
 │╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
 ││ ◯ Ada Byron              ││Select a chat or channel · Enter to open · q to quit                  ││
-││   Ada: The launch notes  ││                                                                      ││
-││   are ready for review.  ││                                                                      ││
+││   Ada: The launch notes… ││                                                                      ││
 ││  Design Sync            ││                                                                      ││
-││   Nina: Nina shared two  ││                                                                      ││
-││   compact layout option… ││                                                                      ││
+││   Nina: Nina shared two… ││                                                                      ││
 ││  Ops Channel            ││                                                                      ││
-││   Mina: Deploy is green  ││                                                                      ││
-││   in the EU region.      ││                                                                      ││
+││   Mina: Deploy is green… ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
 ││                          ││                                                                      ││
 ││                          ││                                                                      ││
 ││                          ││                                                                      ││
@@ -888,14 +856,10 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 6
   },
   "1,7": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "4,7": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "25,7": {
+  "2,7": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -920,10 +884,14 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 6
   },
   "1,8": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,8": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "2,8": {
+  "26,8": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -948,14 +916,10 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 6
   },
   "1,9": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "4,9": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "26,9": {
+  "2,9": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -1012,10 +976,6 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 6
   },
   "1,11": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "2,11": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -1043,14 +1003,6 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "4,12": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "26,12": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
   "27,12": {
     "fgColorMode": 16777216,
     "fgColor": 6
@@ -1072,14 +1024,6 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 6
   },
   "1,13": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "4,13": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "21,13": {
     "fgColorMode": 0,
     "fgColor": -1
   },

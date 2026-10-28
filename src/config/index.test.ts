@@ -424,7 +424,7 @@ describe('Settings ↔ config.json parity', () => {
     chatListGroupByType: !defaultSettings.chatListGroupByType,
     chatListSectionCap: !defaultSettings.chatListSectionCap,
     chatListShortNames: !defaultSettings.chatListShortNames,
-    showMessagePreviews: !defaultSettings.showMessagePreviews,
+    chatListPreviewLines: 3,
     messagePaneShortNames: !defaultSettings.messagePaneShortNames,
     showChatNameHeader: !defaultSettings.showChatNameHeader,
     showPresenceInList: !defaultSettings.showPresenceInList,

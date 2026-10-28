@@ -329,10 +329,10 @@ export type Settings = {
   // is preserved out of the box; users with mostly-internal contacts
   // can flip this on.
   chatListShortNames: boolean
-  // When true (default), each chat row in the sidebar renders up to two
-  // non-indented lines with the start of the last message — light gray for
-  // read chats, the unread color for chats with unread messages. Turn off for a denser, single-line-per-chat list.
-  showMessagePreviews: boolean
+  // Lines of last-message preview under each sidebar chat row, 0 (off) to 3.
+  // Shorter previews take fewer lines. Light gray for read chats, the unread
+  // color for unread ones. Default 1.
+  chatListPreviewLines: number
   // When true (default), the message pane renders the sender column as
   // first-name only ("Finn") instead of the full display name
   // ("Nordling, Finn Saethre"). Independent of `chatListShortNames` so
@@ -510,7 +510,7 @@ export const defaultSettings: Settings = {
   chatListSectionCap: true,
   chatListCollapsedSections: {},
   chatListShortNames: false,
-  showMessagePreviews: true,
+  chatListPreviewLines: 1,
   messagePaneShortNames: true,
   showChatNameHeader: false,
   showPresenceInList: true,
