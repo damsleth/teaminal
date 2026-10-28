@@ -11,7 +11,7 @@ import { getConfigPath, loadSettings } from '../config'
 import { getThemePath, loadThemeFile } from '../config/themes'
 import { warn } from '../log'
 import type { AppState, Store } from '../state/store'
-import { isKittyCapable } from './kittyGraphics'
+import { kittyKeyboardEnabled } from './kittyKeyboard'
 
 type Spawn = (cmd: string, args: string[]) => Pick<SpawnSyncReturns<Buffer>, 'status' | 'error'>
 
@@ -29,7 +29,7 @@ export function runEditor(
 ): boolean {
   const stdin = process.stdin
   const wasRaw = stdin.isTTY && stdin.isRaw
-  const kitty = isKittyCapable()
+  const kitty = kittyKeyboardEnabled()
   if (wasRaw) stdin.setRawMode(false)
   if (kitty) process.stdout.write('\x1b[<u')
   try {

@@ -12,7 +12,12 @@ import { isSeededMode } from '../src/state/seedFixtures'
 import { App } from '../src/ui/App'
 import { ErrorBoundary } from '../src/ui/ErrorBoundary'
 import { startFocusTracker } from '../src/ui/focusTracker'
-import { isKittyCapable, probeCellAspect } from '../src/ui/kittyGraphics'
+import { probeCellAspect } from '../src/ui/kittyGraphics'
+import {
+  kittyKeyboardEnabled,
+  probeKittyKeyboard,
+  setKittyKeyboardEnabled,
+} from '../src/ui/kittyKeyboard'
 import { installTextSizing, probeTextSizing } from '../src/ui/textSizing'
 import { cleanupImageTempFiles } from '../src/ui/openImageFile'
 import { renderCleanExit } from '../src/ui/shutdown'
@@ -134,6 +139,10 @@ if (!isSeededMode()) await probeCellAspect()
 // Same pre-Ink window: detect kitty text sizing (OSC 66). When present, the
 // theme's per-element font sizes are rewritten into OSC 66 on the way out.
 if (!isSeededMode() && (await probeTextSizing())) installTextSizing(process.stdout)
+// Same pre-Ink window: ask the terminal whether it speaks the kitty keyboard
+// protocol. Runs in seeded mode too (it draws nothing), so the tui flows
+// exercise the probe-then-Ink handoff in a terminal that answers.
+setKittyKeyboardEnabled(await probeKittyKeyboard())
 
 const store = createAppStore()
 
@@ -198,9 +207,10 @@ const ink = render(
   // macOS setups) then coalesces 2-3 cursor steps into one paint and
   // list scrolling visibly jumps. 60fps keeps one paint per step.
   // The kitty keyboard protocol tells Ctrl+Enter (send) apart from Enter
-  // (newline) in the composer. Env-gated rather than Ink's 'auto', which
-  // probes stdin with a 'data' listener + unshift (pitfall #10 territory).
-  { maxFps: 60, kittyKeyboard: { mode: isKittyCapable() ? 'enabled' : 'disabled' } },
+  // (newline) in the composer. On when our own pre-Ink probe found it, not
+  // Ink's 'auto', which probes stdin with a 'data' listener + unshift
+  // (pitfall #10 territory).
+  { maxFps: 60, kittyKeyboard: { mode: kittyKeyboardEnabled() ? 'enabled' : 'disabled' } },
 )
 
 // Safety net: a stray rejected promise from a fire-and-forget action (e.g. a

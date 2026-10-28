@@ -153,9 +153,12 @@ adheres to [Semantic Versioning](https://semver.org/).
   modal shrinks to fit instead of running off the edge.
 
 - **Enter inserts a newline in the composer; Ctrl+Enter sends.** Saving an
-  edit is Ctrl+Enter too. In kitty and Ghostty teaminal turns on the kitty
-  keyboard protocol so Ctrl+Enter is told apart from Enter. In terminals
-  without it, use Alt+Enter or Ctrl+J to send.
+  edit is Ctrl+Enter too. At startup teaminal asks the terminal whether it
+  supports the kitty keyboard protocol (a sub-100 ms probe) and turns it on
+  if so, so Ctrl+Enter is told apart from Enter in kitty, Ghostty, WezTerm,
+  iTerm2, Warp, Windows Terminal and any other terminal that implements it.
+  In terminals without it, use Ctrl+J (or Alt+Enter, where Option/Alt sends
+  Meta) to send.
 
 - **Vim-style jumps in conversations.** `G` jumps to the latest message
   and `gg` to the oldest loaded one. `l` / Right no longer jump to the
