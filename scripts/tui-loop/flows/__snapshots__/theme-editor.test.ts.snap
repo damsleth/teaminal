@@ -16,7 +16,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 ││                │       Message gap           1                                  │                ││
 ││                │       Chat list indent      1                                  │                ││
 ││                │       Chat list gap         0                                  │                ││
-││                │      ↓ 45 more                                                 │                ││
+││                │      ↓ 49 more                                                 │                ││
 ││                │                                                                │                ││
 ││                │   ╭────────────────────────────────────────────────────────╮   │                ││
 ││                │   │Ada  Sample message body  12:34                         │   │                ││

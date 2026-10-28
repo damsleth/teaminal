@@ -8,6 +8,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Date marker styling.** The day separators in a conversation ("Today",
+  "Fri, May 15") get their own theme settings: **Date marker** color
+  (`dateMarker`), **Date marker bold** (`emphasis.dateMarkerBold`),
+  **Date marker indent** (`layout.dateMarkerIndent`) and **Date marker**
+  font size (`fontSize.dateMarker`). Defaults match the old look.
+
 - **Focused message bold toggle.** The theme editor's **Focused message
   bold** (`emphasis.focusedBold`, default on) sets whether the focused
   message's text is drawn bold.

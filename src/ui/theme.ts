@@ -76,6 +76,8 @@ export type ThemeLayout = {
   textBackgroundPaddingX: number
   // Rows of background color above and below each message body.
   textBackgroundPaddingY: number
+  // MessagePane: extra left indent of the day separator ("Today", "Fri, May 15").
+  dateMarkerIndent: number
 }
 
 export type ThemeBorders = {
@@ -97,6 +99,8 @@ export type ThemeEmphasis = {
   selectedBold: boolean
   // MessagePane focused message body.
   focusedBold: boolean
+  // MessagePane day separator.
+  dateMarkerBold: boolean
   // ChatList unread previews.
   unreadBold: boolean
   // MessagePane sender column.
@@ -130,6 +134,8 @@ export type Theme = {
   // Background behind your own message bodies; null = none.
   selfMessageBackground: string | null
   systemEvent: string
+  // MessagePane day separator.
+  dateMarker: string
   errorText: string
   warnText: string
   infoText: string
@@ -174,6 +180,7 @@ const LAYOUT_DEFAULT: ThemeLayout = {
   chatListGap: 0,
   textBackgroundPaddingX: 0,
   textBackgroundPaddingY: 0,
+  dateMarkerIndent: 0,
 }
 
 const BORDERS_DEFAULT: ThemeBorders = { panel: 'round', modal: 'round', active: 'round' }
@@ -183,6 +190,7 @@ const EMPHASIS_DEFAULT: ThemeEmphasis = {
   sectionHeadingBold: true,
   selectedBold: true,
   focusedBold: true,
+  dateMarkerBold: true,
   unreadBold: true,
   senderBold: true,
   inlineKeyBold: true,
@@ -196,6 +204,7 @@ const FONT_SIZE_DEFAULT: ThemeFontSize = {
   chatListHeader: 100,
   chatListName: 100,
   chatListPreview: 100,
+  dateMarker: 100,
   tightSpacing: true,
 }
 
@@ -227,6 +236,7 @@ const DARK: Theme = {
   selfName: 'blue',
   selfMessageBackground: null,
   systemEvent: 'gray',
+  dateMarker: 'gray',
   errorText: 'red',
   warnText: 'yellow',
   infoText: 'gray',
@@ -266,6 +276,7 @@ const LIGHT: Theme = {
   selfName: 'blue',
   selfMessageBackground: null,
   systemEvent: 'gray',
+  dateMarker: 'gray',
   errorText: 'red',
   warnText: 'yellow',
   infoText: '#1c1c1c',
@@ -311,6 +322,7 @@ export type PartialTheme = {
   selfName?: string
   selfMessageBackground?: string | null
   systemEvent?: string
+  dateMarker?: string
   errorText?: string
   warnText?: string
   infoText?: string
