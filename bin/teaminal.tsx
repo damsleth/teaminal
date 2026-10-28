@@ -407,6 +407,11 @@ async function switchAccount(nextProfile: string | null): Promise<void> {
   // of the switch: work begun during teardown still holds the old session's
   // client and must count as stale too.
   resetAccountScopedState(store, accountRef(activeProfile))
+  // Seeded mode switches between fixture accounts without a session.
+  if (isSeededMode()) {
+    applySeededState(store, activeProfile)
+    return
+  }
   if (persistCaches) {
     hydrateNameCache(activeProfile)
     hydrateCache(activeProfile)
@@ -446,7 +451,7 @@ let cleanExit = false
       // into the store and skip all Graph / owa-piggy auth. The real Ink
       // render path still runs — only the data source differs.
       debug('bootstrap: seeded mode active (TEAMINAL_SEED=%s)', process.env.TEAMINAL_SEED)
-      applySeededState(store)
+      applySeededState(store, activeProfile)
     } else {
       try {
         currentSession = await runSession({
