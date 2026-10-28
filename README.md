@@ -138,9 +138,9 @@ warnings and fall back to defaults.
 | `showChatNameHeader`           | boolean              | `false` | Show the conversation name (1:1 partner, group chat, or team · # channel) above the messages. |
 | `showPresenceInList`           | boolean              |  `true` | Show presence dots in the chat list when available.                                      |
 | `showTimestampsInPane` | `off`, `on`, `transient` | `on` | Message timestamps in the message pane. `transient` shows one only when a message comes 15 minutes or more after the previous one. `true` / `false` still read as `on` / `off`. |
-| `centerDateMarkers` | boolean | `false` | Center the day separators ("Today", "Fri, May 15") in the message pane. Also in the menu as **Center dates in chat**. |
-| `showSenderNamesInPane` | boolean | `true` | Show the sender name above each message. Off leaves only the timestamp (or nothing, with timestamps off); tell senders apart by color. Also in the menu as **Show sender names**. |
-| `showOwnNameInPane` | boolean | `true` | Show your name above your own messages. Turn off alongside `selfMessagesOnRight`. Also in the menu as **Show my name on my messages**. |
+| `centerDateMarkers` | boolean | `false` | Center the day separators ("Today", "Fri, May 15") in the message pane. Also in the menu as **Messages → Center dates**. |
+| `showSenderNamesInPane` | boolean | `true` | Show the sender name above each message. Off leaves only the timestamp (or nothing, with timestamps off); tell senders apart by color. Also in the menu as **Messages → Sender names**. |
+| `showOwnNameInPane` | boolean | `true` | Show your name above your own messages. Turn off alongside `selfMessagesOnRight`. Also in the menu as **Messages → My name on my messages**. |
 | `showReactions`                | `off`, `current`, `all` | `current` | Show message reactions never, only on the focused message, or on every message.      |
 | `messageFocusIndicatorEnabled` | boolean              |  `true` | Show the focused-message marker while navigating messages.                               |
 | `messageFocusIndicatorChar`    | single character     |     `>` | Marker shown beside the focused message.                                                 |
@@ -244,7 +244,7 @@ subset of these keys is accepted:
     "textBackgroundPaddingY": 0, // bg-colored rows above / below them
     "textBackgroundRadius": 0, // 1 = rounded "speech bubble" corners on message backgrounds
     "dateMarkerIndent": 0, // extra indent of the day separator ("Today")
-    "messageMaxWidth": 100, // message body width cap, % of the pane (10-100, steps of 10)
+    "messageMaxWidth": 100, // conversation column width, % of the pane, centered (10-100, steps of 10)
   },
   // Border styles (none | single | double | round | bold | classic | singleDouble | doubleSingle | arrow):
   "borders": { "panel": "single", "modal": "double", "active": "bold" },
@@ -300,6 +300,7 @@ The in-app Settings menu persists changes back to `config.json`.
 | Esc            | composer / filter | Leave mode.                                                                                                                                                                      |
 | Esc            | anywhere else     | Toggle the menu overlay. Use `h` / Left to step back a pane.                                                                                                                     |
 | Enter / Space  | menu              | Activate the selected menu item (also in submenus).                                                                                                                              |
+| ← / →          | menu              | Step the selected setting's value backwards / forwards (Theme also cycles saved presets); → opens a submenu.                                                                     |
 | Ctrl+O         | menu              | Open the settings file in `$VISUAL` (or `$EDITOR`); reloads on exit.                                                                                                             |
 | Ctrl+T         | menu              | Open the theme file (config.json for built-in themes) the same way.                                                                                                              |
 | Ctrl+Enter     | composer          | Send message (or save an edit) in terminals with the kitty keyboard protocol (detected at startup). Ctrl+J also sends, in every terminal; Alt+Enter where Alt/Option sends Meta. |

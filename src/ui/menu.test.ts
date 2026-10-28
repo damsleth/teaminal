@@ -112,6 +112,25 @@ describe('cycleSetting', () => {
     expect(cycleSetting('showTimestampsInPane', 'off')).toBe('on')
   })
 
+  test('dir -1 steps backwards', () => {
+    expect(cycleSetting('statusBarPosition', 'bottom', -1)).toBe('hidden')
+    expect(cycleSetting('showTimestampsInPane', 'on', -1)).toBe('off')
+    expect(cycleSetting('chatListPreviewLines', 0, -1)).toBe(3)
+    expect(cycleSetting('messageFocusIndicatorChar', '>', -1)).toBe('-')
+    expect(cycleSetting('showPresenceInList', true, -1)).toBe(false)
+    expect(cycleQuietHoursPreset(QUIET_HOURS_PRESETS[0]!, -1)).toEqual(
+      QUIET_HOURS_PRESETS[QUIET_HOURS_PRESETS.length - 1]!,
+    )
+  })
+
+  test('settings groups are labeled by non-selectable headings', () => {
+    const items = ROOT_MENU.find((i) => i.id === 'settings')!.children!
+    const headings = items.filter((i) => i.id.startsWith('heading:'))
+    expect(headings.map((h) => h.label)).toContain('── Chat list')
+    expect(headings.every((h) => h.disabled)).toBe(true)
+    expect(firstSelectable(items)).toBe(items.findIndex((i) => i.id === 'theme'))
+  })
+
   test('negates booleans', () => {
     expect(cycleSetting('showPresenceInList', true)).toBe(false)
     expect(cycleSetting('showPresenceInList', false)).toBe(true)
@@ -202,6 +221,7 @@ describe('ROOT_MENU shape', () => {
     expect(toggleKeys).toEqual([
       // Appearance
       'theme',
+      // Header & status bar
       'statusBarPosition',
       'statusBarShowKeyHints',
       'headerBarCentered',
@@ -215,13 +235,14 @@ describe('ROOT_MENU shape', () => {
       // Messages
       'showChatNameHeader',
       'messagePaneShortNames',
+      'showSenderNamesInPane',
+      'showOwnNameInPane',
+      'selfMessagesOnRight',
       'showTimestampsInPane',
       'centerDateMarkers',
-      'showSenderNamesInPane',
       'showReactions',
       'inlineImages',
-      'selfMessagesOnRight',
-      'showOwnNameInPane',
+      // Navigation & input
       'messageFocusIndicatorEnabled',
       'messageFocusIndicatorChar',
       'scrollOnNewMessages',

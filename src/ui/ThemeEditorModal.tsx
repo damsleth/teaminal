@@ -3,8 +3,8 @@
 // Renders the editable-field list from src/ui/themeEditor.ts and edits each
 // field in place — every change writes to settings.themeOverrides (or the
 // backing Settings key) via the store + persist path, so the whole app
-// re-renders against the new resolved theme immediately. A compact preview
-// box at the bottom samples the tokens being tuned.
+// re-renders against the new resolved theme immediately. A preview (beside
+// the fields on wide windows, below otherwise) samples every text type.
 //
 // Keys:
 //   ↑/k ↓/j     move between fields (wraps; viewport scrolls)
@@ -20,7 +20,7 @@
 // The field list + all value math live in ./themeEditor; this component is
 // the renderer + key dispatcher.
 
-import { Box, Text, useApp } from 'ink'
+import { Box, Text, useApp, useStdout } from 'ink'
 import { useInput } from './useInput'
 import { useState, type ReactElement, type ReactNode } from 'react'
 import { replaceThemeOverrides, updateSettings } from '../config'
@@ -45,6 +45,9 @@ import { useTerminalRows } from './hooks/useTerminalRows'
 import { activeCustomThemeData, useAppState, useAppStore, useTheme } from './StoreContext'
 import { openThemePresets } from './ThemePresetsModal'
 import { activePresetName, saveThemePresetAs } from './themePresets'
+import { BUBBLE_BORDER } from './MessagePane'
+import { fs } from './textSizing'
+import type { Settings } from '../state/store'
 
 const LABEL_W = 22
 const CONTENT_W = 52
@@ -72,6 +75,8 @@ export function ThemeEditorModal() {
     activeCustomThemeData(settings.theme, customTheme)?.base,
   )
   const rows = useTerminalRows()
+  const { stdout } = useStdout()
+  const columns = stdout?.columns ?? 80
   const isOpen = modal?.kind === 'theme-editor'
 
   // Raw hex being typed for the focused color field. Lives here (not in modal
@@ -215,39 +220,67 @@ export function ThemeEditorModal() {
   if (!isOpen || !modal || modal.kind !== 'theme-editor') return null
 
   const cursor = modal.cursor
-  // Field rows that fit, leaving room for the chrome (title, section headers,
-  // preview box, help). Conservative so the overlay never overflows the pane.
-  const capacity = Math.max(5, Math.min(16, rows - 23))
-  const { start, end } = fieldWindow(FIELDS.length, cursor, capacity)
+  // Display rows: a header before each section, then its fields. The window
+  // is taken over these rows so section headers count against the height.
+  const displayRows: ({ kind: 'header'; section: string } | { kind: 'field'; index: number })[] = []
+  FIELDS.forEach((field, index) => {
+    if (index === 0 || FIELDS[index - 1]!.section !== field.section)
+      displayRows.push({ kind: 'header', section: field.section })
+    displayRows.push({ kind: 'field', index })
+  })
+  const cursorRow = displayRows.findIndex((r) => r.kind === 'field' && r.index === cursor)
+  // Preview beside the fields when the window is wide enough, else below.
+  const side = columns >= CONTENT_W + PREVIEW_W + 2 * theme.layout.modalPaddingX + 8
+  const chromeRows =
+    4 /* header bar + status bar */ +
+    2 /* modal border */ +
+    2 * theme.layout.modalPaddingY +
+    2 /* title + legend */ +
+    2 /* ↑ / ↓ more */ +
+    2 /* help */ +
+    (side ? 0 : PREVIEW_ROWS + 1)
+  const capacity = Math.max(5, rows - chromeRows)
+  const { start, end } = fieldWindow(displayRows.length, Math.max(0, cursorRow), capacity)
 
   const bg = modalBg(theme)
-  let lastSection: string | null = null
-  const rowNodes: ReactNode[] = []
-  for (let gi = start; gi < end; gi++) {
-    const field = FIELDS[gi]!
-    if (field.section !== lastSection) {
-      lastSection = field.section
-      rowNodes.push(
-        <Text key={`h-${field.section}`} color="gray" backgroundColor={bg}>
-          {pad(`── ${field.section} `)}
-        </Text>,
+  const rowNodes: ReactNode[] = displayRows.slice(start, end).map((row) => {
+    if (row.kind === 'header')
+      return (
+        <Text key={`h-${row.section}`} color="gray" backgroundColor={bg}>
+          {pad(`── ${row.section} `)}
+        </Text>
       )
-    }
-    rowNodes.push(
+    const field = FIELDS[row.index]!
+    return (
       <FieldRow
         key={field.id}
         field={field}
-        selected={gi === cursor}
+        selected={row.index === cursor}
         overridden={isOverridden(field, settings, base)}
         value={fieldValue(field, theme, settings)}
-        hexBuffer={gi === cursor && hexEdit ? hexEdit.buffer : null}
+        hexBuffer={row.index === cursor && hexEdit ? hexEdit.buffer : null}
         theme={theme}
-      />,
+      />
     )
-  }
+  })
+  const fieldsAbove = displayRows.slice(0, start).filter((r) => r.kind === 'field').length
+  const fieldsBelow = displayRows.slice(end).filter((r) => r.kind === 'field').length
 
-  const moreAbove = start > 0
-  const moreBelow = end < FIELDS.length
+  const fieldColumn = (
+    <Box flexDirection="column" flexShrink={0}>
+      {fieldsAbove > 0 && (
+        <Text color="gray" backgroundColor={bg}>
+          {pad(`   ↑ ${fieldsAbove} more`)}
+        </Text>
+      )}
+      {rowNodes}
+      {fieldsBelow > 0 && (
+        <Text color="gray" backgroundColor={bg}>
+          {pad(`   ↓ ${fieldsBelow} more`)}
+        </Text>
+      )}
+    </Box>
+  )
 
   return (
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
@@ -269,18 +302,20 @@ export function ThemeEditorModal() {
         <Text color="gray" backgroundColor={bg}>
           {pad('• = unsaved edit · s saves them into a preset')}
         </Text>
-        {moreAbove && (
-          <Text color="gray" backgroundColor={bg}>
-            {pad(`   ↑ ${start} more`)}
-          </Text>
+        {side ? (
+          <Box flexDirection="row" backgroundColor={bg}>
+            {fieldColumn}
+            <Box width={2} flexShrink={0} />
+            <ThemePreview theme={theme} settings={settings} />
+          </Box>
+        ) : (
+          <>
+            {fieldColumn}
+            <Box marginTop={1}>
+              <ThemePreview theme={theme} settings={settings} />
+            </Box>
+          </>
         )}
-        {rowNodes}
-        {moreBelow && (
-          <Text color="gray" backgroundColor={bg}>
-            {pad(`   ↓ ${FIELDS.length - end} more`)}
-          </Text>
-        )}
-        <ThemePreview theme={theme} />
         <Text color="gray" backgroundColor={bg}>
           {pad(
             hexEdit
@@ -394,58 +429,147 @@ function FieldRow(props: {
   )
 }
 
-// Compact sample of the tokens being tuned. Reads straight from the resolved
-// theme, so it re-renders on every edit.
-function ThemePreview(props: { theme: ReturnType<typeof useTheme> }): ReactElement {
-  const { theme } = props
+// A sample of every text type the theme styles: the chat list, the message
+// pane (chat header, date marker, sender / self names and timestamps, both
+// kinds of message body with their backgrounds, the focused message, a
+// system event) and the status colors. Reads the resolved theme, so it
+// re-renders on every edit; font sizes show in kitty.
+const PREVIEW_W = 40
+const PREVIEW_ROWS = 24
+
+function ThemePreview(props: {
+  theme: ReturnType<typeof useTheme>
+  settings: Settings
+}): ReactElement {
+  const { theme, settings } = props
   const bg = modalBg(theme)
+  const tight = theme.fontSize.tightSpacing
+  const listIndent = ' '.repeat(Math.max(0, theme.layout.chatListIndent))
+  const senderIndent = Math.max(0, theme.layout.senderIndent)
+  const bodyIndent = Math.max(1, theme.layout.paneHeaderPaddingLeft)
+  const rounded = theme.layout.textBackgroundRadius > 0
+  const marker = settings.messageFocusIndicatorChar.slice(0, 1) || '>'
+
+  // One message body: indent / focus marker column, then the text in its
+  // background, padded and (rounded) framed as in MessagePane.
+  const body = (
+    text: string,
+    color: string | undefined,
+    background: string | null,
+    opts: { focused?: boolean } = {},
+  ) => {
+    const textNode = (
+      <Text
+        color={color}
+        backgroundColor={background ?? undefined}
+        bold={opts.focused && theme.emphasis.focusedBold}
+      >
+        {fs(text, theme.fontSize.messageText)}
+      </Text>
+    )
+    const framed =
+      rounded ||
+      theme.layout.textBackgroundPaddingX > 0 ||
+      theme.layout.textBackgroundPaddingY > 0 ? (
+        <Box
+          paddingX={theme.layout.textBackgroundPaddingX}
+          paddingY={theme.layout.textBackgroundPaddingY}
+          backgroundColor={background ?? undefined}
+          borderStyle={rounded && background ? BUBBLE_BORDER : undefined}
+          borderColor={background ?? undefined}
+        >
+          {textNode}
+        </Box>
+      ) : (
+        textNode
+      )
+    return (
+      <Box flexDirection="row">
+        <Box width={bodyIndent} flexShrink={0} paddingTop={rounded && background ? 1 : 0}>
+          <Text color={theme.messageFocusIndicator}>{opts.focused ? marker : ' '}</Text>
+        </Box>
+        {framed}
+      </Box>
+    )
+  }
+  const senderLine = (name: string, color: string, time: string) => (
+    <Box flexDirection="row">
+      {senderIndent > 0 && <Box width={senderIndent} flexShrink={0} />}
+      <Text>
+        <Text color={color} bold={theme.emphasis.senderBold}>
+          {fs(name, theme.fontSize.sender, tight)}
+        </Text>
+        <Text color={theme.timestamp}>{fs(`  ${time}`, theme.fontSize.timestamp, tight)}</Text>
+      </Text>
+    </Box>
+  )
+
   return (
     <Box
       flexDirection="column"
-      marginTop={1}
+      width={PREVIEW_W}
+      flexShrink={0}
       borderStyle={inkBorder(theme.borders.panel)}
       borderColor={theme.border}
-      backgroundColor={bg}
+      backgroundColor={theme.appBackground ?? bg}
     >
-      <Text backgroundColor={bg}>
-        <Text color={theme.sender} bold={theme.emphasis.senderBold} backgroundColor={bg}>
-          {'Ada  '}
-        </Text>
-        <Text color={theme.text} backgroundColor={bg}>
-          {'Sample message body  '}
-        </Text>
-        <Text color={theme.timestamp} backgroundColor={bg}>
-          12:34
-        </Text>
+      {/* Chat list */}
+      <Text color={theme.text} bold={theme.emphasis.sectionHeadingBold}>
+        {fs('Chats', theme.fontSize.chatListHeader, tight)}
       </Text>
       <Text
         color={theme.selectedRow}
-        backgroundColor={theme.selectedRowBackground ?? bg}
+        backgroundColor={theme.selectedRowBackground ?? undefined}
         bold={theme.emphasis.selectedBold}
       >
-        {pad('  Selected chat row')}
+        {`●${listIndent}`}
+        {fs('Ada Byron', theme.fontSize.chatListName, tight)}
       </Text>
-      <Text color={theme.unread} backgroundColor={bg} bold={theme.emphasis.unreadBold}>
-        {pad('  Unread chat · 3 new')}
+      <Text color={theme.unreadRow} bold={theme.emphasis.unreadBold}>
+        {`●${listIndent}`}
+        {fs('Design Sync', theme.fontSize.chatListName, tight)}
+        <Text color={theme.unread}>{' · 3'}</Text>
       </Text>
-      <Text backgroundColor={bg}>
-        <Text color={theme.selfMessage} backgroundColor={bg}>
-          {'You  '}
-        </Text>
-        <Text color={theme.systemEvent} backgroundColor={bg}>
-          {'· joined the chat'}
-        </Text>
+      <Text color={theme.mutedText}>
+        {` ${listIndent}`}
+        {fs('Nina: shared two drafts', theme.fontSize.chatListPreview, tight)}
       </Text>
-      <Text backgroundColor={bg}>
-        <Text color={theme.errorText} backgroundColor={bg}>
-          {'error '}
+      <Text color={theme.border}>{'─'.repeat(PREVIEW_W - 2)}</Text>
+      {/* Message pane */}
+      <Text color={theme.text} bold={theme.emphasis.sectionHeadingBold}>
+        {fs(' Ada Byron', theme.fontSize.paneHeader, tight)}
+      </Text>
+      <Box justifyContent={settings.centerDateMarkers ? 'center' : undefined}>
+        {!settings.centerDateMarkers && theme.layout.dateMarkerIndent > 0 && (
+          <Box width={theme.layout.dateMarkerIndent} flexShrink={0} />
+        )}
+        <Text color={theme.dateMarker} bold={theme.emphasis.dateMarkerBold}>
+          {fs('Today', theme.fontSize.dateMarker, tight)}
         </Text>
-        <Text color={theme.warnText} backgroundColor={bg}>
-          {'warn '}
-        </Text>
-        <Text color={theme.infoText} backgroundColor={bg}>
-          info
-        </Text>
+      </Box>
+      {senderLine('Ada', theme.sender, '12:34')}
+      {body(
+        'Launch notes are ready',
+        theme.senderMessage ?? theme.text,
+        theme.senderMessageBackground,
+      )}
+      {senderLine('You', theme.selfName, '12:36')}
+      {body('Looks good, shipping', theme.selfMessage, theme.selfMessageBackground)}
+      {body(
+        'Focused message',
+        theme.messageFocusText ?? theme.senderMessage ?? theme.text,
+        theme.messageFocusBackground,
+        { focused: true },
+      )}
+      <Text>
+        <Text color={theme.systemEvent}>{' · Ada joined the chat '}</Text>
+        <Text color={theme.mutedText}>(edited)</Text>
+      </Text>
+      <Text color={theme.border}>{'─'.repeat(PREVIEW_W - 2)}</Text>
+      <Text>
+        <Text color={theme.errorText}>{'error '}</Text>
+        <Text color={theme.warnText}>{'warn '}</Text>
+        <Text color={theme.infoText}>info</Text>
       </Text>
     </Box>
   )

@@ -192,15 +192,21 @@ test('sender name toggles and message max width', () => {
   expect(none).not.toMatch(/Ada|Bob/)
   // No header line left: the body sits right under the date marker.
   expect(none).toMatch(/Jan 3\s*\n\s+.?\s*third day, first message/)
-  const widest = (out: string) =>
-    Math.max(
-      ...out
-        .split('\n')
-        .filter((l) => l.includes('word'))
-        .map((l) => l.trimEnd().length),
-    )
-  expect(widest(renderWith({}, 50))).toBeLessThanOrEqual(42)
-  expect(widest(renderWith({}))).toBeGreaterThan(60)
+  // The conversation column narrows evenly from both sides: text starts
+  // further right and spans fewer columns.
+  const span = (out: string) => {
+    const ls = out.split('\n').filter((l) => l.includes('word'))
+    const start = Math.min(...ls.map((l) => l.search(/\S/)))
+    const end = Math.max(...ls.map((l) => l.trimEnd().length))
+    return { start, width: end - start }
+  }
+  const full = span(renderWith({}))
+  const half = span(renderWith({}, 50))
+  expect(full.width).toBeGreaterThan(60)
+  expect(half.width).toBeLessThanOrEqual(40)
+  // Left margin ≈ a quarter of the pane; the right margin mirrors it.
+  expect(half.start - full.start).toBeGreaterThanOrEqual(15)
+  expect(half.start + half.width).toBeLessThanOrEqual(80 - 15)
 })
 
 function renderWithSettings(settings: Record<string, unknown>, themeOverrides: object = {}) {

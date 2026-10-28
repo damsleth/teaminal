@@ -96,15 +96,16 @@ export const QUIET_HOURS_PRESETS: { start: string | null; end: string | null }[]
   { start: '20:00', end: '09:00' },
 ]
 
-export function cycleQuietHoursPreset(current: { start: string | null; end: string | null }): {
-  start: string | null
-  end: string | null
-} {
+export function cycleQuietHoursPreset(
+  current: { start: string | null; end: string | null },
+  dir: 1 | -1 = 1,
+): { start: string | null; end: string | null } {
   const idx = QUIET_HOURS_PRESETS.findIndex(
     (p) => p.start === current.start && p.end === current.end,
   )
-  const next = QUIET_HOURS_PRESETS[(idx === -1 ? 0 : idx + 1) % QUIET_HOURS_PRESETS.length]!
-  return next
+  if (idx === -1) return QUIET_HOURS_PRESETS[0]!
+  const n = QUIET_HOURS_PRESETS.length
+  return QUIET_HOURS_PRESETS[(idx + dir + n) % n]!
 }
 
 export function renderQuietHoursValue(start: string | null, end: string | null): string {
@@ -123,6 +124,11 @@ export type MenuItem = {
   hidden?: () => boolean
 }
 
+// A non-selectable group label in a menu list.
+function heading(label: string): MenuItem {
+  return { id: `heading:${label}`, label: `── ${label}`, action: { kind: 'noop' }, disabled: true }
+}
+
 export const ROOT_MENU: MenuItem[] = [
   { id: 'resume', label: 'Resume', action: { kind: 'resume' } },
   {
@@ -134,12 +140,10 @@ export const ROOT_MENU: MenuItem[] = [
     id: 'settings',
     label: 'Settings',
     action: { kind: 'submenu' },
-    // Flat list, but ordered into logical clusters so it scans top-to-bottom:
-    // Appearance → Chat list → Messages → Notifications → Presence →
-    // Advanced/debug → Maintenance. Submenus were considered but kept flat
-    // intentionally.
+    // Flat list in labeled groups (non-selectable heading rows), so it scans
+    // top-to-bottom without submenus.
     children: [
-      // — Appearance —
+      heading('Appearance'),
       {
         id: 'theme',
         label: 'Theme',
@@ -157,6 +161,7 @@ export const ROOT_MENU: MenuItem[] = [
         action: { kind: 'show-theme-presets' },
         hint: 'load, save, save as, delete',
       },
+      heading('Header & status bar'),
       {
         id: 'statusBarPosition',
         label: 'Status bar',
@@ -164,7 +169,7 @@ export const ROOT_MENU: MenuItem[] = [
       },
       {
         id: 'statusBarShowKeyHints',
-        label: 'Status bar key hints',
+        label: 'Key hints',
         action: { kind: 'toggle-setting', key: 'statusBarShowKeyHints' },
         hint: 'off = link/image actions only',
       },
@@ -175,7 +180,7 @@ export const ROOT_MENU: MenuItem[] = [
       },
       {
         id: 'headerBar',
-        label: 'Header bar elements',
+        label: 'Header elements',
         action: { kind: 'submenu' },
         children: [
           {
@@ -225,41 +230,41 @@ export const ROOT_MENU: MenuItem[] = [
           },
         ],
       },
-      // — Chat list —
+      heading('Chat list'),
       {
         id: 'chatListSort',
-        label: 'Chat list sort',
+        label: 'Sort',
         action: { kind: 'toggle-setting', key: 'chatListSort' },
       },
       {
         id: 'chatListGroupByType',
-        label: 'Group chats by type',
+        label: 'Group by type',
         action: { kind: 'toggle-setting', key: 'chatListGroupByType' },
         hint: '1:1 / group / meeting',
       },
       {
         id: 'chatListSectionCap',
-        label: 'Cap chat groups at 10',
+        label: 'Cap groups at 10',
         action: { kind: 'toggle-setting', key: 'chatListSectionCap' },
         hint: 'off shows every chat',
       },
       {
         id: 'chatListShortNames',
-        label: 'Short names in chat list',
+        label: 'Short names',
         action: { kind: 'toggle-setting', key: 'chatListShortNames' },
       },
       {
         id: 'chatListPreviewLines',
-        label: 'Preview lines in chat list',
+        label: 'Preview lines',
         action: { kind: 'toggle-setting', key: 'chatListPreviewLines' },
         hint: 'off, 1, 2 or 3',
       },
       {
         id: 'showPresenceInList',
-        label: 'Show presence in chat list',
+        label: 'Presence dots',
         action: { kind: 'toggle-setting', key: 'showPresenceInList' },
       },
-      // — Messages —
+      heading('Messages'),
       {
         id: 'showChatNameHeader',
         label: 'Chat name header',
@@ -268,34 +273,18 @@ export const ROOT_MENU: MenuItem[] = [
       },
       {
         id: 'messagePaneShortNames',
-        label: 'Short names in chats',
+        label: 'Short names',
         action: { kind: 'toggle-setting', key: 'messagePaneShortNames' },
       },
       {
-        id: 'showTimestampsInPane',
-        label: 'Show timestamps in messages',
-        action: { kind: 'toggle-setting', key: 'showTimestampsInPane' },
-        hint: 'transient = after a 15 min pause',
-      },
-      {
-        id: 'centerDateMarkers',
-        label: 'Center dates in chat',
-        action: { kind: 'toggle-setting', key: 'centerDateMarkers' },
-      },
-      {
         id: 'showSenderNamesInPane',
-        label: 'Show sender names',
+        label: 'Sender names',
         action: { kind: 'toggle-setting', key: 'showSenderNamesInPane' },
       },
       {
-        id: 'showReactions',
-        label: 'Show reactions',
-        action: { kind: 'toggle-setting', key: 'showReactions' },
-      },
-      {
-        id: 'inlineImages',
-        label: 'Show images',
-        action: { kind: 'toggle-setting', key: 'inlineImages' },
+        id: 'showOwnNameInPane',
+        label: 'My name on my messages',
+        action: { kind: 'toggle-setting', key: 'showOwnNameInPane' },
       },
       {
         id: 'selfMessagesOnRight',
@@ -303,18 +292,35 @@ export const ROOT_MENU: MenuItem[] = [
         action: { kind: 'toggle-setting', key: 'selfMessagesOnRight' },
       },
       {
-        id: 'showOwnNameInPane',
-        label: 'Show my name on my messages',
-        action: { kind: 'toggle-setting', key: 'showOwnNameInPane' },
+        id: 'showTimestampsInPane',
+        label: 'Timestamps',
+        action: { kind: 'toggle-setting', key: 'showTimestampsInPane' },
+        hint: 'transient = after a 15 min pause',
       },
       {
+        id: 'centerDateMarkers',
+        label: 'Center dates',
+        action: { kind: 'toggle-setting', key: 'centerDateMarkers' },
+      },
+      {
+        id: 'showReactions',
+        label: 'Reactions',
+        action: { kind: 'toggle-setting', key: 'showReactions' },
+      },
+      {
+        id: 'inlineImages',
+        label: 'Images',
+        action: { kind: 'toggle-setting', key: 'inlineImages' },
+      },
+      heading('Navigation & input'),
+      {
         id: 'messageFocusIndicatorEnabled',
-        label: 'Focused message marker',
+        label: 'Focus marker',
         action: { kind: 'toggle-setting', key: 'messageFocusIndicatorEnabled' },
       },
       {
         id: 'messageFocusIndicatorChar',
-        label: 'Focused message marker char',
+        label: 'Focus marker char',
         action: { kind: 'toggle-setting', key: 'messageFocusIndicatorChar' },
       },
       {
@@ -330,15 +336,15 @@ export const ROOT_MENU: MenuItem[] = [
         // so this mode would send half-written messages.
         hidden: () => !kittyKeyboardEnabled(),
       },
-      // — Notifications —
+      heading('Notifications'),
       {
         id: 'notifyMuted',
-        label: 'Mute notifications',
+        label: 'Mute',
         action: { kind: 'toggle-setting', key: 'notifyMuted' },
       },
       {
         id: 'notifyChatMessages',
-        label: 'Notify on every chat message',
+        label: 'Every chat message',
         action: { kind: 'toggle-setting', key: 'notifyChatMessages' },
         hint: 'off = @mentions only',
       },
@@ -352,18 +358,18 @@ export const ROOT_MENU: MenuItem[] = [
         label: 'Quiet hours',
         action: { kind: 'cycle-quiet-hours' },
       },
-      // — Presence —
+      heading('Presence'),
       {
         id: 'forceAvailableWhenFocused',
-        label: 'Set Available while terminal focused',
+        label: 'Available while terminal focused',
         action: { kind: 'toggle-setting', key: 'forceAvailableWhenFocused' },
       },
       {
         id: 'useTeamsPresence',
-        label: 'Use Teams presence source',
+        label: 'Teams presence source',
         action: { kind: 'toggle-setting', key: 'useTeamsPresence' },
       },
-      // — Advanced / debug —
+      heading('Advanced'),
       {
         id: 'realtimeEnabled',
         label: 'Real-time push',
@@ -385,7 +391,6 @@ export const ROOT_MENU: MenuItem[] = [
         label: 'Tail diagnostics',
         action: { kind: 'toggle-setting', key: 'tailDiagnostics' },
       },
-      // — Maintenance —
       {
         id: 'clearCache',
         label: 'Empty cache (this profile)',
@@ -481,47 +486,40 @@ export function nextSelectable(items: MenuItem[], from: number, dir: 1 | -1): nu
 export const MESSAGE_FOCUS_MARKER_PRESETS = ['>', '|', '*', '-'] as const
 export const REACTION_DISPLAY_PRESETS = ['current', 'all', 'off'] as const
 
-function cycleMessageFocusIndicatorChar(current: string): string {
-  const idx = MESSAGE_FOCUS_MARKER_PRESETS.indexOf(
-    current as (typeof MESSAGE_FOCUS_MARKER_PRESETS)[number],
-  )
-  if (idx === -1) return MESSAGE_FOCUS_MARKER_PRESETS[0]!
-  return MESSAGE_FOCUS_MARKER_PRESETS[(idx + 1) % MESSAGE_FOCUS_MARKER_PRESETS.length]!
+// The value `dir` steps away from `current` in `order`, wrapping. An unknown
+// current value lands on the first entry.
+export function stepIn<T>(order: readonly T[], current: T, dir: 1 | -1 = 1): T {
+  const idx = order.indexOf(current)
+  if (idx === -1) return order[0]!
+  return order[(idx + dir + order.length) % order.length]!
 }
 
-function cycleReactionDisplayMode(current: Settings['showReactions']): Settings['showReactions'] {
-  const idx = REACTION_DISPLAY_PRESETS.indexOf(current)
-  if (idx === -1) return REACTION_DISPLAY_PRESETS[0]!
-  return REACTION_DISPLAY_PRESETS[(idx + 1) % REACTION_DISPLAY_PRESETS.length]!
-}
-
-// Cycle a setting to its next value. Two-valued enums flip; booleans
-// negate. Add new keys here when the Settings type grows.
-export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]): Settings[K] {
+// Cycle a setting to its next (dir 1) or previous (dir -1) value; booleans
+// negate. Add new keys here when the Settings type grows. `theme` cycles
+// the built-ins only; the menu adds saved presets (see themeChoices).
+export function cycleSetting<K extends ToggleKey>(
+  key: K,
+  current: Settings[K],
+  dir: 1 | -1 = 1,
+): Settings[K] {
+  const step = (order: readonly unknown[]) => stepIn(order, current, dir) as Settings[K]
   switch (key) {
-    case 'theme': {
-      const order = ['auto', 'dark', 'light']
-      const idx = order.indexOf(current as string)
-      const next = order[(idx === -1 ? -1 : idx) + 1] ?? order[0]!
-      return next as Settings[K]
-    }
+    case 'theme':
+      return step(['auto', 'dark', 'light'])
     case 'chatListSort':
-      return (current === 'recent' ? 'alphabetical' : 'recent') as Settings[K]
+      return step(['recent', 'alphabetical'])
     case 'headerUserFormat':
-      return (current === 'full' ? 'tenant' : 'full') as Settings[K]
+      return step(['full', 'tenant'])
     case 'statusBarPosition':
-      return (current === 'bottom' ? 'top' : current === 'top' ? 'hidden' : 'bottom') as Settings[K]
+      return step(['bottom', 'top', 'hidden'])
     case 'inlineImages':
-      return (current === 'auto' ? 'off' : 'auto') as Settings[K]
+      return step(['auto', 'off'])
     case 'showReactions':
-      return cycleReactionDisplayMode(current as Settings['showReactions']) as Settings[K]
-    case 'showTimestampsInPane': {
-      const order = ['on', 'transient', 'off'] as const
-      const idx = order.indexOf(current as (typeof order)[number])
-      return order[(idx + 1) % order.length] as Settings[K]
-    }
+      return step(REACTION_DISPLAY_PRESETS)
+    case 'showTimestampsInPane':
+      return step(['on', 'transient', 'off'])
     case 'chatListPreviewLines':
-      return (((current as number) + 1) % 4) as Settings[K]
+      return step([0, 1, 2, 3])
     case 'chatListGroupByType':
     case 'chatListSectionCap':
     case 'chatListShortNames':
@@ -548,7 +546,7 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'headerBarCentered':
       return !current as Settings[K]
     case 'messageFocusIndicatorChar':
-      return cycleMessageFocusIndicatorChar(current as string) as Settings[K]
+      return step(MESSAGE_FOCUS_MARKER_PRESETS)
   }
 }
 

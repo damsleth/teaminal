@@ -30,6 +30,7 @@ import {
   renderSettingValue,
   resolveMenuPath,
   ROOT_MENU,
+  stepIn,
   type MenuItem,
   type ToggleKey,
   updateSetting,
@@ -40,6 +41,7 @@ import { useTerminalRows } from './hooks/useTerminalRows'
 import { useSessionApi } from './SessionContext'
 import { openThemeEditor } from './ThemeEditorModal'
 import { openThemePresets } from './ThemePresetsModal'
+import { loadThemePreset, themeChoices } from './themePresets'
 import { openActivity } from './ActivityModal'
 import { editSettingsFile, editThemeFile } from './openInEditor'
 import { clearProfileCaches } from '../state/cacheClear'
@@ -136,6 +138,18 @@ export function MenuModal() {
         store.set({ modal: { ...m, cursor: next } })
         return
       }
+      // ←/→ step a value backwards / forwards (as in the theme editor); →
+      // also opens a submenu.
+      if (key.leftArrow || key.rightArrow) {
+        const item = items[m.cursor]
+        if (!item || item.disabled) return
+        if (item.action.kind === 'submenu') {
+          if (key.rightArrow) activate(item, m.path)
+          return
+        }
+        adjust(item, key.rightArrow ? 1 : -1)
+        return
+      }
       // Space activates like Enter, in the root menu and every submenu.
       if (key.return || input === ' ') {
         const item = items[m.cursor]
@@ -146,7 +160,59 @@ export function MenuModal() {
     { isActive: isOpen },
   )
 
+  // Step a value item; false when the item has no value to step.
+  function adjust(item: MenuItem, dir: 1 | -1): boolean {
+    switch (item.action.kind) {
+      case 'toggle-setting': {
+        const key = item.action.key
+        const current = store.get().settings[key]
+        if (key === 'theme') {
+          // Built-ins and saved presets; loading a preset also applies its
+          // UI settings, like Theme presets → Enter.
+          const names = themeChoices().map((c) => c.name)
+          void loadThemePreset(store, stepIn(names, current as string, dir))
+          return true
+        }
+        const next = cycleSetting(key, current, dir)
+        void updateSetting(store, key, next).catch((err) => {
+          warn(`config: failed to persist "${key}":`, errMessage(err))
+        })
+        return true
+      }
+      case 'toggle-header-element': {
+        const key = item.action.key
+        const cur = store.get().settings.headerElements
+        const nextElements = { ...cur, [key]: !cur[key] }
+        store.set((s) => ({ settings: { ...s.settings, headerElements: nextElements } }))
+        void updateSettings({ headerElements: nextElements }).catch((err) => {
+          warn(`config: failed to persist headerElements.${key}:`, errMessage(err))
+        })
+        return true
+      }
+      case 'cycle-quiet-hours': {
+        const cur = store.get().settings
+        const next = cycleQuietHoursPreset(
+          { start: cur.quietHoursStart, end: cur.quietHoursEnd },
+          dir,
+        )
+        store.set((s) => ({
+          settings: { ...s.settings, quietHoursStart: next.start, quietHoursEnd: next.end },
+        }))
+        void updateSettings({
+          quietHoursStart: next.start,
+          quietHoursEnd: next.end,
+        }).catch((err) => {
+          warn('config: failed to persist quiet hours:', errMessage(err))
+        })
+        return true
+      }
+      default:
+        return false
+    }
+  }
+
   function activate(item: MenuItem, path: string[]): void {
+    if (adjust(item, 1)) return
     switch (item.action.kind) {
       case 'resume':
         store.set({ modal: null, inputZone: 'list' })
@@ -158,41 +224,6 @@ export function MenuModal() {
       case 'submenu':
         openMenu(store, [...path, item.id])
         return
-      case 'toggle-setting': {
-        const key = item.action.key
-        const next = cycleSetting(key, store.get().settings[key])
-        void updateSetting(store, key, next).catch((err) => {
-          warn(`config: failed to persist "${key}":`, errMessage(err))
-        })
-        return
-      }
-      case 'toggle-header-element': {
-        const key = item.action.key
-        const cur = store.get().settings.headerElements
-        const nextElements = { ...cur, [key]: !cur[key] }
-        store.set((s) => ({ settings: { ...s.settings, headerElements: nextElements } }))
-        void updateSettings({ headerElements: nextElements }).catch((err) => {
-          warn(`config: failed to persist headerElements.${key}:`, errMessage(err))
-        })
-        return
-      }
-      case 'cycle-quiet-hours': {
-        const cur = store.get().settings
-        const next = cycleQuietHoursPreset({
-          start: cur.quietHoursStart,
-          end: cur.quietHoursEnd,
-        })
-        store.set((s) => ({
-          settings: { ...s.settings, quietHoursStart: next.start, quietHoursEnd: next.end },
-        }))
-        void updateSettings({
-          quietHoursStart: next.start,
-          quietHoursEnd: next.end,
-        }).catch((err) => {
-          warn('config: failed to persist quiet hours:', errMessage(err))
-        })
-        return
-      }
       case 'show-theme-editor':
         openThemeEditor(store)
         return
@@ -246,7 +277,7 @@ export function MenuModal() {
 
   // The menu grows to fill the app (one row per item); only a list taller
   // than the window scrolls.
-  const footer = '↑/↓ navigate · enter select · esc back · ^O config · ^T theme'
+  const footer = '↑/↓ navigate · ←/→ change · enter select · esc back · ^O config · ^T theme'
   const reservedRows =
     4 /* header bar + status bar */ +
     (atRoot ? LOGO.length + 3 : 0) /* logo + version + repo + blank (root only) */ +
