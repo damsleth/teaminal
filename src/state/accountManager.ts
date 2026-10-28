@@ -81,6 +81,7 @@ export function createAccountManager(
       const names = loadNameCache(getNameCachePath(process.env, p))
       if (Object.keys(names).length > 0) {
         store.set((s) => ({ nameByUserId: { ...names, ...s.nameByUserId } }))
+        debug(`bootstrap: hydrated ${Object.keys(names).length} cached display names`)
       }
     } catch (err) {
       warn(
