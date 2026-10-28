@@ -8,6 +8,25 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Transient timestamps.** Menu → **Show timestamps in messages** now
+  cycles `on` / `transient` / `off` (`showTimestampsInPane`). `transient`
+  shows a timestamp only when a message comes 15 minutes or more after the
+  previous one. `true` / `false` in config still mean `on` / `off`.
+
+- **Center dates in chat.** Menu → **Center dates in chat**
+  (`centerDateMarkers`, default off) centers the day separators.
+
+- **Sender message colors.** Theme editor **Sender message** and **Sender
+  message bg** (`senderMessage`, `senderMessageBackground`) color other
+  people's message bodies, mirroring the self message pair.
+
+- **Rounded message backgrounds.** Theme editor **Text bg rounded**
+  (`layout.textBackgroundRadius`, 0 or 1) frames message backgrounds in
+  half blocks with chamfered corners, for a speech-bubble look. Pairs with
+  the self / sender message backgrounds and text bg padding.
+
+- The theme editor's color cycle includes `#999999`.
+
 - **Theme presets carry UI settings.** Saving a preset also stores the
   look-related Settings menu toggles (status bar, header, chat list and
   message display options) in its `settings` block, and loading it

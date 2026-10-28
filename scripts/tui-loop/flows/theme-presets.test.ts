@@ -74,7 +74,7 @@ test('theme-presets: save as writes the preset and activates it; delete falls ba
   assert.ok(await waitFor(() => fs.existsSync(PRESET_FILE)), 'preset file written')
   const saved = JSON.parse(fs.readFileSync(PRESET_FILE, 'utf8'))
   assert.equal(saved.base, 'dark')
-  assert.equal(saved.settings?.showTimestampsInPane, true, 'preset carries the UI settings')
+  assert.equal(saved.settings?.showTimestampsInPane, 'on', 'preset carries the UI settings')
   assert.ok(await waitFor(() => configTheme() === 'Night Owl'), 'preset is the active theme')
   await expect(terminal.getByText('active: Night Owl')).toBeVisible()
 

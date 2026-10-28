@@ -146,7 +146,7 @@ test('date marker theme settings drive its color, bold and indent', () => {
     </StoreProvider>,
     { columns: 80 },
   )
-  const marker = out.split('\n').find((l) => l.includes('Jan 2'))!
+  const marker = out.split('\n').find((l) => l.includes('Jan 3'))!
   expect(marker).toContain('38;2;255;0;0m')
   expect(marker).not.toMatch(/\x1b\[1m/)
   expect(marker.replace(/\x1b\[[0-9;]*m/g, '')).toMatch(/^ {5}\S/)
@@ -159,7 +159,7 @@ test('sender name toggles and message max width', () => {
       me: { id: 'u-Ada', displayName: 'Ada' } as never,
       settings: {
         ...store.get().settings,
-        showTimestampsInPane: false,
+        showTimestampsInPane: 'off',
         ...settings,
         themeOverrides: { layout: { messageMaxWidth: maxWidth } },
       },
@@ -201,6 +201,68 @@ test('sender name toggles and message max width', () => {
     )
   expect(widest(renderWith({}, 50))).toBeLessThanOrEqual(42)
   expect(widest(renderWith({}))).toBeGreaterThan(60)
+})
+
+function renderWithSettings(settings: Record<string, unknown>, themeOverrides: object = {}) {
+  const store = createAppStore()
+  store.set({
+    settings: { ...store.get().settings, ...settings, themeOverrides },
+    focus: { kind: 'chat', chatId: 'c1' },
+    messagesByConvo: { 'chat:c1': MESSAGES },
+  })
+  return renderToString(
+    <StoreProvider store={store}>
+      <SessionProvider api={session}>
+        <Box flexDirection="column" height={60}>
+          <MessagePane />
+        </Box>
+      </SessionProvider>
+    </StoreProvider>,
+    { columns: 80 },
+  )
+}
+const plain = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '')
+
+test('transient timestamps show only after a 15 minute gap', () => {
+  // The header line above a body carries the sender name and, if shown, a time.
+  const headerAbove = (out: string, body: string) => {
+    const ls = plain(out).split('\n')
+    return ls[ls.findIndex((l) => l.includes(body)) - 1]!
+  }
+  const on = renderWithSettings({ showTimestampsInPane: 'on' })
+  expect(headerAbove(on, 'third day, newest message')).toMatch(/\d\d:\d\d/)
+  const transient = renderWithSettings({ showTimestampsInPane: 'transient' })
+  // A new day comes after a long gap; its second message only 5 minutes on.
+  expect(headerAbove(transient, 'third day, first message')).toMatch(/\d\d:\d\d/)
+  expect(headerAbove(transient, 'third day, newest message')).not.toMatch(/\d\d:\d\d/)
+  expect(headerAbove(transient, 'third day, newest message')).toContain('Bob')
+})
+
+test('centered date markers sit mid-pane', () => {
+  const line = (out: string) =>
+    plain(out)
+      .split('\n')
+      .find((l) => l.includes('Jan 3'))!
+  const left = line(renderWithSettings({})).indexOf('Jan 3')
+  const centered = line(renderWithSettings({ centerDateMarkers: true })).indexOf('Jan 3')
+  expect(centered).toBeGreaterThan(left + 20)
+})
+
+test('rounded backgrounds frame other people’s messages in half blocks', () => {
+  const out = renderWithSettings(
+    {},
+    { senderMessageBackground: '#ff0000', layout: { textBackgroundRadius: 1 } },
+  )
+  const lines = out.split('\n')
+  const body = lines.findIndex((l) => l.includes('third day, first message'))
+  expect(body).toBeGreaterThan(0)
+  expect(plain(lines[body - 1]!)).toMatch(/▗▄+▖/)
+  expect(plain(lines[body]!)).toMatch(/▐.*third day, first message.*▌/)
+  expect(plain(lines[body + 1]!)).toMatch(/▝▀+▘/)
+  // The body has the background; the frame's half blocks are drawn in it.
+  expect(lines[body]).toContain('48;2;255;0;0m')
+  expect(lines[body - 1]).toContain('38;2;255;0;0m')
+  expect(lines[body - 1]).not.toContain('48;2;255;0;0m')
 })
 
 test('the focus marker sits on the message body line, not the sender name', () => {

@@ -89,7 +89,8 @@ warnings and fall back to defaults.
   "chatListPreviewLines": 1,
   "messagePaneShortNames": true,
   "showPresenceInList": true,
-  "showTimestampsInPane": true,
+  "showTimestampsInPane": "on",
+  "centerDateMarkers": false,
   "showSenderNamesInPane": true,
   "showOwnNameInPane": true,
   "showReactions": "current",
@@ -136,7 +137,8 @@ warnings and fall back to defaults.
 | `messagePaneShortNames`        | boolean              |  `true` | Show first names in the message-pane sender column.                                      |
 | `showChatNameHeader`           | boolean              | `false` | Show the conversation name (1:1 partner, group chat, or team · # channel) above the messages. |
 | `showPresenceInList`           | boolean              |  `true` | Show presence dots in the chat list when available.                                      |
-| `showTimestampsInPane`         | boolean              |  `true` | Show message timestamps in the message pane.                                             |
+| `showTimestampsInPane` | `off`, `on`, `transient` | `on` | Message timestamps in the message pane. `transient` shows one only when a message comes 15 minutes or more after the previous one. `true` / `false` still read as `on` / `off`. |
+| `centerDateMarkers` | boolean | `false` | Center the day separators ("Today", "Fri, May 15") in the message pane. Also in the menu as **Center dates in chat**. |
 | `showSenderNamesInPane` | boolean | `true` | Show the sender name above each message. Off leaves only the timestamp (or nothing, with timestamps off); tell senders apart by color. Also in the menu as **Show sender names**. |
 | `showOwnNameInPane` | boolean | `true` | Show your name above your own messages. Turn off alongside `selfMessagesOnRight`. Also in the menu as **Show my name on my messages**. |
 | `showReactions`                | `off`, `current`, `all` | `current` | Show message reactions never, only on the focused message, or on every message.      |
@@ -203,7 +205,7 @@ A preset also saves the look-related Settings menu toggles under
 `"settings"`: status bar and header options, chat list options (sort,
 grouping, short names, preview lines, presence dots) and message options
 (chat name header, short names, timestamps, sender names, reactions,
-images, right-aligned own messages, focus marker). Loading the preset
+images, right-aligned own messages, focus marker, centered dates). Loading the preset
 applies them. Built-in themes carry none, so switching to one leaves them
 as they are. Behavior settings (notifications, presence, scrolling, Enter
 sends) are not part of a preset.
@@ -225,6 +227,8 @@ subset of these keys is accepted:
   "selected": "magenta",
   "unread": "yellow",
   "dateMarker": "gray", // day separator ("Today", "Fri, May 15")
+  "senderMessage": null, // other people's message text; null = terminal text color
+  "senderMessageBackground": null, // background behind other people's messages
   // Per-presence colors:
   "presence": { "Available": "greenBright", "DoNotDisturb": "red" },
   // Paddings / margins (non-negative integers):
@@ -238,6 +242,7 @@ subset of these keys is accepted:
     "chatListGap": 0, // blank rows between chats in the list
     "textBackgroundPaddingX": 0, // bg-colored columns around focused / own message bodies
     "textBackgroundPaddingY": 0, // bg-colored rows above / below them
+    "textBackgroundRadius": 0, // 1 = rounded "speech bubble" corners on message backgrounds
     "dateMarkerIndent": 0, // extra indent of the day separator ("Today")
     "messageMaxWidth": 100, // message body width cap, % of the pane (10-100, steps of 10)
   },

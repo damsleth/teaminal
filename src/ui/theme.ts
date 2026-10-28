@@ -80,6 +80,9 @@ export type ThemeLayout = {
   dateMarkerIndent: number
   // MessagePane: message body width cap, percent of the pane (10-100).
   messageMaxWidth: number
+  // MessagePane: 1 rounds the corners of message body backgrounds (a
+  // half-block "speech bubble" frame); 0 keeps them square.
+  textBackgroundRadius: number
 }
 
 export type ThemeBorders = {
@@ -135,6 +138,10 @@ export type Theme = {
   selfName: string
   // Background behind your own message bodies; null = none.
   selfMessageBackground: string | null
+  // Other people's message bodies; null keeps the terminal's text color.
+  senderMessage: string | null
+  // Background behind other people's message bodies; null = none.
+  senderMessageBackground: string | null
   systemEvent: string
   // MessagePane day separator.
   dateMarker: string
@@ -184,6 +191,7 @@ const LAYOUT_DEFAULT: ThemeLayout = {
   textBackgroundPaddingY: 0,
   dateMarkerIndent: 0,
   messageMaxWidth: 100,
+  textBackgroundRadius: 0,
 }
 
 const BORDERS_DEFAULT: ThemeBorders = { panel: 'round', modal: 'round', active: 'round' }
@@ -238,6 +246,8 @@ const DARK: Theme = {
   selfMessage: 'blue',
   selfName: 'blue',
   selfMessageBackground: null,
+  senderMessage: null,
+  senderMessageBackground: null,
   systemEvent: 'gray',
   dateMarker: 'gray',
   errorText: 'red',
@@ -278,6 +288,8 @@ const LIGHT: Theme = {
   selfMessage: 'blue',
   selfName: 'blue',
   selfMessageBackground: null,
+  senderMessage: null,
+  senderMessageBackground: null,
   systemEvent: 'gray',
   dateMarker: 'gray',
   errorText: 'red',
@@ -324,6 +336,8 @@ export type PartialTheme = {
   selfMessage?: string
   selfName?: string
   selfMessageBackground?: string | null
+  senderMessage?: string | null
+  senderMessageBackground?: string | null
   systemEvent?: string
   dateMarker?: string
   errorText?: string

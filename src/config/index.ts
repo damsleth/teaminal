@@ -57,6 +57,8 @@ const THEME_KEYS = new Set<keyof ThemeOverrides>([
   'selfMessage',
   'selfName',
   'selfMessageBackground',
+  'senderMessage',
+  'senderMessageBackground',
   'appBackground',
   'systemEvent',
   'dateMarker',
@@ -99,6 +101,7 @@ const LAYOUT_KEYS = new Set<keyof NonNullable<ThemeOverrides['layout']>>([
   'textBackgroundPaddingY',
   'dateMarkerIndent',
   'messageMaxWidth',
+  'textBackgroundRadius',
 ])
 
 const BORDERS_KEYS = new Set<keyof NonNullable<ThemeOverrides['borders']>>([
@@ -289,6 +292,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     showChatNameHeader: settings.showChatNameHeader,
     showPresenceInList: settings.showPresenceInList,
     showTimestampsInPane: settings.showTimestampsInPane,
+    centerDateMarkers: settings.centerDateMarkers,
     showSenderNamesInPane: settings.showSenderNamesInPane,
     showOwnNameInPane: settings.showOwnNameInPane,
     showReactions: settings.showReactions,
@@ -497,6 +501,7 @@ export const PRESET_SETTING_KEYS = [
   'showChatNameHeader',
   'messagePaneShortNames',
   'showTimestampsInPane',
+  'centerDateMarkers',
   'showSenderNamesInPane',
   'showReactions',
   'inlineImages',
@@ -599,7 +604,7 @@ function validateAndAssign(
     case 'messagePaneShortNames':
     case 'showChatNameHeader':
     case 'showPresenceInList':
-    case 'showTimestampsInPane':
+    case 'centerDateMarkers':
     case 'showSenderNamesInPane':
     case 'showOwnNameInPane':
     case 'messageFocusIndicatorEnabled':
@@ -632,6 +637,18 @@ function validateAndAssign(
       }
       return false
     }
+    case 'showTimestampsInPane':
+      // Booleans are the pre-0.24 form.
+      if (value === true || value === false) {
+        out.showTimestampsInPane = value ? 'on' : 'off'
+        return true
+      }
+      if (value === 'off' || value === 'on' || value === 'transient') {
+        out.showTimestampsInPane = value
+        return true
+      }
+      warnings.push('config: "showTimestampsInPane" must be "off", "on", or "transient"')
+      return false
     case 'showReactions':
       if (value === 'off' || value === 'current' || value === 'all') {
         out.showReactions = value
@@ -882,6 +899,8 @@ export function validateThemeOverrides(
         key === 'messageFocusBackground' ||
         key === 'selectedRowBackground' ||
         key === 'selfMessageBackground' ||
+        key === 'senderMessage' ||
+        key === 'senderMessageBackground' ||
         key === 'messageFocusText') &&
       rawValue === null
     ) {

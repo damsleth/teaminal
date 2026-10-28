@@ -44,6 +44,7 @@ export type ToggleKey =
   | 'showChatNameHeader'
   | 'showPresenceInList'
   | 'showTimestampsInPane'
+  | 'centerDateMarkers'
   | 'showSenderNamesInPane'
   | 'showOwnNameInPane'
   | 'showReactions'
@@ -274,6 +275,12 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'showTimestampsInPane',
         label: 'Show timestamps in messages',
         action: { kind: 'toggle-setting', key: 'showTimestampsInPane' },
+        hint: 'transient = after a 15 min pause',
+      },
+      {
+        id: 'centerDateMarkers',
+        label: 'Center dates in chat',
+        action: { kind: 'toggle-setting', key: 'centerDateMarkers' },
       },
       {
         id: 'showSenderNamesInPane',
@@ -508,6 +515,11 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
       return (current === 'auto' ? 'off' : 'auto') as Settings[K]
     case 'showReactions':
       return cycleReactionDisplayMode(current as Settings['showReactions']) as Settings[K]
+    case 'showTimestampsInPane': {
+      const order = ['on', 'transient', 'off'] as const
+      const idx = order.indexOf(current as (typeof order)[number])
+      return order[(idx + 1) % order.length] as Settings[K]
+    }
     case 'chatListPreviewLines':
       return (((current as number) + 1) % 4) as Settings[K]
     case 'chatListGroupByType':
@@ -516,7 +528,7 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'messagePaneShortNames':
     case 'showChatNameHeader':
     case 'showPresenceInList':
-    case 'showTimestampsInPane':
+    case 'centerDateMarkers':
     case 'showSenderNamesInPane':
     case 'showOwnNameInPane':
     case 'messageFocusIndicatorEnabled':
@@ -567,6 +579,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'chatListSort':
     case 'showReactions':
     case 'statusBarPosition':
+    case 'showTimestampsInPane':
       return String(value)
     case 'headerUserFormat':
       return value === 'tenant' ? 'tenant only' : 'name + tenant'
@@ -578,7 +591,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'messagePaneShortNames':
     case 'showChatNameHeader':
     case 'showPresenceInList':
-    case 'showTimestampsInPane':
+    case 'centerDateMarkers':
     case 'showSenderNamesInPane':
     case 'showOwnNameInPane':
     case 'messageFocusIndicatorEnabled':
