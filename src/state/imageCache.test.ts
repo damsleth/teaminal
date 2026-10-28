@@ -26,10 +26,12 @@ import {
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
 import {
-  __resetPhotoAvailabilityForTests,
+  __forgetImagesInMemoryForTests,
+  __resetPhotoStateForTests,
   clearImageCache,
   ensureTeamPhoto,
   ensureUserPhoto,
+  userPhotoKey,
   ensureImageFetched,
   fetchAndCacheImage,
   getImageCacheDir,
@@ -476,13 +478,16 @@ describe('profile photos', () => {
   afterEach(() => {
     resetClient()
     resetAuth()
-    __resetPhotoAvailabilityForTests()
+    __resetPhotoStateForTests()
+    __forgetImagesInMemoryForTests()
     if (realXdg === undefined) delete process.env.XDG_CACHE_HOME
     else process.env.XDG_CACHE_HOME = realXdg
   })
 
-  it('a 403 turns photos off for the account: later photos make no request', async () => {
-    process.env.XDG_CACHE_HOME = join(tmpdir(), `teaminal-cache-${Date.now()}-photo`)
+  // A graph account whose Graph transport answers each photo URL with
+  // `respond(url)`; returns the URLs requested.
+  function setup(respond: (url: string) => Response): string[] {
+    process.env.XDG_CACHE_HOME = join(tmpdir(), `teaminal-cache-${Date.now()}-${Math.random()}`)
     setAudiencePreference('graph', { fallback: false })
     const exp = Math.floor(Date.now() / 1000) + 3600
     const jwt = `${Buffer.from('{"alg":"none"}').toString('base64url')}.${Buffer.from(
@@ -492,16 +497,97 @@ describe('profile photos', () => {
     const urls: string[] = []
     setClientTransport(async (url) => {
       urls.push(String(url))
-      return new Response('{"error":{"code":"Forbidden"}}', { status: 403 })
+      return respond(String(url))
     })
-    let changes = 0
-    const opts = { client: testClient(), onChange: () => changes++ }
-    ensureUserPhoto(`u-${Date.now()}`, 48, opts)
-    for (let i = 0; i < 50 && changes === 0; i++) await new Promise((r) => setTimeout(r, 5))
-    expect(urls.filter((u) => u.includes('/photos/'))).toHaveLength(1)
-    ensureUserPhoto(`u2-${Date.now()}`, 48, opts)
-    ensureTeamPhoto(`t-${Date.now()}`, opts)
-    await new Promise((r) => setTimeout(r, 20))
-    expect(urls.filter((u) => u.includes('/photo'))).toHaveLength(1)
+    return urls
+  }
+  const settled = () => new Promise((r) => setTimeout(r, 30))
+  const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3])
+  const photoUrls = (urls: string[]) => urls.filter((u) => u.includes('/photo'))
+
+  it('a 401 turns user photos off for the account; team pictures still load', async () => {
+    const urls = setup((url) =>
+      url.includes('/users/')
+        ? new Response('{}', { status: 401 })
+        : new Response(JPEG, { status: 200 }),
+    )
+    const opts = { client: testClient(), onChange: () => {} }
+    ensureUserPhoto('u1', 48, opts)
+    await settled()
+    ensureUserPhoto('u2', 48, opts)
+    ensureTeamPhoto('t1', opts)
+    await settled()
+    // u1 is asked (the client retries a 401 once); u2 is never asked.
+    expect(photoUrls(urls).filter((u) => u.includes('/u1/')).length).toBeGreaterThan(0)
+    expect(photoUrls(urls).filter((u) => u.includes('/u2/'))).toHaveLength(0)
+    expect(photoUrls(urls).filter((u) => u.includes('/teams/'))).toHaveLength(1)
+  })
+
+  it('a 403 skips only that picture', async () => {
+    const urls = setup(() => new Response('{}', { status: 403 }))
+    const opts = { client: testClient(), onChange: () => {} }
+    ensureUserPhoto('u1', 48, opts)
+    await settled()
+    ensureUserPhoto('u1', 48, opts)
+    ensureUserPhoto('u2', 48, opts)
+    await settled()
+    expect(photoUrls(urls).filter((u) => u.includes('/u1/'))).toHaveLength(1)
+    expect(photoUrls(urls).filter((u) => u.includes('/u2/'))).toHaveLength(1)
+  })
+
+  it('cached photos load from disk even when the kind is turned off', async () => {
+    const urls = setup((url) =>
+      url.includes('/u1/')
+        ? new Response(JPEG, { status: 200 })
+        : new Response('{}', { status: 401 }),
+    )
+    const client = testClient()
+    ensureUserPhoto('u1', 48, { client, onChange: () => {} })
+    await settled()
+    ensureUserPhoto('u2', 48, { client, onChange: () => {} }) // 401: user photos off
+    await settled()
+    __forgetImagesInMemoryForTests() // as after a restart; the 401 block stays
+    ensureUserPhoto('u1', 48, { client, onChange: () => {} })
+    expect(getImageData(client.ctx.account.id, userPhotoKey('u1', 48))).toBeDefined()
+    expect(photoUrls(urls).filter((u) => u.includes('/u1/'))).toHaveLength(1)
+  })
+
+  it('a 404 is remembered on disk, so the next launch does not ask again', async () => {
+    const urls = setup(() => new Response('{}', { status: 404 }))
+    const client = testClient()
+    ensureUserPhoto('nobody', 48, { client, onChange: () => {} })
+    await settled()
+    __forgetImagesInMemoryForTests()
+    ensureUserPhoto('nobody', 48, { client, onChange: () => {} })
+    await settled()
+    expect(photoUrls(urls)).toHaveLength(1)
+  })
+
+  it('every caller waiting on a picture is told when it lands', async () => {
+    setup(() => new Response(JPEG, { status: 200 }))
+    const client = testClient()
+    let list = 0
+    let pane = 0
+    ensureUserPhoto('u1', 48, { client, onChange: () => list++ })
+    ensureUserPhoto('u1', 48, { client, onChange: () => pane++ })
+    await settled()
+    expect([list, pane]).toEqual([1, 1])
+  })
+
+  it('at most 4 photo requests run at once per account', async () => {
+    let active = 0
+    let peak = 0
+    process.env.XDG_CACHE_HOME = join(tmpdir(), `teaminal-cache-${Date.now()}-q`)
+    setup(() => new Response(JPEG, { status: 200 }))
+    setClientTransport(async () => {
+      peak = Math.max(peak, ++active)
+      await new Promise((r) => setTimeout(r, 5))
+      active--
+      return new Response(JPEG, { status: 200 })
+    })
+    const client = testClient()
+    for (let i = 0; i < 10; i++) ensureUserPhoto(`q${i}`, 48, { client, onChange: () => {} })
+    await new Promise((r) => setTimeout(r, 120))
+    expect(peak).toBeLessThanOrEqual(4)
   })
 })

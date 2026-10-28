@@ -26,7 +26,8 @@ import {
   avatarRows,
   iconEscape,
   iconKey,
-  isIconKey,
+  initialsKey,
+  isGeneratedKey,
 } from './avatarImage'
 import { rgbOf } from './theme'
 import type { InlineImageSlots } from './inlineImageLayout'
@@ -379,10 +380,12 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     setKittyOwner('chat-list', {
       viewport: () => listRef.current,
       slots: pictureSlots.current,
-      escape: (cacheKey, rows) => {
-        if (isIconKey(cacheKey)) return iconEscape(cacheKey, rows)
+      escape: (cacheKey, rows, fallbackKey) => {
+        if (isGeneratedKey(cacheKey)) return iconEscape(cacheKey, rows)
         const data = getImageData(accountId, cacheKey)
-        return data && accountId ? avatarEscape(ownedImageKey(accountId, cacheKey), data, rows) : ''
+        const photo =
+          data && accountId ? avatarEscape(ownedImageKey(accountId, cacheKey), data, rows) : ''
+        return photo || (fallbackKey ? iconEscape(fallbackKey, rows) : '')
       },
     })
     requestKittyPaint({ stdout, flush: waitUntilRenderFlush, suppressed: modalOpen })
@@ -539,6 +542,15 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
                   rows={thumbRows}
                   cols={thumbCols}
                   label={picture?.kind === 'icon' ? '' : initialsOf(label)}
+                  fallbackKey={
+                    picture?.kind === 'icon'
+                      ? null
+                      : initialsKey(
+                          initialsOf(
+                            row.item.kind === 'channel' ? row.item.team.displayName : label,
+                          ),
+                        )
+                  }
                   theme={theme}
                 />
               </Box>

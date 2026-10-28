@@ -18,12 +18,16 @@ export function initialsOf(name: string): string {
 export function PictureSlot(props: {
   slots: InlineImageSlots
   cacheKey: string | null
+  // Drawn when cacheKey has nothing to show (initials image).
+  fallbackKey?: string | null
   rows: number
   cols: number
   label: string
   theme: Theme
 }) {
-  const { slots, cacheKey, rows } = props
+  const { slots, rows } = props
+  const cacheKey = props.cacheKey ?? props.fallbackKey ?? null
+  const fallbackKey = props.cacheKey ? (props.fallbackKey ?? undefined) : undefined
   return (
     <Box
       width={props.cols}
@@ -31,7 +35,7 @@ export function PictureSlot(props: {
       flexShrink={0}
       ref={(node) => {
         if (!node || !cacheKey) return
-        slots.set(node, { cacheKey, rows, inset: 0 })
+        slots.set(node, { cacheKey, rows, inset: 0, fallbackKey })
         return () => {
           slots.delete(node)
         }

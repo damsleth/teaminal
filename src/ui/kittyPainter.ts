@@ -15,7 +15,7 @@ export type KittyOwner = {
   viewport: () => DOMElement | null
   slots: InlineImageSlots
   // Escape for one slot; '' paints nothing.
-  escape: (cacheKey: string, rows: number) => string
+  escape: (cacheKey: string, rows: number, fallbackKey?: string) => string
 }
 
 export type KittyPaintContext = {
