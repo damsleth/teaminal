@@ -580,18 +580,12 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": 6,
     "bold": 134217728
   },
-  "32,12": {
-    "bgColorMode": 16777216,
-    "bgColor": 0,
-    "fgColorMode": 0,
-    "fgColor": -1,
-    "bold": 0
-  },
   "59,12": {
     "bgColorMode": 0,
     "bgColor": -1,
     "fgColorMode": 16777216,
-    "fgColor": 8
+    "fgColor": 8,
+    "bold": 0
   },
   "60,12": {
     "bgColorMode": 16777216,

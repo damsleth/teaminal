@@ -551,6 +551,18 @@ function ThemePreview(props: {
         >
           {`●${listIndent}`}
           {fs('Ada Byron', theme.fontSize.chatListName, tight)}
+          {/* Fill the row, as the selection background does in the list. */}
+          {' '.repeat(
+            Math.max(
+              0,
+              PREVIEW_W -
+                2 -
+                (theme.borders.selectedRow === 'none' ? 0 : 2) -
+                1 -
+                listIndent.length -
+                'Ada Byron'.length,
+            ),
+          )}
         </Text>
       </Box>
       <Text color={theme.unreadRow} bold={theme.emphasis.unreadBold}>
