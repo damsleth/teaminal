@@ -170,6 +170,8 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,7": {
+    "bgColorMode": 33554432,
+    "bgColor": 235,
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -180,6 +182,10 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
   "9,7": {
     "fgColorMode": 0,
     "fgColor": -1
+  },
+  "10,7": {
+    "bgColorMode": 0,
+    "bgColor": -1
   },
   "11,7": {
     "fgColorMode": 16777216,
@@ -824,6 +830,8 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 6
   },
   "1,6": {
+    "bgColorMode": 33554432,
+    "bgColor": 235,
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -832,6 +840,8 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 8
   },
   "26,6": {
+    "bgColorMode": 0,
+    "bgColor": -1,
     "fgColorMode": 0,
     "fgColor": -1
   },

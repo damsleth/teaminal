@@ -8,6 +8,22 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Frames around highlighted elements.** Border style and color for the
+  selected chat-list row (`borders.selectedRow`, `selectedRowBorder`), the
+  focused message (`borders.focusedMessage`, `messageFocusBorder`) and your
+  own / other people's messages (`borders.selfMessage` /
+  `borders.senderMessage`, `selfMessageBorder` / `senderMessageBorder`).
+  Default `none`; any other style reserves the frame on every row or
+  message so moving the selection never shifts text.
+
+- **Chat list width in the theme editor.** **Chat list → Width**
+  (`chatListWidth`) is auto or 16-60 columns, saved in presets; Ctrl-X
+  resize mode still works.
+
+- **Every color can be "none".** All theme colors take `null` / none in
+  the editor: the terminal's own color for text and borders, no color for
+  backgrounds and frames.
+
 - **Chat list preview color and picture indent.** Theme editor **Chat
   list → Preview text** (`chatListPreviewText`, default: muted text) colors
   the last-message preview of read chats; unread ones keep the unread
@@ -290,6 +306,9 @@ adheres to [Semantic Versioning](https://semver.org/).
   an empty cache; ordinary aliases keep their existing caches.
 
 ### Fixed
+
+- **The selected chat row is highlighted as a whole**: its background now
+  covers the picture column and the preview line, not just the name.
 
 - **Center header bar works.** The setting had no effect: the header text
   stayed left-aligned.

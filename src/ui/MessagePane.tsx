@@ -40,7 +40,7 @@ import {
   type LoadMoreState,
   type MessageRenderRow,
 } from './messageRows'
-import type { Theme } from './theme'
+import type { BorderStyle, Theme } from './theme'
 import { useSessionApi } from './SessionContext'
 import { useAppState, useTheme } from './StoreContext'
 import { TAIL_PANEL_ROWS } from './TailPanels'
@@ -277,8 +277,9 @@ export function MessagePane(props: {
   // Body wrap width estimate for the viewport budget: pane content (terminal
   // minus the chat-list pane and its border) minus the body indent. Bodies now
   // start near the left edge instead of after a deep sender column.
-  // A rounded background adds a half-block frame row / column on each side.
-  const bubble = theme.layout.textBackgroundRadius > 0 ? 1 : 0
+  // A body frame (border styles or the rounded background) adds a row /
+  // column on each side.
+  const bubble = bodyFramed(theme) ? 1 : 0
   const bgPadX = theme.layout.textBackgroundPaddingX + bubble
   const bodyPaddingY = theme.layout.textBackgroundPaddingY + bubble
   // layout.messageMaxWidth narrows each message (not its sender line) to
@@ -617,6 +618,41 @@ export function avatarRunStarts(messages: ChatMessage[], myUserId?: string): Set
   return ids
 }
 
+// Whether message bodies carry a frame: a border style on any kind of body,
+// or the rounded background. Every body then reserves the frame's space.
+export function bodyFramed(theme: Theme): boolean {
+  const b = theme.borders
+  return (
+    theme.layout.textBackgroundRadius > 0 ||
+    b.focusedMessage !== 'none' ||
+    b.selfMessage !== 'none' ||
+    b.senderMessage !== 'none'
+  )
+}
+
+// The frame one body draws, or undefined when bodies are unframed.
+function bodyFrame(
+  theme: Theme,
+  body: { focused: boolean; self: boolean; plain: boolean; background: string | undefined },
+): { style: Exclude<BorderStyle, 'none'> | typeof BUBBLE_BORDER; color?: string } | undefined {
+  if (!bodyFramed(theme)) return undefined
+  const b = theme.borders
+  if (body.focused && b.focusedMessage !== 'none')
+    return {
+      style: b.focusedMessage,
+      color: theme.messageFocusBorder ?? theme.borderActive,
+    }
+  const own = body.plain ? 'none' : body.self ? b.selfMessage : b.senderMessage
+  if (own !== 'none')
+    return {
+      style: own,
+      color: (body.self ? theme.selfMessageBorder : theme.senderMessageBorder) ?? theme.border,
+    }
+  if (theme.layout.textBackgroundRadius > 0 && body.background)
+    return { style: BUBBLE_BORDER, color: body.background }
+  return { style: BLANK_BUBBLE_BORDER }
+}
+
 // Gap after which 'transient' timestamps show again.
 const TRANSIENT_TIMESTAMP_GAP_MS = 15 * 60 * 1000
 
@@ -830,8 +866,7 @@ function MessageRow(props: {
   const align = flip ? 'flex-end' : undefined
 
   // On the first text row, below any background padding / bubble frame.
-  const markerTop =
-    theme.layout.textBackgroundPaddingY + (theme.layout.textBackgroundRadius > 0 ? 1 : 0)
+  const markerTop = theme.layout.textBackgroundPaddingY + (bodyFramed(theme) ? 1 : 0)
   const marker = (
     <Box width={markerWidth} flexShrink={0} paddingTop={markerTop}>
       {/* No background: the marker color stands on its own, and the focus
@@ -909,17 +944,24 @@ function MessageRow(props: {
   // wrapped lines, so the padded body reads as one solid block.
   const bgPadX = theme.layout.textBackgroundPaddingX
   const bgPadY = theme.layout.textBackgroundPaddingY
-  // Rounded: a half-block frame in the background color around the padded
-  // body, kept (blank) on bodies without one so focusing doesn't shift text.
-  const rounded = theme.layout.textBackgroundRadius > 0
+  // Frame: the body's border style (focused message, else own / sender
+  // message) in its border color; else the rounded half-block frame in the
+  // background color; kept blank on unframed bodies so focusing or a
+  // background change never shifts text.
+  const frame = bodyFrame(theme, {
+    focused: props.focused,
+    self: isSelf,
+    plain: isSystem || isDeleted,
+    background: bodyBg,
+  })
   const bodyNode =
-    bgPadX > 0 || bgPadY > 0 || rounded ? (
+    bgPadX > 0 || bgPadY > 0 || frame ? (
       <Box
         paddingX={bgPadX}
         paddingY={bgPadY}
         backgroundColor={bodyBg}
-        borderStyle={rounded ? (bodyBg ? BUBBLE_BORDER : BLANK_BUBBLE_BORDER) : undefined}
-        borderColor={bodyBg}
+        borderStyle={frame?.style}
+        borderColor={frame?.color}
       >
         {bodyTextNode}
       </Box>

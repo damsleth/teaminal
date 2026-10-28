@@ -10,7 +10,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 ││   Ada: The lau│       Text                  ██ white                             │               ││
 ││  Design Sync │       Muted text            ██ gray                              │               ││
 ││   Nina: Nina s│       Border                ██ gray                              │               ││
-││  Ops Channel │      ↓ 58 more                                                   │               ││
+││  Ops Channel │      ↓ 67 more                                                   │               ││
 ││   Mina: Deploy│                                                                  │               ││
 ││               │   ╭──────────────────────────────────────╮                       │               ││
 ││               │   │Chats                                 │                       │               ││
@@ -228,6 +228,8 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": 8
   },
   "1,5": {
+    "bgColorMode": 33554432,
+    "bgColor": 235,
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -236,6 +238,8 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": 8
   },
   "16,5": {
+    "bgColorMode": 0,
+    "bgColor": -1,
     "fgColorMode": 16777216,
     "fgColor": 6
   },

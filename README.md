@@ -252,7 +252,18 @@ subset of these keys is accepted:
     "messageMaxWidth": 100, // conversation column width, % of the pane, centered (10-100, steps of 10)
   },
   // Border styles (none | single | double | round | bold | classic | singleDouble | doubleSingle | arrow):
-  "borders": { "panel": "single", "modal": "double", "active": "bold" },
+  "borders": {
+    "panel": "single",
+    "modal": "double",
+    "active": "bold",
+    // Frames (default none; any style reserves the space on every row / message):
+    "selectedRow": "round", // selected chat-list row, color selectedRowBorder
+    "focusedMessage": "bold", // focused message, color messageFocusBorder
+    "selfMessage": "none", // your messages, color selfMessageBorder
+    "senderMessage": "none", // other people's messages, color senderMessageBorder
+  },
+  // Any color can be null ("none"): terminal default for text / borders,
+  // no color for backgrounds and frames.
   // Per-role bold (true/false):
   "emphasis": {
     "modalTitleBold": true,

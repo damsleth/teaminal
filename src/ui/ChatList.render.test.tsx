@@ -109,3 +109,36 @@ test('chatListPreviewText colors the previews of read chats', () => {
   const preview = out.split('\n').find((l) => l.includes('The launch notes'))!
   expect(preview).toContain('38;2;255;0;0m')
 })
+
+test('the selected row is colored as a whole and can be framed', () => {
+  const renderList = (overrides: object) => {
+    const store = createAppStore()
+    applySeededState(store)
+    store.set({
+      settings: { ...store.get().settings, themeOverrides: overrides } as never,
+      cursor: 0,
+    })
+    return renderToString(
+      <StoreProvider store={store}>
+        <SessionProvider api={session}>
+          <ChatList listPaneWidth={40} />
+        </SessionProvider>
+      </StoreProvider>,
+      { columns: 40 },
+    ).split('\n')
+  }
+  const plain = (l: string) => l.replace(/\x1b\[[0-9;]*m/g, '')
+  const at = (ls: string[], text: string) => ls.findIndex((l) => plain(l).includes(text))
+  // Background on the preview line of the selected chat too.
+  const bg = renderList({ selectedRowBackground: '#ff0000' })
+  expect(bg[at(bg, 'The launch notes')]).toContain('48;2;255;0;0m')
+  // A selected-row border frames the selected row only, and every row
+  // reserves the frame (2 rows), so rows sit further apart.
+  const framed = renderList({ borders: { selectedRow: 'single' } }).map(plain)
+  const flat = renderList({}).map(plain)
+  expect(framed[at(framed, 'Ada Byron') - 1]).toContain('┌')
+  expect(framed.filter((l) => l.includes('┌'))).toHaveLength(1)
+  expect(at(framed, 'Design Sync') - at(framed, 'Ada Byron')).toBe(
+    at(flat, 'Design Sync') - at(flat, 'Ada Byron') + 2,
+  )
+})

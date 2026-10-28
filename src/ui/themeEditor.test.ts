@@ -133,8 +133,13 @@ describe('cycleColor', () => {
   })
 
   test('a custom hex not in the palette jumps to an end', () => {
-    expect(cycleColor(solid, '#123456', 1)).toBe(COLOR_PALETTE[0]!)
+    // Every color takes "none", so the cycle starts at null.
+    expect(cycleColor(solid, '#123456', 1)).toBeNull()
     expect(cycleColor(solid, '#123456', -1)).toBe(COLOR_PALETTE[COLOR_PALETTE.length - 1]!)
+  })
+
+  test('every color field offers "none"', () => {
+    expect(FIELDS.filter((f) => f.kind === 'color' && !f.nullable)).toEqual([])
   })
 })
 
@@ -383,4 +388,13 @@ describe('formatFieldValue / isHexColor', () => {
     expect(isHexColor('magenta')).toBe(false)
     expect(isHexColor('#')).toBe(false)
   })
+})
+
+test('chat list width steps between auto and 16-60 columns', () => {
+  const f = field('setting.chatListWidth') as NumericField
+  expect(nextFieldValue(f, null, 1)).toBe(16)
+  expect(nextFieldValue(f, 16, -1)).toBeNull()
+  expect(nextFieldValue(f, null, -1)).toBeNull()
+  expect(nextFieldValue(f, 30, 1)).toBe(32)
+  expect(nextFieldValue(f, 60, 1)).toBe(60)
 })
