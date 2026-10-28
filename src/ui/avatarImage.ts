@@ -138,9 +138,101 @@ function calendarShape(x: number, y: number, n: number): boolean {
   return gx >= 0 && gx < 3 && gy >= 0 && gy < 2 && gx % 1 < 0.6 && gy % 1 < 0.6
 }
 
-// Kitty escape for an icon key into a rows x avatarCols(rows) box.
+// Initials drawn as a picture: centered letters on a neutral square, the
+// same size as a photo, for people (and teams) without one. Letters come
+// from a 5x7 pixel font scaled by whole pixels, so they stay crisp.
+// Key: initials:<letters>.
+export function initialsKey(initials: string): string | null {
+  const letters = Array.from(initials.toUpperCase())
+    .map((c) => (GLYPHS[c] ? c : c.normalize('NFD').replace(/\p{M}/gu, '')))
+    .filter((c) => GLYPHS[c])
+    .slice(0, 2)
+    .join('')
+  return letters ? `initials:${letters}` : null
+}
+
+const INITIALS_PX = 66
+// ponytail: fixed neutral gray with white letters reads on light and dark
+// themes alike; make it a theme token if anyone wants it tinted.
+const INITIALS_BG: [number, number, number] = [140, 140, 140]
+const INITIALS_FG: [number, number, number] = [255, 255, 255]
+
+function initialsPixels(key: string): Pixels | null {
+  const letters = Array.from(key.slice('initials:'.length))
+  if (letters.length === 0 || letters.some((c) => !GLYPHS[c])) return null
+  const n = INITIALS_PX
+  const rgba = new Uint8Array(n * n * 4)
+  const paint = (x: number, y: number, rgb: [number, number, number]) => {
+    const i = (y * n + x) * 4
+    rgba[i] = rgb[0]
+    rgba[i + 1] = rgb[1]
+    rgba[i + 2] = rgb[2]
+    rgba[i + 3] = 255
+  }
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) paint(x, y, INITIALS_BG)
+  // Text box: 5 px per letter, 1 px between, 7 px tall; scale it to about
+  // 55% of the square's width, then center it.
+  const textW = letters.length * 6 - 1
+  const k = Math.max(1, Math.min(Math.floor((n * 0.55) / textW), Math.floor((n * 0.5) / 7)))
+  const left = Math.floor((n - textW * k) / 2)
+  const top = Math.floor((n - 7 * k) / 2)
+  letters.forEach((c, li) => {
+    const rows = GLYPHS[c]!
+    for (let gy = 0; gy < 7; gy++)
+      for (let gx = 0; gx < 5; gx++) {
+        if (rows[gy]![gx] !== '#') continue
+        for (let dy = 0; dy < k; dy++)
+          for (let dx = 0; dx < k; dx++)
+            paint(left + (li * 6 + gx) * k + dx, top + gy * k + dy, INITIALS_FG)
+      }
+  })
+  return { rgba, width: n, height: n }
+}
+
+// 5x7 capitals, '#' = ink.
+const GLYPHS: Record<string, string[]> = {
+  A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+  B: ['####.', '#...#', '#...#', '####.', '#...#', '#...#', '####.'],
+  C: ['.###.', '#...#', '#....', '#....', '#....', '#...#', '.###.'],
+  D: ['####.', '#...#', '#...#', '#...#', '#...#', '#...#', '####.'],
+  E: ['#####', '#....', '#....', '####.', '#....', '#....', '#####'],
+  F: ['#####', '#....', '#....', '####.', '#....', '#....', '#....'],
+  G: ['.###.', '#...#', '#....', '#.###', '#...#', '#...#', '.####'],
+  H: ['#...#', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+  I: ['.###.', '..#..', '..#..', '..#..', '..#..', '..#..', '.###.'],
+  J: ['..###', '...#.', '...#.', '...#.', '...#.', '#..#.', '.##..'],
+  K: ['#...#', '#..#.', '#.#..', '##...', '#.#..', '#..#.', '#...#'],
+  L: ['#....', '#....', '#....', '#....', '#....', '#....', '#####'],
+  M: ['#...#', '##.##', '#.#.#', '#.#.#', '#...#', '#...#', '#...#'],
+  N: ['#...#', '#...#', '##..#', '#.#.#', '#..##', '#...#', '#...#'],
+  O: ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+  P: ['####.', '#...#', '#...#', '####.', '#....', '#....', '#....'],
+  Q: ['.###.', '#...#', '#...#', '#...#', '#.#.#', '#..#.', '.##.#'],
+  R: ['####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#'],
+  S: ['.####', '#....', '#....', '.###.', '....#', '....#', '####.'],
+  T: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..'],
+  U: ['#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+  V: ['#...#', '#...#', '#...#', '#...#', '#...#', '.#.#.', '..#..'],
+  W: ['#...#', '#...#', '#...#', '#.#.#', '#.#.#', '#.#.#', '.#.#.'],
+  X: ['#...#', '#...#', '.#.#.', '..#..', '.#.#.', '#...#', '#...#'],
+  Y: ['#...#', '#...#', '.#.#.', '..#..', '..#..', '..#..', '..#..'],
+  Z: ['#####', '....#', '...#.', '..#..', '.#...', '#....', '#####'],
+  Æ: ['.####', '#.#..', '#.#..', '#####', '#.#..', '#.#..', '#.###'],
+  Ø: ['.###.', '#..##', '#.#.#', '#.#.#', '#.#.#', '##..#', '.###.'],
+  Å: ['..#..', '.#.#.', '.###.', '#...#', '#####', '#...#', '#...#'],
+  Ä: ['.#.#.', '.....', '.###.', '#...#', '#####', '#...#', '#...#'],
+  Ö: ['.#.#.', '.....', '.###.', '#...#', '#...#', '#...#', '.###.'],
+  Ü: ['.#.#.', '.....', '#...#', '#...#', '#...#', '#...#', '.###.'],
+}
+
+// Pictures drawn in-process: chat-type icons and initials.
+export function isGeneratedKey(key: string): boolean {
+  return isIconKey(key) || key.startsWith('initials:')
+}
+
+// Kitty escape for an icon / initials key into a rows x avatarCols(rows) box.
 export function iconEscape(key: string, rows: number): string {
-  const pixels = iconPixels(key)
+  const pixels = key.startsWith('initials:') ? initialsPixels(key) : iconPixels(key)
   if (!pixels) return ''
   return buildKittyRawEscape(key, pixels, {
     rows,

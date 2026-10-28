@@ -1,6 +1,11 @@
 import type { DOMElement } from 'ink'
 
-export type InlineImageSlots = Map<DOMElement, { cacheKey: string; rows: number; inset: number }>
+export type InlineImageSlots = Map<
+  DOMElement,
+  // fallbackKey: drawn when cacheKey has nothing to show (e.g. initials for a
+  // missing photo).
+  { cacheKey: string; rows: number; inset: number; fallbackKey?: string }
+>
 
 // Ink exposes Yoga coordinates relative to each parent. The app fills the
 // terminal, so their sum is the zero-based terminal position.
@@ -23,7 +28,7 @@ export function paintInlineImages(
   stdout: NodeJS.WriteStream,
   pane: DOMElement,
   slots: InlineImageSlots,
-  imageEscape: (cacheKey: string, rows: number) => string,
+  imageEscape: (cacheKey: string, rows: number, fallbackKey?: string) => string,
 ): void {
   const viewport = elementRect(pane)
   let output = ''
@@ -38,7 +43,7 @@ export function paintInlineImages(
       rect.left + slot.inset >= stdout.columns
     )
       continue
-    const apc = imageEscape(slot.cacheKey, slot.rows)
+    const apc = imageEscape(slot.cacheKey, slot.rows, slot.fallbackKey)
     if (apc)
       output += `\x1b[${Math.round(rect.top) + 1};${Math.round(rect.left + slot.inset) + 1}H${apc}`
   }

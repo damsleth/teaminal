@@ -59,7 +59,15 @@ import {
   ownedImageKey,
   userPhotoKey,
 } from '../state/imageCache'
-import { avatarCols, avatarEscape, avatarPixels, avatarRows } from './avatarImage'
+import {
+  avatarCols,
+  avatarEscape,
+  avatarPixels,
+  avatarRows,
+  iconEscape,
+  initialsKey,
+  isGeneratedKey,
+} from './avatarImage'
 import { requestKittyPaint, setKittyOwner } from './kittyPainter'
 import { initialsOf, PictureSlot } from './PictureSlot'
 import type { AccountId } from '../account'
@@ -392,12 +400,15 @@ export function MessagePane(props: {
     setKittyOwner('messages', {
       viewport: () => paneRef.current,
       slots: imageSlots.current,
-      escape: (cacheKey, rows) => {
+      escape: (cacheKey, rows, fallbackKey) => {
+        if (isGeneratedKey(cacheKey)) return iconEscape(cacheKey, rows)
         const data = getImageData(accountId, cacheKey)
-        if (!data || !accountId) return ''
-        const owned = ownedImageKey(accountId, cacheKey)
-        if (isPhotoKey(cacheKey)) return avatarEscape(owned, data, rows)
-        return buildKittyImageEscape(owned, data, { rows, reservedRows: rows })
+        const owned = accountId ? ownedImageKey(accountId, cacheKey) : null
+        if (isPhotoKey(cacheKey)) {
+          const photo = data && owned ? avatarEscape(owned, data, rows) : ''
+          return photo || (fallbackKey ? iconEscape(fallbackKey, rows) : '')
+        }
+        return data && owned ? buildKittyImageEscape(owned, data, { rows, reservedRows: rows }) : ''
       },
     })
     requestKittyPaint({ stdout, flush: waitUntilRenderFlush, suppressed: modalOpen })
@@ -1061,6 +1072,7 @@ function MessageRow(props: {
             rows={avatar.rows}
             cols={avatar.cols}
             label={initialsOf(senderRaw)}
+            fallbackKey={initialsKey(initialsOf(senderRaw))}
             theme={theme}
           />
         )}

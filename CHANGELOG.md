@@ -15,8 +15,11 @@ adheres to [Semantic Versioning](https://semver.org/).
   photo at the start of each run from the same sender; the chat list shows
   the other person's photo for 1:1 chats, the team picture for channels,
   and a group or calendar icon at the same size for group and meeting
-  chats. Two-letter initials show until a photo loads, and stay where there
-  is none (no photo set, or no Graph access).
+  chats. Without a photo (none set, or no Graph access) the person's
+  initials are drawn as a picture of the same size, centered on a neutral
+  square. Photos are cached on disk and always read from there first;
+  "no photo" answers are remembered for a week, and at most four photo
+  requests run at once.
   Needs a terminal with the kitty graphics protocol (kitty, Ghostty,
   WezTerm), so the settings only appear there and nothing is drawn
   elsewhere. Photos come from Graph; accounts without Graph access show

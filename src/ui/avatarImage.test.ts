@@ -7,6 +7,7 @@ import {
   avatarRows,
   iconEscape,
   iconKey,
+  initialsKey,
 } from './avatarImage'
 import { __resetKittyImageIdsForTests, kittyImageId } from './kittyGraphics'
 import { __resetKittyPainterForTests, requestKittyPaint, setKittyOwner } from './kittyPainter'
@@ -96,4 +97,32 @@ test('group and meeting icons are drawn as pictures in the given color', () => {
     expect(Buffer.from(b64, 'base64').includes(Buffer.from([10, 20, 30, 255]))).toBe(true)
   }
   expect(iconEscape('icon:nope:1,2,3', 2)).toBe('')
+})
+
+test('initials keys keep known letters and fold accents', () => {
+  expect(initialsKey('cj')).toBe('initials:CJ')
+  expect(initialsKey('ØÉ')).toBe('initials:ØE')
+  expect(initialsKey('ЖЖ')).toBeNull()
+  expect(initialsKey('')).toBeNull()
+})
+
+test('initials are drawn centered on a neutral square', () => {
+  const out = iconEscape(initialsKey('CJ')!, 2)
+  expect(out.startsWith('\x1b_Ga=T,f=32,s=66,v=66,')).toBe(true)
+  const b64 = [...out.matchAll(/;([A-Za-z0-9+/=]+)\x1b\\/g)].map((m) => m[1]).join('')
+  const px = Buffer.from(b64, 'base64')
+  let [minX, maxX, minY, maxY] = [66, -1, 66, -1]
+  for (let y = 0; y < 66; y++)
+    for (let x = 0; x < 66; x++)
+      if (px[(y * 66 + x) * 4] === 255) {
+        minX = Math.min(minX, x)
+        maxX = Math.max(maxX, x)
+        minY = Math.min(minY, y)
+        maxY = Math.max(maxY, y)
+      }
+  // Equal margins (within a pixel) on both axes.
+  expect(Math.abs(minX - (65 - maxX))).toBeLessThanOrEqual(1)
+  expect(Math.abs(minY - (65 - maxY))).toBeLessThanOrEqual(1)
+  // The rest is the opaque background.
+  expect([px[0], px[3]]).toEqual([140, 255])
 })

@@ -6,7 +6,7 @@
 // other credentials. Blobs are rejected above MAX_IMAGE_BYTES to bound disk use.
 
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { teaminalCacheDir } from './cacheFiles'
 import { accountRef, owaProfile, profileSlug, type AccountId } from '../account'
@@ -114,9 +114,6 @@ export type FetchImageOpts = {
   // AsyncGW region (`emea`, `amer`, `apac`, `ind`) when known from the
   // original asm/asyncgw object URL.
   region?: string
-  // A profile photo / team picture: a 404 means "no photo" (not logged), and
-  // any other failure turns photos off for the account (see ensureUserPhoto).
-  photo?: boolean
 }
 
 // Whether `path` is something graphBinary can actually fetch (a Graph-relative
@@ -212,15 +209,6 @@ export async function fetchAndCacheImage(
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    if (opts.photo) {
-      if (err instanceof GraphError && err.status === 404) return null
-      const account = opts.client.ctx.account.id
-      if (!photosUnavailable.has(account)) {
-        photosUnavailable.add(account)
-        recordEvent('graph', 'info', `profile photos unavailable for this account: ${message}`)
-      }
-      return null
-    }
     recordEvent('graph', 'warn', `image fetch failed for ${meta.name}: ${message}`)
     return null
   }
@@ -311,21 +299,145 @@ export function ensureImageFetched(
     })
 }
 
-// Accounts whose photo requests fail for a reason other than "no photo"
-// (no Graph access, e.g. Teams-service-only accounts, or a 401 / 403):
-// photos stay off for them this session and initials show instead.
-// ponytail: a one-off network error also turns them off until restart.
-const photosUnavailable = new Set<AccountId>()
+// Profile photos and team pictures share the image cache under these keys
+// (Graph serves them as JPEG), with their own fetch path:
+//   - the disk cache is always read first, whatever happened to requests;
+//   - a 404 ("no photo") is remembered on disk for NO_PHOTO_TTL_MS;
+//   - a 401 turns that kind (user / team) off for the account this session,
+//     a 403 just that picture: initials show instead;
+//   - any other failure (throttling after the client's own 429 retries,
+//     5xx, network) is retried after PHOTO_RETRY_MS;
+//   - at most MAX_PHOTO_FETCHES requests run at once per account, so a
+//     screenful of new faces doesn't trip Graph's throttling;
+//   - every caller waiting on a picture is told when it lands.
+// ponytail: cached photos never refresh; clear the cache to pick up a new one.
+export type PhotoKind = 'user' | 'team'
 
-export function __resetPhotoAvailabilityForTests(): void {
-  photosUnavailable.clear()
+const NO_PHOTO_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const PHOTO_RETRY_MS = 60_000
+const MAX_PHOTO_FETCHES = 4
+
+const photoKindBlocked = new Set<string>() // `${account}\0${kind}` after a 401
+const photoRetryAt = new Map<string, number>() // owned key -> when a failure may retry
+const photoWaiters = new Map<string, Set<() => void>>() // owned key -> callers to notify
+const photoQueues = new Map<AccountId, { active: number; waiting: (() => void)[] }>()
+
+export function __forgetImagesInMemoryForTests(): void {
+  fetchStatus.clear()
+  imageDataCache.clear()
 }
 
-// Profile photos and team pictures share the image cache under these keys.
-// Graph serves them as JPEG. A user without a photo 404s; that lands as
-// 'error' in memory, so it's asked once per session.
-// ponytail: no on-disk "no photo" marker, so photo-less users are asked
-// again each launch; add one if those 404s ever matter.
+export function __resetPhotoStateForTests(): void {
+  photoKindBlocked.clear()
+  photoRetryAt.clear()
+  photoWaiters.clear()
+  photoQueues.clear()
+}
+
+function noPhotoPath(key: string, profile?: string): string {
+  const hash = createHash('sha1').update(key).digest('hex')
+  return join(getCacheDir(profile), `${hash}.none`)
+}
+
+function hasNoPhotoMarker(key: string, profile?: string): boolean {
+  try {
+    return Date.now() - statSync(noPhotoPath(key, profile)).mtimeMs < NO_PHOTO_TTL_MS
+  } catch {
+    return false
+  }
+}
+
+function enqueuePhotoFetch(account: AccountId, task: () => Promise<void>): void {
+  let q = photoQueues.get(account)
+  if (!q) photoQueues.set(account, (q = { active: 0, waiting: [] }))
+  const queue = q
+  const run = (): void => {
+    queue.active++
+    void task().finally(() => {
+      queue.active--
+      queue.waiting.shift()?.()
+    })
+  }
+  if (queue.active < MAX_PHOTO_FETCHES) run()
+  else queue.waiting.push(run)
+}
+
+function ensurePhoto(
+  kind: PhotoKind,
+  path: string,
+  key: string,
+  opts: { client: GraphClient; onChange: () => void },
+): void {
+  const account = opts.client.ctx.account
+  const owned = ownedImageKey(account.id, key)
+  const status = fetchStatus.get(owned)
+  if (status === 'ready') return
+  if (status === 'loading') {
+    photoWaiters.get(owned)?.add(opts.onChange)
+    return
+  }
+  if (status === 'error' && (photoRetryAt.get(owned) ?? Infinity) > Date.now()) return
+
+  const profile = owaProfile(account)
+  const disk = readCachedImage(key, profile)
+  if (disk) {
+    fetchStatus.set(owned, 'ready')
+    imageDataCache.set(owned, disk.data)
+    opts.onChange()
+    return
+  }
+  const settle = (failed: boolean, retry: boolean): void => {
+    fetchStatus.set(owned, failed ? 'error' : 'ready')
+    if (retry) photoRetryAt.set(owned, Date.now() + PHOTO_RETRY_MS)
+    else photoRetryAt.delete(owned)
+  }
+  if (hasNoPhotoMarker(key, profile) || photoKindBlocked.has(`${account.id}\0${kind}`)) {
+    settle(true, false)
+    return
+  }
+
+  fetchStatus.set(owned, 'loading')
+  photoWaiters.set(owned, new Set([opts.onChange]))
+  enqueuePhotoFetch(account.id, async () => {
+    try {
+      const bytes = await opts.client.graphBinary({ method: 'GET', path })
+      if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error('photo too large')
+      const buf = Buffer.from(bytes)
+      writeCachedImage(
+        key,
+        buf,
+        { contentType: 'image/jpeg', name: key, size: buf.length },
+        profile,
+      )
+      imageDataCache.set(owned, buf)
+      settle(false, false)
+    } catch (err) {
+      const status = err instanceof GraphError ? err.status : null
+      if (status === 404) {
+        try {
+          mkdirSync(getCacheDir(profile), { recursive: true })
+          writeFileSync(noPhotoPath(key, profile), '')
+        } catch {
+          // best-effort: without the marker it's just asked again next launch
+        }
+        settle(true, false)
+      } else if (status === 401) {
+        const blockKey = `${account.id}\0${kind}`
+        if (!photoKindBlocked.has(blockKey)) {
+          photoKindBlocked.add(blockKey)
+          recordEvent('graph', 'info', `${kind} pictures unavailable for this account (401)`)
+        }
+        settle(true, false)
+      } else {
+        settle(true, status !== 403)
+      }
+    }
+    const waiters = photoWaiters.get(owned)
+    photoWaiters.delete(owned)
+    for (const notify of waiters ?? []) notify()
+  })
+}
+
 export function userPhotoKey(userId: string, px: number): string {
   return `photo:user:${userId}:${px}`
 }
@@ -343,12 +455,11 @@ export function ensureUserPhoto(
   px: number,
   opts: { client: GraphClient; onChange: () => void },
 ): void {
-  if (photosUnavailable.has(opts.client.ctx.account.id)) return
-  ensureImageFetched(
+  ensurePhoto(
+    'user',
     `/users/${encodeURIComponent(userId)}/photos/${px}x${px}/$value`,
     userPhotoKey(userId, px),
-    { contentType: 'image/jpeg', name: `photo of ${userId}` },
-    { ...opts, photo: true },
+    opts,
   )
 }
 
@@ -356,11 +467,10 @@ export function ensureTeamPhoto(
   teamId: string,
   opts: { client: GraphClient; onChange: () => void },
 ): void {
-  if (photosUnavailable.has(opts.client.ctx.account.id)) return
-  ensureImageFetched(
+  ensurePhoto(
+    'team',
     `/teams/${encodeURIComponent(teamId)}/photo/$value`,
     teamPhotoKey(teamId),
-    { contentType: 'image/jpeg', name: `team photo ${teamId}` },
-    { ...opts, photo: true },
+    opts,
   )
 }
