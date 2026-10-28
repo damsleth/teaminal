@@ -393,7 +393,7 @@ export function resolveTheme(
 
 const ALPHA_HEX = /^#(?:[0-9a-f]{4}|[0-9a-f]{8})$/i
 
-function rgbOf(color: string | null): [number, number, number] | null {
+export function rgbOf(color: string | null): [number, number, number] | null {
   if (!color) return null
   if (color === 'black') return [0, 0, 0]
   if (color === 'white' || color === 'whiteBright') return [255, 255, 255]

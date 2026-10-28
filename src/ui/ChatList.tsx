@@ -9,8 +9,31 @@
 // Scrolling is tracked in a ref since it derives from cursor changes;
 // re-computed each render.
 
-import { Box, Text } from 'ink'
-import { useEffect, useRef } from 'react'
+import { Box, Text, useApp, useStdout, type DOMElement } from 'ink'
+import { useEffect, useRef, useState } from 'react'
+import {
+  ensureTeamPhoto,
+  ensureUserPhoto,
+  getImageData,
+  ownedImageKey,
+  teamPhotoKey,
+  userPhotoKey,
+} from '../state/imageCache'
+import {
+  avatarCols,
+  avatarEscape,
+  avatarPixels,
+  avatarRows,
+  iconEscape,
+  iconKey,
+  isIconKey,
+} from './avatarImage'
+import { rgbOf } from './theme'
+import type { InlineImageSlots } from './inlineImageLayout'
+import { isKittyCapable } from './kittyGraphics'
+import { requestKittyPaint, setKittyOwner } from './kittyPainter'
+import { initialsOf, PictureSlot } from './PictureSlot'
+import { useSessionApi } from './SessionContext'
 import {
   buildSelectableList,
   chatLabel,
@@ -196,6 +219,20 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const tailDiagnostics = useAppState((s) => s.settings.tailDiagnostics)
   const theme = useTheme()
   const terminalRows = useTerminalRows()
+  // Thumbnails (kitty graphics only): a picture column left of each chat /
+  // channel row, rows tall, plus a gap column.
+  const thumbnailSize = useAppState((s) => s.settings.chatListThumbnails)
+  const accountId = useAppState((s) => s.account?.id)
+  const modalOpen = useAppState((s) => s.modal != null)
+  const session = useSessionApi()
+  const { stdout } = useStdout()
+  const { waitUntilRenderFlush } = useApp()
+  const [, setPictureRevision] = useState(0)
+  const listRef = useRef<DOMElement>(null)
+  const pictureSlots = useRef<InlineImageSlots>(new Map())
+  const thumbRows = isKittyCapable() ? avatarRows(thumbnailSize) : 0
+  const thumbCols = avatarCols(thumbRows)
+  const thumbColumn = thumbRows > 0 ? thumbCols + 1 : 0
   // Full row width: the list pane minus the round border and the column
   // container's paddingRight.
   const previewContentWidth = listPaneWidth - 2 - 1
@@ -241,7 +278,41 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const rows = buildRows(items, syntheticNewChatQuery)
   const chatListGap = theme.layout.chatListGap
   const chatListIndent = theme.layout.chatListIndent
-  const labelWidthFor = labelContentWidth(showPresence, chatListIndent, listPaneWidth)
+  const labelWidthFor = Math.max(
+    1,
+    labelContentWidth(showPresence, chatListIndent, listPaneWidth) - thumbColumn,
+  )
+  // Picture for a row: the other person's photo for 1:1 chats, the team
+  // picture for channels. Group / meeting chats have no picture in Graph, so
+  // they get their chat-type icon drawn at the same size.
+  // ponytail: the icon uses the muted text color when it's hex / black /
+  // white; a named palette color falls back to mid gray.
+  const iconRgb = rgbOf(theme.mutedText) ?? [138, 138, 138]
+  const pictureFor = (
+    item: SelectableItem,
+  ): { kind: 'user' | 'team' | 'icon'; id: string; key: string } | null => {
+    if (thumbRows === 0) return null
+    if (item.kind === 'channel')
+      return { kind: 'team', id: item.team.id, key: teamPhotoKey(item.team.id) }
+    if (
+      item.kind === 'chat' &&
+      (item.chat.chatType === 'group' || item.chat.chatType === 'meeting')
+    ) {
+      const icon = item.chat.chatType
+      return { kind: 'icon', id: icon, key: iconKey(icon, iconRgb) }
+    }
+    if (item.kind !== 'chat' || item.chat.chatType !== 'oneOnOne') return null
+    const other = (item.chat.members ?? []).find((m) => m.userId && m.userId !== me?.id)
+    return other?.userId
+      ? {
+          kind: 'user',
+          id: other.userId,
+          key: userPhotoKey(other.userId, avatarPixels(thumbRows)),
+        }
+      : null
+  }
+  const hasPictureColumn = (item: SelectableItem) =>
+    thumbColumn > 0 && (item.kind === 'chat' || item.kind === 'channel')
 
   // Visual height per logical row. Long chat names wrap onto multiple
   // visual lines, and previews add up to two more;
@@ -262,6 +333,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
       const preview = previewLineForChat(row.item.chat, cw, previewLines)
       if (preview) h += preview.split('\n').length
     }
+    if (hasPictureColumn(row.item)) h = Math.max(h, thumbRows)
     return row.item.kind === 'team' || row.item.kind === 'section' ? h : h + chatListGap
   })
 
@@ -282,6 +354,41 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   )
   viewportRef.current = viewStart
   const visible = rows.slice(viewStart, visibleEnd)
+
+  // Fetch pictures for the visible rows only (idempotent per key).
+  useEffect(() => {
+    if (thumbRows === 0) return
+    const client = session.client()
+    const onChange = () => setPictureRevision((r) => r + 1)
+    for (const row of visible) {
+      if (row.kind !== 'item') continue
+      const pic = pictureFor(row.item)
+      if (pic?.kind === 'user')
+        ensureUserPhoto(pic.id, avatarPixels(thumbRows), { client, onChange })
+      else if (pic?.kind === 'team') ensureTeamPhoto(pic.id, { client, onChange })
+    }
+  })
+  // Painted by the shared kitty painter, alongside the message pane's images.
+  useEffect(() => {
+    if (!stdout || !isKittyCapable()) return
+    setKittyOwner('chat-list', {
+      viewport: () => listRef.current,
+      slots: pictureSlots.current,
+      escape: (cacheKey, rows) => {
+        if (isIconKey(cacheKey)) return iconEscape(cacheKey, rows)
+        const data = getImageData(accountId, cacheKey)
+        return data && accountId ? avatarEscape(ownedImageKey(accountId, cacheKey), data, rows) : ''
+      },
+    })
+    requestKittyPaint({ stdout, flush: waitUntilRenderFlush, suppressed: modalOpen })
+  })
+  useEffect(
+    () => () => {
+      setKittyOwner('chat-list', null)
+      requestKittyPaint()
+    },
+    [],
+  )
 
   // Filter banner: shown while typing a filter, and when a filter is
   // applied but the user isn't actively editing it.
@@ -308,7 +415,14 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   }
 
   return (
-    <Box flexDirection="column" flexShrink={0} overflow="hidden" paddingLeft={0} paddingRight={1}>
+    <Box
+      ref={listRef}
+      flexDirection="column"
+      flexShrink={0}
+      overflow="hidden"
+      paddingLeft={0}
+      paddingRight={1}
+    >
       {filterBanner}
       {visible.map((row) => {
         if (row.kind === 'synthetic-new-chat') {
@@ -400,48 +514,61 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
           isSelected && rowBg !== undefined
             ? labelText + ' '.repeat(Math.max(0, labelWidth - labelText.length))
             : labelText
+        const withPicture = hasPictureColumn(row.item)
+        const picture = withPicture ? pictureFor(row.item) : null
+        const rowWidth = previewContentWidth - (withPicture ? thumbColumn : 0)
         return (
           <Box
             key={`${row.item.kind}-${row.index}`}
-            flexDirection="column"
+            flexDirection="row"
             flexShrink={0}
             marginBottom={chatListGap}
           >
-            <Box flexDirection="row" backgroundColor={rowBg}>
-              {showPresence && (
-                <Box width={GLYPH_WIDTH + chatListIndent} flexShrink={0}>
-                  <Text color={presenceColor}>{presenceText}</Text>
-                </Box>
-              )}
-              <Box width={labelWidth} flexShrink={0} backgroundColor={rowBg}>
-                <Text
-                  color={isSelected ? theme.selected : hasUnread ? theme.unread : undefined}
-                  backgroundColor={rowBg}
-                  bold={
-                    (isSelected && theme.emphasis.selectedBold) ||
-                    (hasUnread && theme.emphasis.unreadBold)
-                  }
-                  wrap="wrap"
-                >
-                  {fs(labelPadded, theme.fontSize.chatListName, theme.fontSize.tightSpacing)}
-                </Text>
-              </Box>
-            </Box>
-            {preview && (
-              <Box
-                width={previewContentWidth}
-                flexShrink={0}
-                paddingLeft={previewContentWidth - labelWidth}
-              >
-                <Text
-                  color={hasUnread ? theme.unread : theme.mutedText}
-                  bold={hasUnread && theme.emphasis.unreadBold}
-                  wrap="wrap"
-                >
-                  {fs(preview, theme.fontSize.chatListPreview, theme.fontSize.tightSpacing)}
-                </Text>
+            {withPicture && (
+              <Box width={thumbColumn} flexShrink={0}>
+                <PictureSlot
+                  slots={pictureSlots.current}
+                  cacheKey={picture?.key ?? null}
+                  rows={thumbRows}
+                  cols={thumbCols}
+                  label={picture?.kind === 'icon' ? '' : initialsOf(label)}
+                  theme={theme}
+                />
               </Box>
             )}
+            <Box flexDirection="column" flexShrink={0}>
+              <Box flexDirection="row" backgroundColor={rowBg}>
+                {showPresence && (
+                  <Box width={GLYPH_WIDTH + chatListIndent} flexShrink={0}>
+                    <Text color={presenceColor}>{presenceText}</Text>
+                  </Box>
+                )}
+                <Box width={labelWidth} flexShrink={0} backgroundColor={rowBg}>
+                  <Text
+                    color={isSelected ? theme.selected : hasUnread ? theme.unread : undefined}
+                    backgroundColor={rowBg}
+                    bold={
+                      (isSelected && theme.emphasis.selectedBold) ||
+                      (hasUnread && theme.emphasis.unreadBold)
+                    }
+                    wrap="wrap"
+                  >
+                    {fs(labelPadded, theme.fontSize.chatListName, theme.fontSize.tightSpacing)}
+                  </Text>
+                </Box>
+              </Box>
+              {preview && (
+                <Box width={rowWidth} flexShrink={0} paddingLeft={rowWidth - labelWidth}>
+                  <Text
+                    color={hasUnread ? theme.unread : theme.mutedText}
+                    bold={hasUnread && theme.emphasis.unreadBold}
+                    wrap="wrap"
+                  >
+                    {fs(preview, theme.fontSize.chatListPreview, theme.fontSize.tightSpacing)}
+                  </Text>
+                </Box>
+              )}
+            </Box>
           </Box>
         )
       })}
