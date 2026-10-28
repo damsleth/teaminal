@@ -370,7 +370,12 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   })
   // Painted by the shared kitty painter, alongside the message pane's images.
   useEffect(() => {
-    if (!stdout || !isKittyCapable()) return
+    // Off: stay out of the painter, so chat-list re-renders (presence,
+    // unread) don't clear and re-place the message pane's images.
+    if (!stdout || thumbRows === 0) {
+      setKittyOwner('chat-list', null)
+      return
+    }
     setKittyOwner('chat-list', {
       viewport: () => listRef.current,
       slots: pictureSlots.current,
