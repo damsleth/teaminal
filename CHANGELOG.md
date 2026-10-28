@@ -164,6 +164,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Removing the account you are using switches away from it.** Removing
+  the active account in **Accounts** used to keep showing its chats until
+  restart; teaminal now switches to the next configured account (or the
+  default profile when none are left).
+
 - **Chat list cursor stays on its chat.** When a new message moves a chat
   up the list, the cursor now follows the chat it was on instead of
   landing on whichever chat took its place (so Enter, `m` and ctrl+d act

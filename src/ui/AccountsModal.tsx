@@ -75,11 +75,12 @@ export function AccountsModal() {
 
   async function removeProfile(profile: string): Promise<void> {
     const accounts = settings.accounts.filter((p) => p !== profile)
-    await persist({
-      accounts,
-      activeAccount:
-        settings.activeAccount === profile ? (accounts[0] ?? null) : settings.activeAccount,
-    })
+    const activeAccount =
+      settings.activeAccount === profile ? (accounts[0] ?? null) : settings.activeAccount
+    await persist({ accounts, activeAccount })
+    // Removing the account that is running must stop showing it: move to the
+    // new active account (the default profile when none are left).
+    if (session.getActiveProfile() === profile) await session.switchAccount(activeAccount)
     setMode({
       kind: 'list',
       cursor: Math.min(mode.kind === 'confirm-remove' ? 0 : 0, accounts.length),
