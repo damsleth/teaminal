@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { findRootQuote } from './Composer'
+import { enterKeyAction, findRootQuote } from './Composer'
 import type { ChatMessage } from '../types'
 
 const ROOT_FOCUS = {
@@ -46,4 +46,19 @@ describe('findRootQuote', () => {
     expect(out?.preview).toContain('world')
     expect(out?.preview).not.toContain('<b>')
   })
+})
+
+test('enterKeyAction: Ctrl+Enter sends by default, enterSends flips it', () => {
+  const enter = { return: true }
+  const ctrlEnter = { return: true, ctrl: true }
+  const shiftEnter = { return: true, shift: true }
+  expect(enterKeyAction('\r', enter, false)).toBe('newline')
+  expect(enterKeyAction('\r', shiftEnter, false)).toBe('newline')
+  expect(enterKeyAction('\r', ctrlEnter, false)).toBe('send')
+  expect(enterKeyAction('j', { ctrl: true }, false)).toBe('send')
+  expect(enterKeyAction('\r', enter, true)).toBe('send')
+  expect(enterKeyAction('\r', shiftEnter, true)).toBe('newline')
+  expect(enterKeyAction('\r', ctrlEnter, true)).toBe('newline')
+  expect(enterKeyAction('j', { ctrl: true }, true)).toBe('newline')
+  expect(enterKeyAction('x', {}, true)).toBeNull()
 })

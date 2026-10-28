@@ -78,6 +78,8 @@ export type ThemeLayout = {
   textBackgroundPaddingY: number
   // MessagePane: extra left indent of the day separator ("Today", "Fri, May 15").
   dateMarkerIndent: number
+  // MessagePane: message body width cap, percent of the pane (10-100).
+  messageMaxWidth: number
 }
 
 export type ThemeBorders = {
@@ -181,6 +183,7 @@ const LAYOUT_DEFAULT: ThemeLayout = {
   textBackgroundPaddingX: 0,
   textBackgroundPaddingY: 0,
   dateMarkerIndent: 0,
+  messageMaxWidth: 100,
 }
 
 const BORDERS_DEFAULT: ThemeBorders = { panel: 'round', modal: 'round', active: 'round' }

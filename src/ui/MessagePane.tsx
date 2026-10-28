@@ -104,6 +104,8 @@ export function MessagePane(props: {
   const teams = useAppState((s) => s.teams)
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
   const showTimestamps = useAppState((s) => s.settings.showTimestampsInPane)
+  const showSenderNames = useAppState((s) => s.settings.showSenderNamesInPane)
+  const showOwnName = useAppState((s) => s.settings.showOwnNameInPane)
   const shortNames = useAppState((s) => s.settings.messagePaneShortNames)
   const showChatNameHeader = useAppState((s) => s.settings.showChatNameHeader)
   const reactionDisplayMode = useAppState((s) => s.settings.showReactions)
@@ -192,7 +194,11 @@ export function MessagePane(props: {
   const rawGap = theme.layout.paneHeaderMarginBottom
   const tallHeaders = rawGap % 1 !== 0 && textSizingSupported()
   const messageGap = tallHeaders ? Math.floor(rawGap) : Math.round(rawGap)
-  const headerRows = tallHeaders ? 2 : 1
+  // The sender line holds the name and/or timestamp; with neither it's gone.
+  const showNameFor = (m: ChatMessage): boolean =>
+    showSenderNames && (showOwnName || !me?.id || m.from?.user?.id !== me.id)
+  const headerRows = (m: ChatMessage): number =>
+    showTimestamps || showNameFor(m) ? (tallHeaders ? 2 : 1) : 0
   const cache = messageCacheByConvo[conv]
   const headerLabel = isListFocus
     ? ''
@@ -236,7 +242,11 @@ export function MessagePane(props: {
   const bodyPaddingY = theme.layout.textBackgroundPaddingY
   const messageTextColumns = Math.max(
     12,
-    terminalSize.columns - listPaneWidth - 2 - bodyIndent - 2 * bgPadX,
+    Math.floor(
+      ((terminalSize.columns - listPaneWidth - 2 - bodyIndent) * theme.layout.messageMaxWidth) /
+        100,
+    ) -
+      2 * bgPadX,
   )
   // Cell budget for an inline image (message pane minus the gutter columns).
   const imgCols = Math.max(12, terminalSize.columns - listPaneWidth - 20)
@@ -500,6 +510,9 @@ export function MessagePane(props: {
                     tallHeader={tallHeaders}
                     shortNames={shortNames}
                     showTimestamp={showTimestamps}
+                    showSenderName={
+                      row.kind === 'message' ? showNameFor(row.message) : showSenderNames
+                    }
                     theme={theme}
                     threadMeta={
                       channelThreads && row.kind === 'message'
@@ -536,6 +549,7 @@ function TimelineRow(props: {
   tallHeader: boolean
   shortNames: boolean
   showTimestamp: boolean
+  showSenderName: boolean
   theme: Theme
   threadMeta?: ReplyBadge
 }) {
@@ -584,6 +598,7 @@ function TimelineRow(props: {
       tallHeader={props.tallHeader}
       shortNames={props.shortNames}
       showTimestamp={props.showTimestamp}
+      showSenderName={props.showSenderName}
       theme={props.theme}
       threadMeta={props.threadMeta}
     />
@@ -608,6 +623,7 @@ function MessageRow(props: {
   tallHeader: boolean
   shortNames: boolean
   showTimestamp: boolean
+  showSenderName: boolean
   theme: Theme
   threadMeta?: ReplyBadge
 }) {
@@ -621,7 +637,8 @@ function MessageRow(props: {
   // full (the header line truncates only if it overruns the pane). System
   // rows have no sender; their text occupies the single line.
   const senderRaw = isSystem ? '' : (effectiveSenderName(m) ?? '')
-  const senderName = senderRaw ? (props.shortNames ? shortName(senderRaw) : senderRaw) : ''
+  const senderName =
+    senderRaw && props.showSenderName ? (props.shortNames ? shortName(senderRaw) : senderRaw) : ''
   const isSending = m._sending === true
   const sendError = m._sendError
   const readReceiptLine =
@@ -769,7 +786,11 @@ function MessageRow(props: {
 
   // System and deleted rows have no sender header — the marker line carries
   // their single line of text directly.
-  const hasHeader = !isSystem && !isDeleted
+  const hasHeader = !isSystem && !isDeleted && (props.showTimestamp || senderName.length > 0)
+  const timeText = senderName ? `  ${time}` : time
+  // Bodies are capped at layout.messageMaxWidth percent of the pane.
+  const maxWidth =
+    theme.layout.messageMaxWidth < 100 ? `${theme.layout.messageMaxWidth}%` : undefined
   // Quoted-reply preview (chat-pane only). Channel threads represent replies
   // via the existing thread tree; double-decorating both would be visual noise.
   const quotedReply = !isSystem ? getQuotedReply(m) : null
@@ -794,8 +815,8 @@ function MessageRow(props: {
               {props.showTimestamp && (
                 <Text color={theme.timestamp}>
                   {props.tallHeader
-                    ? fsTall(`  ${time}`, theme.fontSize.timestamp)
-                    : fs(`  ${time}`, theme.fontSize.timestamp, theme.fontSize.tightSpacing)}
+                    ? fsTall(timeText, theme.fontSize.timestamp)
+                    : fs(timeText, theme.fontSize.timestamp, theme.fontSize.tightSpacing)}
                 </Text>
               )}
             </Text>
@@ -806,7 +827,7 @@ function MessageRow(props: {
         <Box flexDirection="row">
           {!flip && marker}
           <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
-            {bodyNode}
+            <Box maxWidth={maxWidth}>{bodyNode}</Box>
           </Box>
           {flip && marker}
         </Box>
@@ -824,7 +845,7 @@ function MessageRow(props: {
         <Box flexDirection="row">
           {!flip && marker}
           <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
-            {bodyNode}
+            <Box maxWidth={maxWidth}>{bodyNode}</Box>
           </Box>
           {flip && marker}
         </Box>

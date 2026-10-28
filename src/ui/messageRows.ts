@@ -30,8 +30,9 @@ export type MessageRowHeightOpts = {
   // Counted here so the viewport budget and the out-of-band Kitty image
   // offsets agree with what's actually painted.
   messageGap?: number
-  // Rows the sender header takes: 2 when headers render tall (half-row gap).
-  headerRows?: number
+  // Rows the sender header takes: 2 when headers render tall (half-row gap),
+  // 0 when it is hidden. A function decides per message.
+  headerRows?: number | ((message: ChatMessage) => number)
   // Text bg padding Y: blank rows above and below every message body.
   bodyPaddingY?: number
   // Total rows the message's inline images occupy, resolved dynamically from
@@ -125,8 +126,11 @@ export function messageRenderRowHeight(row: MessageRenderRow, opts?: MessageRowH
   const isSystem = message.messageType === 'systemEventMessage'
   const hasSenderHeader = !isSystem && !message.deletedDateTime
   let height =
-    (hasSenderHeader ? (opts?.headerRows ?? 1) : 0) +
-    estimateWrappedRows(messageTextForHeight(row, opts), opts?.messageTextColumns)
+    (hasSenderHeader
+      ? typeof opts?.headerRows === 'function'
+        ? opts.headerRows(message)
+        : (opts?.headerRows ?? 1)
+      : 0) + estimateWrappedRows(messageTextForHeight(row, opts), opts?.messageTextColumns)
   height += 2 * Math.max(0, opts?.bodyPaddingY ?? 0)
   if (message._sendError) height++
   // Reply preview row (only present for chat-pane quoted replies).

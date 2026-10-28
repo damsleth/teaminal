@@ -152,6 +152,57 @@ test('date marker theme settings drive its color, bold and indent', () => {
   expect(marker.replace(/\x1b\[[0-9;]*m/g, '')).toMatch(/^ {5}\S/)
 })
 
+test('sender name toggles and message max width', () => {
+  const renderWith = (settings: Record<string, unknown>, maxWidth = 100) => {
+    const store = createAppStore()
+    store.set({
+      me: { id: 'u-Ada', displayName: 'Ada' } as never,
+      settings: {
+        ...store.get().settings,
+        showTimestampsInPane: false,
+        ...settings,
+        themeOverrides: { layout: { messageMaxWidth: maxWidth } },
+      },
+      focus: { kind: 'chat', chatId: 'c1' },
+      messagesByConvo: {
+        'chat:c1': [
+          ...MESSAGES,
+          msg('m7', '2026-01-03T09:10:00Z', 'Bob', 'word '.repeat(30).trim()),
+        ],
+      },
+    })
+    return renderToString(
+      <StoreProvider store={store}>
+        <SessionProvider api={session}>
+          <Box flexDirection="column" height={60}>
+            <MessagePane />
+          </Box>
+        </SessionProvider>
+      </StoreProvider>,
+      { columns: 80 },
+    ).replace(/\x1b\[[0-9;]*m/g, '')
+  }
+  const all = renderWith({})
+  expect(all).toContain('Ada')
+  expect(all).toContain('Bob')
+  const noOwn = renderWith({ showOwnNameInPane: false })
+  expect(noOwn).not.toContain('Ada')
+  expect(noOwn).toContain('Bob')
+  const none = renderWith({ showSenderNamesInPane: false })
+  expect(none).not.toMatch(/Ada|Bob/)
+  // No header line left: the body sits right under the date marker.
+  expect(none).toMatch(/Jan 3\s*\n\s+.?\s*third day, first message/)
+  const widest = (out: string) =>
+    Math.max(
+      ...out
+        .split('\n')
+        .filter((l) => l.includes('word'))
+        .map((l) => l.trimEnd().length),
+    )
+  expect(widest(renderWith({}, 50))).toBeLessThanOrEqual(42)
+  expect(widest(renderWith({}))).toBeGreaterThan(60)
+})
+
 test('the focus marker sits on the message body line, not the sender name', () => {
   const out = lines(40, 'm4')
   const body = out.find((l) => l.includes('second day, second message'))!

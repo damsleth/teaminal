@@ -26,7 +26,8 @@
 //   See composerReducer for the full action list. Bindings: Left, Right,
 //   Home/Ctrl+A, End/Ctrl+E, Ctrl+W (delete word), Ctrl+U (delete to
 //   line start), Ctrl+K (delete to line end / join), Alt+Backspace
-//   (delete word). Enter inserts a newline; Ctrl+Enter sends.
+//   (delete word). Enter inserts a newline; Ctrl+Enter sends (flipped by
+//   the enterSends setting).
 //
 // Bracketed paste:
 //   On activate the component writes CSI ?2004h to stdout to enable
@@ -60,6 +61,23 @@ const MAX_VISIBLE_LINES = 5
 
 const QUOTE_PREVIEW_MAX = 80
 
+// Ctrl+Enter sends (or commits the edit); plain / Shift+Enter is a newline.
+// Ctrl+Enter is only distinct from Enter under the kitty keyboard protocol,
+// so Alt+Enter, Ctrl+J and a bare LF (what some terminals send for
+// Ctrl+Enter) send too. enterSends flips it: plain Enter sends and the
+// modified forms insert the newline.
+export function enterKeyAction(
+  input: string,
+  key: { return?: boolean; ctrl?: boolean; meta?: boolean; shift?: boolean },
+  enterSends: boolean,
+): 'send' | 'newline' | null {
+  const modified =
+    (key.return && (key.ctrl || key.meta)) || (key.ctrl && input === 'j') || input === '\n'
+  if (modified) return enterSends ? 'newline' : 'send'
+  if (!key.return) return null
+  return enterSends && !key.shift ? 'send' : 'newline'
+}
+
 export function findRootQuote(
   focus: { kind: 'thread'; teamId: string; channelId: string; rootId: string },
   messagesByConvo: Record<string, ChatMessage[]>,
@@ -86,6 +104,7 @@ export function Composer({ columns = 80 }: { columns?: number }) {
   const drafts = useAppState((s) => s.draftsByConvo)
   const messagesByConvo = useAppState((s) => s.messagesByConvo)
   const editingMessageId = useAppState((s) => s.editingMessageId)
+  const enterSends = useAppState((s) => s.settings.enterSends)
   const theme = useTheme()
   const [buf, setBuf] = useState<ComposerBuffer>(emptyBuffer)
   const [sending, setSending] = useState(false)
@@ -191,18 +210,13 @@ export function Composer({ columns = 80 }: { columns?: number }) {
         store.set({ inputZone: 'list' })
         return
       }
-      // Ctrl+Enter sends (or commits the edit); plain / Shift+Enter is a
-      // newline. Ctrl+Enter is only distinct from Enter under the kitty
-      // keyboard protocol, so Alt+Enter, Ctrl+J and a bare LF (what some
-      // terminals send for Ctrl+Enter) send too.
-      const send =
-        (key.return && (key.ctrl || key.meta)) || (key.ctrl && input === 'j') || input === '\n'
-      if (send) {
+      const enter = enterKeyAction(input, key, enterSends)
+      if (enter === 'send') {
         if (editingMessageId) void doEdit(buf.text)
         else void doSend(buf.text)
         return
       }
-      if (key.return) {
+      if (enter === 'newline') {
         dispatch({ kind: 'newline' })
         return
       }

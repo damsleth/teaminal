@@ -43,11 +43,14 @@ export type ToggleKey =
   | 'showChatNameHeader'
   | 'showPresenceInList'
   | 'showTimestampsInPane'
+  | 'showSenderNamesInPane'
+  | 'showOwnNameInPane'
   | 'showReactions'
   | 'inlineImages'
   | 'messageFocusIndicatorEnabled'
   | 'messageFocusIndicatorChar'
   | 'scrollOnNewMessages'
+  | 'enterSends'
   | 'selfMessagesOnRight'
   | 'forceAvailableWhenFocused'
   | 'useTeamsPresence'
@@ -270,6 +273,11 @@ export const ROOT_MENU: MenuItem[] = [
         action: { kind: 'toggle-setting', key: 'showTimestampsInPane' },
       },
       {
+        id: 'showSenderNamesInPane',
+        label: 'Show sender names',
+        action: { kind: 'toggle-setting', key: 'showSenderNamesInPane' },
+      },
+      {
         id: 'showReactions',
         label: 'Show reactions',
         action: { kind: 'toggle-setting', key: 'showReactions' },
@@ -285,6 +293,11 @@ export const ROOT_MENU: MenuItem[] = [
         action: { kind: 'toggle-setting', key: 'selfMessagesOnRight' },
       },
       {
+        id: 'showOwnNameInPane',
+        label: 'Show my name on my messages',
+        action: { kind: 'toggle-setting', key: 'showOwnNameInPane' },
+      },
+      {
         id: 'messageFocusIndicatorEnabled',
         label: 'Focused message marker',
         action: { kind: 'toggle-setting', key: 'messageFocusIndicatorEnabled' },
@@ -298,6 +311,11 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'scrollOnNewMessages',
         label: 'Scroll on new messages',
         action: { kind: 'toggle-setting', key: 'scrollOnNewMessages' },
+      },
+      {
+        id: 'enterSends',
+        label: 'Enter sends (Shift/Ctrl+Enter newline)',
+        action: { kind: 'toggle-setting', key: 'enterSends' },
       },
       // — Notifications —
       {
@@ -493,9 +511,12 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'showChatNameHeader':
     case 'showPresenceInList':
     case 'showTimestampsInPane':
+    case 'showSenderNamesInPane':
+    case 'showOwnNameInPane':
     case 'messageFocusIndicatorEnabled':
     case 'selfMessagesOnRight':
     case 'scrollOnNewMessages':
+    case 'enterSends':
     case 'forceAvailableWhenFocused':
     case 'useTeamsPresence':
     case 'realtimeEnabled':
@@ -552,9 +573,12 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'showChatNameHeader':
     case 'showPresenceInList':
     case 'showTimestampsInPane':
+    case 'showSenderNamesInPane':
+    case 'showOwnNameInPane':
     case 'messageFocusIndicatorEnabled':
     case 'selfMessagesOnRight':
     case 'scrollOnNewMessages':
+    case 'enterSends':
     case 'forceAvailableWhenFocused':
     case 'useTeamsPresence':
     case 'realtimeEnabled':
