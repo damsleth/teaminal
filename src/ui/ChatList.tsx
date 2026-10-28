@@ -483,9 +483,11 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         // enabled), while meeting / group chats show a chat-type glyph so
         // they're distinguishable. Type glyphs need no fetched data, so they
         // render whenever the gutter is visible, regardless of showPresence.
+        // With thumbnails on, group / meeting chats show their icon there, so
+        // the small type glyph would repeat it; presence dots stay.
         const presence =
           (showPresence ? presenceForChatItem(row.item, me?.id, memberPresence, theme) : null) ??
-          chatTypeGlyph(row.item, theme)
+          (thumbRows > 0 ? null : chatTypeGlyph(row.item, theme))
         const unread = row.item.kind === 'chat' ? unreadByChatId[row.item.chat.id] : undefined
         const hasMention = !!unread && unread.mentionCount > 0
         const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))

@@ -82,6 +82,9 @@ test('thumbnails: a picture column on chat rows, rows at least as tall as the pi
     expect(col(medium, 'Ada Byron') - col(off, 'Ada Byron')).toBe(5)
     // Each chat row is at least 2 rows tall, so the next row starts lower.
     expect(at(medium, 'Design Sync') - at(medium, 'Ada Byron')).toBeGreaterThanOrEqual(2)
+    // The group's type glyph (U+F0C0) moves into the picture: not repeated.
+    expect(off[at(off, 'Design Sync')]).toContain('\uf0c0')
+    expect(medium[at(medium, 'Design Sync')]).not.toContain('\uf0c0')
   } finally {
     if (prev === undefined) delete process.env.KITTY_WINDOW_ID
     else process.env.KITTY_WINDOW_ID = prev
