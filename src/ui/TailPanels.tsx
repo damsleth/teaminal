@@ -197,7 +197,7 @@ export function TailPanels() {
           flexShrink={1}
           minWidth={0}
           flexDirection="column"
-          marginLeft={i === 0 ? 0 : theme.layout.tailGap}
+          marginLeft={i === 0 ? 0 : 1}
         >
           {kind === 'events' ? (
             <EventsTail theme={theme} />

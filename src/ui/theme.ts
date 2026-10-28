@@ -65,10 +65,9 @@ export type ThemeLayout = {
   // MessagePane: blank rows inserted after each message group, separating
   // one sender's name+body block from the next.
   paneHeaderMarginBottom: number
-  // Horizontal gap between TailPanels strips.
-  tailGap: number
-  // ChatList right-side gutter.
-  chatListPaddingRight: number
+  // ChatList: columns between the presence / chat-type glyph and the
+  // chat title and preview.
+  chatListIndent: number
   // ChatList: blank rows after each chat/channel row.
   chatListGap: number
   // MessagePane: columns of background color on each side of a message body
@@ -169,8 +168,7 @@ const LAYOUT_DEFAULT: ThemeLayout = {
   paneHeaderPaddingLeft: 2,
   senderIndent: 2,
   paneHeaderMarginBottom: 1,
-  tailGap: 1,
-  chatListPaddingRight: 1,
+  chatListIndent: 1,
   chatListGap: 0,
   textBackgroundPaddingX: 0,
   textBackgroundPaddingY: 0,

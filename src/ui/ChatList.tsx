@@ -1,8 +1,8 @@
 // Left pane: navigable list of chats and channels.
 //
 // Items are rendered in a flat sequence (chats, then teams + channels)
-// matching buildSelectableList; the rendered view inserts non-selectable
-// "Chats" / "Teams" headers without consuming cursor indices.
+// matching buildSelectableList. Section and team headers are rows in that
+// list too (see isSelectable for which ones take the cursor).
 //
 // A simple sliding viewport keeps the cursor on screen: the visible window
 // starts at the latest scroll origin needed to include the cursor row.
@@ -20,7 +20,6 @@ import {
   shortName,
   type SelectableItem,
 } from '../state/selectables'
-import type { ChatListDensity } from '../state/store'
 import type { Presence } from '../types'
 import { htmlToText } from '../text/html'
 import { chromeRowsForChatList, computeChatListViewport } from './chatListViewport'
@@ -44,25 +43,19 @@ const COLLAPSED_GLYPH = '▸'
 const EXPANDED_GLYPH = '▾'
 
 type Row =
-  | { kind: 'header'; label: string }
   | { kind: 'item'; item: SelectableItem; index: number }
   | { kind: 'synthetic-new-chat'; query: string; index: number }
-  | { kind: 'spacer' }
+
+// Presence / chat-type glyph column, before the chatListIndent gap.
+const GLYPH_WIDTH = 2
 
 // Cells available for the wrappable label/preview text after the
-// presence/selector gutters and indent. Used to convert label length
-// into a visual row count for the viewport slicing math.
-function labelContentWidth(
-  density: ChatListDensity,
-  showPresence: boolean,
-  indent: string,
-  listPaneWidth: number,
-): number {
+// presence gutter. Used to convert label length into a visual row count
+// for the viewport slicing math.
+function labelContentWidth(showPresence: boolean, indent: number, listPaneWidth: number): number {
   let width = listPaneWidth - 2 // round border (1 each side)
   width -= 1 // paddingRight on the column container
-  if (density === 'cozy' || showPresence) width -= 3 // presence/type-glyph gutter
-  if (density === 'cozy') width -= 2 // selector gutter
-  width -= indent.length
+  if (showPresence) width -= GLYPH_WIDTH + indent
   return Math.max(1, width)
 }
 
@@ -71,37 +64,12 @@ function visualLines(text: string, contentWidth: number): number {
   return Math.max(1, Math.ceil(text.length / contentWidth))
 }
 
-function buildRows(
-  items: SelectableItem[],
-  density: ChatListDensity,
-  syntheticNewChatQuery: string | null,
-  groupByType: boolean,
-): Row[] {
+function buildRows(items: SelectableItem[], syntheticNewChatQuery: string | null): Row[] {
   const rows: Row[] = []
-  let firstChatEmitted = false
-  let firstTeamEmitted = false
   let lastTeamId: string | null = null
   for (let i = 0; i < items.length; i++) {
     const it = items[i]!
-    if (it.kind === 'chat') {
-      // Grouped lists carry their own selectable per-type headers from
-      // buildSelectableList; only the ungrouped list needs a synthetic one.
-      if (!groupByType && !firstChatEmitted && density === 'cozy') {
-        rows.push({ kind: 'header', label: 'Chats' })
-      }
-      firstChatEmitted = true
-    }
-    if (it.kind === 'team' || (it.kind === 'section' && it.section === 'teams')) {
-      // 'cozy' density: blank row between Chats and the team list.
-      // 'compact': skip the spacer so more rows fit in the viewport.
-      // Grouped lists open the team list with the selectable "Teams" section
-      // header; ungrouped ones start straight at the first team header.
-      if (rows.length > 0 && density === 'cozy' && !firstTeamEmitted) {
-        rows.push({ kind: 'spacer' })
-      }
-      firstTeamEmitted = true
-      if (it.kind === 'team') lastTeamId = it.team.id
-    }
+    if (it.kind === 'team') lastTeamId = it.team.id
     if (it.kind === 'channel' && it.team.id !== lastTeamId) {
       // Channel without its team in the same render scope (team filtered? archived team?)
       // Defensive: still show it but without grouping.
@@ -141,16 +109,6 @@ function rowLabel(
       : `${EXPANDED_GLYPH} ${item.team.displayName}`
   if (item.kind === 'more') return `… ${item.hidden} more`
   return `# ${item.label}`
-}
-
-// Cozy-density indent before the row label. Teams render flush-left
-// as bold headers; channels indent two spaces under their team; chats
-// stay flush-left so the focus indicator (`>`) is one column away
-// from the name.
-function rowIndent(item: SelectableItem): string {
-  if (item.kind === 'channel') return '  '
-  if (item.kind === 'team') return ''
-  return ''
 }
 
 export function isNewChatQueryCandidate(filter: string): boolean {
@@ -222,7 +180,6 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const filter = useAppState((s) => s.filter)
   const expandedChatSections = useAppState((s) => s.expandedChatSections)
   const inputZone = useAppState((s) => s.inputZone)
-  const density = useAppState((s) => s.settings.chatListDensity)
   const chatListSort = useAppState((s) => s.settings.chatListSort)
   const chatListGroupByType = useAppState((s) => s.settings.chatListGroupByType)
   const chatListSectionCap = useAppState((s) => s.settings.chatListSectionCap)
@@ -280,21 +237,20 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   useEffect(() => {
     if (safeCursor !== cursor) store.set(cursorAt(items, safeCursor))
   })
-  const rows = buildRows(items, density, syntheticNewChatQuery, chatListGroupByType)
+  const rows = buildRows(items, syntheticNewChatQuery)
   const chatListGap = theme.layout.chatListGap
+  const chatListIndent = theme.layout.chatListIndent
+  const labelWidthFor = labelContentWidth(showPresence, chatListIndent, listPaneWidth)
 
   // Visual height per logical row. Long chat names wrap onto multiple
-  // visual lines, and unread previews add another line in cozy density;
+  // visual lines, and previews add up to two more;
   // the viewport math below counts visual lines so wrapping never
   // pushes adjacent rows off-screen or into the composer.
   const heights = rows.map((row) => {
-    if (row.kind === 'header' || row.kind === 'spacer') return 1
     if (row.kind === 'synthetic-new-chat') {
-      const cw = labelContentWidth(density, showPresence, '', listPaneWidth)
-      return visualLines(`Create chat with "${row.query}"`, cw)
+      return visualLines(`Create chat with "${row.query}"`, labelWidthFor)
     }
-    const indent = density === 'cozy' ? rowIndent(row.item) : ''
-    const cw = labelContentWidth(density, showPresence, indent, listPaneWidth)
+    const cw = labelWidthFor
     const label = rowLabel(row.item, me?.id, shortNames, nameByUserId)
     const unread = row.item.kind === 'chat' ? unreadByChatId[row.item.chat.id] : undefined
     const hasMention = !!unread && unread.mentionCount > 0
@@ -341,13 +297,8 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
 
   if (selectableCount === 0) {
     return (
-      <Box flexDirection="column" paddingLeft={0} paddingRight={theme.layout.chatListPaddingRight}>
+      <Box flexDirection="column" paddingLeft={0} paddingRight={1}>
         {filterBanner}
-        {density === 'cozy' && (
-          <Text bold={theme.emphasis.sectionHeadingBold}>
-            {fs('Chats', theme.fontSize.chatListHeader, theme.fontSize.tightSpacing)}
-          </Text>
-        )}
         <Text color={theme.mutedText}>
           {filter ? '  no matches' : conn === 'connecting' ? '  loading...' : '  (none)'}
         </Text>
@@ -356,42 +307,14 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   }
 
   return (
-    <Box
-      flexDirection="column"
-      flexShrink={0}
-      overflow="hidden"
-      paddingLeft={0}
-      paddingRight={theme.layout.chatListPaddingRight}
-    >
+    <Box flexDirection="column" flexShrink={0} overflow="hidden" paddingLeft={0} paddingRight={1}>
       {filterBanner}
-      {visible.map((row, i) => {
-        if (row.kind === 'header') {
-          return (
-            <Box key={`h-${row.label}-${i}`} flexShrink={0}>
-              <Text bold={theme.emphasis.sectionHeadingBold}>
-                {fs(row.label, theme.fontSize.chatListHeader, theme.fontSize.tightSpacing)}
-              </Text>
-            </Box>
-          )
-        }
-        if (row.kind === 'spacer') return <Box key={`sp-${i}`} height={1} flexShrink={0} />
-
+      {visible.map((row) => {
         if (row.kind === 'synthetic-new-chat') {
           const isSelected = row.index === safeCursor
           return (
             <Box key={`new-chat-${row.query}`} flexDirection="row" flexShrink={0}>
-              {density === 'cozy' && <Box width={2} flexShrink={0} />}
-              {density === 'cozy' && (
-                <Box width={2} flexShrink={0}>
-                  <Text color={isSelected ? theme.selected : undefined}>
-                    {isSelected ? '> ' : '  '}
-                  </Text>
-                </Box>
-              )}
-              <Box
-                width={labelContentWidth(density, showPresence, '', listPaneWidth)}
-                flexShrink={0}
-              >
+              <Box width={labelWidthFor} flexShrink={0}>
                 <Text
                   color={isSelected ? theme.selected : theme.mutedText}
                   bold={isSelected && theme.emphasis.selectedBold}
@@ -435,7 +358,6 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         }
 
         const isSelected = row.index === safeCursor
-        const indent = density === 'cozy' ? rowIndent(row.item) : ''
         const label = rowLabel(row.item, me?.id, shortNames, nameByUserId)
         // Gutter glyph: 1:1 chats show a presence dot (when presence is
         // enabled), while meeting / group chats show a chat-type glyph so
@@ -450,30 +372,19 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         // Unread badge is a suffix, not a leading dot, so it can't be
         // confused with the presence column.
         const unreadBadge = hasMention ? ' @' : hasUnread ? ' ●' : ''
-        // Layout per row (left → right):
-        //   1. presence / type-glyph column (3 cols): dot/glyph/blank,
-        //      always reserved when presence is enabled or in cozy mode so
-        //      all rows column-align even when individual chats have no
-        //      presence to show.
-        //   2. selector column (cozy only): `> ` for the focused row,
-        //      `  ` otherwise. Compact density saves those columns and
-        //      relies on selected color/bold styling.
-        //   3. indent (cozy: channel/team indent)
-        //   4. label
-        const showGutter = density === 'cozy' || showPresence
-        // 3-cell gutter. Wide nerd-font type glyphs render two cells, so a
-        // single trailing space leaves a gap before the name. Single-cell
-        // presence dots get a leading space too, nudging them right so they
-        // line up under the type glyphs (and a trailing space for the gap).
-        const presenceText = presence
-          ? presence.wide
-            ? `${presence.dot} `
-            : ` ${presence.dot} `
-          : '   '
+        // Layout per row (left → right), when presence is enabled:
+        //   1. glyph column (2 cols): dot/glyph/blank, reserved on every row
+        //      so all rows column-align even without presence to show.
+        //   2. chatListIndent gap
+        //   3. label
+        // The focused row relies on selected color/bold styling.
+        // Wide nerd-font type glyphs fill both cells; single-cell presence
+        // dots get a leading space so they line up under the type glyphs.
+        const presenceText = presence ? (presence.wide ? presence.dot : ` ${presence.dot}`) : ''
         const presenceColor = presence?.color
         // Last-message preview, indented to line up under the label. Read
         // chats render in muted gray, unread chats in the unread color.
-        const labelWidth = labelContentWidth(density, showPresence, indent, listPaneWidth)
+        const labelWidth = labelWidthFor
         const preview =
           showMessagePreviews && row.item.kind === 'chat'
             ? previewLineForChat(row.item.chat, labelWidth)
@@ -496,21 +407,9 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
             marginBottom={chatListGap}
           >
             <Box flexDirection="row" backgroundColor={rowBg}>
-              {showGutter && (
-                <Box width={3} flexShrink={0}>
+              {showPresence && (
+                <Box width={GLYPH_WIDTH + chatListIndent} flexShrink={0}>
                   <Text color={presenceColor}>{presenceText}</Text>
-                </Box>
-              )}
-              {density === 'cozy' && (
-                <Box width={2} flexShrink={0}>
-                  <Text color={isSelected ? theme.selected : undefined} backgroundColor={rowBg}>
-                    {isSelected ? '> ' : '  '}
-                  </Text>
-                </Box>
-              )}
-              {indent && (
-                <Box width={indent.length} flexShrink={0}>
-                  <Text>{indent}</Text>
                 </Box>
               )}
               <Box width={labelWidth} flexShrink={0} backgroundColor={rowBg}>

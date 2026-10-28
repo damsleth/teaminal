@@ -92,8 +92,7 @@ const LAYOUT_KEYS = new Set<keyof NonNullable<ThemeOverrides['layout']>>([
   'paneHeaderPaddingLeft',
   'senderIndent',
   'paneHeaderMarginBottom',
-  'tailGap',
-  'chatListPaddingRight',
+  'chatListIndent',
   'chatListGap',
   'textBackgroundPaddingX',
   'textBackgroundPaddingY',
@@ -276,13 +275,13 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     themeOverrides: cloneThemeOverrides(settings.themeOverrides),
     accounts: [...settings.accounts],
     activeAccount: settings.activeAccount,
-    chatListDensity: settings.chatListDensity,
     chatListSort: settings.chatListSort,
     chatListGroupByType: settings.chatListGroupByType,
     chatListSectionCap: settings.chatListSectionCap,
     chatListShortNames: settings.chatListShortNames,
     showMessagePreviews: settings.showMessagePreviews,
     messagePaneShortNames: settings.messagePaneShortNames,
+    showChatNameHeader: settings.showChatNameHeader,
     showPresenceInList: settings.showPresenceInList,
     showTimestampsInPane: settings.showTimestampsInPane,
     showReactions: settings.showReactions,
@@ -321,7 +320,8 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
 export function mergeSettings(input: Record<string, unknown>, warnings: string[]): Settings {
   const out: Settings = cloneSettings(defaultSettings)
   for (const [key, value] of Object.entries(input)) {
-    if (key === 'windowHeight') {
+    // Removed settings (chatListDensity is pinned to compact).
+    if (key === 'windowHeight' || key === 'chatListDensity') {
       continue
     }
     // Legacy key (pre chatRoutingByAccount): the binary audience preference.
@@ -504,13 +504,6 @@ function validateAndAssign(
       }
       warnings.push('config: "activeAccount" must be null or a profile name')
       return false
-    case 'chatListDensity':
-      if (value === 'cozy' || value === 'compact') {
-        out.chatListDensity = value
-        return true
-      }
-      warnings.push('config: "chatListDensity" must be "cozy" or "compact"')
-      return false
     case 'chatListSort':
       if (value === 'recent' || value === 'alphabetical') {
         out.chatListSort = value
@@ -530,6 +523,7 @@ function validateAndAssign(
     case 'chatListShortNames':
     case 'showMessagePreviews':
     case 'messagePaneShortNames':
+    case 'showChatNameHeader':
     case 'showPresenceInList':
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
@@ -832,8 +826,9 @@ export function validateLayoutOverrides(
   }
   const out: NonNullable<ThemeOverrides['layout']> = {}
   for (const [rawKey, rawValue] of Object.entries(value)) {
-    // Removed setting; pane padding is pinned at 1. Drop quietly.
-    if (rawKey === 'panePaddingX') continue
+    // Removed settings, pinned at 1. Drop quietly.
+    if (rawKey === 'panePaddingX' || rawKey === 'tailGap' || rawKey === 'chatListPaddingRight')
+      continue
     if (!LAYOUT_KEYS.has(rawKey as keyof NonNullable<ThemeOverrides['layout']>)) {
       warnings.push(`config: unknown ${scope} key "${rawKey}" ignored`)
       continue

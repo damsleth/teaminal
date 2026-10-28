@@ -8,6 +8,15 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Chat name header.** New setting (`showChatNameHeader`, menu → Settings
+  → Chat name header, default off) shows the open conversation's name above
+  the messages: the other person in a 1:1, the group chat's name, or
+  `Team · # channel`.
+
+- **Chat list indent.** The theme editor's **Chat list indent**
+  (`layout.chatListIndent`, default 1) sets the columns between a chat's
+  presence dot or chat-type glyph and its name and preview.
+
 - **Center header bar.** New setting (`headerBarCentered`, menu → Settings
   → Center header bar) centers the header bar segments. Off keeps them
   left-aligned.
@@ -187,8 +196,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Removed
 
-- **Pane padding X theme setting** (`layout.panePaddingX`). Pane padding is
-  fixed at 1; an existing value in config or a theme file is ignored.
+- **Pane padding X, Tail strip gap and Chat list pad R theme settings**
+  (`layout.panePaddingX`, `layout.tailGap`, `layout.chatListPaddingRight`).
+  All three are fixed at 1; an existing value in config or a theme file is
+  ignored.
+- **Chat list density setting** (`chatListDensity`). The chat list is always
+  compact: no `Chats` heading, no `>` selector column, channels flush with
+  their team. The chat name header above the messages is now its own
+  setting (below). An existing `chatListDensity` value is ignored.
 
 ## [0.23.0] - 2026-09-25
 
