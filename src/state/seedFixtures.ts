@@ -207,21 +207,39 @@ export function isSeededMode(): boolean {
   return typeof v === 'string' && v.length > 0
 }
 
+// Collision fixture (M2): the profile named BETA_PROFILE reuses every fixture
+// id (me, chats, members, messages) with different text: names, topics and
+// bodies upper-cased. Any alpha text on screen after switching to beta is a
+// cross-account leak. Other profiles get the normal fixtures.
+export const BETA_PROFILE = 'beta'
+const BETA_TEXT_KEYS = new Set(['displayName', 'topic', 'content'])
+function betaVariant<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(betaVariant) as T
+  if (!value || typeof value !== 'object') return value
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(value)) {
+    out[k] = BETA_TEXT_KEYS.has(k) && typeof v === 'string' ? v.toUpperCase() : betaVariant(v)
+  }
+  return out as T
+}
+
 /**
  * Populate the store with deterministic seed data and mark the session
  * as fully online so the UI renders the full chat chrome. No Graph calls
  * are made; no owa-piggy auth is required.
  */
-export function applySeededState(store: Store<AppState>): void {
+export function applySeededState(store: Store<AppState>, profile?: string | null): void {
+  const beta = profile === BETA_PROFILE
+  const pick = <T>(v: T): T => (beta ? betaVariant(v) : v)
   const messageCacheByConvo: AppState['messageCacheByConvo'] = {}
   for (const [key, msgs] of Object.entries(SEED_MESSAGES)) {
-    messageCacheByConvo[key] = emptyMessageCache(msgs)
+    messageCacheByConvo[key] = emptyMessageCache(pick(msgs))
   }
 
   store.set({
-    me: SEED_ME,
+    me: pick(SEED_ME),
     capabilities: SEED_CAPABILITIES,
-    chats: SEED_CHATS,
+    chats: pick(SEED_CHATS),
     teams: [],
     channelsByTeam: {},
     messageCacheByConvo,
