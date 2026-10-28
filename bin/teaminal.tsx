@@ -321,6 +321,12 @@ const nameCacheSubscription = store.subscribe((s) => {
 const pollerHandleRef: PollerHandleRef = { current: null }
 let currentSession: SessionHandle | null = null
 
+// `bun --watch` (dev:watch) sends SIGTERM before it re-execs on a file change.
+// Ink's restore-cursor hooks signal-exit, which re-raises a SIGTERM nobody else
+// listens for, so the process died instead of reloading. A listener of our own
+// stops that; only under --watch, so a real `kill` still quits a normal run.
+if (process.execArgv.includes('--watch')) process.on('SIGTERM', () => {})
+
 const ink = render(
   <ErrorBoundary>
     <StoreProvider store={store}>
