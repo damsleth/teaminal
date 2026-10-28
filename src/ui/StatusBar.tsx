@@ -3,7 +3,7 @@
 // capability, unread, and refresh details live in HeaderBar.
 
 import { Box, Text } from 'ink'
-import { selectFocusedAttachment } from './messageFocusables'
+import { focusedReplyCount, selectFocusedAttachment } from './messageFocusables'
 import { useAppState, useTheme } from './StoreContext'
 
 export function StatusBar() {
@@ -21,8 +21,12 @@ export function StatusBar() {
     if (!f) return null
     if (f.kind === 'image') return `▸ image: ${f.ref.name} · space opens`
     if (f.kind === 'link') return `▸ link: ${f.ref.href} · space opens`
+    if (f.kind === 'thread')
+      return `▸ thread: ${f.count} ${f.count === 1 ? 'reply' : 'replies'} · space/l opens`
     return null
   })
+  // The focused channel message has a thread: advertise 't'.
+  const hasThread = useAppState((s) => focusedReplyCount(s) > 0)
   const theme = useTheme()
 
   let hint = 'j/k move · l/Enter open · / filter · n new chat · ? help · q quit'
@@ -36,7 +40,7 @@ export function StatusBar() {
   } else if (focus.kind !== 'list') {
     hint =
       attachmentHint ??
-      'j/k msg · u/d half · u/k older top · l bottom · h back · Tab compose · r refresh'
+      `j/k msg · u/d half · gg top · G bottom · h back${hasThread ? ' · t thread' : ''} · Tab compose · r refresh`
   }
 
   // When key hints are turned off the status bar is reserved for the focused

@@ -616,10 +616,12 @@ function MessageRow(props: {
   // (unfocused) treatment. Index 0 is the body, so >0 selects an attachment.
   let focusedLinkHref: string | null = null
   let focusedImageKey: string | null = null
+  let threadFocused = false
   if (props.focused && props.focusedAttachmentIndex && props.focusedAttachmentIndex > 0) {
-    const fa = messageFocusables(m)[props.focusedAttachmentIndex]
+    const fa = messageFocusables(m, props.threadMeta?.count)[props.focusedAttachmentIndex]
     if (fa?.kind === 'link') focusedLinkHref = fa.ref.href
     else if (fa?.kind === 'image') focusedImageKey = fa.ref.cacheKey
+    else if (fa?.kind === 'thread') threadFocused = true
   }
   const bodySpans = splitBodyLinkSpans(bodyText, focusedLinkHref)
   const isDeleted = isMessageDeleted(m)
@@ -784,8 +786,17 @@ function MessageRow(props: {
         props.threadMeta.count > 0 &&
         contentRow(
           'thread',
-          <Text color={theme.mutedText} wrap="truncate-end">
-            {`╰─ ${formatReplyCount(props.threadMeta)}`}
+          <Text wrap="truncate-end">
+            <Text color={theme.mutedText}>╰─ </Text>
+            <Text
+              color={threadFocused ? theme.selected : theme.mutedText}
+              bold={threadFocused}
+              backgroundColor={
+                threadFocused ? (theme.selectedRowBackground ?? undefined) : undefined
+              }
+            >
+              {formatReplyCount(props.threadMeta)}
+            </Text>
           </Text>,
         )}
       {readReceiptLine &&

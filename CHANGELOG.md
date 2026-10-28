@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Focusable reply badges.** In a channel, `j`/`k` now stops on a message's
+  `N replies` badge like it does on links and images; Space or `l` opens the
+  thread. The status bar shows `t thread` when the focused message has
+  replies.
+
 - **Separate focus text color.** **Focus text** (`messageFocusText`) sets
   the color of the focused message's text, apart from **Focus marker**
   (`messageFocusIndicator`), which now only colors the marker. `none`
@@ -72,6 +77,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 - **Space works like Enter in the menu**, including every submenu.
 
 ### Changed
+
+- **Vim-style jumps in conversations.** `G` jumps to the latest message
+  and `gg` to the oldest loaded one. `l` / Right no longer jump to the
+  bottom; they only open a focused reply badge. The status bar drops the
+  `u/k older top` hint.
 
 - **The header shows only the status dots** for presence, graph and push;
   the words (`available`, `online`, `connected`) are gone.
