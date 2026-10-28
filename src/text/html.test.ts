@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { htmlToText, isEmojiOnly } from './html'
+import { htmlToRich, htmlToText, isEmojiOnly, richText } from './html'
 
 describe('htmlToText', () => {
   test('returns empty string for empty input', () => {
@@ -18,8 +18,8 @@ describe('htmlToText', () => {
     expect(htmlToText('<p>a</p><p>b</p>')).toBe('a b')
   })
 
-  test('preserves paragraph breaks when preserveNewlines is true', () => {
-    expect(htmlToText('<p>a</p><p>b</p>', { preserveNewlines: true })).toBe('a\n\nb')
+  test('puts each paragraph on its own line when preserveNewlines is true', () => {
+    expect(htmlToText('<p>a</p><p>b</p>', { preserveNewlines: true })).toBe('a\nb')
   })
 
   test('treats <br> as a line break (collapsed to space by default)', () => {
@@ -141,5 +141,49 @@ describe('htmlToText', () => {
     // a separate branch for systemEventMessage, so this is just a sanity
     // check that we don't crash on the literal.
     expect(htmlToText('<systemEventMessage/>')).toBe('')
+  })
+})
+
+describe('htmlToRich', () => {
+  const text = (html: string) => richText(htmlToRich(html))
+
+  test('one <p> per line, &nbsp; paragraph as a blank line (Teams shape)', () => {
+    const html = '<p>git clone</p>\n<p>cd SKILLS</p>\n<p>&nbsp;</p>\n<p>Åpner en picker</p>'
+    expect(text(html)).toBe('git clone\ncd SKILLS\n \nÅpner en picker')
+  })
+
+  test('<br> inside a paragraph breaks the line; source newlines are spaces', () => {
+    expect(text('<p>a<br>b\nc</p>')).toBe('a\nb c')
+  })
+
+  test('keeps a <codeblock> body verbatim and marks it code', () => {
+    const spans = htmlToRich(
+      '<p>see</p><codeblock class="PlainText"><code>x  = 1\ny = 2</code></codeblock>',
+    )
+    expect(richText(spans)).toBe('see\nx  = 1\ny = 2')
+    expect(spans.find((s) => s.text.includes('x  = 1'))?.code).toBe(true)
+  })
+
+  test('styles bold / italic / underline / strike runs', () => {
+    const spans = htmlToRich('<p><strong>b</strong> <em>i</em> <u>u</u> <s>s</s></p>')
+    expect(spans.find((s) => s.text === 'b')?.bold).toBe(true)
+    expect(spans.find((s) => s.text === 'i')?.italic).toBe(true)
+    expect(spans.find((s) => s.text === 'u')?.underline).toBe(true)
+    expect(spans.find((s) => s.text === 's')?.strike).toBe(true)
+  })
+
+  test('bullets and numbers list items, indented by depth', () => {
+    expect(text('<ul><li>a</li><li>b<ul><li>c</li></ul></li></ul>')).toBe('• a\n• b\n  • c')
+    expect(text('<ol><li>one</li><li>two</li></ol>')).toBe('1. one\n2. two')
+  })
+
+  test('prefixes blockquote lines', () => {
+    expect(text('<blockquote><p>q1</p><p>q2</p></blockquote><p>after</p>')).toBe(
+      '│ q1\n│ q2\nafter',
+    )
+  })
+
+  test('collapses runs of blank lines to one', () => {
+    expect(text('a<br><br><br><br>b')).toBe('a\n\nb')
   })
 })

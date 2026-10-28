@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Formatted messages.** Message bodies keep their line breaks and render
+  bold, italic, underline, strikethrough, inline code, code blocks,
+  bulleted and numbered lists (nested lists indent) and quotes. Teams code
+  blocks, which used to be dropped, now show. Tables are still dropped.
+
 - **Chat name header.** New setting (`showChatNameHeader`, menu → Settings
   → Chat name header, default off) shows the open conversation's name above
   the messages: the other person in a 1:1, the group chat's name, or

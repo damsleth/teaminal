@@ -3,7 +3,7 @@ import { parseMessageReference } from '../types'
 import { channelRoots } from '../state/channelThreads'
 import type { Focus } from '../state/store'
 import { describeSystemEvent } from './systemEvent'
-import { htmlToText } from '../text/html'
+import { htmlToRich, htmlToText, richText, type RichSpan } from '../text/html'
 import { extractInlineImages } from '../text/inlineImages'
 import { shortName } from '../state/selectables'
 import { localTime } from './localTime'
@@ -123,22 +123,31 @@ export function isMessageDeleted(m: ChatMessage): boolean {
  * images out of the rows reserved for them.
  */
 export function messageBodyText(m: ChatMessage): string {
+  return richText(messageBodyRich(m))
+}
+
+// The body as styled runs, line breaks kept. messageBodyText is the same
+// text joined, so the renderer and the height math stay in lockstep.
+export function messageBodyRich(m: ChatMessage): RichSpan[] {
   if (isMessageDeleted(m)) {
     const senderName = m.from?.user?.displayName ?? 'someone'
     const time = localTime(m.createdDateTime)
-    return `(message deleted by ${senderName} \u00b7 ${time})`
+    return [{ text: `(message deleted by ${senderName} \u00b7 ${time})` }]
   }
   if (m.messageType === 'systemEventMessage') {
     const decoded = describeSystemEvent(m)
-    return decoded ?? ''
+    return decoded ? [{ text: decoded }] : []
   }
   const raw = m.body.content ?? ''
   if (m.body.contentType === 'text') {
-    return raw.replace(/\s+/g, ' ').trim()
+    const text = raw
+      .replace(/[ \t]+/g, ' ')
+      .replace(/ *\n */g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+    return text ? [{ text }] : []
   }
-  // Graph inserts an opaque <attachment id="..."></attachment> tag at
-  // the top of body.content for quoted replies. htmlToText drops it
-  // (unknown tag) but leaves the preceding whitespace; trim again so
-  // the new message body starts at column 0.
-  return htmlToText(raw).trim()
+  // Graph inserts an opaque <attachment id="..."></attachment> tag at the
+  // top of body.content for quoted replies; htmlToRich drops it and trims.
+  return htmlToRich(raw, { preserveNewlines: true })
 }

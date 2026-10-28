@@ -17,6 +17,7 @@ import {
 } from '../state/channelThreads'
 import type { Chat, ChatMessage, Channel, Team } from '../types'
 import { extractFileAttachments, formatBytes } from '../text/fileAttachments'
+import type { RichSpan } from '../text/html'
 import { extractInlineImages, type InlineImageRef } from '../text/inlineImages'
 import { reactionsSummary } from './reactions'
 import { searchMessages } from './messageSearch'
@@ -25,6 +26,7 @@ import {
   getQuotedReply,
   isMessageDeleted,
   isMessageEdited,
+  messageBodyRich,
   messageBodyText,
   messagesForTimelineNavigation,
 } from './renderableMessage'
@@ -53,7 +55,7 @@ import {
 import { ensureImageFetched, getImageData, ownedImageKey } from '../state/imageCache'
 import type { AccountId } from '../account'
 import { messageFocusables } from './messageFocusables'
-import { splitBodyLinkSpans } from './bodySpans'
+import { splitBodyLinkSpans, type BodySpan } from './bodySpans'
 import { pickerAnchorCol } from './pickerAnchor'
 import { paintInlineImages, type InlineImageSlots } from './inlineImageLayout'
 import { localTime } from './localTime'
@@ -623,7 +625,7 @@ function MessageRow(props: {
       ? readReceiptLineForMessage(props.readReceipts, m.id, props.myUserId)
       : null
 
-  const bodyText = messageBodyText(m)
+  const richSpans = messageBodyRich(m)
   // Resolve which attachment the focus ring points at, but only for the
   // focused message — every other row leaves its links/images at the subtle
   // (unfocused) treatment. Index 0 is the body, so >0 selects an attachment.
@@ -636,7 +638,17 @@ function MessageRow(props: {
     else if (fa?.kind === 'image') focusedImageKey = fa.ref.cacheKey
     else if (fa?.kind === 'thread') threadFocused = true
   }
-  const bodySpans = splitBodyLinkSpans(bodyText, focusedLinkHref)
+  // Styled runs, split into link runs, with line breaks kept outside fs():
+  // an OSC 66 sized-text sequence must not span a newline.
+  const bodyRuns: { text: string; style: RichSpan; link?: BodySpan['kind'] }[] = []
+  for (const span of richSpans) {
+    for (const piece of span.text.split(/(\n)/)) {
+      if (piece === '\n') bodyRuns.push({ text: '\n', style: { text: '' } })
+      else
+        for (const ls of splitBodyLinkSpans(piece, focusedLinkHref))
+          bodyRuns.push({ text: ls.text, style: span, link: ls.kind })
+    }
+  }
   const isDeleted = isMessageDeleted(m)
   const isEdited = !isDeleted && isMessageEdited(m)
   const reactionLine = shouldShowReactionRow(
@@ -701,23 +713,39 @@ function MessageRow(props: {
       bold={props.focused && !isDeleted}
       wrap="wrap"
     >
-      {bodySpans.map((span, i) =>
-        span.kind === 'text' ? (
-          <Text key={i}>{fs(span.text, theme.fontSize.messageText)}</Text>
-        ) : (
+      {bodyRuns.map((run, i) => {
+        if (run.text === '\n') return <Text key={i}>{'\n'}</Text>
+        const { style, link } = run
+        // Unset flags stay undefined so the focused message's bold inherits.
+        const styled = {
+          bold: style.bold || undefined,
+          italic: style.italic || undefined,
+          underline: style.underline || undefined,
+          strikethrough: style.strike || undefined,
+          color: style.code ? theme.infoText : undefined,
+        }
+        if (link === 'text') {
+          return (
+            <Text key={i} {...styled}>
+              {fs(run.text, theme.fontSize.messageText)}
+            </Text>
+          )
+        }
+        return (
           <Text
             key={i}
+            {...styled}
             color={theme.selected}
             underline
-            bold={span.kind === 'link-focused'}
+            bold={link === 'link-focused' || styled.bold}
             backgroundColor={
-              span.kind === 'link-focused' ? (theme.selectedRowBackground ?? undefined) : undefined
+              link === 'link-focused' ? (theme.selectedRowBackground ?? undefined) : undefined
             }
           >
-            {fs(span.text, theme.fontSize.messageText)}
+            {fs(run.text, theme.fontSize.messageText)}
           </Text>
-        ),
-      )}
+        )
+      })}
       {isEdited && <Text color={theme.mutedText}> (edited)</Text>}
       {reactionLine && <Text color={theme.mutedText}> {`(${reactionLine})`}</Text>}
     </Text>
