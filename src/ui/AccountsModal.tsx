@@ -210,6 +210,7 @@ export function AccountsModal() {
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
         width={70}
+        maxWidth="100%"
       >
         <Text bold={theme.emphasis.modalTitleBold}>Accounts</Text>
         <Box height={1} />

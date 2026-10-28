@@ -105,6 +105,7 @@ export function NetworkModal() {
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
         width={100}
+        maxWidth="100%"
       >
         <Text bold={theme.emphasis.modalTitleBold}>Network ({totalCount})</Text>
         <Box height={1} />

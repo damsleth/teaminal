@@ -129,6 +129,7 @@ export function MessageSearchModal() {
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
         width={70}
+        maxWidth="100%"
       >
         <Text bold={theme.emphasis.modalTitleBold}>Search all messages</Text>
         <Box height={1} />

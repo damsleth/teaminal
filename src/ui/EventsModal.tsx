@@ -128,6 +128,7 @@ export function EventsModal() {
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
         width={100}
+        maxWidth="100%"
       >
         <Text bold={theme.emphasis.modalTitleBold}>Events ({totalCount})</Text>
         <Box height={1} />

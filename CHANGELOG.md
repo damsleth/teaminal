@@ -128,6 +128,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Modals overlay the whole app.** Menus, Notifications (Ctrl+A), the theme
+  editor and the other overlays center over both the chat list and the
+  conversation instead of only the conversation pane, so they fit without
+  hiding the sidebar (Ctrl+B). In a terminal narrower than a modal, the
+  modal shrinks to fit instead of running off the edge.
+
 - **Enter inserts a newline in the composer; Ctrl+Enter sends.** Saving an
   edit is Ctrl+Enter too. In kitty and Ghostty teaminal turns on the kitty
   keyboard protocol so Ctrl+Enter is told apart from Enter. In terminals

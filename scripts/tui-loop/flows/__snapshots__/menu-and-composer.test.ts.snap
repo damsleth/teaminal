@@ -2,25 +2,25 @@
 
 exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
 ╭────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
+││  teaminal · You (example.com) · presence ● · graph ● · 3 chats                                   ││
+│╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
+│╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
+││ ◯ Ada Byron              ││Select a chat or channel · Enter to open · q to quit                  ││
+││   Ada: The launch notes  ││                                                                      ││
+││   are ready for review.  ││                                                                      ││
+││  Design Sync            ││                                                                      ││
+││   Nina: Nina shared two  ││                                                                      ││
 ││   compact layout option… ││                                                                      ││
-││  Ops Channel      ╭──────────────────────────────────────────────────────────────────────────────│
-│──────╮                                                                                             │
-││   Mina: Deploy is g│                                                                              │
-│      │                                                                                             │
-││   in the EU region.│   Notifications                                                              │
-│      │                                                                                             │
-││                    │                                                                              │
-│      │                                                                                             │
-││                    │   (no notifications)                                                         │
-│      │                                                                                             │
-││                    │                                                                              │
-│      │                                                                                             │
-││                    │   j/k: move · enter: open · a: mark all read · esc: close                    │
-│      │                                                                                             │
-││                    │                                                                              │
-│      │                                                                                             │
-││                    ╰──────────────────────────────────────────────────────────────────────────────│
-│──────╯                                                                                             │
+││  Ops╭────────────────────────────────────────────────────────────────────────────────────╮      ││
+││   Min│                                                                                    │      ││
+││   in │   Notifications                                                                    │      ││
+││      │                                                                                    │      ││
+││      │   (no notifications)                                                               │      ││
+││      │                                                                                    │      ││
+││      │   j/k: move · enter: open · a: mark all read · esc: close                          │      ││
+││      │                                                                                    │      ││
+││      ╰────────────────────────────────────────────────────────────────────────────────────╯      ││
 ││                          ││                                                                      ││
 ││                          ││                                                                      ││
 ││                          ││                                                                      ││
@@ -34,7 +34,7 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
 │ menu open                                                                                          │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
 {
-  "0,9": {
+  "0,0": {
     "bgColorMode": 0,
     "bgColor": -1,
     "fgColorMode": 16777216,
@@ -48,6 +48,154 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "overline": 0,
     "strike": 0,
     "underline": 0
+  },
+  "1,1": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "3,1": {
+    "bold": 134217728
+  },
+  "11,1": {
+    "fgColorMode": 16777216,
+    "fgColor": 8,
+    "bold": 0
+  },
+  "53,1": {
+    "fgColorMode": 16777216,
+    "fgColor": 2
+  },
+  "54,1": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "64,1": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,1": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,4": {
+    "bgColorMode": 33554432,
+    "bgColor": 235
+  },
+  "3,4": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 6,
+    "bold": 134217728
+  },
+  "26,4": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 0,
+    "fgColor": -1,
+    "bold": 0
+  },
+  "27,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "81,4": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,5": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "26,5": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,5": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,5": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,6": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "25,6": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,6": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "2,7": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,7": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,8": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "26,8": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "27,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,8": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
   },
   "1,9": {
     "fgColorMode": 0,
@@ -77,15 +225,47 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "21,10": {
+  "7,10": {
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "7,11": {
+  "93,10": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "0,12": {
+  "99,10": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,11": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "7,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "8,11": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "92,11": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "93,11": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,11": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -97,27 +277,61 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "21,12": {
+  "7,12": {
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "22,12": {
+  "8,12": {
     "bgColorMode": 16777216,
     "bgColor": 0,
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "6,13": {
+  "11,12": {
+    "bold": 134217728
+  },
+  "24,12": {
+    "bold": 0
+  },
+  "92,12": {
     "bgColorMode": 0,
     "bgColor": -1,
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "7,13": {
+  "93,12": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "0,14": {
+  "99,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,13": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "7,13": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "8,13": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "92,13": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "93,13": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,13": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -125,37 +339,63 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "4,14": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "21,14": {
+  "7,14": {
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "22,14": {
+  "8,14": {
     "bgColorMode": 16777216,
     "bgColor": 0,
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "25,14": {
-    "bold": 134217728
+  "11,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
   },
-  "38,14": {
-    "bold": 0
+  "29,14": {
+    "fgColorMode": 0,
+    "fgColor": -1
   },
-  "6,15": {
+  "92,14": {
     "bgColorMode": 0,
     "bgColor": -1,
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "7,15": {
+  "93,14": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "0,16": {
+  "99,14": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,15": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "7,15": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "8,15": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "92,15": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "93,15": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,15": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -163,27 +403,63 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "21,16": {
+  "7,16": {
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "22,16": {
+  "8,16": {
     "bgColorMode": 16777216,
     "bgColor": 0,
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "6,17": {
+  "11,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "66,16": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "92,16": {
     "bgColorMode": 0,
     "bgColor": -1,
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "7,17": {
+  "93,16": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "0,18": {
+  "99,16": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "1,17": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "7,17": {
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "8,17": {
+    "bgColorMode": 16777216,
+    "bgColor": 0,
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "92,17": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 16777216,
+    "fgColor": 6
+  },
+  "93,17": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,17": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -191,35 +467,31 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "21,18": {
+  "7,18": {
     "fgColorMode": 16777216,
     "fgColor": 6
   },
-  "22,18": {
-    "bgColorMode": 16777216,
-    "bgColor": 0,
+  "93,18": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "25,18": {
+  "99,18": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "43,18": {
+  "1,19": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "6,19": {
-    "bgColorMode": 0,
-    "bgColor": -1,
+  "27,19": {
     "fgColorMode": 16777216,
-    "fgColor": 6
+    "fgColor": 8
   },
-  "7,19": {
+  "29,19": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "0,20": {
+  "99,19": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -227,27 +499,31 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "21,20": {
+  "27,20": {
     "fgColorMode": 16777216,
-    "fgColor": 6
+    "fgColor": 8
   },
-  "22,20": {
-    "bgColorMode": 16777216,
-    "bgColor": 0,
+  "29,20": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "6,21": {
-    "bgColorMode": 0,
-    "bgColor": -1,
+  "99,20": {
     "fgColorMode": 16777216,
-    "fgColor": 6
+    "fgColor": 8
   },
-  "7,21": {
+  "1,21": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "0,22": {
+  "27,21": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,21": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,21": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -255,35 +531,31 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "21,22": {
-    "fgColorMode": 16777216,
-    "fgColor": 6
-  },
-  "22,22": {
-    "bgColorMode": 16777216,
-    "bgColor": 0,
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "25,22": {
+  "27,22": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "80,22": {
+  "29,22": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "6,23": {
-    "bgColorMode": 0,
-    "bgColor": -1,
+  "99,22": {
     "fgColorMode": 16777216,
-    "fgColor": 6
+    "fgColor": 8
   },
-  "7,23": {
+  "1,23": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "0,24": {
+  "27,23": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "29,23": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "99,23": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
@@ -291,167 +563,43 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "21,24": {
-    "fgColorMode": 16777216,
-    "fgColor": 6
-  },
-  "22,24": {
-    "bgColorMode": 16777216,
-    "bgColor": 0,
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "6,25": {
-    "bgColorMode": 0,
-    "bgColor": -1,
-    "fgColorMode": 16777216,
-    "fgColor": 6
-  },
-  "7,25": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "0,26": {
+  "27,24": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,26": {
+  "29,24": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "21,26": {
-    "fgColorMode": 16777216,
-    "fgColor": 6
-  },
-  "7,27": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "0,28": {
+  "99,24": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,28": {
+  "1,27": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "27,28": {
+  "2,27": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "29,28": {
+  "24,27": {
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "99,28": {
+  "99,27": {
     "fgColorMode": 16777216,
     "fgColor": 8
+  },
+  "0,29": {
+    "fgColorMode": 0,
+    "fgColor": -1
   },
   "1,29": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "27,29": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "29,29": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "99,29": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "1,30": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "27,30": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "29,30": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "99,30": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "1,31": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "27,31": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "29,31": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "99,31": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "1,32": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "27,32": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "29,32": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "99,32": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "1,33": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "27,33": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "29,33": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "99,33": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "1,36": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "2,36": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "24,36": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "99,36": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "0,38": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "1,38": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "10,38": {
+  "10,29": {
     "fgColorMode": 0,
     "fgColor": -1
   }

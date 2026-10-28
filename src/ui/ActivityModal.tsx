@@ -171,6 +171,7 @@ export function ActivityModal() {
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
         width={86}
+        maxWidth="100%"
       >
         <Text bold={theme.emphasis.modalTitleBold}>
           Notifications{totalUnread > 0 ? ` (${totalUnread} unread)` : ''}

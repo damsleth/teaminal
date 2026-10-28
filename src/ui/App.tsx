@@ -546,7 +546,7 @@ export function App() {
       <Box borderStyle={inkBorder(theme.borders.panel)} borderColor={theme.border} paddingX={1}>
         <HeaderBar />
       </Box>
-      <Box flexDirection="row" flexGrow={1}>
+      <Box flexDirection="row" flexGrow={1} position="relative">
         {showList && (
           <Box width={listWidth} flexShrink={0} {...paneBorder('list')}>
             <ChatList listPaneWidth={listWidth} />
@@ -569,13 +569,7 @@ export function App() {
           ) : replaceModal ? (
             <AuthExpiredModal />
           ) : (
-            <Box
-              flexDirection="column"
-              flexGrow={1}
-              flexShrink={1}
-              minWidth={0}
-              position="relative"
-            >
+            <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
               <MessagePane
                 focusedMessageId={focusedMessageId}
                 focusIndicatorActive={focus.kind !== 'list' && inputZone === 'list'}
@@ -583,50 +577,52 @@ export function App() {
                 listPaneWidth={conversationListWidth}
                 composerRows={resolvedComposerHeight}
               />
-              {overlayModalKind && (
-                <Box
-                  position="absolute"
-                  top={0}
-                  left={0}
-                  right={0}
-                  bottom={0}
-                  flexDirection="column"
-                  alignItems="center"
-                  justifyContent="center"
-                >
-                  {overlayModalKind === 'menu' ? (
-                    <MenuModal />
-                  ) : overlayModalKind === 'theme-editor' ? (
-                    <ThemeEditorModal />
-                  ) : overlayModalKind === 'accounts' ? (
-                    <AccountsModal />
-                  ) : overlayModalKind === 'keybinds' ? (
-                    <KeybindsModal />
-                  ) : overlayModalKind === 'diagnostics' ? (
-                    <DiagnosticsModal />
-                  ) : overlayModalKind === 'events' ? (
-                    <EventsModal />
-                  ) : overlayModalKind === 'activity' ? (
-                    <ActivityModal />
-                  ) : overlayModalKind === 'reaction-picker' ? (
-                    <ReactionPickerModal />
-                  ) : overlayModalKind === 'confirm-delete' ||
-                    overlayModalKind === 'confirm-delete-chat' ? (
-                    <ConfirmDeleteModal />
-                  ) : overlayModalKind === 'message-search-global' ? (
-                    <MessageSearchModal />
-                  ) : overlayModalKind === 'image' ? (
-                    <ImageModal />
-                  ) : overlayModalKind === 'edit-reactions' ? (
-                    <EditReactionsModal />
-                  ) : (
-                    <NetworkModal />
-                  )}
-                </Box>
-              )}
             </Box>
           )}
         </Box>
+        {/* Modals overlay both panes (chat list + conversation), so they get
+            the full app width and never need the sidebar hidden to fit. */}
+        {overlayModalKind && !replaceModal && newChatPrompt === null && (
+          <Box
+            position="absolute"
+            top={0}
+            left={0}
+            right={0}
+            bottom={0}
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+          >
+            {overlayModalKind === 'menu' ? (
+              <MenuModal />
+            ) : overlayModalKind === 'theme-editor' ? (
+              <ThemeEditorModal />
+            ) : overlayModalKind === 'accounts' ? (
+              <AccountsModal />
+            ) : overlayModalKind === 'keybinds' ? (
+              <KeybindsModal />
+            ) : overlayModalKind === 'diagnostics' ? (
+              <DiagnosticsModal />
+            ) : overlayModalKind === 'events' ? (
+              <EventsModal />
+            ) : overlayModalKind === 'activity' ? (
+              <ActivityModal />
+            ) : overlayModalKind === 'reaction-picker' ? (
+              <ReactionPickerModal />
+            ) : overlayModalKind === 'confirm-delete' ||
+              overlayModalKind === 'confirm-delete-chat' ? (
+              <ConfirmDeleteModal />
+            ) : overlayModalKind === 'message-search-global' ? (
+              <MessageSearchModal />
+            ) : overlayModalKind === 'image' ? (
+              <ImageModal />
+            ) : overlayModalKind === 'edit-reactions' ? (
+              <EditReactionsModal />
+            ) : (
+              <NetworkModal />
+            )}
+          </Box>
+        )}
       </Box>
       {showTailPanels && <TailPanels />}
       <Box {...paneBorder('composer')} height={resolvedComposerHeight}>
