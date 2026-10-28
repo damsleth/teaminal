@@ -16,7 +16,7 @@
 // owns whatever they decide to share.
 
 import { Box, Text, useApp } from 'ink'
-import { inkBorder } from './theme'
+import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
 import { decodeJwtClaims, getToken } from '../auth/owaPiggy'
@@ -120,7 +120,7 @@ export function DiagnosticsModal() {
         flexDirection="column"
         borderStyle={inkBorder(theme.borders.modal)}
         borderColor={theme.borderActive}
-        backgroundColor={theme.modalBackground ?? undefined}
+        backgroundColor={modalBg(theme)}
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
         width={80}

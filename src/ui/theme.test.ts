@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { defaultSettings } from '../state/store'
-import { blendAlpha, builtinThemes, getTheme, resolveTheme } from './theme'
+import { blendAlpha, builtinThemes, getTheme, modalBg, resolveTheme } from './theme'
 
 describe('getTheme', () => {
   test('returns clones of built-in themes', () => {
@@ -168,5 +168,18 @@ describe('alpha colors', () => {
     })
     expect(theme.selfMessageBackground).toBe('#ccccff')
     expect(theme.rawColors).toEqual({ selfMessageBackground: '#0000ff33' })
+  })
+})
+
+describe('modalBg', () => {
+  test('falls back modal -> app -> an opaque terminal-default fill', () => {
+    const dark = builtinThemes.dark
+    expect(modalBg({ ...dark, modalBackground: 'blue' })).toBe('blue')
+    expect(modalBg({ ...dark, modalBackground: null, appBackground: 'red' })).toBe('red')
+    // Must be truthy (Ink only fills a box with a backgroundColor) and not a
+    // chalk name (so the fill carries no color).
+    const fill = modalBg({ ...dark, modalBackground: null, appBackground: null })
+    expect(fill).toBeTruthy()
+    expect(fill in (require('chalk').default as object)).toBe(false)
   })
 })

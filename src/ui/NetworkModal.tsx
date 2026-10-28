@@ -8,7 +8,7 @@
 // Esc closes. j/k or ↓/↑ scroll. g jumps to the tail.
 
 import { Box, Text, useApp } from 'ink'
-import { inkBorder } from './theme'
+import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
 import { getRecentRequests, subscribeRequests, type RequestRecord } from '../log'
@@ -101,7 +101,7 @@ export function NetworkModal() {
         flexDirection="column"
         borderStyle={inkBorder(theme.borders.modal)}
         borderColor={theme.borderActive}
-        backgroundColor={theme.modalBackground ?? undefined}
+        backgroundColor={modalBg(theme)}
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
         width={100}

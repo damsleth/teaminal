@@ -10,7 +10,7 @@
 // push reconcile — renders as one row.
 
 import { Box, Text, useApp } from 'ink'
-import { inkBorder } from './theme'
+import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { useEffect } from 'react'
 import type { ActivityItem } from '../graph/teamsActivity'
@@ -167,7 +167,7 @@ export function ActivityModal() {
         flexDirection="column"
         borderStyle={inkBorder(theme.borders.modal)}
         borderColor={theme.borderActive}
-        backgroundColor={theme.modalBackground ?? undefined}
+        backgroundColor={modalBg(theme)}
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
         width={86}

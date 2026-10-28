@@ -11,7 +11,7 @@
 import { Box, Text, useApp } from 'ink'
 import { useState } from 'react'
 import { useTerminalRows } from './hooks/useTerminalRows'
-import { inkBorder } from './theme'
+import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
@@ -111,7 +111,7 @@ export function KeybindsModal() {
         flexDirection="column"
         borderStyle={inkBorder(theme.borders.modal)}
         borderColor={theme.borderActive}
-        backgroundColor={theme.modalBackground ?? undefined}
+        backgroundColor={modalBg(theme)}
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
         width={80}

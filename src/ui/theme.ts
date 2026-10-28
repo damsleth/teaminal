@@ -364,6 +364,14 @@ function rgbOf(color: string | null): [number, number, number] | null {
   return [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number]
 }
 
+// Background for modals and overlays. Ink only clears an absolutely
+// positioned box's cells when it has a backgroundColor, so with no modal or
+// app color the chat underneath bleeds through. A name chalk doesn't know
+// makes Ink write plain (terminal-default) spaces: opaque but uncolored.
+export function modalBg(theme: Theme): string {
+  return theme.modalBackground ?? theme.appBackground ?? 'terminal-default'
+}
+
 // Terminal colors have no alpha: mix #rgba / #rrggbbaa onto `background`.
 // ponytail: named backgrounds other than black/white blend as black, since
 // their real RGB is the terminal palette's business.
