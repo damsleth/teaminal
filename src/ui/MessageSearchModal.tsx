@@ -7,7 +7,7 @@
 // and render as non-jumpable rows); Esc closes.
 
 import { Box, Text, useApp } from 'ink'
-import { inkBorder } from './theme'
+import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
 import { searchAllMessages } from '../state/chatActions'
@@ -125,7 +125,7 @@ export function MessageSearchModal() {
         flexDirection="column"
         borderStyle={inkBorder(theme.borders.modal)}
         borderColor={theme.borderActive}
-        backgroundColor={theme.modalBackground ?? undefined}
+        backgroundColor={modalBg(theme)}
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
         width={70}

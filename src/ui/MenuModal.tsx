@@ -17,7 +17,7 @@
 // dispatcher. Add menu items there, not here.
 
 import { Box, Text, useApp } from 'ink'
-import { inkBorder } from './theme'
+import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import {
   cycleQuietHoursPreset,
@@ -256,7 +256,7 @@ export function MenuModal() {
         flexDirection="column"
         borderStyle={inkBorder(theme.borders.modal)}
         borderColor={theme.borderActive}
-        backgroundColor={theme.modalBackground ?? undefined}
+        backgroundColor={modalBg(theme)}
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
       >
@@ -268,31 +268,31 @@ export function MenuModal() {
           <>
             <Box flexDirection="column">
               {LOGO.map((line, i) => (
-                <Text key={i} color="cyan" backgroundColor={theme.modalBackground ?? undefined}>
+                <Text key={i} color="cyan" backgroundColor={modalBg(theme)}>
                   {pad(line)}
                 </Text>
               ))}
             </Box>
-            <Text color="gray" backgroundColor={theme.modalBackground ?? undefined}>
+            <Text color="gray" backgroundColor={modalBg(theme)}>
               {pad(`teaminal ${VERSION}`)}
             </Text>
-            <Text color="gray" backgroundColor={theme.modalBackground ?? undefined}>
+            <Text color="gray" backgroundColor={modalBg(theme)}>
               {pad(REPOSITORY_URL)}
             </Text>
-            <Text backgroundColor={theme.modalBackground ?? undefined}>{pad('')}</Text>
+            <Text backgroundColor={modalBg(theme)}>{pad('')}</Text>
           </>
         ) : null}
         {breadcrumb && (
           <>
-            <Text color="gray" backgroundColor={theme.modalBackground ?? undefined}>
+            <Text color="gray" backgroundColor={modalBg(theme)}>
               {pad(breadcrumb)}
             </Text>
-            <Text backgroundColor={theme.modalBackground ?? undefined}>{pad('')}</Text>
+            <Text backgroundColor={modalBg(theme)}>{pad('')}</Text>
           </>
         )}
         <Box flexDirection="column">
           {moreAbove && (
-            <Text color="gray" backgroundColor={theme.modalBackground ?? undefined}>
+            <Text color="gray" backgroundColor={modalBg(theme)}>
               {pad('  ⋯')}
             </Text>
           )}
@@ -309,7 +309,7 @@ export function MenuModal() {
               <Text
                 key={item.id}
                 color={color}
-                backgroundColor={theme.modalBackground ?? undefined}
+                backgroundColor={modalBg(theme)}
                 bold={selected && !item.disabled && theme.emphasis.selectedBold}
               >
                 {pad(`${marker}${item.label}${valueSuffix}${hint}`)}
@@ -317,13 +317,13 @@ export function MenuModal() {
             )
           })}
           {moreBelow && (
-            <Text color="gray" backgroundColor={theme.modalBackground ?? undefined}>
+            <Text color="gray" backgroundColor={modalBg(theme)}>
               {pad('  ⋯')}
             </Text>
           )}
         </Box>
-        <Text backgroundColor={theme.modalBackground ?? undefined}>{pad('')}</Text>
-        <Text color="gray" backgroundColor={theme.modalBackground ?? undefined}>
+        <Text backgroundColor={modalBg(theme)}>{pad('')}</Text>
+        <Text color="gray" backgroundColor={modalBg(theme)}>
           {pad('↑/↓ navigate · enter select · esc back')}
         </Text>
       </Box>

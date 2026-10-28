@@ -38,7 +38,7 @@ import {
   type EditableField,
   type FieldPatch,
 } from './themeEditor'
-import { blendAlpha, resolveBaseName, inkBorder } from './theme'
+import { blendAlpha, resolveBaseName, inkBorder, modalBg } from './theme'
 import { useTerminalRows } from './hooks/useTerminalRows'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
@@ -195,7 +195,7 @@ export function ThemeEditorModal() {
   const capacity = Math.max(5, Math.min(16, rows - 22))
   const { start, end } = fieldWindow(FIELDS.length, cursor, capacity)
 
-  const bg = theme.modalBackground ?? undefined
+  const bg = modalBg(theme)
   let lastSection: string | null = null
   const rowNodes: ReactNode[] = []
   for (let gi = start; gi < end; gi++) {
@@ -273,7 +273,7 @@ function FieldRow(props: {
   theme: ReturnType<typeof useTheme>
 }): ReactElement {
   const { field, selected, overridden, value, hexBuffer, theme } = props
-  const bg = theme.modalBackground ?? undefined
+  const bg = modalBg(theme)
   const marker = selected ? '> ' : '  '
   const dot = overridden ? '• ' : '  '
   const label = field.label.padEnd(LABEL_W)
@@ -364,7 +364,7 @@ function FieldRow(props: {
 // theme, so it re-renders on every edit.
 function ThemePreview(props: { theme: ReturnType<typeof useTheme> }): ReactElement {
   const { theme } = props
-  const bg = theme.modalBackground ?? undefined
+  const bg = modalBg(theme)
   return (
     <Box
       flexDirection="column"
