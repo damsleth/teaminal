@@ -78,7 +78,8 @@ export type ThemeLayout = {
   textBackgroundPaddingY: number
   // MessagePane: extra left indent of the day separator ("Today", "Fri, May 15").
   dateMarkerIndent: number
-  // MessagePane: message body width cap, percent of the pane (10-100).
+  // MessagePane: width of the conversation column, percent of the pane
+  // (10-100), centered so the margins grow evenly on both sides.
   messageMaxWidth: number
   // MessagePane: 1 rounds the corners of message body backgrounds (a
   // half-block "speech bubble" frame); 0 keeps them square.

@@ -38,9 +38,10 @@ adheres to [Semantic Versioning](https://semver.org/).
   only honored) in terminals with the kitty keyboard protocol, where
   Shift+Enter can be told apart from Enter.
 
-- **Message max width.** The theme editor's **Message max width %**
-  (`layout.messageMaxWidth`, 10-100 in steps of 10, default 100) caps how
-  wide a message body wraps, as a percent of the message pane.
+- **Conversation width.** The theme editor's **Conversation width %**
+  (`layout.messageMaxWidth`, 10-100 in steps of 10, default 100) narrows the
+  whole conversation to that share of the message pane, with equal margins
+  on both sides, so messages sit in a centered column that's easy to scan.
 
 - **Sender name toggles.** Menu → **Show sender names**
   (`showSenderNamesInPane`) hides the name above every message, and **Show
@@ -184,6 +185,27 @@ adheres to [Semantic Versioning](https://semver.org/).
 - **Space works like Enter in the menu**, including every submenu.
 
 ### Changed
+
+- **Settings menu in labeled groups.** Settings now reads top to bottom
+  under headings: Appearance, Header & status bar, Chat list, Messages,
+  Navigation & input, Notifications, Presence, Advanced. Labels inside a
+  group are shorter ("Chat list → Sort" instead of "Chat list sort").
+
+- **←/→ change values in the menu**, as in the theme editor: → steps a
+  setting forward, ← back, and → opens a submenu.
+
+- **Theme cycles through saved presets.** Settings → Theme steps through
+  auto, dark, light and every saved preset, and loads a preset the same way
+  Theme presets → Enter does (including its UI settings).
+
+- **Theme editor grouped by screen area.** Fields are grouped by where they
+  show up (General, Modals, Chat list, Sender & time, Message text, Focused
+  message, Date markers, Status text, Images) instead of by kind, the list
+  grows with the window, and the preview samples every text type: chat list
+  header, rows and preview, chat header, date marker, sender and self names
+  with timestamps, both kinds of message body with their backgrounds and
+  rounded frames, the focused message, system events and status colors. On
+  wide windows the preview sits beside the fields.
 
 - **Preview lines in chat list.** `showMessagePreviews` is replaced by
   `chatListPreviewLines` (menu → Settings → Preview lines in chat list):

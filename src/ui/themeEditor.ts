@@ -27,7 +27,15 @@ import { BORDER_STYLES, type BuiltinThemeName, type Theme } from './theme'
 export type FieldKind = 'numeric' | 'color' | 'enum' | 'boolean'
 export type FieldGroup = 'color' | 'layout' | 'borders' | 'emphasis' | 'fontSize' | 'setting'
 export type EditorSection =
-  'Spacing / Layout' | 'Colors' | 'Borders' | 'Emphasis' | 'Font size' | 'Images'
+  | 'General'
+  | 'Modals'
+  | 'Chat list'
+  | 'Sender & time'
+  | 'Message text'
+  | 'Focused message'
+  | 'Date markers'
+  | 'Status text'
+  | 'Images'
 
 export type FieldValue = string | number | boolean | null
 
@@ -99,11 +107,16 @@ export function isHexColor(value: string): boolean {
   return HEX_RE.test(value)
 }
 
-const color = (key: string, label: string, nullable = false): ColorField => ({
+const color = (
+  key: string,
+  label: string,
+  section: EditorSection,
+  nullable = false,
+): ColorField => ({
   kind: 'color',
   id: `color.${key}`,
   label,
-  section: 'Colors',
+  section,
   group: 'color',
   key,
   nullable,
@@ -127,11 +140,15 @@ const num = (
   max,
   step,
 })
-const border = (key: 'panel' | 'modal' | 'active', label: string): EnumField => ({
+const border = (
+  key: 'panel' | 'modal' | 'active',
+  label: string,
+  section: EditorSection,
+): EnumField => ({
   kind: 'enum',
   id: `borders.${key}`,
   label,
-  section: 'Borders',
+  section,
   group: 'borders',
   key,
   options: BORDER_STYLES,
@@ -139,8 +156,8 @@ const border = (key: 'panel' | 'modal' | 'active', label: string): EnumField => 
 const bool = (
   key: string,
   label: string,
+  section: EditorSection,
   group: 'emphasis' | 'fontSize' = 'emphasis',
-  section: EditorSection = 'Emphasis',
 ): BooleanField => ({
   kind: 'boolean',
   id: `${group}.${key}`,
@@ -150,72 +167,76 @@ const bool = (
   key,
 })
 
-// Section order is the render order. Numeric + color come first (the most
-// iterated-on tokens), then borders / emphasis / image sizing.
+// Sections follow the UI, top to bottom: the frame (General, Modals), the
+// chat list, then the message pane (senders, bodies, focus, dates), status
+// text and images. Each field still stores in its own group.
 export const FIELDS: readonly EditableField[] = [
-  // — Spacing / Layout —
-  num('layout', 'modalPaddingX', 'Modal padding X', 'Spacing / Layout', 0, 8),
-  num('layout', 'modalPaddingY', 'Modal padding Y', 'Spacing / Layout', 0, 4),
-  num('layout', 'paneHeaderPaddingLeft', 'Message body indent', 'Spacing / Layout', 0, 6),
-  num('layout', 'senderIndent', 'Sender indent', 'Spacing / Layout', 0, 6),
-  num('layout', 'paneHeaderMarginBottom', 'Message gap', 'Spacing / Layout', 0, 4, 0.5),
-  num('layout', 'chatListIndent', 'Chat list indent', 'Spacing / Layout', 0, 6),
-  num('layout', 'chatListGap', 'Chat list gap', 'Spacing / Layout', 0, 3),
-  num('layout', 'textBackgroundPaddingX', 'Text bg padding X', 'Spacing / Layout', 0, 3),
-  num('layout', 'textBackgroundPaddingY', 'Text bg padding Y', 'Spacing / Layout', 0, 2),
-  num('layout', 'textBackgroundRadius', 'Text bg rounded', 'Spacing / Layout', 0, 1),
-  num('layout', 'dateMarkerIndent', 'Date marker indent', 'Spacing / Layout', 0, 12),
-  num('layout', 'messageMaxWidth', 'Message max width %', 'Spacing / Layout', 10, 100, 10),
-  // — Colors —
-  color('appBackground', 'Background', true),
-  color('modalBackground', 'Modal bg', true),
-  color('text', 'Text'),
-  color('mutedText', 'Muted text'),
-  color('border', 'Border'),
-  color('borderActive', 'Active border'),
-  color('selected', 'Selected'),
-  color('selectedRow', 'Selected row'),
-  color('selectedRowBackground', 'Selected row bg', true),
-  color('unread', 'Unread'),
-  color('unreadRow', 'Unread row'),
-  color('timestamp', 'Timestamp'),
-  color('sender', 'Sender'),
-  color('selfMessage', 'Self message'),
-  color('selfName', 'Self name'),
-  color('selfMessageBackground', 'Self message bg', true),
-  color('senderMessage', 'Sender message', true),
-  color('senderMessageBackground', 'Sender message bg', true),
-  color('systemEvent', 'System event'),
-  color('dateMarker', 'Date marker'),
-  color('errorText', 'Error text'),
-  color('warnText', 'Warn text'),
-  color('infoText', 'Info text'),
-  color('messageFocusIndicator', 'Focus marker'),
-  color('messageFocusText', 'Focus text', true),
-  color('messageFocusBackground', 'Focus background', true),
-  // — Borders —
-  border('panel', 'Panel border'),
-  border('modal', 'Modal border'),
-  border('active', 'Active pane border'),
-  // — Emphasis —
-  bool('modalTitleBold', 'Modal title bold'),
-  bool('sectionHeadingBold', 'Section heading bold'),
-  bool('selectedBold', 'Selected bold'),
-  bool('focusedBold', 'Focused message bold'),
-  bool('dateMarkerBold', 'Date marker bold'),
-  bool('unreadBold', 'Unread bold'),
-  bool('senderBold', 'Sender bold'),
-  bool('inlineKeyBold', 'Inline key bold'),
-  // — Font size (% of base; kitty text sizing protocol only) —
-  num('fontSize', 'paneHeader', 'Chat header', 'Font size', 50, 100, 10),
-  num('fontSize', 'sender', 'Sender', 'Font size', 50, 100, 10),
-  num('fontSize', 'timestamp', 'Timestamp', 'Font size', 50, 100, 10),
-  num('fontSize', 'messageText', 'Message text', 'Font size', 50, 100, 10),
-  num('fontSize', 'chatListHeader', 'Chat list header', 'Font size', 50, 100, 10),
-  num('fontSize', 'chatListName', 'Chat list name', 'Font size', 50, 100, 10),
-  num('fontSize', 'chatListPreview', 'Chat list preview', 'Font size', 50, 100, 10),
-  num('fontSize', 'dateMarker', 'Date marker', 'Font size', 50, 100, 10),
-  bool('tightSpacing', 'Tight spacing', 'fontSize', 'Font size'),
+  // — General —
+  color('appBackground', 'Background', 'General', true),
+  color('text', 'Text', 'General'),
+  color('mutedText', 'Muted text', 'General'),
+  color('border', 'Border', 'General'),
+  color('borderActive', 'Active border', 'General'),
+  border('panel', 'Panel border', 'General'),
+  border('active', 'Active pane border', 'General'),
+  bool('sectionHeadingBold', 'Section heading bold', 'General'),
+  bool('tightSpacing', 'Tight font spacing', 'General', 'fontSize'),
+  // — Modals —
+  color('modalBackground', 'Modal bg', 'Modals', true),
+  border('modal', 'Modal border', 'Modals'),
+  num('layout', 'modalPaddingX', 'Modal padding X', 'Modals', 0, 8),
+  num('layout', 'modalPaddingY', 'Modal padding Y', 'Modals', 0, 4),
+  bool('modalTitleBold', 'Modal title bold', 'Modals'),
+  bool('inlineKeyBold', 'Inline key bold', 'Modals'),
+  // — Chat list —
+  color('selected', 'Selected', 'Chat list'),
+  color('selectedRow', 'Selected row', 'Chat list'),
+  color('selectedRowBackground', 'Selected row bg', 'Chat list', true),
+  bool('selectedBold', 'Selected bold', 'Chat list'),
+  color('unread', 'Unread', 'Chat list'),
+  color('unreadRow', 'Unread row', 'Chat list'),
+  bool('unreadBold', 'Unread bold', 'Chat list'),
+  num('layout', 'chatListIndent', 'Indent', 'Chat list', 0, 6),
+  num('layout', 'chatListGap', 'Gap', 'Chat list', 0, 3),
+  num('fontSize', 'chatListHeader', 'Header size', 'Chat list', 50, 100, 10),
+  num('fontSize', 'chatListName', 'Name size', 'Chat list', 50, 100, 10),
+  num('fontSize', 'chatListPreview', 'Preview size', 'Chat list', 50, 100, 10),
+  // — Sender & time —
+  num('fontSize', 'paneHeader', 'Chat header size', 'Sender & time', 50, 100, 10),
+  color('sender', 'Sender', 'Sender & time'),
+  color('selfName', 'Self name', 'Sender & time'),
+  bool('senderBold', 'Sender bold', 'Sender & time'),
+  num('fontSize', 'sender', 'Sender size', 'Sender & time', 50, 100, 10),
+  num('layout', 'senderIndent', 'Sender indent', 'Sender & time', 0, 6),
+  color('timestamp', 'Timestamp', 'Sender & time'),
+  num('fontSize', 'timestamp', 'Timestamp size', 'Sender & time', 50, 100, 10),
+  // — Message text —
+  color('senderMessage', 'Sender message', 'Message text', true),
+  color('senderMessageBackground', 'Sender message bg', 'Message text', true),
+  color('selfMessage', 'Self message', 'Message text'),
+  color('selfMessageBackground', 'Self message bg', 'Message text', true),
+  color('systemEvent', 'System event', 'Message text'),
+  num('fontSize', 'messageText', 'Text size', 'Message text', 50, 100, 10),
+  num('layout', 'paneHeaderPaddingLeft', 'Body indent', 'Message text', 0, 6),
+  num('layout', 'paneHeaderMarginBottom', 'Message gap', 'Message text', 0, 4, 0.5),
+  num('layout', 'messageMaxWidth', 'Conversation width %', 'Message text', 10, 100, 10),
+  num('layout', 'textBackgroundPaddingX', 'Bg padding X', 'Message text', 0, 3),
+  num('layout', 'textBackgroundPaddingY', 'Bg padding Y', 'Message text', 0, 2),
+  num('layout', 'textBackgroundRadius', 'Bg rounded', 'Message text', 0, 1),
+  // — Focused message —
+  color('messageFocusIndicator', 'Focus marker', 'Focused message'),
+  color('messageFocusText', 'Focus text', 'Focused message', true),
+  color('messageFocusBackground', 'Focus background', 'Focused message', true),
+  bool('focusedBold', 'Focused bold', 'Focused message'),
+  // — Date markers —
+  color('dateMarker', 'Date marker', 'Date markers'),
+  bool('dateMarkerBold', 'Date marker bold', 'Date markers'),
+  num('layout', 'dateMarkerIndent', 'Date marker indent', 'Date markers', 0, 12),
+  num('fontSize', 'dateMarker', 'Date marker size', 'Date markers', 50, 100, 10),
+  // — Status text —
+  color('errorText', 'Error text', 'Status text'),
+  color('warnText', 'Warn text', 'Status text'),
+  color('infoText', 'Info text', 'Status text'),
   // — Images —
   num('setting', 'inlineImageMaxRows', 'Inline image max rows', 'Images', 1, 50),
   {

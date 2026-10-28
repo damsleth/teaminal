@@ -86,7 +86,7 @@ test('theme-editor: opens from Settings and renders fields + preview', async ({ 
   // Neither appears anywhere else, so they prove the modal opened (not just
   // the same-named menu row).
   await expect(terminal.getByText('= unsaved edit')).toBeVisible()
-  await expect(terminal.getByText('Spacing / Layout')).toBeVisible()
+  await expect(terminal.getByText('── General')).toBeVisible()
 
   // Text-snapshot gate for the open editor.
   await expect(terminal).toMatchSnapshot({ includeColors: true })

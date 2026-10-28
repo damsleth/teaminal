@@ -42,6 +42,7 @@ const BINDINGS: Binding[] = [
   { keys: 'Tab', when: 'composer', action: 'back to chat' },
   { keys: 'Esc', when: 'composer / filter', action: 'leave mode' },
   { keys: 'Esc', when: 'list / chat / channel', action: 'open menu' },
+  { keys: '← / →', when: 'menu', action: 'change the selected value / open submenu' },
   { keys: 'Ctrl+O / Ctrl+T', when: 'menu', action: 'edit settings / theme file in $VISUAL' },
   { keys: 'Ctrl+Enter', when: 'composer', action: 'send (also Alt+Enter, Ctrl+J)' },
   { keys: 'Enter', when: 'composer', action: 'newline (swapped with send by enterSends)' },

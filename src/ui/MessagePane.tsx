@@ -246,16 +246,14 @@ export function MessagePane(props: {
   const bubble = theme.layout.textBackgroundRadius > 0 ? 1 : 0
   const bgPadX = theme.layout.textBackgroundPaddingX + bubble
   const bodyPaddingY = theme.layout.textBackgroundPaddingY + bubble
-  const messageTextColumns = Math.max(
-    12,
-    Math.floor(
-      ((terminalSize.columns - listPaneWidth - 2 - bodyIndent) * theme.layout.messageMaxWidth) /
-        100,
-    ) -
-      2 * bgPadX,
-  )
-  // Cell budget for an inline image (message pane minus the gutter columns).
-  const imgCols = Math.max(12, terminalSize.columns - listPaneWidth - 20)
+  // layout.messageMaxWidth narrows the whole conversation column to that
+  // percent of the pane, centered: equal margins left and right.
+  const paneColumns = terminalSize.columns - listPaneWidth - 2
+  const conversationColumns = Math.floor((paneColumns * theme.layout.messageMaxWidth) / 100)
+  const conversationMargin = Math.floor((paneColumns - conversationColumns) / 2)
+  const messageTextColumns = Math.max(12, conversationColumns - bodyIndent - 2 * bgPadX)
+  // Cell budget for an inline image (conversation column minus the gutter).
+  const imgCols = Math.max(12, conversationColumns - 18)
   // Rows a message's inline images occupy: each loaded image takes its fitted
   // height (no label), each still-loading image takes one `[img]` label row.
   // Recomputed each render (imageRevision bumps on load) so layout, the
@@ -406,7 +404,7 @@ export function MessagePane(props: {
     const bodyText = focusedMsg ? messageBodyText(focusedMsg) : ''
     const bodyStartCol = messageBodyTerminalColumn({
       bodyIndent: bodyIndent + bgPadX,
-      listPaneWidth,
+      listPaneWidth: listPaneWidth + conversationMargin,
     })
     const fallbackCol = listPaneWidth + 3
     const col = pickerAnchorCol({
@@ -481,7 +479,15 @@ export function MessagePane(props: {
           overflow="hidden"
           justifyContent={windowEnd === allRows.length ? 'flex-end' : 'flex-start'}
         >
-          <Box flexDirection="column" flexGrow={1} flexShrink={0}>
+          <Box
+            flexDirection="column"
+            flexGrow={1}
+            flexShrink={0}
+            width={
+              theme.layout.messageMaxWidth < 100 ? `${theme.layout.messageMaxWidth}%` : undefined
+            }
+            alignSelf={theme.layout.messageMaxWidth < 100 ? 'center' : undefined}
+          >
             {messages.length === 0 ? (
               <Text color="gray"> loading...</Text>
             ) : (
@@ -558,7 +564,7 @@ export function transientTimestampIds(messages: ChatMessage[]): Set<string> {
 
 // Half blocks drawn in the background color: half a cell of air on each
 // side and chamfered corners, the terminal's closest thing to a rounded box.
-const BUBBLE_BORDER = {
+export const BUBBLE_BORDER = {
   topLeft: '▗',
   top: '▄',
   topRight: '▖',
@@ -850,9 +856,6 @@ function MessageRow(props: {
   // their single line of text directly.
   const hasHeader = !isSystem && !isDeleted && (props.showTimestamp || senderName.length > 0)
   const timeText = senderName ? `  ${time}` : time
-  // Bodies are capped at layout.messageMaxWidth percent of the pane.
-  const maxWidth =
-    theme.layout.messageMaxWidth < 100 ? `${theme.layout.messageMaxWidth}%` : undefined
   // Quoted-reply preview (chat-pane only). Channel threads represent replies
   // via the existing thread tree; double-decorating both would be visual noise.
   const quotedReply = !isSystem ? getQuotedReply(m) : null
@@ -889,7 +892,7 @@ function MessageRow(props: {
         <Box flexDirection="row">
           {!flip && marker}
           <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
-            <Box maxWidth={maxWidth}>{bodyNode}</Box>
+            {bodyNode}
           </Box>
           {flip && marker}
         </Box>
@@ -907,7 +910,7 @@ function MessageRow(props: {
         <Box flexDirection="row">
           {!flip && marker}
           <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
-            <Box maxWidth={maxWidth}>{bodyNode}</Box>
+            {bodyNode}
           </Box>
           {flip && marker}
         </Box>

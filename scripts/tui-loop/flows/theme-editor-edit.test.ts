@@ -74,18 +74,21 @@ test('theme-editor: a live edit persists and resets through the real app', async
   terminal.submit()
   await expect(terminal.getByText('= unsaved edit')).toBeVisible()
 
-  // The cursor opens on the first field, "Modal padding X" (default 3). `+`
-  // steps it forward; the change is written to the isolated config.
+  // The cursor opens on the first field, "Background" (dark base, default
+  // none). `+` steps it to the first palette color; the change is written to
+  // the isolated config under the dark bucket.
   terminal.write('+')
-  const afterEdit = await waitForConfig((cfg) => cfg?.themeOverrides?.layout?.modalPaddingX === 4)
+  const afterEdit = await waitForConfig(
+    (cfg) => cfg?.themeOverrides?.dark?.appBackground === 'black',
+  )
   // tui-test's expect() only carries locator/terminal matchers, so assert the
   // persisted value with node:assert.
-  assert.equal(afterEdit?.themeOverrides?.layout?.modalPaddingX, 4)
+  assert.equal(afterEdit?.themeOverrides?.dark?.appBackground, 'black')
 
   // `r` resets the focused field — the override key is removed, not merged.
   terminal.write('r')
   const afterReset = await waitForConfig(
-    (cfg) => cfg?.themeOverrides?.layout?.modalPaddingX === undefined,
+    (cfg) => cfg?.themeOverrides?.dark?.appBackground === undefined,
   )
-  assert.equal(afterReset?.themeOverrides?.layout?.modalPaddingX, undefined)
+  assert.equal(afterReset?.themeOverrides?.dark?.appBackground, undefined)
 })
