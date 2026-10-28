@@ -72,6 +72,8 @@ const COLOR_KEYS = new Set([
 ])
 
 const NULLABLE_COLOR_KEYS = new Set([
+  'background',
+  'appBackground',
   'messageFocusBackground',
   'selectedRowBackground',
   'selfMessageBackground',

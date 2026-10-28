@@ -107,7 +107,10 @@ export type ThemeEmphasis = {
 export type ThemeFontSize = Record<ThemeFontSizeKey, number> & { tightSpacing: boolean }
 
 export type Theme = {
-  background: string
+  // Whole-app background; null = the terminal's own.
+  appBackground: string | null
+  // Modal / overlay background; null = the terminal's own.
+  background: string | null
   text: string
   mutedText: string
   border: string
@@ -202,6 +205,7 @@ export function isBuiltinTheme(name: string): name is BuiltinThemeName {
 }
 
 const DARK: Theme = {
+  appBackground: null,
   background: 'black',
   text: 'white',
   mutedText: 'gray',
@@ -241,6 +245,7 @@ const DARK: Theme = {
 // modal backgrounds render dark under the light theme. Hex is palette-
 // independent on truecolor terminals.
 const LIGHT: Theme = {
+  appBackground: null,
   background: '#ffffff',
   text: '#1c1c1c',
   mutedText: 'gray',
@@ -284,7 +289,8 @@ export function getTheme(mode: string): Theme {
 // Partial theme as loaded from a user theme JSON file. Same shape as
 // Theme but every field optional, with sub-objects partial too.
 export type PartialTheme = {
-  background?: string
+  appBackground?: string | null
+  background?: string | null
   text?: string
   mutedText?: string
   border?: string
@@ -381,7 +387,10 @@ function flattenAlpha(theme: Theme): Theme {
   const flat = (key: string, value: string): string => {
     if (!ALPHA_HEX.test(value)) return value
     raw[key] = value
-    return blendAlpha(value, key === 'background' ? null : theme.background)
+    return blendAlpha(
+      value,
+      key === 'background' || key === 'appBackground' ? null : theme.background,
+    )
   }
   for (const [key, value] of Object.entries(theme)) {
     if (typeof value === 'string') (theme as Record<string, unknown>)[key] = flat(key, value)

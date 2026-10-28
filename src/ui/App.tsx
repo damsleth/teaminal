@@ -528,7 +528,11 @@ export function App() {
   const listWidth = chatListCollapsed ? terminalCols : resolvedChatListWidth
   const conversationListWidth = chatListCollapsed ? 0 : resolvedChatListWidth
   return (
-    <Box flexDirection="column" height={terminalRows}>
+    <Box
+      flexDirection="column"
+      height={terminalRows}
+      backgroundColor={theme.appBackground ?? undefined}
+    >
       {statusBarPosition === 'top' && <StatusBar />}
       <Box
         borderStyle={inkBorder(theme.borders.panel)}

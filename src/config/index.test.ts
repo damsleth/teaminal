@@ -532,6 +532,19 @@ describe('Settings ↔ config.json parity', () => {
     expect(settings.chatRoutingByAccount).toEqual({ a: 'ic3-only' })
   })
 
+  test('background and appBackground accept null (terminal default)', () => {
+    const w: string[] = []
+    const s = configToSettings(
+      { themeOverrides: { dark: { background: null, appBackground: '#101010' } } } as Record<
+        string,
+        unknown
+      >,
+      w,
+    )
+    expect(s.themeOverrides.dark).toEqual({ background: null, appBackground: '#101010' })
+    expect(w).toEqual([])
+  })
+
   describe('chatListWidth validation', () => {
     test('accepts null (auto)', () => {
       const w: string[] = []

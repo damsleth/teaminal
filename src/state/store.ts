@@ -234,7 +234,8 @@ export type ThemePresenceKey =
 // base theme (legacy); under `dark` / `light` they apply only to that base,
 // which is where the theme editor writes, so switching themes stays visible.
 export type ThemeColorOverrides = {
-  background?: string
+  appBackground?: string | null
+  background?: string | null
   text?: string
   mutedText?: string
   border?: string

@@ -182,7 +182,8 @@ theme layered on top of `dark`; any subset of these keys is accepted:
 ```jsonc
 {
   // Color roles (named color or `#rrggbb`):
-  "background": "#001100",
+  "appBackground": "#001100", // whole app; null = terminal background
+  "background": "#002200", // modals / overlays; null = terminal background
   "text": "white",
   "border": "#444",
   "borderActive": "magentaBright",
