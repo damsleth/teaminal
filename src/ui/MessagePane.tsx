@@ -61,6 +61,7 @@ import {
 } from '../state/imageCache'
 import { avatarCols, avatarEscape, avatarPixels, avatarRows } from './avatarImage'
 import { requestKittyPaint, setKittyOwner } from './kittyPainter'
+import { initialsOf, PictureSlot } from './PictureSlot'
 import type { AccountId } from '../account'
 import { messageFocusables } from './messageFocusables'
 import { splitBodyLinkSpans, type BodySpan } from './bodySpans'
@@ -751,6 +752,7 @@ function MessageRow(props: {
   threadMeta?: ReplyBadge
 }) {
   const { theme } = props
+  const slots = useContext(ImageSlotsContext)
   const m = props.message
   const isSelf = !!props.myUserId && m.from?.user?.id === props.myUserId
   const flip = props.selfMessagesOnRight && isSelf
@@ -1056,11 +1058,12 @@ function MessageRow(props: {
     <Box flexDirection="row" flexShrink={0}>
       <Box width={avatar.column} flexShrink={0} flexDirection="column">
         {avatar.userId && (
-          <AvatarSlot
-            userId={avatar.userId}
-            name={senderRaw}
+          <PictureSlot
+            slots={slots}
+            cacheKey={userPhotoKey(avatar.userId, avatarPixels(avatar.rows))}
             rows={avatar.rows}
             cols={avatar.cols}
+            label={initialsOf(senderRaw)}
             theme={theme}
           />
         )}
@@ -1074,46 +1077,6 @@ function MessageRow(props: {
       >
         {block}
       </Box>
-    </Box>
-  )
-}
-
-// Cells for one profile picture. Shows the sender's initials until (or
-// unless) the photo loads; the kitty painter then draws the photo over them.
-function AvatarSlot(props: {
-  userId: string
-  name: string
-  rows: number
-  cols: number
-  theme: Theme
-}) {
-  const slots = useContext(ImageSlotsContext)
-  const initials = props.name
-    .split(/[\s,]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => Array.from(w)[0]!.toUpperCase())
-    .join('')
-  return (
-    <Box
-      width={props.cols}
-      height={props.rows}
-      flexShrink={0}
-      ref={(node) => {
-        if (!node) return
-        slots.set(node, {
-          cacheKey: userPhotoKey(props.userId, avatarPixels(props.rows)),
-          rows: props.rows,
-          inset: 0,
-        })
-        return () => {
-          slots.delete(node)
-        }
-      }}
-    >
-      <Text color={props.theme.mutedText} wrap="truncate-end">
-        {initials.slice(0, props.cols)}
-      </Text>
     </Box>
   )
 }

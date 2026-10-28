@@ -8,6 +8,20 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Profile pictures and chat list thumbnails.** Menu → **Messages →
+  Profile pictures** (`messageAvatars`) and **Chat list → Thumbnails**
+  (`chatListThumbnails`) take `off` / `small` / `medium` / `large` (1, 2 or
+  3 rows tall; default off). Messages from other people get the sender's
+  photo at the start of each run from the same sender; the chat list shows
+  the other person's photo for 1:1 chats, the team picture for channels,
+  and a group or calendar icon at the same size for group and meeting
+  chats. Two-letter initials show until a photo loads, and stay where there
+  is none (no photo set, or no Graph access).
+  Needs a terminal with the kitty graphics protocol (kitty, Ghostty,
+  WezTerm), so the settings only appear there and nothing is drawn
+  elsewhere. Photos come from Graph; accounts without Graph access show
+  initials.
+
 - **Transient timestamps.** Menu → **Show timestamps in messages** now
   cycles `on` / `transient` / `off` (`showTimestampsInPane`). `transient`
   shows a timestamp only when a message comes 15 minutes or more after the

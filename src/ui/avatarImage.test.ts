@@ -5,6 +5,8 @@ import {
   avatarCols,
   avatarEscape,
   avatarRows,
+  iconEscape,
+  iconKey,
 } from './avatarImage'
 import { __resetKittyImageIdsForTests, kittyImageId } from './kittyGraphics'
 import { __resetKittyPainterForTests, requestKittyPaint, setKittyOwner } from './kittyPainter'
@@ -82,4 +84,16 @@ test('the painter places every owner after one clear', async () => {
   const out = writes.join('')
   expect(out).toContain('IMG-A')
   expect(out).toContain('IMG-B')
+})
+
+test('group and meeting icons are drawn as pictures in the given color', () => {
+  for (const icon of ['group', 'meeting'] as const) {
+    const out = iconEscape(iconKey(icon, [10, 20, 30]), 2)
+    expect(out.startsWith('\x1b_Ga=T,f=32,s=48,v=48,')).toBe(true)
+    expect(out).toContain('c=4,r=2')
+    // Some opaque pixels in the color (base64 of 0a141eff).
+    const b64 = out.slice(out.indexOf(';') + 1, out.indexOf('\x1b\\'))
+    expect(Buffer.from(b64, 'base64').includes(Buffer.from([10, 20, 30, 255]))).toBe(true)
+  }
+  expect(iconEscape('icon:nope:1,2,3', 2)).toBe('')
 })
