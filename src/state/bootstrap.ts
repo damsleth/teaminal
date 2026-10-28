@@ -16,19 +16,14 @@
 import { accountRef, type AccountRef } from '../account'
 import { getToken } from '../auth/owaPiggy'
 import { probeCapabilities } from '../graph/capabilities'
-import {
-  createGraphClient,
-  getAudiencePreference,
-  setAudiencePreference,
-  type GraphClient,
-} from '../graph/client'
+import { createGraphClient, setAudiencePreference, type GraphClient } from '../graph/client'
 import { resetChatMessageTransport } from '../graph/chats'
 import { getMe } from '../graph/me'
 import { listActivityFeed } from '../graph/teamsActivity'
 import { recordEvent, warn } from '../log'
 import { drainNotifications, notifyMention } from '../notify'
 import { RealtimeEventBus } from '../realtime/events'
-import { setActiveTransport } from '../realtime/transport'
+import { getActiveTransport, setActiveTransport } from '../realtime/transport'
 import { TrouterTransport } from '../realtime/trouter'
 import { htmlToText } from '../text/html'
 import { mergeActivityItems, countUnreadMentions, recordNotification } from './activityFeed'
@@ -110,11 +105,16 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
   if (store.ref.id !== sessionAccount.id) {
     throw new Error('runSession: store is bound to another account')
   }
-  // Every Graph call this session makes runs as sessionAccount. The audience
-  // comes from the account's routing (applied below) and is read per call so
-  // a routing change in the Accounts modal applies to the next request.
+  // Every Graph call this session makes runs as sessionAccount, with the
+  // audience of *this* account's routing (not the process-wide preference,
+  // which another session could set). Read per call so a routing change in
+  // the Accounts modal applies to the next request.
+  const routingKey = profile ?? store.get().settings.activeAccount ?? null
   const client = (): GraphClient =>
-    createGraphClient({ account: sessionAccount, ...getAudiencePreference() })
+    createGraphClient({
+      account: sessionAccount,
+      ...audienceFromRouting(routingForAccount(store.get().settings, routingKey)),
+    })
 
   // Apply this account's chat routing mode. The mode resolves to the token
   // audience the graph client mints for default calls plus whether it may
@@ -122,11 +122,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
   // preference => graph+ic3) keeps the default graph-first behavior. We also
   // clear the chatsvc message latch so a previous account's Conditional
   // Access fallback doesn't leak across a profile switch.
-  {
-    const settings = store.get().settings
-    const routingKey = profile ?? settings.activeAccount ?? null
-    applyChatRouting(sessionAccount, routingForAccount(settings, routingKey))
-  }
+  applyChatRouting(sessionAccount, routingForAccount(store.get().settings, routingKey))
 
   let pollerHandle: Awaited<ReturnType<typeof startPoller>> | null = null
   let bus: RealtimeEventBus | null = null
@@ -303,7 +299,8 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
       try {
         transport?.disconnect()
       } catch {}
-      setActiveTransport(null)
+      // Only clear the slot if it is still ours.
+      if (transport && getActiveTransport() === transport) setActiveTransport(null)
       try {
         bridge?.stop()
       } catch {}
