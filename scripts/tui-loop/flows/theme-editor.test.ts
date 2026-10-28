@@ -85,7 +85,7 @@ test('theme-editor: opens from Settings and renders fields + preview', async ({ 
   // The editor's distinctive chrome: the override legend + a section header.
   // Neither appears anywhere else, so they prove the modal opened (not just
   // the same-named menu row).
-  await expect(terminal.getByText('= overridden')).toBeVisible()
+  await expect(terminal.getByText('= unsaved edit')).toBeVisible()
   await expect(terminal.getByText('Spacing / Layout')).toBeVisible()
 
   // Text-snapshot gate for the open editor.
@@ -96,6 +96,6 @@ test('theme-editor: opens from Settings and renders fields + preview', async ({ 
 
   // Esc closes back to the chat list.
   terminal.keyEscape()
-  await expect(terminal.getByText('= overridden')).not.toBeVisible()
+  await expect(terminal.getByText('= unsaved edit')).not.toBeVisible()
   await expect(terminal.getByText('Ada Byron')).toBeVisible()
 })

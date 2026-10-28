@@ -72,7 +72,7 @@ test('theme-editor: a live edit persists and resets through the real app', async
   terminal.write('j')
   await pause()
   terminal.submit()
-  await expect(terminal.getByText('= overridden')).toBeVisible()
+  await expect(terminal.getByText('= unsaved edit')).toBeVisible()
 
   // The cursor opens on the first field, "Modal padding X" (default 3). `+`
   // steps it forward; the change is written to the isolated config.

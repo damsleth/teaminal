@@ -39,6 +39,7 @@ import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useTerminalRows } from './hooks/useTerminalRows'
 import { useSessionApi } from './SessionContext'
 import { openThemeEditor } from './ThemeEditorModal'
+import { openThemePresets } from './ThemePresetsModal'
 import { openActivity } from './ActivityModal'
 import { editSettingsFile, editThemeFile } from './openInEditor'
 import { clearProfileCaches } from '../state/cacheClear'
@@ -192,6 +193,9 @@ export function MenuModal() {
       }
       case 'show-theme-editor':
         openThemeEditor(store)
+        return
+      case 'show-theme-presets':
+        openThemePresets(store, 'menu')
         return
       case 'show-keybinds':
         store.set({ modal: { kind: 'keybinds' }, inputZone: 'menu' })

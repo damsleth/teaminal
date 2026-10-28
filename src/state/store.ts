@@ -112,6 +112,17 @@ export type ModalState =
   // list (src/ui/themeEditor.ts); the per-field hex-entry buffer lives in the
   // component's local state, not here.
   | { kind: 'theme-editor'; cursor: number }
+  // Theme presets list (save / save as / load / delete). `prompt` is the
+  // name being typed for Save as; `confirmDelete` arms the delete key;
+  // `returnTo` is where esc goes back to.
+  | {
+      kind: 'theme-presets'
+      cursor: number
+      returnTo: 'menu' | 'theme-editor'
+      prompt: string | null
+      confirmDelete: boolean
+      message: string | null
+    }
   | { kind: 'keybinds' }
   | { kind: 'diagnostics' }
   | { kind: 'events' }

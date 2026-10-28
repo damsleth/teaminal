@@ -13,6 +13,8 @@
 //   e            edit a color as raw hex (#rgb / #rrggbb), enter to commit
 //   r            reset the focused field to its default
 //   R            reset ALL theme overrides
+//   s / S        save into the active preset / save as a new preset
+//   p            theme presets (load / save / delete)
 //   esc          close
 //
 // The field list + all value math live in ./themeEditor; this component is
@@ -40,7 +42,9 @@ import {
 } from './themeEditor'
 import { blendAlpha, resolveBaseName, inkBorder, modalBg } from './theme'
 import { useTerminalRows } from './hooks/useTerminalRows'
-import { useAppState, useAppStore, useTheme } from './StoreContext'
+import { activeCustomThemeData, useAppState, useAppStore, useTheme } from './StoreContext'
+import { openThemePresets } from './ThemePresetsModal'
+import { activePresetName, saveThemePresetAs } from './themePresets'
 
 const LABEL_W = 22
 const CONTENT_W = 52
@@ -61,7 +65,12 @@ export function ThemeEditorModal() {
   const theme = useTheme()
   // Color edits are scoped to the built-in base currently rendered.
   const systemAppearance = useAppState((s) => s.systemAppearance)
-  const base = resolveBaseName(settings.theme, systemAppearance)
+  const customTheme = useAppState((s) => s.customTheme)
+  const base = resolveBaseName(
+    settings.theme,
+    systemAppearance,
+    activeCustomThemeData(settings.theme, customTheme)?.base,
+  )
   const rows = useTerminalRows()
   const isOpen = modal?.kind === 'theme-editor'
 
@@ -161,6 +170,22 @@ export function ThemeEditorModal() {
         beginHexEdit()
         return
       }
+      // Presets: s saves into the active preset (a built-in has no file, so
+      // it asks for a name), S saves as a new one, p opens the list.
+      if (input === 's') {
+        const active = activePresetName(store.get())
+        if (active) void saveThemePresetAs(store, active)
+        else openThemePresets(store, 'theme-editor', '')
+        return
+      }
+      if (input === 'S') {
+        openThemePresets(store, 'theme-editor', '')
+        return
+      }
+      if (input === 'p') {
+        openThemePresets(store, 'theme-editor')
+        return
+      }
 
       const ch = input.toLowerCase()
       if (key.upArrow || ch === 'k') {
@@ -192,7 +217,7 @@ export function ThemeEditorModal() {
   const cursor = modal.cursor
   // Field rows that fit, leaving room for the chrome (title, section headers,
   // preview box, help). Conservative so the overlay never overflows the pane.
-  const capacity = Math.max(5, Math.min(16, rows - 22))
+  const capacity = Math.max(5, Math.min(16, rows - 23))
   const { start, end } = fieldWindow(FIELDS.length, cursor, capacity)
 
   const bg = modalBg(theme)
@@ -235,10 +260,14 @@ export function ThemeEditorModal() {
         paddingY={theme.layout.modalPaddingY}
       >
         <Text bold={theme.emphasis.modalTitleBold} backgroundColor={bg}>
-          {pad(`Theme editor · ${base} colors`)}
+          {pad(
+            settings.theme === base
+              ? `Theme editor · ${base} colors`
+              : `Theme editor · ${settings.theme} (${base})`,
+          )}
         </Text>
         <Text color="gray" backgroundColor={bg}>
-          {pad('• = overridden · adjust live, persists to config')}
+          {pad('• = unsaved edit · s saves them into a preset')}
         </Text>
         {moreAbove && (
           <Text color="gray" backgroundColor={bg}>
@@ -259,6 +288,11 @@ export function ThemeEditorModal() {
               : '↑↓ field · ←→ adjust · e hex · r reset · R reset all · esc',
           )}
         </Text>
+        {!hexEdit && (
+          <Text color="gray" backgroundColor={bg}>
+            {pad('s save preset · S save as · p presets (load / delete)')}
+          </Text>
+        )}
       </Box>
     </Box>
   )

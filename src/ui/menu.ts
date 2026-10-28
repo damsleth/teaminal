@@ -73,6 +73,7 @@ export type MenuAction =
   | { kind: 'toggle-header-element'; key: keyof HeaderElementVisibility }
   | { kind: 'cycle-quiet-hours' }
   | { kind: 'show-theme-editor' }
+  | { kind: 'show-theme-presets' }
   | { kind: 'show-keybinds' }
   | { kind: 'show-diagnostics' }
   | { kind: 'show-events' }
@@ -142,6 +143,12 @@ export const ROOT_MENU: MenuItem[] = [
         label: 'Theme editor',
         action: { kind: 'show-theme-editor' },
         hint: 'colors, spacing, borders',
+      },
+      {
+        id: 'themePresets',
+        label: 'Theme presets',
+        action: { kind: 'show-theme-presets' },
+        hint: 'load, save, save as, delete',
       },
       {
         id: 'statusBarPosition',

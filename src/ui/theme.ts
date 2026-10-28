@@ -290,6 +290,8 @@ export function getTheme(mode: string): Theme {
 // Partial theme as loaded from a user theme JSON file. Same shape as
 // Theme but every field optional, with sub-objects partial too.
 export type PartialTheme = {
+  // Built-in palette a preset file layers on; absent means 'dark'.
+  base?: BuiltinThemeName
   appBackground?: string | null
   modalBackground?: string | null
   text?: string
@@ -321,13 +323,14 @@ export type PartialTheme = {
 }
 
 // Built-in base a theme setting renders on: 'auto' follows the OS, a user
-// theme file (any other name) layers on 'dark'.
+// theme file (any other name) layers on its own `base`, else 'dark'.
 export function resolveBaseName(
   themeSetting: string,
   systemAppearance: SystemAppearance = 'dark',
+  customBase?: BuiltinThemeName,
 ): BuiltinThemeName {
   const requested = themeSetting === 'auto' ? systemAppearance : themeSetting
-  return isBuiltinTheme(requested) ? requested : 'dark'
+  return isBuiltinTheme(requested) ? requested : (customBase ?? 'dark')
 }
 
 export function resolveTheme(
@@ -337,7 +340,7 @@ export function resolveTheme(
 ): Theme {
   // 'auto' follows the OS appearance; everything else is a literal theme
   // name (built-in or a user theme file, which falls back to 'dark').
-  const baseName = resolveBaseName(settings.theme, systemAppearance)
+  const baseName = resolveBaseName(settings.theme, systemAppearance, customTheme?.base)
   const base = cloneTheme(builtinThemes[baseName])
   const withCustom = customTheme ? mergePartial(base, customTheme) : base
   const merged = applyOverrides(withCustom, settings.themeOverrides, baseName)
@@ -412,7 +415,7 @@ function flattenAlpha(theme: Theme): Theme {
 }
 
 function mergePartial(theme: Theme, partial: PartialTheme): Theme {
-  const { presence, layout, borders, emphasis, fontSize, ...flat } = partial
+  const { base: _base, presence, layout, borders, emphasis, fontSize, ...flat } = partial
   for (const [key, value] of Object.entries(flat) as [keyof PartialTheme, unknown][]) {
     if (value !== undefined) {
       ;(theme as Record<string, unknown>)[key] = value
@@ -441,6 +444,42 @@ function applyOverrides(
   if (emphasis) theme.emphasis = { ...theme.emphasis, ...emphasis }
   if (fontSize) theme.fontSize = { ...theme.fontSize, ...fontSize }
   return theme
+}
+
+// A preset that renders exactly like `custom` + `overrides` on `base`: the
+// overrides that apply to `base` (global colors, then that base's bucket,
+// then the nested groups — the order applyOverrides uses) folded into the
+// custom theme. Writing this to a file and clearing those overrides keeps
+// the look unchanged.
+export function bakeTheme(
+  custom: PartialTheme | null,
+  overrides: ThemeOverrides,
+  base: BuiltinThemeName,
+): PartialTheme {
+  const { presence, layout, borders, emphasis, fontSize, dark, light, ...flat } = overrides
+  const c = custom ?? {}
+  const merged: PartialTheme = { ...c, ...flat, ...(base === 'light' ? light : dark), base }
+  const group = <T extends object>(a?: T, b?: T): T | undefined =>
+    a || b ? { ...(a ?? ({} as T)), ...(b ?? ({} as T)) } : undefined
+  const nested = {
+    presence: group(c.presence, presence),
+    layout: group(c.layout, layout),
+    borders: group(c.borders, borders),
+    emphasis: group(c.emphasis, emphasis),
+    fontSize: group(c.fontSize, fontSize),
+  }
+  for (const [k, v] of Object.entries(nested)) if (v) (merged as Record<string, unknown>)[k] = v
+  return merged
+}
+
+// The overrides left once bakeTheme has folded the `base` ones into a
+// preset: only the other base's color bucket, which doesn't apply to it.
+export function remainingOverrides(
+  overrides: ThemeOverrides,
+  base: BuiltinThemeName,
+): ThemeOverrides {
+  const other = base === 'light' ? 'dark' : 'light'
+  return overrides[other] ? { [other]: overrides[other] } : {}
 }
 
 function applyColors(theme: Theme, colors: ThemeColorOverrides | undefined): void {

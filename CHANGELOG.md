@@ -8,6 +8,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Theme presets.** Settings → Theme presets lists the built-in themes
+  and your saved presets: Enter loads, `s` saves, `n` saves as a new
+  preset, `d` deletes. In the theme editor, `s` saves, `S` saves as and
+  `p` opens the list. Saving folds the editor's unsaved edits (the dots)
+  into the preset file, so a light setup with overrides becomes a preset
+  in one step. Preset files take a new `base` key (`dark` or `light`) so
+  a preset saved from the light theme loads on light.
+
 - **Edit config files from the menu.** In the Esc menu, Ctrl+O opens
   `config.json` in `$VISUAL` (or `$EDITOR`) and Ctrl+T opens the active
   theme's file (`config.json` for built-in themes, whose overrides live
