@@ -21,6 +21,7 @@ import {
   type SelectableItem,
 } from '../state/selectables'
 import type { Presence } from '../types'
+import wrapAnsi from 'wrap-ansi'
 import { htmlToText } from '../text/html'
 import { chromeRowsForChatList, computeChatListViewport } from './chatListViewport'
 import { useTerminalRows } from './hooks/useTerminalRows'
@@ -185,7 +186,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const chatListSectionCap = useAppState((s) => s.settings.chatListSectionCap)
   const chatListCollapsedSections = useAppState((s) => s.settings.chatListCollapsedSections)
   const shortNames = useAppState((s) => s.settings.chatListShortNames)
-  const showMessagePreviews = useAppState((s) => s.settings.showMessagePreviews)
+  const previewLines = useAppState((s) => s.settings.chatListPreviewLines)
   const showPresence = useAppState((s) => s.settings.showPresenceInList)
   const memberPresence = useAppState((s) => s.memberPresence)
   const nameByUserId = useAppState((s) => s.nameByUserId)
@@ -257,9 +258,9 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
     const unreadBadge = hasMention ? ' @' : hasUnread ? ' ●' : ''
     let h = visualLines(label + unreadBadge, cw)
-    if (showMessagePreviews && row.item.kind === 'chat') {
-      const preview = previewLineForChat(row.item.chat, cw)
-      if (preview) h += visualLines(preview, cw)
+    if (row.item.kind === 'chat') {
+      const preview = previewLineForChat(row.item.chat, cw, previewLines)
+      if (preview) h += preview.split('\n').length
     }
     return row.item.kind === 'team' || row.item.kind === 'section' ? h : h + chatListGap
   })
@@ -386,8 +387,8 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         // chats render in muted gray, unread chats in the unread color.
         const labelWidth = labelWidthFor
         const preview =
-          showMessagePreviews && row.item.kind === 'chat'
-            ? previewLineForChat(row.item.chat, labelWidth)
+          row.item.kind === 'chat'
+            ? previewLineForChat(row.item.chat, labelWidth, previewLines)
             : ''
         // Background highlight for the selected row. Pad the label to fill
         // its column width so the background renders as a continuous bar
@@ -458,24 +459,31 @@ function previewChat(chat: Extract<SelectableItem, { kind: 'chat' }>['chat']): s
   return text
 }
 
-// Truncate to at most `maxLines` visual lines worth of characters, adding an
-// ellipsis when clipped. Keeps the rendered preview and the viewport height
-// math in agreement.
-function clampToLines(text: string, width: number, maxLines = 2): string {
-  const max = Math.max(1, width) * maxLines
-  if (text.length <= max) return text
-  return `${text.slice(0, Math.max(0, max - 1)).trimEnd()}…`
+// Word-wrap the way Ink does (wrap-ansi, hard) and keep at most `maxLines`
+// lines, ending the last kept one in an ellipsis when clipped. The lines are
+// joined with explicit newlines, so Ink paints exactly these rows and the
+// viewport height math (line count) agrees.
+export function clampToLines(text: string, width: number, maxLines: number): string {
+  const w = Math.max(1, width)
+  const lines = wrapAnsi(text, w, { hard: true }).split('\n')
+  if (lines.length <= maxLines) return lines.join('\n')
+  const kept = lines.slice(0, maxLines)
+  const last = kept[maxLines - 1]!.slice(0, w - 1).trimEnd()
+  kept[maxLines - 1] = `${last}…`
+  return kept.join('\n')
 }
 
-// "Sender: message" preview for a chat's last message, clamped to two lines.
-// Empty string when the chat has no last-message preview to show.
+// "Sender: message" preview for a chat's last message, clamped to `maxLines`.
+// Empty string when the chat has no last-message preview or previews are off.
 function previewLineForChat(
   chat: Extract<SelectableItem, { kind: 'chat' }>['chat'],
   width: number,
+  maxLines: number,
 ): string {
+  if (maxLines <= 0) return ''
   const text = previewChat(chat)
   if (!text) return ''
   const sender = chat.lastMessagePreview?.from?.user?.displayName
   const line = sender ? `${shortName(sender)}: ${text}` : text
-  return clampToLines(line, width)
+  return clampToLines(line, width, maxLines)
 }

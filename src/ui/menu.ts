@@ -38,7 +38,7 @@ export type ToggleKey =
   | 'chatListSectionCap'
   | 'headerUserFormat'
   | 'chatListShortNames'
-  | 'showMessagePreviews'
+  | 'chatListPreviewLines'
   | 'messagePaneShortNames'
   | 'showChatNameHeader'
   | 'showPresenceInList'
@@ -235,9 +235,10 @@ export const ROOT_MENU: MenuItem[] = [
         action: { kind: 'toggle-setting', key: 'chatListShortNames' },
       },
       {
-        id: 'showMessagePreviews',
-        label: 'Show message previews in chat list',
-        action: { kind: 'toggle-setting', key: 'showMessagePreviews' },
+        id: 'chatListPreviewLines',
+        label: 'Preview lines in chat list',
+        action: { kind: 'toggle-setting', key: 'chatListPreviewLines' },
+        hint: 'off, 1, 2 or 3',
       },
       {
         id: 'showPresenceInList',
@@ -476,10 +477,11 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
       return (current === 'auto' ? 'off' : 'auto') as Settings[K]
     case 'showReactions':
       return cycleReactionDisplayMode(current as Settings['showReactions']) as Settings[K]
+    case 'chatListPreviewLines':
+      return (((current as number) + 1) % 4) as Settings[K]
     case 'chatListGroupByType':
     case 'chatListSectionCap':
     case 'chatListShortNames':
-    case 'showMessagePreviews':
     case 'messagePaneShortNames':
     case 'showChatNameHeader':
     case 'showPresenceInList':
@@ -534,10 +536,11 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
       return String(value)
     case 'headerUserFormat':
       return value === 'tenant' ? 'tenant only' : 'name + tenant'
+    case 'chatListPreviewLines':
+      return value === 0 ? 'off' : String(value)
     case 'chatListGroupByType':
     case 'chatListSectionCap':
     case 'chatListShortNames':
-    case 'showMessagePreviews':
     case 'messagePaneShortNames':
     case 'showChatNameHeader':
     case 'showPresenceInList':

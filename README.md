@@ -86,7 +86,7 @@ warnings and fall back to defaults.
   "accounts": [],
   "activeAccount": null,
   "chatListShortNames": false,
-  "showMessagePreviews": true,
+  "chatListPreviewLines": 1,
   "messagePaneShortNames": true,
   "showPresenceInList": true,
   "showTimestampsInPane": true,
@@ -129,7 +129,7 @@ warnings and fall back to defaults.
 | `accounts`                     | string array         |    `[]` | owa-piggy profile aliases managed by Accounts.                                           |
 | `activeAccount`                | string or null       |  `null` | Default profile alias used at startup when `--profile` is not passed.                    |
 | `chatListShortNames`           | boolean              | `false` | Show first names in chat list rows.                                                      |
-| `showMessagePreviews`          | boolean              |  `true` | Show up to two last-message preview lines in chat list rows.                             |
+| `chatListPreviewLines`         | 0–3                  |     `1` | Last-message preview lines under each chat list row (0 = off). Shorter previews use fewer lines. Replaces `showMessagePreviews` (`false` reads as 0). |
 | `messagePaneShortNames`        | boolean              |  `true` | Show first names in the message-pane sender column.                                      |
 | `showChatNameHeader`           | boolean              | `false` | Show the conversation name (1:1 partner, group chat, or team · # channel) above the messages. |
 | `showPresenceInList`           | boolean              |  `true` | Show presence dots in the chat list when available.                                      |
