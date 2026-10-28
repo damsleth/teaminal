@@ -22,6 +22,7 @@
 
 import { updateSettings } from '../config'
 import { kittyKeyboardEnabled } from './kittyKeyboard'
+import { isKittyCapable } from './kittyGraphics'
 import type {
   AccountManagerModalState,
   AppState,
@@ -45,6 +46,8 @@ export type ToggleKey =
   | 'showPresenceInList'
   | 'showTimestampsInPane'
   | 'centerDateMarkers'
+  | 'messageAvatars'
+  | 'chatListThumbnails'
   | 'showSenderNamesInPane'
   | 'showOwnNameInPane'
   | 'showReactions'
@@ -264,6 +267,14 @@ export const ROOT_MENU: MenuItem[] = [
         label: 'Presence dots',
         action: { kind: 'toggle-setting', key: 'showPresenceInList' },
       },
+      {
+        id: 'chatListThumbnails',
+        label: 'Thumbnails',
+        action: { kind: 'toggle-setting', key: 'chatListThumbnails' },
+        hint: 'photos and team pictures',
+        // Pictures need the kitty graphics protocol.
+        hidden: () => !isKittyCapable(),
+      },
       heading('Messages'),
       {
         id: 'showChatNameHeader',
@@ -311,6 +322,12 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'inlineImages',
         label: 'Images',
         action: { kind: 'toggle-setting', key: 'inlineImages' },
+      },
+      {
+        id: 'messageAvatars',
+        label: 'Profile pictures',
+        action: { kind: 'toggle-setting', key: 'messageAvatars' },
+        hidden: () => !isKittyCapable(),
       },
       heading('Navigation & input'),
       {
@@ -530,6 +547,9 @@ export function cycleSetting<K extends ToggleKey>(
       return step(REACTION_DISPLAY_PRESETS)
     case 'showTimestampsInPane':
       return step(['on', 'transient', 'off'])
+    case 'messageAvatars':
+    case 'chatListThumbnails':
+      return step(['off', 'small', 'medium', 'large'])
     case 'chatListPreviewLines':
       return step([0, 1, 2, 3])
     case 'chatListGroupByType':
@@ -590,6 +610,8 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'showReactions':
     case 'statusBarPosition':
     case 'showTimestampsInPane':
+    case 'messageAvatars':
+    case 'chatListThumbnails':
       return String(value)
     case 'headerUserFormat':
       return value === 'tenant' ? 'tenant only' : 'name + tenant'

@@ -93,6 +93,9 @@ export type KittyPlacement = {
   cols?: number
   rows?: number
   reservedRows: number
+  // Place into exactly cols x rows cells (both c= and r=), stretching if the
+  // aspect differs. For avatars, whose cell box must never be overrun.
+  exact?: boolean
 }
 
 export type ImageFormat = 'png' | 'jpeg' | 'gif' | 'webp' | 'bmp'
@@ -261,6 +264,44 @@ export function buildKittyAPC(png: Buffer, placement: KittyPlacement, imageId?: 
   const dimensions = kittyDimensions(placement)
   if (!dimensions) return ''
 
+  return transmitAPC('f=100', b64, dimensions, imageId)
+}
+
+// Raw 32-bit RGBA pixels (`f=32`, `s=`/`v=` pixel size): the path for images
+// decoded in-process, e.g. JPEG profile photos.
+export function buildKittyRawAPC(
+  rgba: Uint8Array,
+  width: number,
+  height: number,
+  placement: KittyPlacement,
+  imageId?: number,
+): string {
+  if (width <= 0 || height <= 0 || rgba.length !== width * height * 4) return ''
+  const dimensions = kittyDimensions(placement)
+  if (!dimensions) return ''
+  return transmitAPC(
+    `f=32,s=${width},v=${height}`,
+    Buffer.from(rgba).toString('base64'),
+    dimensions,
+    imageId,
+  )
+}
+
+// Same transmit-once / place-by-id behaviour as buildKittyImageEscape.
+export function buildKittyRawEscape(
+  cacheKey: string,
+  pixels: { rgba: Uint8Array; width: number; height: number },
+  placement: KittyPlacement,
+): string {
+  const id = kittyImageId(cacheKey)
+  if (transmitted.has(id)) return buildKittyPlaceById(id, placement)
+  const apc = buildKittyRawAPC(pixels.rgba, pixels.width, pixels.height, placement, id)
+  if (apc) transmitted.add(id)
+  return apc
+}
+
+// One transmit-and-display APC, chunked to MAX_B64_CHUNK.
+function transmitAPC(format: string, b64: string, dimensions: string, imageId?: number): string {
   const chunks: string[] = []
   for (let i = 0; i < b64.length; i += MAX_B64_CHUNK) {
     chunks.push(b64.slice(i, i + MAX_B64_CHUNK))
@@ -268,14 +309,10 @@ export function buildKittyAPC(png: Buffer, placement: KittyPlacement, imageId?: 
 
   // `i=` names the image so later paints can place it without the pixels.
   const idKey = imageId === undefined ? '' : `i=${imageId},`
-  if (chunks.length === 1) {
-    return `\x1b_Ga=T,f=100,${idKey}${dimensions},C=1,z=${TEAMINAL_KITTY_Z},q=2,m=0;${chunks[0]}\x1b\\`
-  }
+  const head = `\x1b_Ga=T,${format},${idKey}${dimensions},C=1,z=${TEAMINAL_KITTY_Z},q=2`
+  if (chunks.length === 1) return `${head},m=0;${chunks[0]}\x1b\\`
 
-  const parts: string[] = []
-  parts.push(
-    `\x1b_Ga=T,f=100,${idKey}${dimensions},C=1,z=${TEAMINAL_KITTY_Z},q=2,m=1;${chunks[0]}\x1b\\`,
-  )
+  const parts: string[] = [`${head},m=1;${chunks[0]}\x1b\\`]
   for (let i = 1; i < chunks.length - 1; i++) {
     parts.push(`\x1b_Gm=1;${chunks[i]}\x1b\\`)
   }
@@ -322,6 +359,8 @@ export function __resetKittyImageIdsForTests(): void {
 }
 
 function kittyDimensions(placement: KittyPlacement): string | null {
+  if (placement.exact && placement.cols !== undefined && placement.rows !== undefined)
+    return `c=${Math.max(1, Math.floor(placement.cols))},r=${Math.max(1, Math.floor(placement.rows))}`
   if (placement.cols !== undefined) return `c=${Math.max(1, Math.floor(placement.cols))}`
   if (placement.rows !== undefined) return `r=${Math.max(1, Math.floor(placement.rows))}`
   return null

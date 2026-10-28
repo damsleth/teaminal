@@ -114,6 +114,8 @@ export type FetchImageOpts = {
   // AsyncGW region (`emea`, `amer`, `apac`, `ind`) when known from the
   // original asm/asyncgw object URL.
   region?: string
+  // A 404 is an expected "nothing here" (profile photos): don't log it.
+  quietNotFound?: boolean
 }
 
 // Whether `path` is something graphBinary can actually fetch (a Graph-relative
@@ -208,11 +210,12 @@ export async function fetchAndCacheImage(
       bytes = await fetchHostedContent(path, opts)
     }
   } catch (err) {
-    recordEvent(
-      'graph',
-      'warn',
-      `image fetch failed for ${meta.name}: ${err instanceof Error ? err.message : String(err)}`,
-    )
+    if (!(opts.quietNotFound && err instanceof GraphError && err.status === 404))
+      recordEvent(
+        'graph',
+        'warn',
+        `image fetch failed for ${meta.name}: ${err instanceof Error ? err.message : String(err)}`,
+      )
     return null
   }
 
@@ -300,4 +303,46 @@ export function ensureImageFetched(
       fetchStatus.set(owned, 'error')
       opts.onChange()
     })
+}
+
+// Profile photos and team pictures share the image cache under these keys.
+// Graph serves them as JPEG. A user without a photo 404s; that lands as
+// 'error' in memory, so it's asked once per session.
+// ponytail: no on-disk "no photo" marker, so photo-less users are asked
+// again each launch; add one if those 404s ever matter.
+export function userPhotoKey(userId: string, px: number): string {
+  return `photo:user:${userId}:${px}`
+}
+
+export function teamPhotoKey(teamId: string): string {
+  return `photo:team:${teamId}`
+}
+
+export function isPhotoKey(key: string): boolean {
+  return key.startsWith('photo:')
+}
+
+export function ensureUserPhoto(
+  userId: string,
+  px: number,
+  opts: { client: GraphClient; onChange: () => void },
+): void {
+  ensureImageFetched(
+    `/users/${encodeURIComponent(userId)}/photos/${px}x${px}/$value`,
+    userPhotoKey(userId, px),
+    { contentType: 'image/jpeg', name: `photo of ${userId}` },
+    { ...opts, quietNotFound: true },
+  )
+}
+
+export function ensureTeamPhoto(
+  teamId: string,
+  opts: { client: GraphClient; onChange: () => void },
+): void {
+  ensureImageFetched(
+    `/teams/${encodeURIComponent(teamId)}/photo/$value`,
+    teamPhotoKey(teamId),
+    { contentType: 'image/jpeg', name: `team photo ${teamId}` },
+    { ...opts, quietNotFound: true },
+  )
 }

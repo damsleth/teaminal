@@ -33,6 +33,8 @@ export type MessageRowHeightOpts = {
   // Rows the sender header takes: 2 when headers render tall (half-row gap),
   // 0 when it is hidden. A function decides per message.
   headerRows?: number | ((message: ChatMessage) => number)
+  // Least rows a message takes (a profile picture beside it), gap included.
+  minRows?: (message: ChatMessage) => number
   // Text bg padding Y: blank rows above and below every message body.
   bodyPaddingY?: number
   // Total rows the message's inline images occupy, resolved dynamically from
@@ -147,7 +149,7 @@ export function messageRenderRowHeight(row: MessageRenderRow, opts?: MessageRowH
   }
   // Trailing blank rows separating this group from the next.
   height += Math.max(0, opts?.messageGap ?? 0)
-  return height
+  return Math.max(height, opts?.minRows?.(message) ?? 0)
 }
 
 export function defaultMessageRowsWindowStart(

@@ -367,6 +367,10 @@ export type Settings = {
   showTimestampsInPane: 'off' | 'on' | 'transient'
   // Day separators ("Today") centered in the message pane.
   centerDateMarkers: boolean
+  // Profile pictures beside other people's messages / thumbnails in the
+  // chat list (kitty graphics terminals only). Size = rows tall.
+  messageAvatars: 'off' | 'small' | 'medium' | 'large'
+  chatListThumbnails: 'off' | 'small' | 'medium' | 'large'
   // Sender name above message bodies; showOwnNameInPane covers your own.
   showSenderNamesInPane: boolean
   showOwnNameInPane: boolean
@@ -545,6 +549,8 @@ export const defaultSettings: Settings = {
   showPresenceInList: true,
   showTimestampsInPane: 'on',
   centerDateMarkers: false,
+  messageAvatars: 'off',
+  chatListThumbnails: 'off',
   showSenderNamesInPane: true,
   showOwnNameInPane: true,
   showReactions: 'current',

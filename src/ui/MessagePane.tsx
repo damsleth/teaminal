@@ -49,15 +49,23 @@ import {
   isKittyRenderable,
   detectImageFormat,
   buildKittyImageEscape,
-  clearKittyImages,
   fitKittyPlacement,
 } from './kittyGraphics'
-import { ensureImageFetched, getImageData, ownedImageKey } from '../state/imageCache'
+import {
+  ensureImageFetched,
+  ensureUserPhoto,
+  getImageData,
+  isPhotoKey,
+  ownedImageKey,
+  userPhotoKey,
+} from '../state/imageCache'
+import { avatarCols, avatarEscape, avatarPixels, avatarRows } from './avatarImage'
+import { requestKittyPaint, setKittyOwner } from './kittyPainter'
 import type { AccountId } from '../account'
 import { messageFocusables } from './messageFocusables'
 import { splitBodyLinkSpans, type BodySpan } from './bodySpans'
 import { pickerAnchorCol } from './pickerAnchor'
-import { paintInlineImages, type InlineImageSlots } from './inlineImageLayout'
+import type { InlineImageSlots } from './inlineImageLayout'
 import { localTime } from './localTime'
 import { fs, fsTall, textSizingSupported } from './textSizing'
 
@@ -105,6 +113,7 @@ export function MessagePane(props: {
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
   const showTimestamps = useAppState((s) => s.settings.showTimestampsInPane)
   const centerDates = useAppState((s) => s.settings.centerDateMarkers)
+  const avatarSize = useAppState((s) => s.settings.messageAvatars)
   const showSenderNames = useAppState((s) => s.settings.showSenderNamesInPane)
   const showOwnName = useAppState((s) => s.settings.showOwnNameInPane)
   const shortNames = useAppState((s) => s.settings.messagePaneShortNames)
@@ -198,6 +207,21 @@ export function MessagePane(props: {
   // The sender line holds the name and/or timestamp; with neither it's gone.
   const showNameFor = (m: ChatMessage): boolean =>
     showSenderNames && (showOwnName || !me?.id || m.from?.user?.id !== me.id)
+  // Profile pictures (kitty graphics only): rows tall, plus a gap column.
+  const avRows = isKittyCapable() ? avatarRows(avatarSize) : 0
+  const avCols = avatarCols(avRows)
+  const avatarColumn = avRows > 0 ? avCols + 1 : 0
+  const avatarStarts = avRows > 0 ? avatarRunStarts(messages, me?.id) : null
+  const avatarFor = (m: ChatMessage): MessageAvatar | null =>
+    avRows > 0
+      ? {
+          rows: avRows,
+          cols: avCols,
+          column: avatarColumn,
+          userId: avatarStarts?.has(m.id) ? (m.from?.user?.id ?? null) : null,
+        }
+      : null
+  const minRows = (m: ChatMessage): number => (avatarStarts?.has(m.id) ? avRows : 0)
   const transientTimes = showTimestamps === 'transient' ? transientTimestampIds(messages) : null
   const showTimeFor = (m: ChatMessage): boolean =>
     showTimestamps === 'on' || (transientTimes?.has(m.id) ?? false)
@@ -251,7 +275,10 @@ export function MessagePane(props: {
   const paneColumns = terminalSize.columns - listPaneWidth - 2
   const conversationColumns = Math.floor((paneColumns * theme.layout.messageMaxWidth) / 100)
   const conversationMargin = Math.floor((paneColumns - conversationColumns) / 2)
-  const messageTextColumns = Math.max(12, conversationColumns - bodyIndent - 2 * bgPadX)
+  const messageTextColumns = Math.max(
+    12,
+    conversationColumns - avatarColumn - bodyIndent - 2 * bgPadX,
+  )
   // Cell budget for an inline image (conversation column minus the gutter).
   const imgCols = Math.max(12, conversationColumns - 18)
   // Rows a message's inline images occupy: each loaded image takes its fitted
@@ -282,6 +309,7 @@ export function MessagePane(props: {
     messageTextColumns,
     messageGap,
     headerRows,
+    minRows,
     bodyPaddingY,
     reactionDisplayMode,
     rowBudget,
@@ -294,6 +322,7 @@ export function MessagePane(props: {
     messageTextColumns,
     messageGap,
     headerRows,
+    minRows,
     bodyPaddingY,
     reactionDisplayMode,
     rowBudget,
@@ -337,31 +366,48 @@ export function MessagePane(props: {
     }
   })
 
+  // Profile photos for the visible run starts (same idempotent pattern).
+  useEffect(() => {
+    if (!avatarStarts) return
+    const client = session.client()
+    for (const row of rows) {
+      if (row.kind !== 'message' || !avatarStarts.has(row.message.id)) continue
+      const userId = row.message.from?.user?.id
+      if (userId)
+        ensureUserPhoto(userId, avatarPixels(avRows), {
+          client,
+          onChange: () => setImageRevision((r) => r + 1),
+        })
+    }
+  })
+
   // Yoga owns the positions, including unused space below short timelines,
   // wrapped text and dynamic chrome. Wait for Ink's throttled text frame
   // before reading those positions and placing graphics over their slots.
+  // The shared painter (kittyPainter) does the clearing and placing, so the
+  // chat list's thumbnails and these images don't erase each other.
   useEffect(() => {
-    if (!stdout || !kittyEnabled) return
-    let cancelled = false
-    void waitUntilRenderFlush().then(() => {
-      if (cancelled) return
-      clearKittyImages(stdout)
-      if (modalOpen || !paneRef.current) return
-      paintInlineImages(stdout, paneRef.current, imageSlots.current, (cacheKey, rows) => {
+    if (!stdout || !isKittyCapable()) return
+    setKittyOwner('messages', {
+      viewport: () => paneRef.current,
+      slots: imageSlots.current,
+      escape: (cacheKey, rows) => {
         const data = getImageData(accountId, cacheKey)
-        return data && accountId
-          ? buildKittyImageEscape(ownedImageKey(accountId, cacheKey), data, {
-              rows,
-              reservedRows: rows,
-            })
-          : ''
-      })
+        if (!data || !accountId) return ''
+        const owned = ownedImageKey(accountId, cacheKey)
+        if (isPhotoKey(cacheKey)) return avatarEscape(owned, data, rows)
+        return buildKittyImageEscape(owned, data, { rows, reservedRows: rows })
+      },
     })
-    return () => {
-      cancelled = true
-      clearKittyImages(stdout)
-    }
+    requestKittyPaint({ stdout, flush: waitUntilRenderFlush, suppressed: modalOpen })
   })
+  useEffect(
+    () => () => {
+      setKittyOwner('messages', null)
+      requestKittyPaint()
+    },
+    [],
+  )
 
   // While the reaction picker is open we delegate to the macOS Character
   // Viewer, which anchors to the terminal's text cursor (after an Ink render
@@ -382,6 +428,7 @@ export function MessagePane(props: {
       messageTextColumns,
       messageGap,
       headerRows,
+      minRows,
       bodyPaddingY,
       reactionDisplayMode,
     }
@@ -404,7 +451,7 @@ export function MessagePane(props: {
     const bodyText = focusedMsg ? messageBodyText(focusedMsg) : ''
     const bodyStartCol = messageBodyTerminalColumn({
       bodyIndent: bodyIndent + bgPadX,
-      listPaneWidth: listPaneWidth + conversationMargin,
+      listPaneWidth: listPaneWidth + conversationMargin + avatarColumn,
     })
     const fallbackCol = listPaneWidth + 3
     const col = pickerAnchorCol({
@@ -525,6 +572,7 @@ export function MessagePane(props: {
                       row.kind === 'message' ? showTimeFor(row.message) : showTimestamps !== 'off'
                     }
                     centerDate={centerDates}
+                    avatar={row.kind === 'message' ? avatarFor(row.message) : null}
                     showSenderName={
                       row.kind === 'message' ? showNameFor(row.message) : showSenderNames
                     }
@@ -544,6 +592,23 @@ export function MessagePane(props: {
       </Box>
     </ImageSlotsContext.Provider>
   )
+}
+
+// The profile-picture column of one message: its size, and whose picture
+// to draw (null = keep the column empty, e.g. later messages in a run).
+type MessageAvatar = { rows: number; cols: number; column: number; userId: string | null }
+
+// Messages that start a run from one sender (other people only): where a
+// profile picture goes.
+export function avatarRunStarts(messages: ChatMessage[], myUserId?: string): Set<string> {
+  const ids = new Set<string>()
+  let prev: string | null = null
+  for (const m of messages) {
+    const sender = m.messageType === 'systemEventMessage' ? null : (m.from?.user?.id ?? null)
+    if (sender && sender !== myUserId && sender !== prev) ids.add(m.id)
+    prev = sender
+  }
+  return ids
 }
 
 // Gap after which 'transient' timestamps show again.
@@ -605,6 +670,7 @@ function TimelineRow(props: {
   showTimestamp: boolean
   showSenderName: boolean
   centerDate: boolean
+  avatar?: MessageAvatar | null
   theme: Theme
   threadMeta?: ReplyBadge
 }) {
@@ -654,6 +720,7 @@ function TimelineRow(props: {
       shortNames={props.shortNames}
       showTimestamp={props.showTimestamp}
       showSenderName={props.showSenderName}
+      avatar={props.avatar}
       theme={props.theme}
       threadMeta={props.threadMeta}
     />
@@ -679,6 +746,7 @@ function MessageRow(props: {
   shortNames: boolean
   showTimestamp: boolean
   showSenderName: boolean
+  avatar?: MessageAvatar | null
   theme: Theme
   threadMeta?: ReplyBadge
 }) {
@@ -860,7 +928,7 @@ function MessageRow(props: {
   // via the existing thread tree; double-decorating both would be visual noise.
   const quotedReply = !isSystem ? getQuotedReply(m) : null
 
-  return (
+  const block = (
     <>
       {hasHeader ? (
         <Box flexDirection="row" height={props.tallHeader ? 2 : undefined}>
@@ -978,6 +1046,75 @@ function MessageRow(props: {
         </Box>
       ))}
     </>
+  )
+  // Profile pictures: a column left of the message, the picture at the top of
+  // a sender's run. Every non-flipped message keeps the column so bodies
+  // line up; flipped own messages (right-aligned) have none.
+  const avatar = props.avatar
+  if (!avatar || flip) return block
+  return (
+    <Box flexDirection="row" flexShrink={0}>
+      <Box width={avatar.column} flexShrink={0} flexDirection="column">
+        {avatar.userId && (
+          <AvatarSlot
+            userId={avatar.userId}
+            name={senderRaw}
+            rows={avatar.rows}
+            cols={avatar.cols}
+            theme={theme}
+          />
+        )}
+      </Box>
+      <Box
+        flexDirection="column"
+        flexGrow={1}
+        flexShrink={1}
+        minWidth={0}
+        minHeight={avatar.userId ? avatar.rows : undefined}
+      >
+        {block}
+      </Box>
+    </Box>
+  )
+}
+
+// Cells for one profile picture. Shows the sender's initials until (or
+// unless) the photo loads; the kitty painter then draws the photo over them.
+function AvatarSlot(props: {
+  userId: string
+  name: string
+  rows: number
+  cols: number
+  theme: Theme
+}) {
+  const slots = useContext(ImageSlotsContext)
+  const initials = props.name
+    .split(/[\s,]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => Array.from(w)[0]!.toUpperCase())
+    .join('')
+  return (
+    <Box
+      width={props.cols}
+      height={props.rows}
+      flexShrink={0}
+      ref={(node) => {
+        if (!node) return
+        slots.set(node, {
+          cacheKey: userPhotoKey(props.userId, avatarPixels(props.rows)),
+          rows: props.rows,
+          inset: 0,
+        })
+        return () => {
+          slots.delete(node)
+        }
+      }}
+    >
+      <Text color={props.theme.mutedText} wrap="truncate-end">
+        {initials.slice(0, props.cols)}
+      </Text>
+    </Box>
   )
 }
 

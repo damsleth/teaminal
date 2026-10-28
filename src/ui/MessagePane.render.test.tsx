@@ -328,6 +328,51 @@ test('an HTML body keeps its line breaks, bullets and bold run', () => {
   expect(raw).toMatch(/\x1b\[1mSKILLS/)
 })
 
+test('profile pictures: a column per message, initials at the start of each run', () => {
+  const prev = process.env.KITTY_WINDOW_ID
+  process.env.KITTY_WINDOW_ID = '1'
+  try {
+    const run = [
+      msg('r1', '2026-01-03T09:00:00Z', 'Ada Lovelace', 'ada first'),
+      msg('r2', '2026-01-03T09:01:00Z', 'Ada Lovelace', 'ada second'),
+      msg('r3', '2026-01-03T09:02:00Z', 'Bob', 'bob reply'),
+    ]
+    const render = (messageAvatars: string) => {
+      const store = createAppStore()
+      store.set({
+        settings: { ...store.get().settings, messageAvatars } as never,
+        focus: { kind: 'chat', chatId: 'c1' },
+        messagesByConvo: { 'chat:c1': run },
+      })
+      return plain(
+        renderToString(
+          <StoreProvider store={store}>
+            <SessionProvider api={session}>
+              <Box flexDirection="column" height={40}>
+                <MessagePane />
+              </Box>
+            </SessionProvider>
+          </StoreProvider>,
+          { columns: 80 },
+        ),
+      ).split('\n')
+    }
+    const col = (ls: string[], text: string) => ls.find((l) => l.includes(text))!.indexOf(text)
+    const off = render('off')
+    const medium = render('medium') // 2 rows x 4 cols + 1 gap column
+    for (const text of ['ada first', 'ada second', 'bob reply'])
+      expect(col(medium, text) - col(off, text)).toBe(5)
+    // Initials sit on the sender line of each run's first message only.
+    const above = (text: string) => medium[medium.findIndex((l) => l.includes(text)) - 1]!
+    expect(above('ada first').trimStart()).toMatch(/^AL\s+Ada/)
+    expect(above('bob reply').trimStart()).toMatch(/^B\s+Bob/)
+    expect(above('ada second')).not.toMatch(/AL/)
+  } finally {
+    if (prev === undefined) delete process.env.KITTY_WINDOW_ID
+    else process.env.KITTY_WINDOW_ID = prev
+  }
+})
+
 test('the search bar stays intact above an overflowing timeline', () => {
   const out = lines(8, null, 'newest')
   expect(out.filter((l) => l.includes('hit(s)'))).toHaveLength(1)
