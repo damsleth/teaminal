@@ -96,6 +96,7 @@ const LAYOUT_KEYS = new Set<keyof NonNullable<ThemeOverrides['layout']>>([
   'chatListPaddingRight',
   'chatListGap',
   'textBackgroundPaddingX',
+  'textBackgroundPaddingY',
 ])
 
 const BORDERS_KEYS = new Set<keyof NonNullable<ThemeOverrides['borders']>>([

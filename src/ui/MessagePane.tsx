@@ -228,6 +228,7 @@ export function MessagePane(props: {
   // minus the chat-list pane and its border) minus the body indent. Bodies now
   // start near the left edge instead of after a deep sender column.
   const bgPadX = theme.layout.textBackgroundPaddingX
+  const bodyPaddingY = theme.layout.textBackgroundPaddingY
   const messageTextColumns = Math.max(
     12,
     terminalSize.columns - listPaneWidth - 2 - bodyIndent - 2 * bgPadX,
@@ -261,6 +262,7 @@ export function MessagePane(props: {
     messageTextColumns,
     messageGap,
     headerRows,
+    bodyPaddingY,
     reactionDisplayMode,
     rowBudget,
     previousStart: windowStartRef.current,
@@ -272,6 +274,7 @@ export function MessagePane(props: {
     messageTextColumns,
     messageGap,
     headerRows,
+    bodyPaddingY,
     reactionDisplayMode,
     rowBudget,
   })
@@ -354,6 +357,7 @@ export function MessagePane(props: {
       messageTextColumns,
       messageGap,
       headerRows,
+      bodyPaddingY,
       reactionDisplayMode,
     }
     let rowsBefore = 0
@@ -365,7 +369,7 @@ export function MessagePane(props: {
     // the body rather than the name.
     const preludeRows =
       cozyRows + (searchActive ? 1 : 0) + (isLoadingOlder && !showingHistoryTop ? 1 : 0)
-    const row = 4 + 1 + preludeRows + rowsBefore + 1
+    const row = 4 + 1 + preludeRows + rowsBefore + 1 + bodyPaddingY
     // Compute the column at the end of the focused message body's last wrapped
     // line. `messageBodyTerminalColumn` gives the 1-based terminal column where
     // the body text begins; `pickerAnchorCol` adds the display width of the
@@ -711,9 +715,10 @@ function MessageRow(props: {
   // Ink paints a Box background over its padding and the ragged ends of
   // wrapped lines, so the padded body reads as one solid block.
   const bgPadX = theme.layout.textBackgroundPaddingX
+  const bgPadY = theme.layout.textBackgroundPaddingY
   const bodyNode =
-    bgPadX > 0 ? (
-      <Box paddingX={bgPadX} backgroundColor={bodyBg}>
+    bgPadX > 0 || bgPadY > 0 ? (
+      <Box paddingX={bgPadX} paddingY={bgPadY} backgroundColor={bodyBg}>
         {bodyTextNode}
       </Box>
     ) : (
