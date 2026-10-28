@@ -5,6 +5,7 @@
 import { Box, Text } from 'ink'
 import { focusedReplyCount, selectFocusedAttachment } from './messageFocusables'
 import { useAppState, useTheme } from './StoreContext'
+import { kittyKeyboardEnabled } from './kittyKeyboard'
 
 export function StatusBar() {
   const focus = useAppState((s) => s.focus)
@@ -28,7 +29,7 @@ export function StatusBar() {
   // The focused channel message has a thread: advertise 't'.
   const hasThread = useAppState((s) => focusedReplyCount(s) > 0)
   const theme = useTheme()
-  const enterSends = useAppState((s) => s.settings.enterSends)
+  const enterSends = useAppState((s) => s.settings.enterSends) && kittyKeyboardEnabled()
 
   let hint = 'j/k move · l/Enter open · / filter · n new chat · ? help · q quit'
   if (inputZone === 'filter') hint = 'type to filter · Enter accept · Esc clear'

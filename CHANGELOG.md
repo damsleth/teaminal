@@ -10,7 +10,9 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 - **Enter sends.** Menu → **Enter sends (Shift/Ctrl+Enter newline)**
   (`enterSends`, default off) flips the composer keys: Enter sends and
-  Shift+Enter, Ctrl+Enter or Ctrl+J insert a newline.
+  Shift+Enter, Ctrl+Enter or Ctrl+J insert a newline. Only offered (and
+  only honored) in terminals with the kitty keyboard protocol, where
+  Shift+Enter can be told apart from Enter.
 
 - **Message max width.** The theme editor's **Message max width %**
   (`layout.messageMaxWidth`, 10-100 in steps of 10, default 100) caps how
