@@ -177,12 +177,30 @@ The four built-in themes (`dark`, `light`, `compact`, `comfortable`)
 live inside teaminal. `compact` and `comfortable` inherit the `dark`
 color palette but tighten or loosen paddings.
 
-Drop a JSON file at `~/.config/teaminal/themes/<name>.json` and set
-`"theme": "<name>"` in `config.json` to load it. The file is a partial
-theme layered on top of `dark`; any subset of these keys is accepted:
+**Presets.** Settings → Theme presets (or `p` in the theme editor) lists
+the built-in themes and your saved presets:
+
+| Key           | Action                                                                      |
+| ------------- | --------------------------------------------------------------------------- |
+| Enter / Space | Load the selected theme.                                                    |
+| `s`           | Save the current look into the active preset (a built-in asks for a name).  |
+| `n`           | Save as a new preset: type a name, Enter.                                   |
+| `d`, then `y` | Delete the selected preset. Deleting the active one falls back to its base. |
+| Esc           | Back.                                                                       |
+
+In the theme editor, `s` saves and `S` saves as. Edits made in the editor
+(the dots) are unsaved until you save them into a preset, which folds them
+into the file and clears them. Loading a preset keeps any unsaved edits on
+top, like any other theme switch.
+
+Presets are JSON files at `~/.config/teaminal/themes/<name>.json`; you can
+also write one by hand and set `"theme": "<name>"` in `config.json`. The
+file is a partial theme layered on its `base` (`dark` when absent); any
+subset of these keys is accepted:
 
 ```jsonc
 {
+  "base": "light", // built-in palette underneath: "dark" (default) or "light"
   // Color roles (named color or `#rrggbb`):
   "appBackground": "#001100", // whole app; null = terminal background
   "modalBackground": "#002200", // menus / modals; null = terminal background

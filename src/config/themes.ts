@@ -9,7 +9,15 @@
 // (and falling back to the built-in 'dark' base when the theme name is
 // unknown) happens in src/ui/theme.ts.
 
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -153,6 +161,47 @@ export function loadThemeFile(name: string, env: Env = process.env): LoadedTheme
   return { name, path, data, warnings, source: 'file' }
 }
 
+// Preset names become file names: keep them to a safe charset (no path
+// separators, no leading dot) and off the built-in names.
+const PRESET_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9 _.-]{0,40}$/
+
+export function isValidPresetName(name: string): boolean {
+  return PRESET_NAME_RE.test(name) && !BUILTIN_NAMES.has(name) && !name.endsWith('.')
+}
+
+export function isBuiltinThemeName(name: string): boolean {
+  return BUILTIN_NAMES.has(name)
+}
+
+// Saved presets, by name, sorted.
+export function listThemePresets(env: Env = process.env): string[] {
+  const dir = getThemesDir(env)
+  if (!existsSync(dir)) return []
+  return readdirSync(dir)
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => f.slice(0, -'.json'.length))
+    .filter(isValidPresetName)
+    .sort((a, b) => a.localeCompare(b))
+}
+
+export function writeThemePreset(
+  name: string,
+  data: Record<string, unknown>,
+  env: Env = process.env,
+): void {
+  if (!isValidPresetName(name)) throw new Error(`invalid theme name "${name}"`)
+  ensureThemesDir(env)
+  const path = getThemePath(name, env)
+  const tmp = `${path}.tmp`
+  writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`)
+  renameSync(tmp, path)
+}
+
+export function deleteThemePreset(name: string, env: Env = process.env): void {
+  if (!isValidPresetName(name)) throw new Error(`invalid theme name "${name}"`)
+  rmSync(getThemePath(name, env), { force: true })
+}
+
 function failure(name: string, path: string, message: string): LoadedTheme {
   return { name, path, data: null, warnings: [message], source: 'missing' }
 }
@@ -168,6 +217,12 @@ function validatePartialTheme(
   for (const [rawKey, value] of Object.entries(input)) {
     // `background` is the pre-0.25 name of modalBackground.
     const key = rawKey === 'background' ? 'modalBackground' : rawKey
+    // The built-in palette the preset layers on. Absent means 'dark'.
+    if (key === 'base') {
+      if (value === 'dark' || value === 'light') out.base = value
+      else warnings.push('theme: "base" must be "dark" or "light"')
+      continue
+    }
     if (key === 'presence') {
       const presence = validatePresence(value, warnings)
       if (presence) out.presence = presence
