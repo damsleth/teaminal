@@ -91,7 +91,7 @@ export function EditReactionsModal() {
       flexDirection="column"
       borderStyle={inkBorder(theme.borders.modal)}
       borderColor={theme.borderActive}
-      backgroundColor={theme.background}
+      backgroundColor={theme.background ?? undefined}
       paddingX={theme.layout.modalPaddingX}
       paddingY={theme.layout.modalPaddingY}
     >

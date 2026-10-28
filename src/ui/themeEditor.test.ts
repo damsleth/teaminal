@@ -118,7 +118,7 @@ describe('cycleEnum', () => {
 })
 
 describe('cycleColor', () => {
-  const solid = field('color.background') as ColorField
+  const solid = field('color.text') as ColorField
   const nullable = field('color.messageFocusBackground') as ColorField
 
   test('cycles through the palette', () => {
