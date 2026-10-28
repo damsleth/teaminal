@@ -9,6 +9,9 @@ three kinds of terminal, presses q, and checks the app quits:
   plain   answers DA1 only                       -> mode never pushed
   silent  answers nothing (probe times out)      -> mode never pushed
 
+The background-color probe (OSC 11, for the 'auto' theme) runs after it; the
+kitty mode also answers that with a color, plain with DA1 only.
+
 Usage: python3 -I scripts/check-probe-handoff.py   (from the repo root)
 """
 import fcntl
@@ -24,6 +27,12 @@ import time
 REPO = os.getcwd()
 QUERY = b'\x1b[?u\x1b[c'
 ANSWERS = {'kitty': b'\x1b[?0u\x1b[?62;22c', 'plain': b'\x1b[?62;22c', 'silent': b''}
+BG_QUERY = b'\x1b]11;?\x1b\\\x1b[c'
+BG_ANSWERS = {
+    'kitty': b'\x1b]11;rgb:f7f7/f7f7/f7f7\x1b\\\x1b[?62;22c',
+    'plain': b'\x1b[?62;22c',
+    'silent': b'',
+}
 
 
 def run(mode: str) -> dict:
@@ -35,7 +44,7 @@ def run(mode: str) -> dict:
         os.execvp('bun', ['bun', 'run', 'bin/teaminal.tsx'])
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack('HHHH', 30, 100, 0, 0))
 
-    out, answered, q_at, exited = b'', False, None, False
+    out, answered, bg_answered, q_at, exited = b'', False, False, None, False
     deadline = time.time() + 30
     while time.time() < deadline:
         if select.select([fd], [], [], 0.05)[0]:
@@ -51,6 +60,10 @@ def run(mode: str) -> dict:
             answered = True
             if ANSWERS[mode]:
                 os.write(fd, ANSWERS[mode])
+        if not bg_answered and BG_QUERY in out:
+            bg_answered = True
+            if BG_ANSWERS[mode]:
+                os.write(fd, BG_ANSWERS[mode])
         if q_at is None and b'Ada Byron' in out:
             time.sleep(0.5)
             os.write(fd, b'q')
@@ -63,6 +76,7 @@ def run(mode: str) -> dict:
         os.kill(pid, 9)
     return {
         'probe_seen': answered,
+        'bg_probe_seen': bg_answered,
         'quit_on_q': exited,
         'pushed': b'\x1b[>1u' in out,
         'popped': b'\x1b[<u' in out,
@@ -76,6 +90,7 @@ def main() -> int:
         want_mode = mode == 'kitty'
         good = (
             r['probe_seen']
+            and r['bg_probe_seen']
             and r['quit_on_q']
             and r['pushed'] == want_mode
             and r['popped'] == want_mode

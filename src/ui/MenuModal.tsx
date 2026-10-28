@@ -36,7 +36,7 @@ import {
   type ToggleKey,
   updateSetting,
 } from './menu'
-import type { Settings } from '../state/store'
+import type { Settings, SystemAppearance } from '../state/store'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useTerminalRows } from './hooks/useTerminalRows'
 import { useRef } from 'react'
@@ -96,6 +96,7 @@ export function MenuModal() {
   const session = useSessionApi()
   const modal = useAppState((s) => s.modal)
   const settings = useAppState((s) => s.settings)
+  const appearance = useAppState((s) => s.systemAppearance)
   const theme = useTheme()
   const terminalRows = useTerminalRows()
   const { stdout } = useStdout()
@@ -304,7 +305,7 @@ export function MenuModal() {
   const moreAbove = start > 0
   const moreBelow = end < items.length
   const visibleItems = items.slice(start, end).map((item, i) => {
-    const valueSuffix = formatValueSuffix(item, settings)
+    const valueSuffix = formatValueSuffix(item, settings, appearance)
     const hint = item.hint ? `  (${item.hint})` : ''
     const marker = i + start === modal.cursor && !item.disabled ? '> ' : '  '
     return { item, idx: start + i, text: `${marker}${item.label}${valueSuffix}${hint}` }
@@ -324,7 +325,7 @@ export function MenuModal() {
         (it) =>
           2 +
           it.label.length +
-          formatValueSuffix(it, settings).length +
+          formatValueSuffix(it, settings, appearance).length +
           (it.hint ? it.hint.length + 4 : 0),
       ),
     ),
@@ -414,9 +415,15 @@ function errMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-function formatValueSuffix(item: MenuItem, settings: Settings): string {
+function formatValueSuffix(
+  item: MenuItem,
+  settings: Settings,
+  appearance: SystemAppearance,
+): string {
   if (item.action.kind === 'toggle-setting') {
     const key = item.action.key as ToggleKey
+    // 'auto' isn't a theme: show the light or dark one it picked.
+    if (key === 'theme' && settings.theme === 'auto') return ` : auto → ${appearance}`
     return ` : ${renderSettingValue(key, settings[key])}`
   }
   if (item.action.kind === 'cycle-quiet-hours') {

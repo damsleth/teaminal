@@ -51,6 +51,7 @@ export function ThemePresetsModal() {
   const store = useAppStore()
   const modal = useAppState((s) => s.modal)
   const activeTheme = useAppState((s) => s.settings.theme)
+  const appearance = useAppState((s) => s.systemAppearance)
   const theme = useTheme()
   const isOpen = modal?.kind === 'theme-presets'
   const choices = isOpen ? themeChoices() : []
@@ -150,7 +151,9 @@ export function ThemePresetsModal() {
         maxWidth="100%"
       >
         <Text bold={theme.emphasis.modalTitleBold} backgroundColor={bg}>
-          {pad(`Theme presets · active: ${activeTheme}`)}
+          {pad(
+            `Theme presets · active: ${activeTheme === 'auto' ? `auto → ${appearance}` : activeTheme}`,
+          )}
         </Text>
         <Text color="gray" backgroundColor={bg}>
           {pad('● = active · saving folds your edits into the preset')}
@@ -175,7 +178,13 @@ export function ThemePresetsModal() {
                 {c.name}
               </Text>
               <Text color="gray" backgroundColor={bg}>
-                {pad(c.builtin ? '  built-in' : '').slice(0, CONTENT_W - 4 - c.name.length)}
+                {pad(
+                  c.name === 'auto'
+                    ? `  light or dark to match the terminal (${appearance})`
+                    : c.builtin
+                      ? '  built-in'
+                      : '',
+                ).slice(0, CONTENT_W - 4 - c.name.length)}
               </Text>
             </Text>
           )

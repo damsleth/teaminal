@@ -129,7 +129,7 @@ warnings and fall back to defaults.
 
 | Key                            | Values               | Default | Description                                                                              |
 | ------------------------------ | -------------------- | ------: | ---------------------------------------------------------------------------------------- |
-| `theme`                        | `dark`, `light`, `compact`, `comfortable`, or a custom name | `dark` | Terminal palette + layout preset. Custom names load `~/.config/teaminal/themes/<name>.json` (see [Themes](#themes) below). |
+| `theme`                        | `auto`, `dark`, `light`, or a custom name | `dark` | Terminal palette + layout preset. `auto` isn't a theme of its own: it picks `light` or `dark` to match the terminal's background color (asked at startup), falling back to the macOS appearance when the terminal doesn't say; a later macOS appearance switch flips it too. Custom names load `~/.config/teaminal/themes/<name>.json` (see [Themes](#themes) below). |
 | `accounts`                     | string array         |    `[]` | owa-piggy profile aliases managed by Accounts.                                           |
 | `activeAccount`                | string or null       |  `null` | Default profile alias used at startup when `--profile` is not passed.                    |
 | `chatListShortNames`           | boolean              | `false` | Show first names in chat list rows.                                                      |

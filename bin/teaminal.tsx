@@ -7,6 +7,7 @@ import { loadThemeFile } from '../src/config/themes'
 import { createAccountManager } from '../src/state/accountManager'
 import { startForceAvailabilityDriver } from '../src/state/forceAvailability'
 import { startSystemAppearanceDriver } from '../src/state/systemAppearance'
+import { probeTerminalBackground } from '../src/ui/terminalBackground'
 import { createAppStore } from '../src/state/store'
 import { isSeededMode } from '../src/state/seedFixtures'
 import { App } from '../src/ui/App'
@@ -143,6 +144,10 @@ if (!isSeededMode() && (await probeTextSizing())) installTextSizing(process.stdo
 // protocol. Runs in seeded mode too (it draws nothing), so the tui flows
 // exercise the probe-then-Ink handoff in a terminal that answers.
 setKittyKeyboardEnabled(await probeKittyKeyboard())
+// Same window: the terminal's background color, which the 'auto' theme
+// follows (light or dark). Runs in seeded mode too, like the keyboard probe,
+// so the handoff check covers it; the seeded theme is pinned anyway.
+const terminalAppearance = await probeTerminalBackground()
 
 const store = createAppStore()
 
@@ -183,9 +188,9 @@ for (const w of configResult.warnings) warn(w)
 // mounting, so the sidebar and message pane show history immediately.
 const accounts = createAccountManager(store, initialProfile)
 
-// Detect the OS appearance before the first render so the 'auto' theme
-// paints the right base immediately, then keep it updated on an interval.
-const systemAppearance = startSystemAppearanceDriver(store)
+// Pick the appearance 'auto' follows before the first render (terminal
+// background, else the OS), then keep it updated on an interval.
+const systemAppearance = startSystemAppearanceDriver(store, { terminal: terminalAppearance })
 
 // `bun --watch` (dev:watch) sends SIGTERM before it re-execs on a file change.
 // Ink's restore-cursor hooks signal-exit, which re-raises a SIGTERM nobody else
