@@ -489,7 +489,7 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
 │╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
 ││ > █                                                                                              ││
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
-│ Enter send · Ctrl+J newline · Tab chat                                                             │
+│ Ctrl+Enter send · Enter newline · Tab chat                                                         │
 ╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
 {
   "0,0": {
@@ -1017,7 +1017,7 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "39,29": {
+  "43,29": {
     "fgColorMode": 0,
     "fgColor": -1
   }

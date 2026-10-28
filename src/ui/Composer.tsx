@@ -26,7 +26,7 @@
 //   See composerReducer for the full action list. Bindings: Left, Right,
 //   Home/Ctrl+A, End/Ctrl+E, Ctrl+W (delete word), Ctrl+U (delete to
 //   line start), Ctrl+K (delete to line end / join), Alt+Backspace
-//   (delete word). Ctrl+J inserts a newline; plain Enter sends.
+//   (delete word). Enter inserts a newline; Ctrl+Enter sends.
 //
 // Bracketed paste:
 //   On activate the component writes CSI ?2004h to stdout to enable
@@ -191,14 +191,19 @@ export function Composer({ columns = 80 }: { columns?: number }) {
         store.set({ inputZone: 'list' })
         return
       }
-      // Ctrl+J inserts a newline; plain Enter sends (or commits the edit).
-      if (key.ctrl && input === 'j') {
-        dispatch({ kind: 'newline' })
+      // Ctrl+Enter sends (or commits the edit); plain / Shift+Enter is a
+      // newline. Ctrl+Enter is only distinct from Enter under the kitty
+      // keyboard protocol, so Alt+Enter, Ctrl+J and a bare LF (what some
+      // terminals send for Ctrl+Enter) send too.
+      const send =
+        (key.return && (key.ctrl || key.meta)) || (key.ctrl && input === 'j') || input === '\n'
+      if (send) {
+        if (editingMessageId) void doEdit(buf.text)
+        else void doSend(buf.text)
         return
       }
       if (key.return) {
-        if (editingMessageId) void doEdit(buf.text)
-        else void doSend(buf.text)
+        dispatch({ kind: 'newline' })
         return
       }
       // Cursor motion
@@ -302,7 +307,7 @@ export function Composer({ columns = 80 }: { columns?: number }) {
       {editingMessageId && (
         <Box>
           <Text color={theme.warnText} wrap="truncate-end">
-            editing message · enter to save · esc to cancel
+            editing message · ctrl+enter to save · esc to cancel
           </Text>
         </Box>
       )}

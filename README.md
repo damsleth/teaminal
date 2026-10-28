@@ -256,8 +256,8 @@ The in-app Settings menu persists changes back to `config.json`.
 | Esc            | composer / filter | Leave mode.                                                             |
 | Esc            | anywhere else     | Toggle the menu overlay. Use `h` / Left to step back a pane.            |
 | Enter / Space  | menu              | Activate the selected menu item (also in submenus).                     |
-| Enter          | composer          | Send message.                                                           |
-| Ctrl+J         | composer          | Insert newline.                                                         |
+| Ctrl+Enter     | composer          | Send message (or save an edit). Alt+Enter and Ctrl+J also send.         |
+| Enter          | composer          | Insert newline.                                                         |
 | `/`            | list              | Filter chats.                                                           |
 | `n`            | list              | Open the new-chat prompt.                                               |
 | `m`            | list              | Toggle the focused chat read/unread.                                    |

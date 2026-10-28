@@ -31,7 +31,7 @@ import { applySeededState, isSeededMode } from '../src/state/seedFixtures'
 import { App } from '../src/ui/App'
 import { ErrorBoundary } from '../src/ui/ErrorBoundary'
 import { startFocusTracker } from '../src/ui/focusTracker'
-import { probeCellAspect } from '../src/ui/kittyGraphics'
+import { isKittyCapable, probeCellAspect } from '../src/ui/kittyGraphics'
 import { installTextSizing, probeTextSizing } from '../src/ui/textSizing'
 import { cleanupImageTempFiles } from '../src/ui/openImageFile'
 import { renderCleanExit } from '../src/ui/shutdown'
@@ -340,7 +340,10 @@ const ink = render(
   // Ink defaults to maxFps 30; fast OS key-repeat (50-90Hz on tuned
   // macOS setups) then coalesces 2-3 cursor steps into one paint and
   // list scrolling visibly jumps. 60fps keeps one paint per step.
-  { maxFps: 60 },
+  // The kitty keyboard protocol tells Ctrl+Enter (send) apart from Enter
+  // (newline) in the composer. Env-gated rather than Ink's 'auto', which
+  // probes stdin with a 'data' listener + unshift (pitfall #10 territory).
+  { maxFps: 60, kittyKeyboard: { mode: isKittyCapable() ? 'enabled' : 'disabled' } },
 )
 
 // Safety net: a stray rejected promise from a fire-and-forget action (e.g. a

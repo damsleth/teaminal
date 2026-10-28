@@ -31,7 +31,7 @@ export function StatusBar() {
 
   let hint = 'j/k move · l/Enter open · / filter · n new chat · ? help · q quit'
   if (inputZone === 'filter') hint = 'type to filter · Enter accept · Esc clear'
-  else if (inputZone === 'composer') hint = 'Enter send · Ctrl+J newline · Tab chat'
+  else if (inputZone === 'composer') hint = 'Ctrl+Enter send · Enter newline · Tab chat'
   else if (inputZone === 'menu') hint = 'menu open'
   else if (inputZone === 'resize') {
     const listLabel = chatListWidthSetting != null ? `${chatListWidthSetting} cols` : 'auto'
