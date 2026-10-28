@@ -256,7 +256,7 @@ export type ThemeColorOverrides = {
   unreadRow?: string
   timestamp?: string
   sender?: string
-  selfMessage?: string
+  selfMessage?: string | null
   selfName?: string
   selfMessageBackground?: string | null
   senderMessage?: string | null

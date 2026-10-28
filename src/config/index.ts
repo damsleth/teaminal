@@ -912,6 +912,7 @@ export function validateThemeOverrides(
         key === 'selectedRowBackground' ||
         key === 'selfMessageBackground' ||
         key === 'senderMessage' ||
+        key === 'selfMessage' ||
         key === 'senderMessageBackground' ||
         key === 'messageFocusText') &&
       rawValue === null

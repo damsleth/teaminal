@@ -200,6 +200,17 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The composer uses your terminal's cursor.** The caret is the real
+  terminal cursor, so it has the shape, color and blink you set in the
+  terminal (e.g. a blinking bar in kitty), instead of a drawn block.
+
+- **Conversation width leaves sender lines alone.** It narrows only the
+  messages; the sender name and time keep their place from **Sender
+  indent**.
+
+- **Self message color can be "none"**, like sender message: your own
+  messages then use the terminal's text color.
+
 - **`auto` theme follows the terminal.** `auto` picks the built-in light or
   dark theme to match the terminal's background color (asked at startup),
   instead of the macOS appearance, which is now only the fallback for

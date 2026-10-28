@@ -134,7 +134,8 @@ export type Theme = {
   unreadRow: string
   timestamp: string
   sender: string
-  selfMessage: string
+  // Your own message bodies; null keeps the terminal's text color.
+  selfMessage: string | null
   // Sender name on your own messages (body uses selfMessage).
   selfName: string
   // Background behind your own message bodies; null = none.
@@ -334,7 +335,7 @@ export type PartialTheme = {
   unreadRow?: string
   timestamp?: string
   sender?: string
-  selfMessage?: string
+  selfMessage?: string | null
   selfName?: string
   selfMessageBackground?: string | null
   senderMessage?: string | null
