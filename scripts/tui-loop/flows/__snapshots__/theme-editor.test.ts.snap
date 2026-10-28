@@ -13,11 +13,11 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 ││     rev…                 ││  │       Modal padding X       3                                  │  ││
 ││    Design Sync          ││  │       Modal padding Y       1                                  │  ││
 ││     Nina: Nina shared    ││  │       Message body indent   2                                  │  ││
-││     two compact layout   ││  │       Message gap           1                                  │  ││
-││     op…                  ││  │       Tail strip gap        1                                  │  ││
-││    Ops Channel          ││  │       Chat list pad R       1                                  │  ││
-││     Mina: Deploy is      ││  │       Chat list gap         0                                  │  ││
-││     green in the EU      ││  │      ↓ 43 more                                                 │  ││
+││     two compact layout   ││  │       Sender indent         2                                  │  ││
+││     op…                  ││  │       Message gap           1                                  │  ││
+││    Ops Channel          ││  │       Tail strip gap        1                                  │  ││
+││     Mina: Deploy is      ││  │       Chat list pad R       1                                  │  ││
+││     green in the EU      ││  │      ↓ 45 more                                                 │  ││
 ││     region.              ││  │                                                                │  ││
 ││                          ││  │   ╭────────────────────────────────────────────────────────╮   │  ││
 ││                          ││  │   │Ada  Sample message body  12:34                         │   │  ││

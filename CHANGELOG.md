@@ -37,6 +37,10 @@ adheres to [Semantic Versioning](https://semver.org/).
   from there. Terminals without the kitty text sizing protocol round to
   whole rows.
 
+- **Sender indent.** **Sender indent** (`themeOverrides.layout.senderIndent`,
+  0-6) sets the left indent of the sender name and timestamp line on its own.
+  **Message body indent** no longer moves the sender line.
+
 - **Text background padding Y.** **Text bg padding Y**
   (`themeOverrides.layout.textBackgroundPaddingY`, 0-2) adds rows of
   background color above and below message bodies, next to the existing

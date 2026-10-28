@@ -648,11 +648,12 @@ function MessageRow(props: {
   // The marker column carries the focus arrow when this row is focused;
   // otherwise the send-status glyph (failed / sending). It sits on the body
   // line (the thing being focused), not the sender header, and is as wide as
-  // the body indent so the sender name lines up directly above the body.
+  // the body indent. The sender line has its own indent (layout.senderIndent).
   const sendStatusGlyph = sendError ? '✗' : isSending ? '…' : ' '
   const indicator = props.focused ? props.focusIndicatorChar.slice(0, 1) || '>' : sendStatusGlyph
   const indent = Math.max(0, props.bodyIndent)
   const markerWidth = Math.max(1, indent)
+  const senderIndent = Math.max(0, theme.layout.senderIndent)
   const align = flip ? 'flex-end' : undefined
 
   const marker = (
@@ -736,7 +737,7 @@ function MessageRow(props: {
     <>
       {hasHeader ? (
         <Box flexDirection="row" height={props.tallHeader ? 2 : undefined}>
-          {!flip && <Box width={markerWidth} flexShrink={0} />}
+          {!flip && senderIndent > 0 && <Box width={senderIndent} flexShrink={0} />}
           <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
             <Text wrap="truncate-end">
               <Text
@@ -758,7 +759,7 @@ function MessageRow(props: {
               )}
             </Text>
           </Box>
-          {flip && <Box width={markerWidth} flexShrink={0} />}
+          {flip && senderIndent > 0 && <Box width={senderIndent} flexShrink={0} />}
         </Box>
       ) : (
         <Box flexDirection="row">
