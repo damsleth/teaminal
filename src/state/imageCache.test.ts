@@ -26,11 +26,13 @@ import {
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
 import {
+  clearImageCache,
   ensureImageFetched,
   fetchAndCacheImage,
   getImageCacheDir,
   getImageData,
   imageCacheKey as cacheKey,
+  ownedImageKey,
   readCachedImage,
 } from './imageCache'
 
@@ -399,7 +401,7 @@ describe('ensureImageFetched disk-cache notification', () => {
       { client: testClient(), onChange: () => notified++ },
     )
     expect(notified).toBe(1)
-    expect(getImageData(key)).toEqual(png)
+    expect(getImageData(testClient().ctx.account.id, key)).toEqual(png)
 
     // The 'ready' guard means a repeat call is a no-op — no render loop.
     ensureImageFetched(
@@ -409,5 +411,59 @@ describe('ensureImageFetched disk-cache notification', () => {
       { client: testClient(), onChange: () => notified++ },
     )
     expect(notified).toBe(1)
+  })
+})
+
+describe('image ownership across accounts', () => {
+  const realXdg = process.env.XDG_CACHE_HOME
+  let cacheRoot = ''
+
+  afterEach(() => {
+    if (realXdg === undefined) delete process.env.XDG_CACHE_HOME
+    else process.env.XDG_CACHE_HOME = realXdg
+    if (cacheRoot) rmSync(cacheRoot, { recursive: true, force: true })
+  })
+
+  it('the same cache key under two accounts keeps distinct bytes, clears and kitty ids', () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-owners`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    const key = cacheKey('msg-1', 'att-1')
+    const seed = (profile: string, fill: number) => {
+      const png = Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        Buffer.alloc(16, fill),
+      ])
+      const dir = getImageCacheDir(profile)
+      mkdirSync(dir, { recursive: true })
+      const hash = createHash('sha1').update(key).digest('hex')
+      writeFileSync(join(dir, `${hash}.bin`), png)
+      writeFileSync(join(dir, `${hash}.meta.json`), JSON.stringify({ contentType: 'image/png' }))
+      return png
+    }
+    const pngA = seed('alpha', 1)
+    const pngB = seed('beta', 2)
+    const a = accountRef('alpha')
+    const b = accountRef('beta')
+    const clientFor = (account: typeof a) =>
+      createGraphClient({ ...currentAccountContext(), account })
+    for (const account of [a, b]) {
+      ensureImageFetched(
+        'ignored',
+        key,
+        { contentType: 'image/png', name: 'x.png' },
+        { client: clientFor(account), onChange: () => {} },
+      )
+    }
+
+    expect(getImageData(a.id, key)).toEqual(pngA)
+    expect(getImageData(b.id, key)).toEqual(pngB)
+    expect(getImageData(undefined, key)).toBeUndefined()
+    // Kitty ids are assigned per key string, so distinct owned keys never
+    // reuse the other account's transmitted pixels.
+    expect(ownedImageKey(a.id, key)).not.toBe(ownedImageKey(b.id, key))
+
+    clearImageCache('alpha')
+    expect(getImageData(a.id, key)).toBeUndefined()
+    expect(getImageData(b.id, key)).toEqual(pngB)
   })
 })

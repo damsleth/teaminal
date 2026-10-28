@@ -22,7 +22,7 @@ import { Box, Text, useApp } from 'ink'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
-import { ensureImageFetched, getImageData } from '../state/imageCache'
+import { ensureImageFetched, getImageData, ownedImageKey } from '../state/imageCache'
 import { detectImageFormat } from './kittyGraphics'
 import { materializeImage, openImageFile } from './openImageFile'
 import { openExternal } from './openExternal'
@@ -55,6 +55,7 @@ export function ImageModal() {
   const store = useAppStore()
   const session = useSessionApi()
   const modal = useAppState((s) => s.modal)
+  const accountId = useAppState((s) => s.account?.id)
   const theme = useTheme()
   const isOpen = modal?.kind === 'image'
   const ref = isOpen ? modal.ref : null
@@ -103,9 +104,9 @@ export function ImageModal() {
           store.set({ modal: null, inputZone: 'list' })
           return
         }
-        const data = getImageData(ref.cacheKey)
-        if (!data) return
-        const path = materializeImage(ref.cacheKey, data)
+        const data = getImageData(accountId, ref.cacheKey)
+        if (!data || !accountId) return
+        const path = materializeImage(ownedImageKey(accountId, ref.cacheKey), data)
         if (path && openImageFile(path)) {
           store.set({ modal: null, inputZone: 'list' })
         }
@@ -116,7 +117,7 @@ export function ImageModal() {
 
   if (!isOpen || !ref) return null
 
-  const data = getImageData(ref.cacheKey)
+  const data = getImageData(accountId, ref.cacheKey)
   const format = data ? detectImageFormat(data) : null
   const dims = data ? readPngDimensions(data) : null
   // Openable either as its original URL or as the cached blob, once fetched.

@@ -50,7 +50,8 @@ import {
   clearKittyImages,
   fitKittyPlacement,
 } from './kittyGraphics'
-import { ensureImageFetched, getImageData } from '../state/imageCache'
+import { ensureImageFetched, getImageData, ownedImageKey } from '../state/imageCache'
+import type { AccountId } from '../account'
 import { messageFocusables } from './messageFocusables'
 import { splitBodyLinkSpans } from './bodySpans'
 import { pickerAnchorCol } from './pickerAnchor'
@@ -94,6 +95,8 @@ export function MessagePane(props: {
   const messagesByConvo = useAppState((s) => s.messagesByConvo)
   const messageCacheByConvo = useAppState((s) => s.messageCacheByConvo)
   const me = useAppState((s) => s.me)
+  // Owner of every image in this pane (in-memory image maps are per account).
+  const accountId = useAppState((s) => s.account?.id)
   const nameByUserId = useAppState((s) => s.nameByUserId)
   const chats = useAppState((s) => s.chats)
   const teams = useAppState((s) => s.teams)
@@ -242,6 +245,7 @@ export function MessagePane(props: {
   const imageRowsForMessage = (message: ChatMessage): number =>
     extractInlineImages(message).reduce((sum, ref) => {
       const reserved = inlineImageReservedRows(
+        accountId,
         ref.cacheKey,
         imgCols,
         inlineImageMaxRows,
@@ -328,8 +332,13 @@ export function MessagePane(props: {
       clearKittyImages(stdout)
       if (modalOpen || !paneRef.current) return
       paintInlineImages(stdout, paneRef.current, imageSlots.current, (cacheKey, rows) => {
-        const data = getImageData(cacheKey)
-        return data ? buildKittyImageEscape(cacheKey, data, { rows, reservedRows: rows }) : ''
+        const data = getImageData(accountId, cacheKey)
+        return data && accountId
+          ? buildKittyImageEscape(ownedImageKey(accountId, cacheKey), data, {
+              rows,
+              reservedRows: rows,
+            })
+          : ''
       })
     })
     return () => {
@@ -898,6 +907,7 @@ function ImageRows(props: {
   theme: Theme
 }) {
   const slots = useContext(ImageSlotsContext)
+  const accountId = useAppState((s) => s.account?.id)
   const indent = Math.max(0, props.bodyIndent)
   // A bar marks the image's vertical extent in lieu of a full box border: the
   // picture is painted out-of-band by the Kitty layer into rows whose
@@ -920,6 +930,7 @@ function ImageRows(props: {
     </Box>
   )
   const reservedRows = inlineImageReservedRows(
+    accountId,
     props.cacheKey,
     props.imgCols,
     props.maxRows,
@@ -942,7 +953,7 @@ function ImageRows(props: {
             }
             wrap="truncate-end"
           >
-            {inlineImagePlaceholder(props.cacheKey, props.label)}
+            {inlineImagePlaceholder(accountId, props.cacheKey, props.label)}
           </Text>
         </Box>
       </Box>
@@ -990,6 +1001,7 @@ function messageBodyTerminalColumn(opts: { bodyIndent: number; listPaneWidth: nu
 // height math, the reserved blank rows, and the Kitty placement so all three
 // agree on how many rows each image occupies.
 function inlineImageReservedRows(
+  accountId: AccountId | undefined,
   cacheKey: string,
   imgCols: number,
   maxRows: number,
@@ -1002,7 +1014,7 @@ function inlineImageReservedRows(
   // height math, the reserved rows, and the paint effect so they can't
   // disagree.
   if (!painted) return null
-  const data = getImageData(cacheKey)
+  const data = getImageData(accountId, cacheKey)
   if (!data) return null
   // Only PNG can actually be painted by the Kitty layer. Returning null for
   // anything else makes the row render its labeled placeholder instead of
@@ -1014,8 +1026,12 @@ function inlineImageReservedRows(
 // Placeholder text for an image we can't paint: still loading, or a format
 // (JPEG/GIF/WebP) Kitty terminals can't decode. Noting the format makes
 // "why isn't my image showing" answerable at a glance.
-function inlineImagePlaceholder(cacheKey: string, name: string): string {
-  const data = getImageData(cacheKey)
+function inlineImagePlaceholder(
+  accountId: AccountId | undefined,
+  cacheKey: string,
+  name: string,
+): string {
+  const data = getImageData(accountId, cacheKey)
   const fmt = data ? detectImageFormat(data) : null
   if (fmt && fmt !== 'png') return `[img] ${name} (${fmt})`
   return `[img] ${name}`

@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { teaminalCacheDir } from './cacheFiles'
-import { accountRef, owaProfile, profileSlug } from '../account'
+import { accountRef, owaProfile, profileSlug, type AccountId } from '../account'
 import { GraphError, type GraphClient } from '../graph/client'
 import { fetchObjectById, fetchObjectByUrl, isAsyncGwUrl } from '../graph/teamsAsyncGw'
 import { recordEvent } from '../log'
@@ -31,6 +31,14 @@ export function imageCacheKey(messageId: string, attachmentId: string): string {
   return `${messageId}::${attachmentId}`
 }
 
+// In-memory (and kitty) key for an image owned by one account. Two accounts
+// can carry the same messageId::attachmentId with different bytes, so the
+// memory maps and terminal-side ids are keyed by owner. The disk key stays
+// the bare cacheKey: each account already has its own cache directory.
+export function ownedImageKey(account: AccountId, cacheKey: string): string {
+  return `${account}\u0000${cacheKey}`
+}
+
 function getCacheDir(profile?: string): string {
   const slug = profileSlug(accountRef(profile)) ?? 'default'
   return join(teaminalCacheDir(), slug, 'images')
@@ -41,8 +49,9 @@ export function getImageCacheDir(profile?: string | null): string {
   return getCacheDir(profile ?? undefined)
 }
 
-// Remove a profile's on-disk image blobs and drop the in-memory fetch
-// status / blob maps so the next render re-fetches from the network.
+// Remove a profile's on-disk image blobs and drop its in-memory fetch
+// status / blobs so the next render re-fetches from the network. Other
+// accounts' entries stay.
 // Best-effort: a missing directory is a no-op. Returns the directory it
 // targeted so callers can log it.
 export function clearImageCache(profile?: string | null): string {
@@ -52,8 +61,10 @@ export function clearImageCache(profile?: string | null): string {
   } catch {
     // best-effort
   }
-  fetchStatus.clear()
-  imageDataCache.clear()
+  const prefix = ownedImageKey(accountRef(profile).id, '')
+  for (const map of [fetchStatus, imageDataCache]) {
+    for (const k of map.keys()) if (k.startsWith(prefix)) map.delete(k)
+  }
   return dir
 }
 
@@ -226,12 +237,14 @@ type FetchStatus = 'pending' | 'loading' | 'ready' | 'error'
 const fetchStatus = new Map<string, FetchStatus>()
 const imageDataCache = new Map<string, Buffer>()
 
-export function getImageStatus(key: string): FetchStatus {
-  return fetchStatus.get(key) ?? 'pending'
+// Reads take the owning account; with none (no session bound yet) nothing
+// is loaded.
+export function getImageStatus(account: AccountId | undefined, key: string): FetchStatus {
+  return (account && fetchStatus.get(ownedImageKey(account, key))) || 'pending'
 }
 
-export function getImageData(key: string): Buffer | undefined {
-  return imageDataCache.get(key)
+export function getImageData(account: AccountId | undefined, key: string): Buffer | undefined {
+  return account ? imageDataCache.get(ownedImageKey(account, key)) : undefined
 }
 
 // Fetch an arbitrary image URL without auth headers. Applies the same
@@ -256,13 +269,14 @@ export function ensureImageFetched(
   meta: { contentType: string; name: string },
   opts: FetchImageOpts & { onChange: () => void },
 ): void {
-  const current = fetchStatus.get(key)
+  const owned = ownedImageKey(opts.client.ctx.account.id, key)
+  const current = fetchStatus.get(owned)
   if (current === 'loading' || current === 'ready' || current === 'error') return
 
   const disk = readCachedImage(key, owaProfile(opts.client.ctx.account))
   if (disk) {
-    fetchStatus.set(key, 'ready')
-    imageDataCache.set(key, disk.data)
+    fetchStatus.set(owned, 'ready')
+    imageDataCache.set(owned, disk.data)
     // Notify like the network path does: a caller that rendered a "loading…"
     // state before this ran would otherwise never learn the blob is available.
     // Safe against a render loop — the 'ready' guard above makes every later
@@ -271,19 +285,19 @@ export function ensureImageFetched(
     return
   }
 
-  fetchStatus.set(key, 'loading')
+  fetchStatus.set(owned, 'loading')
   fetchAndCacheImage(path, key, meta, opts)
     .then((buf) => {
       if (buf) {
-        imageDataCache.set(key, buf)
-        fetchStatus.set(key, 'ready')
+        imageDataCache.set(owned, buf)
+        fetchStatus.set(owned, 'ready')
       } else {
-        fetchStatus.set(key, 'error')
+        fetchStatus.set(owned, 'error')
       }
       opts.onChange()
     })
     .catch(() => {
-      fetchStatus.set(key, 'error')
+      fetchStatus.set(owned, 'error')
       opts.onChange()
     })
 }
