@@ -44,7 +44,7 @@ const BINDINGS: Binding[] = [
   { keys: 'Esc', when: 'list / chat / channel', action: 'open menu' },
   { keys: 'Ctrl+O / Ctrl+T', when: 'menu', action: 'edit settings / theme file in $VISUAL' },
   { keys: 'Ctrl+Enter', when: 'composer', action: 'send (also Alt+Enter, Ctrl+J)' },
-  { keys: 'Enter', when: 'composer', action: 'newline' },
+  { keys: 'Enter', when: 'composer', action: 'newline (swapped with send by enterSends)' },
   { keys: '← / →', when: 'composer', action: 'cursor left / right' },
   { keys: 'Ctrl+A / Ctrl+E', when: 'composer', action: 'line start / end' },
   { keys: 'Ctrl+W / M-Bksp', when: 'composer', action: 'delete previous word' },

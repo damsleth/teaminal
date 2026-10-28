@@ -285,6 +285,7 @@ export type ThemeOverrides = ThemeColorOverrides & {
     textBackgroundPaddingX: number
     textBackgroundPaddingY: number
     dateMarkerIndent: number
+    messageMaxWidth: number
   }>
   borders?: Partial<{
     panel: BorderStyleName
@@ -359,6 +360,9 @@ export type Settings = {
   showChatNameHeader: boolean
   showPresenceInList: boolean
   showTimestampsInPane: boolean
+  // Sender name above message bodies; showOwnNameInPane covers your own.
+  showSenderNamesInPane: boolean
+  showOwnNameInPane: boolean
   showReactions: ReactionDisplayMode
   messageFocusIndicatorEnabled: boolean
   messageFocusIndicatorChar: string
@@ -415,6 +419,8 @@ export type Settings = {
   // Jump the message cursor (and so the scroll) to a newly arrived message
   // in the open conversation.
   scrollOnNewMessages: boolean
+  // Composer: Enter sends and Shift/Ctrl+Enter is a newline (flipped default).
+  enterSends: boolean
   // Inline image rendering for message attachments.
   // 'auto': show images via Kitty graphics protocol when the terminal
   //   supports it (KITTY_WINDOW_ID / TERM=xterm-kitty); fall back to
@@ -531,6 +537,8 @@ export const defaultSettings: Settings = {
   showChatNameHeader: false,
   showPresenceInList: true,
   showTimestampsInPane: true,
+  showSenderNamesInPane: true,
+  showOwnNameInPane: true,
   showReactions: 'current',
   messageFocusIndicatorEnabled: true,
   messageFocusIndicatorChar: '>',
@@ -550,6 +558,7 @@ export const defaultSettings: Settings = {
   tailDiagnostics: false,
   selfMessagesOnRight: false,
   scrollOnNewMessages: true,
+  enterSends: false,
   inlineImages: 'auto',
   inlineImageMaxRows: 10,
   statusBarPosition: 'bottom',

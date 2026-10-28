@@ -90,6 +90,8 @@ warnings and fall back to defaults.
   "messagePaneShortNames": true,
   "showPresenceInList": true,
   "showTimestampsInPane": true,
+  "showSenderNamesInPane": true,
+  "showOwnNameInPane": true,
   "showReactions": "current",
   "messageFocusIndicatorEnabled": true,
   "messageFocusIndicatorChar": ">",
@@ -110,6 +112,7 @@ warnings and fall back to defaults.
   "tailDiagnostics": false,
   "selfMessagesOnRight": false,
   "scrollOnNewMessages": true,
+  "enterSends": false,
   "chatListSort": "recent",
   "chatListGroupByType": false,
   "chatListSectionCap": true,
@@ -134,6 +137,8 @@ warnings and fall back to defaults.
 | `showChatNameHeader`           | boolean              | `false` | Show the conversation name (1:1 partner, group chat, or team · # channel) above the messages. |
 | `showPresenceInList`           | boolean              |  `true` | Show presence dots in the chat list when available.                                      |
 | `showTimestampsInPane`         | boolean              |  `true` | Show message timestamps in the message pane.                                             |
+| `showSenderNamesInPane` | boolean | `true` | Show the sender name above each message. Off leaves only the timestamp (or nothing, with timestamps off); tell senders apart by color. Also in the menu as **Show sender names**. |
+| `showOwnNameInPane` | boolean | `true` | Show your name above your own messages. Turn off alongside `selfMessagesOnRight`. Also in the menu as **Show my name on my messages**. |
 | `showReactions`                | `off`, `current`, `all` | `current` | Show message reactions never, only on the focused message, or on every message.      |
 | `messageFocusIndicatorEnabled` | boolean              |  `true` | Show the focused-message marker while navigating messages.                               |
 | `messageFocusIndicatorChar`    | single character     |     `>` | Marker shown beside the focused message.                                                 |
@@ -154,6 +159,7 @@ warnings and fall back to defaults.
 | `tailDiagnostics`              | boolean              | `false` | Show an always-on diagnostics tail panel above the composer.                             |
 | `selfMessagesOnRight`          | boolean              | `false` | When `true`, your own messages are right-aligned in the message pane (body on the right, sender/timestamp on the left of the body). Other users' messages remain left-aligned. |
 | `scrollOnNewMessages`          | boolean              |  `true` | Jump to a new message when it arrives in the open conversation. `false` keeps the cursor where it is. Also in the menu as **Scroll on new messages**. |
+| `enterSends` | boolean | `false` | Flip the composer keys: Enter sends, Shift+Enter / Ctrl+Enter / Ctrl+J insert a newline. Shift+Enter needs the kitty keyboard protocol; elsewhere use Ctrl+J. Also in the menu as **Enter sends**. |
 | `inlineImages`                 | `auto`, `off`        |  `auto` | `auto` renders message images inline in Kitty-compatible terminals, bounded to `inlineImageMaxRows` tall and the width of the message pane, so an image never overlaps neighbouring messages. `off` — and any terminal without Kitty graphics — renders one focusable `[img] name` row per image instead, reserving no picture rows. Space opens the focused image either way. |
 | `inlineImageMaxRows`           | integer 1-50         |    `10` | Maximum terminal rows reserved for a single inline image.                                |
 | `statusBarPosition`            | `bottom`, `hidden`   | `bottom` | Where the status bar renders. `hidden` suppresses it entirely, freeing one row of vertical space in the message pane. |
@@ -224,6 +230,7 @@ subset of these keys is accepted:
     "textBackgroundPaddingX": 0, // bg-colored columns around focused / own message bodies
     "textBackgroundPaddingY": 0, // bg-colored rows above / below them
     "dateMarkerIndent": 0, // extra indent of the day separator ("Today")
+    "messageMaxWidth": 100, // message body width cap, % of the pane (10-100, steps of 10)
   },
   // Border styles (none | single | double | round | bold | classic | singleDouble | doubleSingle | arrow):
   "borders": { "panel": "single", "modal": "double", "active": "bold" },

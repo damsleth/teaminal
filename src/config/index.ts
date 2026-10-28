@@ -98,6 +98,7 @@ const LAYOUT_KEYS = new Set<keyof NonNullable<ThemeOverrides['layout']>>([
   'textBackgroundPaddingX',
   'textBackgroundPaddingY',
   'dateMarkerIndent',
+  'messageMaxWidth',
 ])
 
 const BORDERS_KEYS = new Set<keyof NonNullable<ThemeOverrides['borders']>>([
@@ -288,6 +289,8 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     showChatNameHeader: settings.showChatNameHeader,
     showPresenceInList: settings.showPresenceInList,
     showTimestampsInPane: settings.showTimestampsInPane,
+    showSenderNamesInPane: settings.showSenderNamesInPane,
+    showOwnNameInPane: settings.showOwnNameInPane,
     showReactions: settings.showReactions,
     messageFocusIndicatorEnabled: settings.messageFocusIndicatorEnabled,
     messageFocusIndicatorChar: settings.messageFocusIndicatorChar,
@@ -307,6 +310,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     tailDiagnostics: settings.tailDiagnostics,
     selfMessagesOnRight: settings.selfMessagesOnRight,
     scrollOnNewMessages: settings.scrollOnNewMessages,
+    enterSends: settings.enterSends,
     inlineImages: settings.inlineImages,
     inlineImageMaxRows: settings.inlineImageMaxRows,
     statusBarPosition: settings.statusBarPosition,
@@ -534,6 +538,8 @@ function validateAndAssign(
     case 'showChatNameHeader':
     case 'showPresenceInList':
     case 'showTimestampsInPane':
+    case 'showSenderNamesInPane':
+    case 'showOwnNameInPane':
     case 'messageFocusIndicatorEnabled':
     case 'useTeamsPresence':
     case 'forceAvailableWhenFocused':
@@ -546,6 +552,7 @@ function validateAndAssign(
     case 'tailDiagnostics':
     case 'selfMessagesOnRight':
     case 'scrollOnNewMessages':
+    case 'enterSends':
     case 'statusBarShowKeyHints':
     case 'headerBarCentered':
       if (typeof value === 'boolean') {
@@ -846,6 +853,14 @@ export function validateLayoutOverrides(
       continue
     if (!LAYOUT_KEYS.has(rawKey as keyof NonNullable<ThemeOverrides['layout']>)) {
       warnings.push(`config: unknown ${scope} key "${rawKey}" ignored`)
+      continue
+    }
+    if (rawKey === 'messageMaxWidth') {
+      if (typeof rawValue !== 'number' || rawValue % 10 !== 0 || rawValue < 10 || rawValue > 100) {
+        warnings.push(`config: "${scope}.${rawKey}" must be 10-100 in steps of 10`)
+        continue
+      }
+      out.messageMaxWidth = rawValue
       continue
     }
     // The message gap also takes halves (tall headers, kitty text sizing).

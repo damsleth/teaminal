@@ -8,6 +8,19 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Enter sends.** Menu → **Enter sends (Shift/Ctrl+Enter newline)**
+  (`enterSends`, default off) flips the composer keys: Enter sends and
+  Shift+Enter, Ctrl+Enter or Ctrl+J insert a newline.
+
+- **Message max width.** The theme editor's **Message max width %**
+  (`layout.messageMaxWidth`, 10-100 in steps of 10, default 100) caps how
+  wide a message body wraps, as a percent of the message pane.
+
+- **Sender name toggles.** Menu → **Show sender names**
+  (`showSenderNamesInPane`) hides the name above every message, and **Show
+  my name on my messages** (`showOwnNameInPane`) hides it on your own,
+  e.g. when they're right-aligned. Both default on.
+
 - **Date marker styling.** The day separators in a conversation ("Today",
   "Fri, May 15") get their own theme settings: **Date marker** color
   (`dateMarker`), **Date marker bold** (`emphasis.dateMarkerBold`),

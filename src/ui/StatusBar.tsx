@@ -28,10 +28,14 @@ export function StatusBar() {
   // The focused channel message has a thread: advertise 't'.
   const hasThread = useAppState((s) => focusedReplyCount(s) > 0)
   const theme = useTheme()
+  const enterSends = useAppState((s) => s.settings.enterSends)
 
   let hint = 'j/k move · l/Enter open · / filter · n new chat · ? help · q quit'
   if (inputZone === 'filter') hint = 'type to filter · Enter accept · Esc clear'
-  else if (inputZone === 'composer') hint = 'Ctrl+Enter send · Enter newline · Tab chat'
+  else if (inputZone === 'composer')
+    hint = enterSends
+      ? 'Enter send · Shift/Ctrl+Enter newline · Tab chat'
+      : 'Ctrl+Enter send · Enter newline · Tab chat'
   else if (inputZone === 'menu') hint = 'menu open'
   else if (inputZone === 'resize') {
     const listLabel = chatListWidthSetting != null ? `${chatListWidthSetting} cols` : 'auto'

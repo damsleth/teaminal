@@ -163,6 +163,7 @@ export const FIELDS: readonly EditableField[] = [
   num('layout', 'textBackgroundPaddingX', 'Text bg padding X', 'Spacing / Layout', 0, 3),
   num('layout', 'textBackgroundPaddingY', 'Text bg padding Y', 'Spacing / Layout', 0, 2),
   num('layout', 'dateMarkerIndent', 'Date marker indent', 'Spacing / Layout', 0, 12),
+  num('layout', 'messageMaxWidth', 'Message max width %', 'Spacing / Layout', 10, 100, 10),
   // — Colors —
   color('appBackground', 'Background', true),
   color('modalBackground', 'Modal bg', true),
