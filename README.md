@@ -232,6 +232,7 @@ subset of these keys is accepted:
   "dateMarker": "gray", // day separator ("Today", "Fri, May 15")
   "senderMessage": null, // other people's message text; null = terminal text color
   "senderMessageBackground": null, // background behind other people's messages
+  "chatListPreviewText": null, // chat list last-message preview (read chats); null = muted text
   // Per-presence colors:
   "presence": { "Available": "greenBright", "DoNotDisturb": "red" },
   // Paddings / margins (non-negative integers):
@@ -246,6 +247,7 @@ subset of these keys is accepted:
     "textBackgroundPaddingX": 0, // bg-colored columns around focused / own message bodies
     "textBackgroundPaddingY": 0, // bg-colored rows above / below them
     "textBackgroundRadius": 0, // 1 = rounded "speech bubble" corners on message backgrounds
+    "avatarIndent": 0, // columns before the profile picture in conversations
     "dateMarkerIndent": 0, // extra indent of the day separator ("Today")
     "messageMaxWidth": 100, // conversation column width, % of the pane, centered (10-100, steps of 10)
   },

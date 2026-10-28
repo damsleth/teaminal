@@ -579,7 +579,9 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
               {preview && (
                 <Box width={rowWidth} flexShrink={0} paddingLeft={rowWidth - labelWidth}>
                   <Text
-                    color={hasUnread ? theme.unread : theme.mutedText}
+                    color={
+                      hasUnread ? theme.unread : (theme.chatListPreviewText ?? theme.mutedText)
+                    }
                     bold={hasUnread && theme.emphasis.unreadBold}
                     wrap="wrap"
                   >

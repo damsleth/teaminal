@@ -84,6 +84,8 @@ export type ThemeLayout = {
   // MessagePane: 1 rounds the corners of message body backgrounds (a
   // half-block "speech bubble" frame); 0 keeps them square.
   textBackgroundRadius: number
+  // MessagePane: columns before the profile picture (when shown).
+  avatarIndent: number
 }
 
 export type ThemeBorders = {
@@ -144,6 +146,8 @@ export type Theme = {
   senderMessage: string | null
   // Background behind other people's message bodies; null = none.
   senderMessageBackground: string | null
+  // Chat list last-message previews of read chats; null = muted text.
+  chatListPreviewText: string | null
   systemEvent: string
   // MessagePane day separator.
   dateMarker: string
@@ -194,6 +198,7 @@ const LAYOUT_DEFAULT: ThemeLayout = {
   dateMarkerIndent: 0,
   messageMaxWidth: 100,
   textBackgroundRadius: 0,
+  avatarIndent: 0,
 }
 
 const BORDERS_DEFAULT: ThemeBorders = { panel: 'round', modal: 'round', active: 'round' }
@@ -250,6 +255,7 @@ const DARK: Theme = {
   selfMessageBackground: null,
   senderMessage: null,
   senderMessageBackground: null,
+  chatListPreviewText: null,
   systemEvent: 'gray',
   dateMarker: 'gray',
   errorText: 'red',
@@ -292,6 +298,7 @@ const LIGHT: Theme = {
   selfMessageBackground: null,
   senderMessage: null,
   senderMessageBackground: null,
+  chatListPreviewText: null,
   systemEvent: 'gray',
   dateMarker: 'gray',
   errorText: 'red',
@@ -340,6 +347,7 @@ export type PartialTheme = {
   selfMessageBackground?: string | null
   senderMessage?: string | null
   senderMessageBackground?: string | null
+  chatListPreviewText?: string | null
   systemEvent?: string
   dateMarker?: string
   errorText?: string

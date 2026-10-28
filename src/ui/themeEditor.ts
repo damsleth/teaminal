@@ -196,6 +196,7 @@ export const FIELDS: readonly EditableField[] = [
   color('unread', 'Unread', 'Chat list'),
   color('unreadRow', 'Unread row', 'Chat list'),
   bool('unreadBold', 'Unread bold', 'Chat list'),
+  color('chatListPreviewText', 'Preview text', 'Chat list', true),
   num('layout', 'chatListIndent', 'Indent', 'Chat list', 0, 6),
   num('layout', 'chatListGap', 'Gap', 'Chat list', 0, 3),
   num('fontSize', 'chatListHeader', 'Header size', 'Chat list', 50, 100, 10),
@@ -208,6 +209,7 @@ export const FIELDS: readonly EditableField[] = [
   bool('senderBold', 'Sender bold', 'Sender & time'),
   num('fontSize', 'sender', 'Sender size', 'Sender & time', 50, 100, 10),
   num('layout', 'senderIndent', 'Sender indent', 'Sender & time', 0, 40),
+  num('layout', 'avatarIndent', 'Picture indent', 'Sender & time', 0, 40),
   color('timestamp', 'Timestamp', 'Sender & time'),
   num('fontSize', 'timestamp', 'Timestamp size', 'Sender & time', 50, 100, 10),
   // — Message text —

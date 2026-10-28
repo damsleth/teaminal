@@ -261,6 +261,7 @@ export type ThemeColorOverrides = {
   selfMessageBackground?: string | null
   senderMessage?: string | null
   senderMessageBackground?: string | null
+  chatListPreviewText?: string | null
   systemEvent?: string
   dateMarker?: string
   errorText?: string
@@ -289,6 +290,7 @@ export type ThemeOverrides = ThemeColorOverrides & {
     dateMarkerIndent: number
     messageMaxWidth: number
     textBackgroundRadius: number
+    avatarIndent: number
   }>
   borders?: Partial<{
     panel: BorderStyleName
