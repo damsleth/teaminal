@@ -268,6 +268,7 @@ export type ThemeOverrides = ThemeColorOverrides & {
     modalPaddingX: number
     modalPaddingY: number
     paneHeaderPaddingLeft: number
+    senderIndent: number
     paneHeaderMarginBottom: number
     tailGap: number
     chatListPaddingRight: number

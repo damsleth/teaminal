@@ -62,6 +62,9 @@ export type ThemeLayout = {
   // MessagePane: left indent of message bodies (and the cozy chat-name
   // header, which aligns with them). Sender name + body share this indent.
   paneHeaderPaddingLeft: number
+  // MessagePane: left indent of the sender name + timestamp line, set apart
+  // from the body indent.
+  senderIndent: number
   // MessagePane: blank rows inserted after each message group, separating
   // one sender's name+body block from the next.
   paneHeaderMarginBottom: number
@@ -168,6 +171,7 @@ const LAYOUT_DEFAULT: ThemeLayout = {
   modalPaddingY: 1,
   // Message body indent (cols) and gap between message groups (rows).
   paneHeaderPaddingLeft: 2,
+  senderIndent: 2,
   paneHeaderMarginBottom: 1,
   tailGap: 1,
   chatListPaddingRight: 1,

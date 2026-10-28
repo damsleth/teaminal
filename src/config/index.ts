@@ -91,6 +91,7 @@ const LAYOUT_KEYS = new Set<keyof NonNullable<ThemeOverrides['layout']>>([
   'modalPaddingX',
   'modalPaddingY',
   'paneHeaderPaddingLeft',
+  'senderIndent',
   'paneHeaderMarginBottom',
   'tailGap',
   'chatListPaddingRight',

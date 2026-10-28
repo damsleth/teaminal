@@ -196,7 +196,8 @@ theme layered on top of `dark`; any subset of these keys is accepted:
     "panePaddingX": 1,
     "modalPaddingX": 3,
     "modalPaddingY": 1,
-    "paneHeaderPaddingLeft": 1,
+    "paneHeaderPaddingLeft": 1, // message body indent
+    "senderIndent": 1, // sender name + timestamp indent
     "paneHeaderMarginBottom": 1, // message gap; 0.5 steps give half-row gaps in kitty
     "tailGap": 1,
     "chatListPaddingRight": 1,
