@@ -16,7 +16,7 @@
 // Menu structure lives in ./menu - this component is the renderer + input
 // dispatcher. Add menu items there, not here.
 
-import { Box, Text, useApp } from 'ink'
+import { Box, Text, useApp, useStdout } from 'ink'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import {
@@ -56,18 +56,18 @@ const LOGO = [
   '   ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝',
 ]
 
-// Width of the rendered menu rows (LOGO length). Used to pad every
-// row so each Text node writes a uniform-width run with the menu's
-// background color — Ink's Box backgroundColor fill paints the box's
-// rectangle, but when the menu sits behind cells the underlying chat
-// has already written to we get more reliable opacity by also setting
-// backgroundColor on each Text and padding so every cell of the row
-// is covered.
-const MENU_CONTENT_WIDTH = LOGO[0]!.length
+// Minimum width of the rendered menu rows (LOGO length). Every row is
+// padded to the menu's width so each Text node writes a uniform-width run
+// with the menu's background color — Ink's Box backgroundColor fill paints
+// the box's rectangle, but when the menu sits behind cells the underlying
+// chat has already written to we get more reliable opacity by also setting
+// backgroundColor on each Text and padding so every cell of the row is
+// covered.
+const MENU_MIN_WIDTH = LOGO[0]!.length
 
-function pad(text: string): string {
-  if (text.length >= MENU_CONTENT_WIDTH) return text
-  return text + ' '.repeat(MENU_CONTENT_WIDTH - text.length)
+function padTo(text: string, width: number): string {
+  if (text.length >= width) return text
+  return text + ' '.repeat(width - text.length)
 }
 
 export function openMenu(store: ReturnType<typeof useAppStore>, path: string[] = []): void {
@@ -94,6 +94,8 @@ export function MenuModal() {
   const settings = useAppState((s) => s.settings)
   const theme = useTheme()
   const terminalRows = useTerminalRows()
+  const { stdout } = useStdout()
+  const terminalColumns = stdout?.columns ?? 80
   const isOpen = modal?.kind === 'menu'
 
   useInput(
@@ -242,22 +244,48 @@ export function MenuModal() {
   const atRoot = modal.path.length === 0
   const breadcrumb = !atRoot ? modal.path.join(' / ') : null
 
-  // Each menu row visually consumes ~2 terminal rows in this layout, and the
-  // modal is centered inside the message pane. Window the items so a long
-  // submenu (Settings) fits without clipping the top/bottom off-screen.
-  const PER_ITEM_ROWS = 2
+  // The menu grows to fill the app (one row per item); only a list taller
+  // than the window scrolls.
+  const footer = '↑/↓ navigate · enter select · esc back · ^O config · ^T theme'
   const reservedRows =
-    8 /* outer header + composer + status + frame */ +
+    4 /* header bar + status bar */ +
     (atRoot ? LOGO.length + 3 : 0) /* logo + version + repo + blank (root only) */ +
     (breadcrumb ? 2 : 0) +
-    4 /* trailing blank + footer + ⋯ headroom */ +
+    2 /* trailing blank + footer */ +
+    2 /* ⋯ above / below */ +
     theme.layout.modalPaddingY * 2 +
     2 /* modal border */
-  const maxVisible = Math.max(4, Math.floor((terminalRows - reservedRows) / PER_ITEM_ROWS))
+  const maxVisible = Math.max(4, terminalRows - reservedRows)
   const { start, end } = menuItemWindow(items.length, modal.cursor, maxVisible)
   const moreAbove = start > 0
   const moreBelow = end < items.length
-  const visibleItems = items.slice(start, end).map((item, i) => ({ item, idx: start + i }))
+  const visibleItems = items.slice(start, end).map((item, i) => {
+    const valueSuffix = formatValueSuffix(item, settings)
+    const hint = item.hint ? `  (${item.hint})` : ''
+    const marker = i + start === modal.cursor && !item.disabled ? '> ' : '  '
+    return { item, idx: start + i, text: `${marker}${item.label}${valueSuffix}${hint}` }
+  })
+  // As wide as the longest row (all items, so scrolling doesn't resize it),
+  // up to the window minus the modal frame.
+  const maxWidth = Math.max(
+    MENU_MIN_WIDTH,
+    terminalColumns - 2 /* border */ - theme.layout.modalPaddingX * 2 - 2 /* margin */,
+  )
+  const width = Math.min(
+    maxWidth,
+    Math.max(
+      MENU_MIN_WIDTH,
+      footer.length,
+      ...items.map(
+        (it) =>
+          2 +
+          it.label.length +
+          formatValueSuffix(it, settings).length +
+          (it.hint ? it.hint.length + 4 : 0),
+      ),
+    ),
+  )
+  const pad = (text: string): string => padTo(text, width)
 
   return (
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
@@ -305,23 +333,21 @@ export function MenuModal() {
               {pad('  ⋯')}
             </Text>
           )}
-          {visibleItems.map(({ item, idx }) => {
+          {visibleItems.map(({ item, idx, text }) => {
             const selected = idx === modal.cursor
-            const marker = selected && !item.disabled ? '> ' : '  '
             // Use theme.text (not the terminal default fg) so rows stay
             // readable on the themed modal background even when the active
             // terminal palette's default foreground doesn't match the theme.
             const color = item.disabled ? 'gray' : selected ? theme.selected : theme.text
-            const valueSuffix = formatValueSuffix(item, settings)
-            const hint = item.hint ? `  (${item.hint})` : ''
             return (
               <Text
                 key={item.id}
                 color={color}
                 backgroundColor={modalBg(theme)}
                 bold={selected && !item.disabled && theme.emphasis.selectedBold}
+                wrap="truncate-end"
               >
-                {pad(`${marker}${item.label}${valueSuffix}${hint}`)}
+                {pad(text)}
               </Text>
             )
           })}
@@ -333,7 +359,7 @@ export function MenuModal() {
         </Box>
         <Text backgroundColor={modalBg(theme)}>{pad('')}</Text>
         <Text color="gray" backgroundColor={modalBg(theme)}>
-          {pad('↑/↓ navigate · enter select · esc back · ^O config · ^T theme')}
+          {pad(footer)}
         </Text>
       </Box>
     </Box>

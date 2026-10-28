@@ -205,6 +205,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The menu uses the whole window.** Settings and other submenus grow as
+  tall and wide as the app allows, instead of showing about half the list
+  and scrolling. Only a list taller than the window scrolls.
+
 - **Removing the account you are using switches away from it.** Removing
   the active account in **Accounts** used to keep showing its chats until
   restart; teaminal now switches to the next configured account (or the
