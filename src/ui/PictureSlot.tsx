@@ -2,11 +2,10 @@ import { Box, Text } from 'ink'
 import type { InlineImageSlots } from './inlineImageLayout'
 import type { Theme } from './theme'
 
-// Initials of a display name ("Lovelace, Ada" → "LA"), at most two.
+// Initials of a display name ("Lovelace, Ada" → "LA"), at most two, from
+// words that start with a letter: "(1:1)" or "🐷" give none.
 export function initialsOf(name: string): string {
-  return name
-    .split(/[\s,]+/)
-    .filter(Boolean)
+  return (name.match(/\p{L}[\p{L}\p{M}\p{N}'’-]*/gu) ?? [])
     .slice(0, 2)
     .map((w) => Array.from(w)[0]!.toUpperCase())
     .join('')
