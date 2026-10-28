@@ -307,7 +307,9 @@ export function ThemeEditorModal() {
           {pad(
             settings.theme === base
               ? `Theme editor · ${base} colors`
-              : `Theme editor · ${settings.theme} (${base})`,
+              : settings.theme === 'auto'
+                ? `Theme editor · ${base} colors (picked by auto)`
+                : `Theme editor · ${settings.theme} (${base})`,
           )}
         </Text>
         <Text color="gray" backgroundColor={bg}>

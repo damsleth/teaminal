@@ -55,4 +55,24 @@ describe('startSystemAppearanceDriver', () => {
     driver.stop()
     unsub()
   })
+
+  test("the terminal's background wins until the OS appearance flips", async () => {
+    const store = createAppStore()
+    let os: 'light' | 'dark' = 'dark'
+    const driver = startSystemAppearanceDriver(store, {
+      detect: () => os,
+      terminal: 'light',
+      intervalMs: 5,
+    })
+    expect(store.get().systemAppearance).toBe('light')
+    await new Promise((r) => setTimeout(r, 20))
+    // Same OS value: the terminal's answer stands.
+    expect(store.get().systemAppearance).toBe('light')
+    os = 'light'
+    await new Promise((r) => setTimeout(r, 20))
+    os = 'dark'
+    await new Promise((r) => setTimeout(r, 20))
+    expect(store.get().systemAppearance).toBe('dark')
+    driver.stop()
+  })
 })

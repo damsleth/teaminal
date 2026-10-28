@@ -200,6 +200,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **`auto` theme follows the terminal.** `auto` picks the built-in light or
+  dark theme to match the terminal's background color (asked at startup),
+  instead of the macOS appearance, which is now only the fallback for
+  terminals that don't answer. The menu, theme presets and theme editor
+  show it as the light or dark theme it picked ("auto → light").
+
 - **Settings menu in labeled groups.** Settings now reads top to bottom
   under headings: Appearance, Header & status bar, Chat list, Messages,
   Navigation & input, Notifications, Presence, Advanced. Labels inside a

@@ -1,5 +1,13 @@
-// Detects whether the OS is in dark or light appearance, so the 'auto'
-// theme can follow it.
+// The appearance the 'auto' theme follows: light or dark. The terminal's
+// own background (probed at startup, src/ui/terminalBackground.ts) wins;
+// the OS appearance is the fallback for terminals that don't report one.
+//
+// After startup the OS appearance is still polled: when it flips, the
+// terminal's colors usually flip with it (light/dark theme pairs), so the
+// new OS value is taken from then on.
+// ponytail: the terminal isn't asked again after startup (its reply would
+// land in Ink's input); re-probe on focus-in if a terminal changes colors
+// on its own.
 //
 // macOS: `defaults read -g AppleInterfaceStyle` prints "Dark" in dark mode
 // and exits non-zero (the key does not exist) in light mode. Other platforms
@@ -43,15 +51,26 @@ export type SystemAppearanceDriver = { stop: () => void }
 
 export function startSystemAppearanceDriver(
   store: Store<AppState>,
-  opts?: { intervalMs?: number; detect?: () => SystemAppearance },
+  opts?: {
+    intervalMs?: number
+    detect?: () => SystemAppearance
+    // The terminal background's appearance from the startup probe, if any.
+    terminal?: SystemAppearance | null
+  },
 ): SystemAppearanceDriver {
   const detect = opts?.detect ?? (() => detectSystemAppearance())
-  const apply = (): void => {
-    const next = detect()
+  const set = (next: SystemAppearance): void => {
     if (store.get().systemAppearance !== next) store.set({ systemAppearance: next })
   }
-  apply() // synchronous initial read so the first render uses the right base
-  const timer = setInterval(apply, opts?.intervalMs ?? 15_000)
+  // Synchronous initial read so the first render uses the right base.
+  let os = detect()
+  set(opts?.terminal ?? os)
+  const timer = setInterval(() => {
+    const next = detect()
+    if (next === os) return
+    os = next
+    set(next)
+  }, opts?.intervalMs ?? 15_000)
   if (typeof timer.unref === 'function') timer.unref()
   return {
     stop() {
