@@ -4,30 +4,11 @@ import { render } from 'ink'
 import { isRefreshExpiredError } from '../src/auth/owaPiggy'
 import { loadSettings } from '../src/config'
 import { loadThemeFile } from '../src/config/themes'
-import { runSession, type SessionHandle } from '../src/state/bootstrap'
+import { createAccountManager } from '../src/state/accountManager'
 import { startForceAvailabilityDriver } from '../src/state/forceAvailability'
 import { startSystemAppearanceDriver } from '../src/state/systemAppearance'
-import { createAppStore, messagesFromCaches, resetAccountScopedState } from '../src/state/store'
-import {
-  flushMessageCache,
-  getMessageCachePath,
-  loadMessageCache,
-  scheduleMessageCacheSave,
-} from '../src/state/messageCachePersistence'
-import {
-  flushListCache,
-  getListCachePath,
-  loadListCache,
-  scheduleListCacheSave,
-} from '../src/state/listCachePersistence'
-import {
-  flushNameCache,
-  getNameCachePath,
-  loadNameCache,
-  scheduleNameCacheSave,
-} from '../src/state/nameCachePersistence'
-import { indexNamesFromChats, indexNamesFromMessages } from '../src/state/nameIndex'
-import { applySeededState, isSeededMode } from '../src/state/seedFixtures'
+import { createAppStore } from '../src/state/store'
+import { isSeededMode } from '../src/state/seedFixtures'
 import { App } from '../src/ui/App'
 import { ErrorBoundary } from '../src/ui/ErrorBoundary'
 import { startFocusTracker } from '../src/ui/focusTracker'
@@ -36,9 +17,7 @@ import { installTextSizing, probeTextSizing } from '../src/ui/textSizing'
 import { cleanupImageTempFiles } from '../src/ui/openImageFile'
 import { renderCleanExit } from '../src/ui/shutdown'
 import { PollerProvider } from '../src/ui/PollerContext'
-import type { PollerHandleRef } from '../src/state/poller'
 import { accountRef } from '../src/account'
-import { createGraphClient, getAudiencePreference } from '../src/graph/client'
 import { SessionProvider, type SessionApi } from '../src/ui/SessionContext'
 import { StoreProvider } from '../src/ui/StoreContext'
 import { debug, setLogFile, setNetworkLog, warn } from '../src/log'
@@ -182,8 +161,7 @@ if (themeResult.source === 'file') {
   debug(`theme: loaded "${themeResult.name}" from ${themeResult.path}`)
 }
 for (const w of themeResult.warnings) warn(w)
-let activeProfile: string | null = cliProfile ?? configResult.settings.activeAccount ?? null
-store.set({ account: accountRef(activeProfile) })
+const initialProfile: string | null = cliProfile ?? configResult.settings.activeAccount ?? null
 const resolvedLogFile = cliLogFile ?? configResult.settings.logFile ?? null
 if (resolvedLogFile) setLogFile(resolvedLogFile)
 if (cliNetworkLog) setNetworkLog(cliNetworkLog)
@@ -192,134 +170,13 @@ if (configResult.source === 'file') {
 }
 for (const w of configResult.warnings) warn(w)
 
-// Hydrate the per-profile message cache before mounting so the message
-// pane shows history immediately. Failure is silent — the active poller
-// repopulates from Graph.
-function hydrateCache(profile: string | null): void {
-  try {
-    const persisted = loadMessageCache(getMessageCachePath(process.env, profile))
-    if (Object.keys(persisted).length > 0) {
-      const messages = messagesFromCaches(persisted)
-      store.set((s) => ({
-        messageCacheByConvo: persisted,
-        messagesByConvo: messages,
-        // Seed the name index from cached senders so 1:1 / group labels
-        // resolve real names before the first poll re-fetches messages.
-        nameByUserId: indexNamesFromMessages(s.nameByUserId, Object.values(messages).flat()),
-      }))
-      debug(`bootstrap: hydrated ${Object.keys(persisted).length} cached conversations`)
-    }
-  } catch (err) {
-    warn(
-      'bootstrap: hydrate message cache failed:',
-      err instanceof Error ? err.message : String(err),
-    )
-  }
-}
-
-// Hydrate the per-profile userId -> name index so sidebar labels show
-// real names immediately, even for chats whose roster displayName is
-// missing or just an email. Merged with (not overwritten by) names
-// already seeded from the message/list caches above.
-function hydrateNameCache(profile: string | null): void {
-  try {
-    const persisted = loadNameCache(getNameCachePath(process.env, profile))
-    const count = Object.keys(persisted).length
-    if (count > 0) {
-      store.set((s) => ({ nameByUserId: { ...persisted, ...s.nameByUserId } }))
-      debug(`bootstrap: hydrated ${count} cached display names`)
-    }
-  } catch (err) {
-    warn('bootstrap: hydrate name cache failed:', err instanceof Error ? err.message : String(err))
-  }
-}
-
-// Hydrate the per-profile chat/teams list cache so the sidebar is
-// populated before the first list-poll completes. The poller overwrites
-// it on its first successful refresh; failure is silent.
-function hydrateListCache(profile: string | null): void {
-  try {
-    const persisted = loadListCache(getListCachePath(process.env, profile))
-    if (persisted) {
-      store.set((s) => ({
-        chats: persisted.chats,
-        teams: persisted.teams,
-        channelsByTeam: persisted.channelsByTeam,
-        nameByUserId: indexNamesFromChats(s.nameByUserId, persisted.chats),
-      }))
-      debug(
-        `bootstrap: hydrated ${persisted.chats.length} chats / ${persisted.teams.length} teams from list cache`,
-      )
-    }
-  } catch (err) {
-    warn('bootstrap: hydrate list cache failed:', err instanceof Error ? err.message : String(err))
-  }
-}
-// Seeded/offline mode (tui-test, demos) must neither read nor write the real
-// per-profile caches: fixture data would overwrite ~/.cache/teaminal, and
-// real cached data would leak into deterministic snapshots.
-const persistCaches = !isSeededMode()
-if (persistCaches) {
-  hydrateNameCache(activeProfile)
-  hydrateCache(activeProfile)
-  hydrateListCache(activeProfile)
-}
+// Binds the store to the initial account and hydrates its caches before
+// mounting, so the sidebar and message pane show history immediately.
+const accounts = createAccountManager(store, initialProfile)
 
 // Detect the OS appearance before the first render so the 'auto' theme
 // paints the right base immediately, then keep it updated on an interval.
 const systemAppearance = startSystemAppearanceDriver(store)
-
-// Persist message cache on every relevant store change. Debounced inside
-// scheduleMessageCacheSave so chat-spam doesn't thrash the disk. The
-// path is tied to the *current* active profile and rebuilt on switch.
-let lastSavedCaches = store.get().messageCacheByConvo
-let activeCachePath = getMessageCachePath(process.env, activeProfile)
-const cacheSubscription = store.subscribe((s) => {
-  if (!persistCaches || s.messageCacheByConvo === lastSavedCaches) return
-  lastSavedCaches = s.messageCacheByConvo
-  // An empty cache is the wiped post-switch / hard-refresh state; writing it
-  // would clobber the profile's history before the poller refills it.
-  if (Object.keys(s.messageCacheByConvo).length === 0) return
-  scheduleMessageCacheSave(s.messageCacheByConvo, undefined, activeCachePath)
-})
-
-// Persist the chat/teams list whenever the poller refreshes it. Debounced
-// inside scheduleListCacheSave; path tracks the active profile.
-let lastSavedChats = store.get().chats
-let lastSavedTeams = store.get().teams
-let activeListCachePath = getListCachePath(process.env, activeProfile)
-const listCacheSubscription = store.subscribe((s) => {
-  if (!persistCaches || (s.chats === lastSavedChats && s.teams === lastSavedTeams)) return
-  lastSavedChats = s.chats
-  lastSavedTeams = s.teams
-  // Don't persist a wiped list — resetAccountScopedState clears chats/teams
-  // on account switch, and that empty state must not clobber either
-  // profile's cached sidebar.
-  if (s.chats.length === 0 && s.teams.length === 0) return
-  scheduleListCacheSave(
-    { chats: s.chats, teams: s.teams, channelsByTeam: s.channelsByTeam },
-    undefined,
-    activeListCachePath,
-  )
-})
-
-// Persist the userId -> name index whenever it grows. Debounced; path
-// tracks the active profile. An empty index is the wiped post-switch
-// state, which must not clobber the previous profile's cached names.
-let lastSavedNames = store.get().nameByUserId
-let activeNameCachePath = getNameCachePath(process.env, activeProfile)
-const nameCacheSubscription = store.subscribe((s) => {
-  if (!persistCaches || s.nameByUserId === lastSavedNames) return
-  lastSavedNames = s.nameByUserId
-  if (Object.keys(s.nameByUserId).length === 0) return
-  scheduleNameCacheSave(s.nameByUserId, undefined, activeNameCachePath)
-})
-
-// PollerHandleRef and current session handle are mutated by the
-// bootstrap + restart flows; the App reads ref.current inside event
-// handlers, so it observes the assignment without needing a re-render.
-const pollerHandleRef: PollerHandleRef = { current: null }
-let currentSession: SessionHandle | null = null
 
 // `bun --watch` (dev:watch) sends SIGTERM before it re-execs on a file change.
 // Ink's restore-cursor hooks signal-exit, which re-raises a SIGTERM nobody else
@@ -330,7 +187,7 @@ if (process.execArgv.includes('--watch')) process.on('SIGTERM', () => {})
 const ink = render(
   <ErrorBoundary>
     <StoreProvider store={store}>
-      <PollerProvider handleRef={pollerHandleRef}>
+      <PollerProvider handleRef={accounts.pollerHandleRef}>
         <SessionProvider api={makeSessionApi()}>
           <App />
         </SessionProvider>
@@ -359,80 +216,13 @@ const focusTracker = startFocusTracker(store)
 // PUTs to presence.teams.microsoft.com, so stub it out when seeded.
 const forceAvailability = isSeededMode()
   ? { stop() {} }
-  : startForceAvailabilityDriver(store, () => accountRef(activeProfile))
+  : startForceAvailabilityDriver(store, () => accountRef(accounts.activeProfile()))
 
 function makeSessionApi(): SessionApi {
   return {
-    getActiveProfile: () => activeProfile,
-    // The running session's client; before one exists (seeded mode, the
-    // auth-expired modal) a client bound to the selected profile.
-    client: () =>
-      currentSession?.client() ??
-      createGraphClient({ account: accountRef(activeProfile), ...getAudiencePreference() }),
-    switchAccount,
-  }
-}
-
-async function switchAccount(nextProfile: string | null): Promise<void> {
-  if (currentSession?.profile === nextProfile) return
-  // Tear down the running session first so its loops can't write into
-  // the about-to-be-reset store.
-  if (currentSession) {
-    try {
-      await currentSession.stop()
-    } catch (err) {
-      warn(
-        'switch: stop previous session failed:',
-        err instanceof Error ? err.message : String(err),
-      )
-    }
-    currentSession = null
-  }
-  // Flush the previous profile's caches before swapping the paths.
-  try {
-    flushMessageCache()
-  } catch {}
-  try {
-    flushListCache()
-  } catch {}
-  try {
-    flushNameCache()
-  } catch {}
-  // Swap the persistence paths before the reset: the reset fires the cache
-  // subscribers, and any write they schedule must target the new profile.
-  activeProfile = nextProfile
-  activeCachePath = getMessageCachePath(process.env, activeProfile)
-  activeListCachePath = getListCachePath(process.env, activeProfile)
-  activeNameCachePath = getNameCachePath(process.env, activeProfile)
-  // The reset bumps store.accountGeneration, so every accountStore() handle
-  // held by async work drops its writes instead of landing in another account
-  // (even across A -> B -> A). Bumped at the reset itself, not at the start
-  // of the switch: work begun during teardown still holds the old session's
-  // client and must count as stale too.
-  resetAccountScopedState(store, accountRef(activeProfile))
-  // Seeded mode switches between fixture accounts without a session.
-  if (isSeededMode()) {
-    applySeededState(store, activeProfile)
-    return
-  }
-  if (persistCaches) {
-    hydrateNameCache(activeProfile)
-    hydrateCache(activeProfile)
-    hydrateListCache(activeProfile)
-  }
-
-  try {
-    currentSession = await runSession({
-      store,
-      profile: activeProfile,
-      pollerHandleRef,
-      onFatal: (kind, msg) => {
-        warn(`bootstrap: fatal (${kind}): ${msg}`)
-      },
-    })
-  } catch (err) {
-    warn('switch: bootstrap failed:', err instanceof Error ? err.message : String(err))
-    throw err
+    getActiveProfile: () => accounts.activeProfile(),
+    client: () => accounts.client(),
+    switchAccount: (profile) => accounts.switchAccount(profile),
   }
 }
 
@@ -449,36 +239,24 @@ function showAuthExpiredModal(profile: string | null, message: string): void {
 let cleanExit = false
 ;(async () => {
   try {
-    if (isSeededMode()) {
-      // Seeded/offline mode: inject deterministic fixture data directly
-      // into the store and skip all Graph / owa-piggy auth. The real Ink
-      // render path still runs — only the data source differs.
-      debug('bootstrap: seeded mode active (TEAMINAL_SEED=%s)', process.env.TEAMINAL_SEED)
-      applySeededState(store, activeProfile)
-    } else {
-      try {
-        currentSession = await runSession({
-          store,
-          profile: activeProfile,
-          pollerHandleRef,
-          onFatal: (kind, msg) => {
-            ink.unmount()
-            process.stderr.write(`teaminal: auth failed (${kind}): ${msg}\n`)
-            process.exit(3)
-          },
-        })
-      } catch (err) {
-        // Refresh-token expiry: keep the UI mounted and offer
-        // reseed / switch / quit instead of dumping the AAD message.
-        // Any other bootstrap error still bubbles up to the outer
-        // catch and exits.
-        const message = err instanceof Error ? err.message : String(err)
-        if (isRefreshExpiredError(message)) {
-          warn(`bootstrap: refresh token expired for profile=${activeProfile ?? '(default)'}`)
-          showAuthExpiredModal(activeProfile, message)
-        } else {
-          throw err
-        }
+    try {
+      await accounts.start((kind, msg) => {
+        ink.unmount()
+        process.stderr.write(`teaminal: auth failed (${kind}): ${msg}\n`)
+        process.exit(3)
+      })
+    } catch (err) {
+      // Refresh-token expiry: keep the UI mounted and offer
+      // reseed / switch / quit instead of dumping the AAD message.
+      // Any other bootstrap error still bubbles up to the outer
+      // catch and exits.
+      const message = err instanceof Error ? err.message : String(err)
+      const profile = accounts.activeProfile()
+      if (isRefreshExpiredError(message)) {
+        warn(`bootstrap: refresh token expired for profile=${profile ?? '(default)'}`)
+        showAuthExpiredModal(profile, message)
+      } else {
+        throw err
       }
     }
 
@@ -497,16 +275,7 @@ let cleanExit = false
     // hardware-level helpers (focus tracker / force-availability), then
     // flush the cache one last time.
     try {
-      cacheSubscription()
-    } catch {}
-    try {
-      listCacheSubscription()
-    } catch {}
-    try {
-      nameCacheSubscription()
-    } catch {}
-    try {
-      if (currentSession) await currentSession.stop()
+      await accounts.stopAll()
     } catch {}
     try {
       forceAvailability.stop()
@@ -516,15 +285,6 @@ let cleanExit = false
     } catch {}
     try {
       focusTracker.stop()
-    } catch {}
-    try {
-      flushMessageCache()
-    } catch {}
-    try {
-      flushListCache()
-    } catch {}
-    try {
-      flushNameCache()
     } catch {}
     // Images handed to the platform viewer live in a private temp dir; don't
     // leave them on disk.
