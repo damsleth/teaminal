@@ -293,6 +293,8 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     showPresenceInList: settings.showPresenceInList,
     showTimestampsInPane: settings.showTimestampsInPane,
     centerDateMarkers: settings.centerDateMarkers,
+    messageAvatars: settings.messageAvatars,
+    chatListThumbnails: settings.chatListThumbnails,
     showSenderNamesInPane: settings.showSenderNamesInPane,
     showOwnNameInPane: settings.showOwnNameInPane,
     showReactions: settings.showReactions,
@@ -498,6 +500,7 @@ export const PRESET_SETTING_KEYS = [
   'chatListShortNames',
   'chatListPreviewLines',
   'showPresenceInList',
+  'chatListThumbnails',
   'showChatNameHeader',
   'messagePaneShortNames',
   'showTimestampsInPane',
@@ -506,6 +509,7 @@ export const PRESET_SETTING_KEYS = [
   'showReactions',
   'inlineImages',
   'inlineImageMaxRows',
+  'messageAvatars',
   'selfMessagesOnRight',
   'showOwnNameInPane',
   'messageFocusIndicatorEnabled',
@@ -648,6 +652,14 @@ function validateAndAssign(
         return true
       }
       warnings.push('config: "showTimestampsInPane" must be "off", "on", or "transient"')
+      return false
+    case 'messageAvatars':
+    case 'chatListThumbnails':
+      if (value === 'off' || value === 'small' || value === 'medium' || value === 'large') {
+        out[key] = value
+        return true
+      }
+      warnings.push(`config: "${key}" must be "off", "small", "medium", or "large"`)
       return false
     case 'showReactions':
       if (value === 'off' || value === 'current' || value === 'all') {

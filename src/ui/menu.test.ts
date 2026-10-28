@@ -233,6 +233,7 @@ describe('ROOT_MENU shape', () => {
       'chatListShortNames',
       'chatListPreviewLines',
       'showPresenceInList',
+      'chatListThumbnails',
       // Messages
       'showChatNameHeader',
       'messagePaneShortNames',
@@ -243,6 +244,7 @@ describe('ROOT_MENU shape', () => {
       'centerDateMarkers',
       'showReactions',
       'inlineImages',
+      'messageAvatars',
       // Navigation & input
       'messageFocusIndicatorEnabled',
       'messageFocusIndicatorChar',
