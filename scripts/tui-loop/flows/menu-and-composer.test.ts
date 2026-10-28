@@ -107,6 +107,18 @@ test('composer-active: Enter opens a chat and Tab focuses the composer', async (
   // selection and the composer prompt both render one.)
   await expect(terminal.getByText('Ctrl+Enter send')).toBeVisible()
 
+  // The caret is the terminal's own cursor, not a drawn block: after typing,
+  // it sits on the cell right after the text on the composer's prompt line.
+  terminal.write('hi')
+  await expect(terminal.getByText('> hi')).toBeVisible()
+  const rows = terminal.getViewableBuffer().map((r) => r.join(''))
+  const y = rows.findIndex((r) => r.includes('> hi'))
+  const cursor = terminal.getCursor()
+  if (cursor.y !== y || cursor.x !== rows[y]!.indexOf('> hi') + 4)
+    throw new Error(`cursor at ${cursor.x},${cursor.y}; caret expected after "> hi" on row ${y}`)
+  terminal.write('\x7f\x7f')
+  await expect(terminal.getByText('> hi')).not.toBeVisible()
+
   // Text-snapshot gate for the composer-active state.
   await expect(terminal).toMatchSnapshot({ includeColors: true })
 

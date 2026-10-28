@@ -207,6 +207,12 @@ test('sender name toggles and message max width', () => {
   // Left margin ≈ a quarter of the pane; the right margin mirrors it.
   expect(half.start - full.start).toBeGreaterThanOrEqual(15)
   expect(half.start + half.width).toBeLessThanOrEqual(80 - 15)
+  // The sender line isn't narrowed: it stays at its sender indent.
+  const senderCol = (out: string) => {
+    const ls = out.split('\n')
+    return ls[ls.findIndex((l) => l.includes('word')) - 1]!.search(/\S/)
+  }
+  expect(senderCol(renderWith({}, 50))).toBe(senderCol(renderWith({})))
 })
 
 function renderWithSettings(settings: Record<string, unknown>, themeOverrides: object = {}) {

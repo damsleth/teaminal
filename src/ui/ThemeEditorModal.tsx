@@ -567,7 +567,7 @@ function ThemePreview(props: {
         theme.senderMessageBackground,
       )}
       {senderLine('You', theme.selfName, '12:36')}
-      {body('Looks good, shipping', theme.selfMessage, theme.selfMessageBackground)}
+      {body('Looks good, shipping', theme.selfMessage ?? theme.text, theme.selfMessageBackground)}
       {body(
         'Focused message',
         theme.messageFocusText ?? theme.senderMessage ?? theme.text,

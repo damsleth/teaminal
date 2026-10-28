@@ -213,7 +213,7 @@ export const FIELDS: readonly EditableField[] = [
   // — Message text —
   color('senderMessage', 'Sender message', 'Message text', true),
   color('senderMessageBackground', 'Sender message bg', 'Message text', true),
-  color('selfMessage', 'Self message', 'Message text'),
+  color('selfMessage', 'Self message', 'Message text', true),
   color('selfMessageBackground', 'Self message bg', 'Message text', true),
   color('systemEvent', 'System event', 'Message text'),
   num('fontSize', 'messageText', 'Text size', 'Message text', 50, 100, 10),

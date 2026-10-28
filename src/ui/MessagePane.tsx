@@ -271,15 +271,15 @@ export function MessagePane(props: {
   const bubble = theme.layout.textBackgroundRadius > 0 ? 1 : 0
   const bgPadX = theme.layout.textBackgroundPaddingX + bubble
   const bodyPaddingY = theme.layout.textBackgroundPaddingY + bubble
-  // layout.messageMaxWidth narrows the whole conversation column to that
-  // percent of the pane, centered: equal margins left and right.
+  // layout.messageMaxWidth narrows each message (not its sender line) to
+  // that percent of the space beside the avatar column, centered: equal
+  // margins left and right.
   const paneColumns = terminalSize.columns - listPaneWidth - 2
-  const conversationColumns = Math.floor((paneColumns * theme.layout.messageMaxWidth) / 100)
-  const conversationMargin = Math.floor((paneColumns - conversationColumns) / 2)
-  const messageTextColumns = Math.max(
-    12,
-    conversationColumns - avatarColumn - bodyIndent - 2 * bgPadX,
+  const conversationColumns = Math.floor(
+    ((paneColumns - avatarColumn) * theme.layout.messageMaxWidth) / 100,
   )
+  const conversationMargin = Math.floor((paneColumns - avatarColumn - conversationColumns) / 2)
+  const messageTextColumns = Math.max(12, conversationColumns - bodyIndent - 2 * bgPadX)
   // Cell budget for an inline image (conversation column minus the gutter).
   const imgCols = Math.max(12, conversationColumns - 18)
   // Rows a message's inline images occupy: each loaded image takes its fitted
@@ -527,15 +527,7 @@ export function MessagePane(props: {
           overflow="hidden"
           justifyContent={windowEnd === allRows.length ? 'flex-end' : 'flex-start'}
         >
-          <Box
-            flexDirection="column"
-            flexGrow={1}
-            flexShrink={0}
-            width={
-              theme.layout.messageMaxWidth < 100 ? `${theme.layout.messageMaxWidth}%` : undefined
-            }
-            alignSelf={theme.layout.messageMaxWidth < 100 ? 'center' : undefined}
-          >
+          <Box flexDirection="column" flexGrow={1} flexShrink={0}>
             {messages.length === 0 ? (
               <Text color="gray"> loading...</Text>
             ) : (
@@ -810,7 +802,7 @@ function MessageRow(props: {
   if (sendError) color = theme.errorText
   else if (isSending) color = theme.systemEvent
   else if (isSystem) color = theme.systemEvent
-  else if (isSelf) color = theme.selfMessage
+  else if (isSelf) color = theme.selfMessage ?? undefined
   else color = theme.senderMessage ?? undefined
 
   // The marker column carries the focus arrow when this row is focused;
@@ -930,6 +922,17 @@ function MessageRow(props: {
   // via the existing thread tree; double-decorating both would be visual noise.
   const quotedReply = !isSystem ? getQuotedReply(m) : null
 
+  const conversationWidth =
+    theme.layout.messageMaxWidth < 100 ? `${theme.layout.messageMaxWidth}%` : undefined
+  const bodyRow = (
+    <Box flexDirection="row">
+      {!flip && marker}
+      <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
+        {bodyNode}
+      </Box>
+      {flip && marker}
+    </Box>
+  )
   const block = (
     <>
       {hasHeader ? (
@@ -958,90 +961,84 @@ function MessageRow(props: {
           </Box>
           {flip && senderIndent > 0 && <Box width={senderIndent} flexShrink={0} />}
         </Box>
-      ) : (
-        <Box flexDirection="row">
-          {!flip && marker}
-          <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
-            {bodyNode}
-          </Box>
-          {flip && marker}
-        </Box>
-      )}
-      {quotedReply &&
-        contentRow(
-          'quoted',
-          <Text color={theme.mutedText} wrap="truncate-end">
-            {`↳ replying to ${quotedReply.senderName}${
-              quotedReply.preview ? `: "${quotedReply.preview}"` : ''
-            }`}
-          </Text>,
-        )}
-      {hasHeader && (
-        <Box flexDirection="row">
-          {!flip && marker}
-          <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
-            {bodyNode}
-          </Box>
-          {flip && marker}
-        </Box>
-      )}
-      {props.threadMeta &&
-        props.threadMeta.count > 0 &&
-        contentRow(
-          'thread',
-          <Text wrap="truncate-end">
-            <Text color={theme.mutedText}>╰─ </Text>
-            <Text
-              color={threadFocused ? theme.selected : theme.mutedText}
-              bold={threadFocused}
-              backgroundColor={
-                threadFocused ? (theme.selectedRowBackground ?? undefined) : undefined
-              }
-            >
-              {formatReplyCount(props.threadMeta)}
-            </Text>
-          </Text>,
-        )}
-      {readReceiptLine &&
-        contentRow(
-          'receipt',
-          <Text color={theme.mutedText} wrap="truncate-end">
-            {readReceiptLine}
-          </Text>,
-        )}
-      {sendError &&
-        contentRow(
-          'error',
-          <Text color={theme.warnText} wrap="truncate-end">
-            {`send failed: ${sendError.slice(0, 120)}`}
-          </Text>,
-        )}
-      {/* Images share the left body indent, including in flip mode. */}
-      {!isDeleted &&
-        extractInlineImages(m).map((ref: InlineImageRef) => (
-          <ImageRows
-            key={ref.cacheKey}
-            cacheKey={ref.cacheKey}
-            imgCols={props.imgCols}
-            maxRows={props.inlineImageMaxRows}
-            painted={props.inlineImagesPainted}
-            label={ref.name}
-            focused={focusedImageKey === ref.cacheKey}
-            bodyIndent={indent}
-            theme={theme}
-          />
-        ))}
-      {!isDeleted &&
-        extractFileAttachments(m).map((file) => (
-          <FileAttachmentRow
-            key={`file-${file.id}`}
-            label={file.name}
-            sizeText={formatBytes(file.sizeBytes)}
-            flip={flip}
-            bodyIndent={indent}
-            theme={theme}
-          />
-        ))}
+      ) : null}
+      {/* The message itself narrows to layout.messageMaxWidth, centered; the
+          sender line above keeps the full width and its own sender indent. */}
+      <Box
+        flexDirection="column"
+        flexShrink={0}
+        width={conversationWidth}
+        alignSelf={conversationWidth ? 'center' : undefined}
+      >
+        {!hasHeader && bodyRow}
+        {quotedReply &&
+          contentRow(
+            'quoted',
+            <Text color={theme.mutedText} wrap="truncate-end">
+              {`↳ replying to ${quotedReply.senderName}${
+                quotedReply.preview ? `: "${quotedReply.preview}"` : ''
+              }`}
+            </Text>,
+          )}
+        {hasHeader && bodyRow}
+        {props.threadMeta &&
+          props.threadMeta.count > 0 &&
+          contentRow(
+            'thread',
+            <Text wrap="truncate-end">
+              <Text color={theme.mutedText}>╰─ </Text>
+              <Text
+                color={threadFocused ? theme.selected : theme.mutedText}
+                bold={threadFocused}
+                backgroundColor={
+                  threadFocused ? (theme.selectedRowBackground ?? undefined) : undefined
+                }
+              >
+                {formatReplyCount(props.threadMeta)}
+              </Text>
+            </Text>,
+          )}
+        {readReceiptLine &&
+          contentRow(
+            'receipt',
+            <Text color={theme.mutedText} wrap="truncate-end">
+              {readReceiptLine}
+            </Text>,
+          )}
+        {sendError &&
+          contentRow(
+            'error',
+            <Text color={theme.warnText} wrap="truncate-end">
+              {`send failed: ${sendError.slice(0, 120)}`}
+            </Text>,
+          )}
+        {/* Images share the left body indent, including in flip mode. */}
+        {!isDeleted &&
+          extractInlineImages(m).map((ref: InlineImageRef) => (
+            <ImageRows
+              key={ref.cacheKey}
+              cacheKey={ref.cacheKey}
+              imgCols={props.imgCols}
+              maxRows={props.inlineImageMaxRows}
+              painted={props.inlineImagesPainted}
+              label={ref.name}
+              focused={focusedImageKey === ref.cacheKey}
+              bodyIndent={indent}
+              theme={theme}
+            />
+          ))}
+        {!isDeleted &&
+          extractFileAttachments(m).map((file) => (
+            <FileAttachmentRow
+              key={`file-${file.id}`}
+              label={file.name}
+              sizeText={formatBytes(file.sizeBytes)}
+              flip={flip}
+              bodyIndent={indent}
+              theme={theme}
+            />
+          ))}
+      </Box>
       {Array.from({ length: Math.max(0, props.messageGap) }, (_, i) => (
         <Box key={`gap-${i}`}>
           <Text> </Text>

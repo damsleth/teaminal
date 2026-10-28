@@ -36,7 +36,7 @@
 //   appended verbatim (newlines preserved) instead of being treated
 //   as a sequence of individual key events.
 
-import { Box, Text, useStdin, useStdout } from 'ink'
+import { Box, Text, useCursor, useStdin, useStdout, type DOMElement } from 'ink'
 import { useInput } from './useInput'
 import { useEffect, useRef, useState } from 'react'
 import { accountStore } from '../state/accountStore'
@@ -55,6 +55,7 @@ import { htmlToText } from '../text/html'
 import { COMPOSER_TEXT_CHROME, cursorRowCol, wrapComposer } from './composerWrap'
 import { shortName } from '../state/selectables'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
+import { elementRect } from './inlineImageLayout'
 import { useSessionApi } from './SessionContext'
 import { kittyKeyboardEnabled } from './kittyKeyboard'
 
@@ -118,6 +119,12 @@ export function Composer({ columns = 80 }: { columns?: number }) {
     isRawModeSupported &&
     inputZone === 'composer' &&
     (focus.kind === 'chat' || focus.kind === 'channel' || focus.kind === 'thread')
+  // The caret is the terminal's own cursor (its shape, color and blink as the
+  // user configured them), shown at the caret cell while composing. Hidden
+  // unless the render below places it.
+  const { setCursorPosition } = useCursor()
+  setCursorPosition(undefined)
+  const rootRef = useRef<DOMElement>(null)
 
   // Re-seed the buffer from the per-conversation draft when focus changes.
   // Tracked by `conv` (a string), so equality comparison is cheap. Switching
@@ -318,8 +325,23 @@ export function Composer({ columns = 80 }: { columns?: number }) {
 
   const quote = focus.kind === 'thread' ? findRootQuote(focus, messagesByConvo) : null
 
+  // Caret cell: the composer's box from the last layout, plus the rows above
+  // the text (edit banner, quote, "earlier lines") and the 2-column prompt.
+  if (composerActive && rootRef.current) {
+    const rect = elementRect(rootRef.current)
+    const rowsAbove =
+      (editingMessageId ? 1 : 0) + (quote ? 1 : 0) + (overflow > 0 && firstVisible > 0 ? 1 : 0)
+    const before = (lines[cursorLine]?.text ?? '').slice(0, cursorCol)
+    // +1 row: Ink moves the cursor up from the line after its output, but the
+    // app fills the terminal, so the cursor really starts on the last row.
+    setCursorPosition({
+      x: Math.round(rect.left) + 1 + 2 + Bun.stringWidth(before),
+      y: Math.round(rect.top) + rowsAbove + (cursorLine - firstVisible) + 1,
+    })
+  }
+
   return (
-    <Box paddingX={1} flexDirection="column">
+    <Box ref={rootRef} paddingX={1} flexDirection="column">
       {editingMessageId && (
         <Box>
           <Text color={theme.warnText} wrap="truncate-end">
@@ -353,15 +375,14 @@ export function Composer({ columns = 80 }: { columns?: number }) {
             </Box>
           )
         }
-        const before = line.slice(0, cursorCol)
-        const after = line.slice(cursorCol)
+        // The caret is the real terminal cursor (see setCursorPosition
+        // above); a trailing space gives it a cell at the end of the line.
         return (
           <Box key={lineIdx}>
             <Text wrap="truncate-end">
               {prefix}
-              {before}
-              <Text color="cyan">█</Text>
-              {after}
+              {line}
+              {cursorCol >= line.length ? ' ' : ''}
             </Text>
           </Box>
         )
