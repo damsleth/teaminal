@@ -8,6 +8,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Edit config files from the menu.** In the Esc menu, Ctrl+O opens
+  `config.json` in `$VISUAL` (or `$EDITOR`) and Ctrl+T opens the active
+  theme's file (`config.json` for built-in themes, whose overrides live
+  there). Settings reload when the editor exits. GUI editors need their
+  wait flag (`code -w`).
+
 - **Formatted messages.** Message bodies keep their line breaks and render
   bold, italic, underline, strikethrough, inline code, code blocks,
   bulleted and numbered lists (nested lists indent) and quotes. Teams code
