@@ -30,7 +30,10 @@ export type SelectableInput = Pick<AppState, 'chats' | 'teams' | 'channelsByTeam
   // Partial so callers and tests can supply just the knobs they care about;
   // every field falls back to its default below.
   settings?: Partial<
-    Pick<Settings, 'chatListSort' | 'chatListGroupByType' | 'chatListCollapsedSections'>
+    Pick<
+      Settings,
+      'chatListSort' | 'chatListGroupByType' | 'chatListSectionCap' | 'chatListCollapsedSections'
+    >
   >
   // A non-empty filter must be able to reach chats hidden behind a section
   // cap, so capping is skipped while filtering.
@@ -126,6 +129,7 @@ export function chatTypeRank(chatType: string): number {
 export function buildSelectableList(state: SelectableInput): SelectableItem[] {
   const sort = state.settings?.chatListSort ?? 'recent'
   const groupByType = state.settings?.chatListGroupByType ?? false
+  const cap = state.settings?.chatListSectionCap ?? true
   // A filter has to reach rows hidden behind a section cap or a collapsed
   // header, so both are lifted (and headers dropped) while filtering.
   const filtering = !!state.filter
@@ -140,7 +144,7 @@ export function buildSelectableList(state: SelectableInput): SelectableItem[] {
 
   const items: SelectableItem[] =
     groupByType && !filtering
-      ? sectionedChats(chatItems, collapsed, state.expandedChatSections ?? {})
+      ? sectionedChats(chatItems, collapsed, state.expandedChatSections ?? {}, cap)
       : [...chatItems]
   if (groupByType && !filtering && state.teams.length > 0) {
     const teamsCollapsed = !!collapsed.teams
@@ -188,12 +192,14 @@ function orderChats(
 }
 
 // One header per chat type, followed by that section's rows: omitted entirely
-// while collapsed, trimmed to CHAT_SECTION_CAP with a `… N more` row otherwise.
+// while collapsed, trimmed to CHAT_SECTION_CAP with a `… N more` row otherwise
+// (unless the cap is off).
 // Relies on orderChats having made each section contiguous.
 function sectionedChats(
   items: ChatItem[],
   collapsed: Record<string, boolean>,
   expanded: Record<string, boolean>,
+  cap: boolean,
 ): SelectableItem[] {
   const out: SelectableItem[] = []
   let i = 0
@@ -214,7 +220,7 @@ function sectionedChats(
       i = end
       continue
     }
-    if (expanded[section] || run.length <= CHAT_SECTION_CAP) {
+    if (!cap || expanded[section] || run.length <= CHAT_SECTION_CAP) {
       out.push(...run)
     } else {
       out.push(...run.slice(0, CHAT_SECTION_CAP))

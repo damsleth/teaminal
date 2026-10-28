@@ -223,6 +223,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const density = useAppState((s) => s.settings.chatListDensity)
   const chatListSort = useAppState((s) => s.settings.chatListSort)
   const chatListGroupByType = useAppState((s) => s.settings.chatListGroupByType)
+  const chatListSectionCap = useAppState((s) => s.settings.chatListSectionCap)
   const chatListCollapsedSections = useAppState((s) => s.settings.chatListCollapsedSections)
   const shortNames = useAppState((s) => s.settings.chatListShortNames)
   const showMessagePreviews = useAppState((s) => s.settings.showMessagePreviews)
@@ -255,7 +256,12 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     teams,
     channelsByTeam,
     nameByUserId,
-    settings: { chatListSort, chatListGroupByType, chatListCollapsedSections },
+    settings: {
+      chatListSort,
+      chatListGroupByType,
+      chatListSectionCap,
+      chatListCollapsedSections,
+    },
     filter,
     expandedChatSections,
   })

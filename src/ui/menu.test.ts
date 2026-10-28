@@ -205,6 +205,7 @@ describe('ROOT_MENU shape', () => {
       'chatListDensity',
       'chatListSort',
       'chatListGroupByType',
+      'chatListSectionCap',
       'chatListShortNames',
       'showMessagePreviews',
       'showPresenceInList',

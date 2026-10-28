@@ -319,6 +319,9 @@ export type Settings = {
   // (each with a non-selectable header) instead of one flat list. Ordering
   // within each section still follows chatListSort. Default false.
   chatListGroupByType: boolean
+  // When grouped, show at most CHAT_SECTION_CAP chats per section behind a
+  // `… N more` row. false lists every chat. Default true.
+  chatListSectionCap: boolean
   // Collapsed sidebar headers, keyed by chat-section name ('oneOnOne',
   // 'group', 'meeting', 'other') or `team:<id>`. A collapsed header hides
   // its children and becomes the cursor stop that restores them.
@@ -505,6 +508,7 @@ export const defaultSettings: Settings = {
   chatListDensity: 'cozy',
   chatListSort: 'recent',
   chatListGroupByType: false,
+  chatListSectionCap: true,
   chatListCollapsedSections: {},
   chatListShortNames: false,
   showMessagePreviews: true,

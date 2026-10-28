@@ -37,6 +37,10 @@ adheres to [Semantic Versioning](https://semver.org/).
   from there. Terminals without the kitty text sizing protocol round to
   whole rows.
 
+- **Uncapped chat groups.** **Cap chat groups at 10** in the settings menu
+  (`chatListSectionCap`, default `true`) can be turned off so grouped chat
+  sections list every chat instead of the top 10 and a `… N more` row.
+
 - **Sender indent.** **Sender indent** (`themeOverrides.layout.senderIndent`,
   0-6) sets the left indent of the sender name and timestamp line on its own.
   **Message body indent** no longer moves the sender line.

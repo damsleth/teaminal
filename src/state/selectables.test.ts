@@ -151,6 +151,21 @@ describe('buildSelectableList', () => {
     expect(list.some((i) => i.kind === 'more')).toBe(false)
   })
 
+  test('chatListSectionCap=false lists every chat with no `more` row', () => {
+    const state = {
+      ...initialAppState(),
+      chats: Array.from({ length: 12 }, (_, i) => chat(`d${i}`, { topic: `d${i}` })),
+      settings: {
+        chatListSort: 'recent' as const,
+        chatListGroupByType: true,
+        chatListSectionCap: false,
+      },
+    }
+    const list = buildSelectableList(state)
+    expect(list.filter((i) => i.kind === 'chat')).toHaveLength(12)
+    expect(list.some((i) => i.kind === 'more')).toBe(false)
+  })
+
   test('an active filter lifts the cap so hidden chats stay reachable', () => {
     const state = {
       ...initialAppState(),

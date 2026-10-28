@@ -36,6 +36,7 @@ export type ToggleKey =
   | 'chatListDensity'
   | 'chatListSort'
   | 'chatListGroupByType'
+  | 'chatListSectionCap'
   | 'headerUserFormat'
   | 'chatListShortNames'
   | 'showMessagePreviews'
@@ -220,6 +221,12 @@ export const ROOT_MENU: MenuItem[] = [
         label: 'Group chats by type',
         action: { kind: 'toggle-setting', key: 'chatListGroupByType' },
         hint: '1:1 / group / meeting',
+      },
+      {
+        id: 'chatListSectionCap',
+        label: 'Cap chat groups at 10',
+        action: { kind: 'toggle-setting', key: 'chatListSectionCap' },
+        hint: 'off shows every chat',
       },
       {
         id: 'chatListShortNames',
@@ -465,6 +472,7 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'showReactions':
       return cycleReactionDisplayMode(current as Settings['showReactions']) as Settings[K]
     case 'chatListGroupByType':
+    case 'chatListSectionCap':
     case 'chatListShortNames':
     case 'showMessagePreviews':
     case 'messagePaneShortNames':
@@ -521,6 +529,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'headerUserFormat':
       return value === 'tenant' ? 'tenant only' : 'name + tenant'
     case 'chatListGroupByType':
+    case 'chatListSectionCap':
     case 'chatListShortNames':
     case 'showMessagePreviews':
     case 'messagePaneShortNames':

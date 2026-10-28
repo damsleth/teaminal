@@ -45,6 +45,7 @@ export type ListKeysCtx = {
   // exactly what ChatList renders (matters once chatListSort reorders rows).
   nameByUserId?: Record<string, string>
   settings: Pick<Settings, 'chatListSort' | 'chatListGroupByType'> & {
+    chatListSectionCap?: boolean
     chatListCollapsedSections?: Record<string, boolean>
   }
   filter: string
