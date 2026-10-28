@@ -122,6 +122,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Enter inserts a newline in the composer; Ctrl+Enter sends.** Saving an
+  edit is Ctrl+Enter too. In kitty and Ghostty teaminal turns on the kitty
+  keyboard protocol so Ctrl+Enter is told apart from Enter. In terminals
+  without it, use Alt+Enter or Ctrl+J to send.
+
 - **Vim-style jumps in conversations.** `G` jumps to the latest message
   and `gg` to the oldest loaded one. `l` / Right no longer jump to the
   bottom; they only open a focused reply badge. The status bar drops the

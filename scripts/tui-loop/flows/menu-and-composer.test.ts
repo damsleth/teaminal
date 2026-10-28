@@ -105,7 +105,7 @@ test('composer-active: Enter opens a chat and Tab focuses the composer', async (
   // The composer-active footer is unique to this state — a robust signal that
   // focus reached the composer. (A bare ">" is ambiguous: the chat-list
   // selection and the composer prompt both render one.)
-  await expect(terminal.getByText('Enter send')).toBeVisible()
+  await expect(terminal.getByText('Ctrl+Enter send')).toBeVisible()
 
   // Text-snapshot gate for the composer-active state.
   await expect(terminal).toMatchSnapshot({ includeColors: true })
