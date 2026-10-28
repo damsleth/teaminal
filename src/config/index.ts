@@ -280,6 +280,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     chatListDensity: settings.chatListDensity,
     chatListSort: settings.chatListSort,
     chatListGroupByType: settings.chatListGroupByType,
+    chatListSectionCap: settings.chatListSectionCap,
     chatListShortNames: settings.chatListShortNames,
     showMessagePreviews: settings.showMessagePreviews,
     messagePaneShortNames: settings.messagePaneShortNames,
@@ -525,6 +526,7 @@ function validateAndAssign(
       warnings.push('config: "headerUserFormat" must be "full" or "tenant"')
       return false
     case 'chatListGroupByType':
+    case 'chatListSectionCap':
     case 'chatListShortNames':
     case 'showMessagePreviews':
     case 'messagePaneShortNames':

@@ -113,6 +113,7 @@ warnings and fall back to defaults.
   "scrollOnNewMessages": true,
   "chatListSort": "recent",
   "chatListGroupByType": false,
+  "chatListSectionCap": true,
   "inlineImages": "auto",
   "inlineImageMaxRows": 10,
   "statusBarPosition": "bottom",
@@ -159,7 +160,8 @@ warnings and fall back to defaults.
 | `statusBarPosition`            | `bottom`, `hidden`   | `bottom` | Where the status bar renders. `hidden` suppresses it entirely, freeing one row of vertical space in the message pane. |
 | `chatRoutingByAccount`         | object               |    `{}` | Per-account chat transport mode: `graph+ic3`, `ic3+graph`, `ic3-only`, or `graph-only`. |
 | `chatListSort`                 | `recent`, `alphabetical` | `recent` | Order of chat rows in the sidebar. `recent` follows last-message time; `alphabetical` sorts by the displayed name. |
-| `chatListGroupByType`          | boolean              | `false` | Group sidebar chats under `Direct` / `Groups` / `Meetings` / `Other` headings. Each group shows at most 10 chats, with a `… N more` row to reveal the rest, so one busy type can't push teams and channels off the pane. Headings are collapsible with `h` / `l`. |
+| `chatListGroupByType`          | boolean              | `false` | Group sidebar chats under `Direct` / `Groups` / `Meetings` / `Other` headings. Each group shows at most 10 chats, with a `… N more` row to reveal the rest, so one busy type can't push teams and channels off the pane (turn off with `chatListSectionCap`). Headings are collapsible with `h` / `l`. |
+| `chatListSectionCap`           | boolean              | `true`  | With grouping on, cap each group at 10 chats behind a `… N more` row. `false` lists every chat. |
 | `headerElements`               | object               | all `true` | Per-segment visibility for the header bar. Keys: `app`, `user`, `presence`, `graph`, `chats`, `unread`, `push`, `updated`. Omitted keys keep their default. |
 | `headerUserFormat`             | `full`, `tenant`     |  `full` | Header identity format: `full` shows `user (tenant)`, `tenant` shows the tenant only. |
 | `statusBarShowKeyHints`        | boolean              |  `true` | Show the keybinding hints line in the status bar. |

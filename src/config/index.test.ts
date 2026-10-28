@@ -423,6 +423,7 @@ describe('Settings ↔ config.json parity', () => {
     chatListDensity: 'compact',
     chatListSort: 'alphabetical',
     chatListGroupByType: !defaultSettings.chatListGroupByType,
+    chatListSectionCap: !defaultSettings.chatListSectionCap,
     chatListShortNames: !defaultSettings.chatListShortNames,
     showMessagePreviews: !defaultSettings.showMessagePreviews,
     messagePaneShortNames: !defaultSettings.messagePaneShortNames,
