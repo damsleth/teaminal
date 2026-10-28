@@ -93,7 +93,7 @@ content.replace(/<[^>]+>/g, '') // breaks on <at> mentions and entities
 7. **Notification scope is chats + active channel only** in v1. There is no efficient way to detect mentions in non-active channels under delegated auth.
 8. **Seed the seen-message-ID set on startup** — otherwise the first poll after launch notifies on every existing message.
 9. **`bun init` writes a tsconfig with `verbatimModuleSyntax: true`** — type-only imports must use `import type`, not bare `import`.
-10. **Never `stdin.pause()` from inside a stdin `'data'` handler before Ink starts.** Under Bun the stream then never emits `'readable'`, Ink's reader stays dead, and the app ignores every key including Ctrl-C. Defer with `setImmediate`. Only reproduces in a terminal that answers the query (kitty, Ghostty) — the tui-test xterm.js harness and Terminal.app stay silent, so they take the timeout path and look fine.
+10. **Never `stdin.pause()` from inside a stdin `'data'` handler before Ink starts.** Under Bun the stream then never emits `'readable'`, Ink's reader stays dead, and the app ignores every key including Ctrl-C. Defer with `setImmediate`. Only reproduces in a terminal that answers the query (kitty, Ghostty) — the tui-test xterm.js harness and Terminal.app stay silent, so they take the timeout path and look fine. `python3 -I scripts/check-probe-handoff.py` runs the app in a pty that answers the probes (kitty / DA1-only / silent) and fails if `q` no longer quits; run it after touching any pre-Ink probe.
 
 ## Testing
 
