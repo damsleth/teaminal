@@ -162,6 +162,7 @@ export const FIELDS: readonly EditableField[] = [
   num('layout', 'chatListGap', 'Chat list gap', 'Spacing / Layout', 0, 3),
   num('layout', 'textBackgroundPaddingX', 'Text bg padding X', 'Spacing / Layout', 0, 3),
   num('layout', 'textBackgroundPaddingY', 'Text bg padding Y', 'Spacing / Layout', 0, 2),
+  num('layout', 'dateMarkerIndent', 'Date marker indent', 'Spacing / Layout', 0, 12),
   // — Colors —
   color('appBackground', 'Background', true),
   color('modalBackground', 'Modal bg', true),
@@ -180,6 +181,7 @@ export const FIELDS: readonly EditableField[] = [
   color('selfName', 'Self name'),
   color('selfMessageBackground', 'Self message bg', true),
   color('systemEvent', 'System event'),
+  color('dateMarker', 'Date marker'),
   color('errorText', 'Error text'),
   color('warnText', 'Warn text'),
   color('infoText', 'Info text'),
@@ -195,6 +197,7 @@ export const FIELDS: readonly EditableField[] = [
   bool('sectionHeadingBold', 'Section heading bold'),
   bool('selectedBold', 'Selected bold'),
   bool('focusedBold', 'Focused message bold'),
+  bool('dateMarkerBold', 'Date marker bold'),
   bool('unreadBold', 'Unread bold'),
   bool('senderBold', 'Sender bold'),
   bool('inlineKeyBold', 'Inline key bold'),
@@ -206,6 +209,7 @@ export const FIELDS: readonly EditableField[] = [
   num('fontSize', 'chatListHeader', 'Chat list header', 'Font size', 50, 100, 10),
   num('fontSize', 'chatListName', 'Chat list name', 'Font size', 50, 100, 10),
   num('fontSize', 'chatListPreview', 'Chat list preview', 'Font size', 50, 100, 10),
+  num('fontSize', 'dateMarker', 'Date marker', 'Font size', 50, 100, 10),
   bool('tightSpacing', 'Tight spacing', 'fontSize', 'Font size'),
   // — Images —
   num('setting', 'inlineImageMaxRows', 'Inline image max rows', 'Images', 1, 50),

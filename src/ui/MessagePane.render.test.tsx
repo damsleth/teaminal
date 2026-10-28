@@ -122,6 +122,36 @@ test('focusedBold off leaves the focused message body unbolded', () => {
   expect(bodyLine(false)).not.toMatch(/\x1b\[1m[^\n]*second day/)
 })
 
+test('date marker theme settings drive its color, bold and indent', () => {
+  const store = createAppStore()
+  store.set({
+    settings: {
+      ...store.get().settings,
+      themeOverrides: {
+        dateMarker: '#ff0000',
+        emphasis: { dateMarkerBold: false },
+        layout: { dateMarkerIndent: 4 },
+      },
+    },
+    focus: { kind: 'chat', chatId: 'c1' },
+    messagesByConvo: { 'chat:c1': MESSAGES },
+  })
+  const out = renderToString(
+    <StoreProvider store={store}>
+      <SessionProvider api={session}>
+        <Box flexDirection="column" height={40}>
+          <MessagePane />
+        </Box>
+      </SessionProvider>
+    </StoreProvider>,
+    { columns: 80 },
+  )
+  const marker = out.split('\n').find((l) => l.includes('Jan 2'))!
+  expect(marker).toContain('38;2;255;0;0m')
+  expect(marker).not.toMatch(/\x1b\[1m/)
+  expect(marker.replace(/\x1b\[[0-9;]*m/g, '')).toMatch(/^ {5}\S/)
+})
+
 test('the focus marker sits on the message body line, not the sender name', () => {
   const out = lines(40, 'm4')
   const body = out.find((l) => l.includes('second day, second message'))!

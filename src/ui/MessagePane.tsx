@@ -540,11 +540,15 @@ function TimelineRow(props: {
   threadMeta?: ReplyBadge
 }) {
   if (props.row.kind === 'date') {
+    const theme = props.theme
     return (
       <Box>
         {props.showTimestamp && <Box width={1} flexShrink={0} />}
-        <Text color="gray" bold>
-          {props.row.label}
+        {theme.layout.dateMarkerIndent > 0 && (
+          <Box width={theme.layout.dateMarkerIndent} flexShrink={0} />
+        )}
+        <Text color={theme.dateMarker} bold={theme.emphasis.dateMarkerBold}>
+          {fs(props.row.label, theme.fontSize.dateMarker, theme.fontSize.tightSpacing)}
         </Text>
       </Box>
     )

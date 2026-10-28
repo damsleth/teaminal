@@ -73,6 +73,7 @@ const COLOR_KEYS = new Set([
   'selfMessage',
   'selfName',
   'systemEvent',
+  'dateMarker',
   'errorText',
   'warnText',
   'infoText',

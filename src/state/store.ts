@@ -260,6 +260,7 @@ export type ThemeColorOverrides = {
   selfName?: string
   selfMessageBackground?: string | null
   systemEvent?: string
+  dateMarker?: string
   errorText?: string
   warnText?: string
   infoText?: string
@@ -283,6 +284,7 @@ export type ThemeOverrides = ThemeColorOverrides & {
     chatListGap: number
     textBackgroundPaddingX: number
     textBackgroundPaddingY: number
+    dateMarkerIndent: number
   }>
   borders?: Partial<{
     panel: BorderStyleName
@@ -294,6 +296,7 @@ export type ThemeOverrides = ThemeColorOverrides & {
     sectionHeadingBold: boolean
     selectedBold: boolean
     focusedBold: boolean
+    dateMarkerBold: boolean
     unreadBold: boolean
     senderBold: boolean
     inlineKeyBold: boolean
@@ -312,6 +315,7 @@ export const THEME_FONT_SIZE_KEYS = [
   'chatListHeader',
   'chatListName',
   'chatListPreview',
+  'dateMarker',
 ] as const
 export type ThemeFontSizeKey = (typeof THEME_FONT_SIZE_KEYS)[number]
 
