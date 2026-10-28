@@ -262,8 +262,9 @@ subset of these keys is accepted:
     "selfMessage": "none", // your messages, color selfMessageBorder
     "senderMessage": "none", // other people's messages, color senderMessageBorder
   },
-  // Any color can be null ("none"): terminal default for text / borders,
-  // no color for backgrounds and frames.
+  // Any color can be null ("none"): text and lines get no color of their own
+  // (the terminal's, or the surrounding text's), backgrounds none, and
+  // frame colors fall back to "border" / "borderActive".
   // Per-role bold (true/false):
   "emphasis": {
     "modalTitleBold": true,

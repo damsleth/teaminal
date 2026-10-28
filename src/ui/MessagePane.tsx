@@ -630,8 +630,9 @@ export function bodyFramed(theme: Theme): boolean {
   )
 }
 
-// The frame one body draws, or undefined when bodies are unframed.
-function bodyFrame(
+// The frame one body draws, or undefined when bodies are unframed. Null
+// frame colors fall back to borderActive (focus) / border (bodies).
+export function bodyFrame(
   theme: Theme,
   body: { focused: boolean; self: boolean; plain: boolean; background: string | undefined },
 ): { style: Exclude<BorderStyle, 'none'> | typeof BUBBLE_BORDER; color?: string } | undefined {

@@ -419,6 +419,37 @@ test('message border styles frame the focused body; other bodies reserve the spa
   expect(framed.filter((l) => l.includes('┌'))).toHaveLength(1)
 })
 
+test('framed bodies in a short pane: the newest message stays whole at the bottom', () => {
+  const store = createAppStore()
+  store.set({
+    settings: {
+      ...store.get().settings,
+      themeOverrides: { borders: { senderMessage: 'single' } },
+    },
+    focus: { kind: 'chat', chatId: 'c1' },
+    messagesByConvo: {
+      'chat:c1': [...MESSAGES, msg('m7', '2026-01-03T09:10:00Z', 'Ada', 'word '.repeat(40).trim())],
+    },
+  })
+  const ls = plain(
+    renderToString(
+      <StoreProvider store={store}>
+        <SessionProvider api={session}>
+          <Box flexDirection="column" height={12}>
+            <MessagePane />
+          </Box>
+        </SessionProvider>
+      </StoreProvider>,
+      { columns: 60 },
+    ),
+  )
+    .split('\n')
+    .filter((l) => l.trim() !== '')
+  // The wrapped, framed last body ends in its bottom border on the last row.
+  expect(ls.at(-1)).toContain('└')
+  expect(ls.some((l) => l.includes('┌'))).toBe(true)
+})
+
 test('the search bar stays intact above an overflowing timeline', () => {
   const out = lines(8, null, 'newest')
   expect(out.filter((l) => l.includes('hit(s)'))).toHaveLength(1)

@@ -21,8 +21,9 @@ adheres to [Semantic Versioning](https://semver.org/).
   resize mode still works.
 
 - **Every color can be "none".** All theme colors take `null` / none in
-  the editor: the terminal's own color for text and borders, no color for
-  backgrounds and frames.
+  the editor: text and lines get no color of their own (the terminal's, or
+  the surrounding text's), backgrounds none, and frame colors fall back to
+  the border colors.
 
 - **Chat list preview color and picture indent.** Theme editor **Chat
   list → Preview text** (`chatListPreviewText`, default: muted text) colors
