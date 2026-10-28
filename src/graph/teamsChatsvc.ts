@@ -17,6 +17,7 @@
 
 import type { AccountRef } from '../account'
 import { recordEvent, recordRequest } from '../log'
+import { teamsMessageBody } from '../text/html'
 import type { ChatMessage, Reaction } from '../types'
 import { getSkypeToken, withSkypeAuth } from './teamsFederation'
 import { resolveRegion } from './teamsRegion'
@@ -515,9 +516,10 @@ export async function sendChannelMessageViaChatsvc(
     const url = `${TEAMS_ORIGIN}/api/chatsvc/${r}/v1/users/ME/conversations/${encodeURIComponent(
       threadId,
     )}/messages`
+    const outgoing = teamsMessageBody(content)
     const body: Record<string, unknown> = {
-      content,
-      messagetype: 'Text',
+      content: outgoing.content,
+      messagetype: outgoing.contentType === 'html' ? 'RichText/Html' : 'Text',
       contenttype: 'text',
       clientmessageid: cmid,
       ...(opts?.imdisplayname ? { imdisplayname: opts.imdisplayname } : {}),
