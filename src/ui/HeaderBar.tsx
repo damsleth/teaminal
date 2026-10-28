@@ -180,7 +180,7 @@ export function HeaderBar() {
   // jump as dynamic segments like push/updated change). truncate-end keeps it
   // to exactly one row no matter the width or content.
   return (
-    <Box paddingX={1} justifyContent={centered ? 'center' : 'flex-start'}>
+    <Box paddingX={1} flexGrow={1} justifyContent={centered ? 'center' : 'flex-start'}>
       <Text wrap="truncate-end">
         {segments.map((seg, i) => (
           <Fragment key={i}>

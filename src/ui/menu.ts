@@ -483,6 +483,18 @@ export function nextSelectable(items: MenuItem[], from: number, dir: 1 | -1): nu
   return -1
 }
 
+// The selectable item about `delta` rows from `from`, clamped to the list
+// (no wrap): page keys stop at the ends. Lands on the nearest selectable
+// row in the direction of travel, else the nearest one back.
+export function pageSelectable(items: MenuItem[], from: number, delta: number): number {
+  if (items.length === 0) return -1
+  const target = Math.max(0, Math.min(items.length - 1, from + delta))
+  const dir = delta >= 0 ? 1 : -1
+  for (let i = target; i >= 0 && i < items.length; i += dir) if (!items[i]!.disabled) return i
+  for (let i = target; i >= 0 && i < items.length; i -= dir) if (!items[i]!.disabled) return i
+  return from
+}
+
 export const MESSAGE_FOCUS_MARKER_PRESETS = ['>', '|', '*', '-'] as const
 export const REACTION_DISPLAY_PRESETS = ['current', 'all', 'off'] as const
 

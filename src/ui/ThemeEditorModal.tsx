@@ -22,7 +22,7 @@
 
 import { Box, Text, useApp, useStdout } from 'ink'
 import { useInput } from './useInput'
-import { useState, type ReactElement, type ReactNode } from 'react'
+import { useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { replaceThemeOverrides, updateSettings } from '../config'
 import { warn } from '../log'
 import {
@@ -82,6 +82,8 @@ export function ThemeEditorModal() {
   // Raw hex being typed for the focused color field. Lives here (not in modal
   // state) so the live re-render from a settings change doesn't reset it.
   const [hexEdit, setHexEdit] = useState<{ buffer: string } | null>(null)
+  // Field rows visible at the last render; page keys move half of it.
+  const pageRows = useRef(10)
 
   async function persist(patch: FieldPatch): Promise<void> {
     if (patch.kind === 'overrides') {
@@ -193,6 +195,14 @@ export function ThemeEditorModal() {
       }
 
       const ch = input.toLowerCase()
+      // PageUp / PageDown and u / d move half a page, stopping at the ends.
+      if (key.pageUp || key.pageDown || ch === 'u' || ch === 'd') {
+        const half = Math.max(1, Math.floor(pageRows.current / 2))
+        const delta = key.pageUp || ch === 'u' ? -half : half
+        const cursor = Math.max(0, Math.min(FIELDS.length - 1, m.cursor + delta))
+        store.set({ modal: { kind: 'theme-editor', cursor } })
+        return
+      }
       if (key.upArrow || ch === 'k') {
         store.set({
           modal: { kind: 'theme-editor', cursor: moveCursor(m.cursor, -1, FIELDS.length) },
@@ -241,6 +251,7 @@ export function ThemeEditorModal() {
     (side ? 0 : PREVIEW_ROWS + 1)
   const capacity = Math.max(5, rows - chromeRows)
   const { start, end } = fieldWindow(displayRows.length, Math.max(0, cursorRow), capacity)
+  pageRows.current = Math.min(capacity, FIELDS.length)
 
   const bg = modalBg(theme)
   const rowNodes: ReactNode[] = displayRows.slice(start, end).map((row) => {
@@ -320,7 +331,7 @@ export function ThemeEditorModal() {
           {pad(
             hexEdit
               ? 'type hex · enter commit · esc cancel'
-              : '↑↓ field · ←→ adjust · e hex · r reset · R reset all · esc',
+              : '↑↓/ud move · ←→ adjust · e hex · r reset · R reset all · esc',
           )}
         </Text>
         {!hexEdit && (

@@ -25,6 +25,7 @@ import {
   emptyAccountManagerModal,
   firstSelectable,
   nextSelectable,
+  pageSelectable,
   renderQuietHoursValue,
   menuItemWindow,
   renderSettingValue,
@@ -38,6 +39,7 @@ import {
 import type { Settings } from '../state/store'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useTerminalRows } from './hooks/useTerminalRows'
+import { useRef } from 'react'
 import { useSessionApi } from './SessionContext'
 import { openThemeEditor } from './ThemeEditorModal'
 import { openThemePresets } from './ThemePresetsModal'
@@ -99,6 +101,8 @@ export function MenuModal() {
   const { stdout } = useStdout()
   const terminalColumns = stdout?.columns ?? 80
   const isOpen = modal?.kind === 'menu'
+  // Visible item rows at the last render; page keys move half of it.
+  const pageRows = useRef(10)
 
   useInput(
     (input, key) => {
@@ -126,6 +130,14 @@ export function MenuModal() {
         return
       }
 
+      // PageUp / PageDown and u / d move half a page.
+      if (key.pageUp || key.pageDown || ch === 'u' || ch === 'd') {
+        const half = Math.max(1, Math.floor(pageRows.current / 2))
+        const up = key.pageUp || ch === 'u'
+        const next = pageSelectable(items, m.cursor, up ? -half : half)
+        if (next !== -1) store.set({ modal: { ...m, cursor: next } })
+        return
+      }
       if (key.upArrow || ch === 'k') {
         const next = nextSelectable(items, m.cursor, -1)
         if (next === -1) return
@@ -277,7 +289,7 @@ export function MenuModal() {
 
   // The menu grows to fill the app (one row per item); only a list taller
   // than the window scrolls.
-  const footer = '↑/↓ navigate · ←/→ change · enter select · esc back · ^O config · ^T theme'
+  const footer = '↑↓/ud move · ←→ change · enter select · esc back · ^O config · ^T theme'
   const reservedRows =
     4 /* header bar + status bar */ +
     (atRoot ? LOGO.length + 3 : 0) /* logo + version + repo + blank (root only) */ +
@@ -287,6 +299,7 @@ export function MenuModal() {
     theme.layout.modalPaddingY * 2 +
     2 /* modal border */
   const maxVisible = Math.max(4, terminalRows - reservedRows)
+  pageRows.current = Math.min(maxVisible, items.length)
   const { start, end } = menuItemWindow(items.length, modal.cursor, maxVisible)
   const moreAbove = start > 0
   const moreBelow = end < items.length

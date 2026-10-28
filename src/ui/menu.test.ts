@@ -5,6 +5,7 @@ import {
   firstSelectable,
   menuItemWindow,
   nextSelectable,
+  pageSelectable,
   QUIET_HOURS_PRESETS,
   renderQuietHoursValue,
   renderSettingValue,
@@ -348,4 +349,14 @@ test('Enter sends is only offered with the kitty keyboard protocol', () => {
   setKittyKeyboardEnabled(true)
   expect(ids()).toContain('enterSends')
   setKittyKeyboardEnabled(false)
+})
+
+test('pageSelectable moves by a page, skips headings and stops at the ends', () => {
+  const items = ROOT_MENU.find((i) => i.id === 'settings')!.children!
+  const first = firstSelectable(items)
+  expect(pageSelectable(items, first, -5)).toBe(first)
+  expect(pageSelectable(items, first, 999)).toBe(items.length - 1)
+  const mid = pageSelectable(items, first, 6)
+  expect(items[mid]!.disabled).toBeFalsy()
+  expect(mid).toBeGreaterThanOrEqual(first + 6)
 })

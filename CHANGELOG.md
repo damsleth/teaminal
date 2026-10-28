@@ -191,6 +191,9 @@ adheres to [Semantic Versioning](https://semver.org/).
   Navigation & input, Notifications, Presence, Advanced. Labels inside a
   group are shorter ("Chat list → Sort" instead of "Chat list sort").
 
+- **Half-page scrolling in the menu and theme editor.** PageUp / PageDown
+  and `u` / `d` move half a page.
+
 - **←/→ change values in the menu**, as in the theme editor: → steps a
   setting forward, ← back, and → opens a submenu.
 
@@ -246,6 +249,9 @@ adheres to [Semantic Versioning](https://semver.org/).
   an empty cache; ordinary aliases keep their existing caches.
 
 ### Fixed
+
+- **Center header bar works.** The setting had no effect: the header text
+  stayed left-aligned.
 
 - **The menu uses the whole window.** Settings and other submenus grow as
   tall and wide as the app allows, instead of showing about half the list
