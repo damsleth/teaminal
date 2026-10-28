@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Focused message bold toggle.** The theme editor's **Focused message
+  bold** (`emphasis.focusedBold`, default on) sets whether the focused
+  message's text is drawn bold.
+
 - **Theme presets.** Settings → Theme presets lists the built-in themes
   and your saved presets: Enter loads, `s` saves, `n` saves as a new
   preset, `d` deletes. In the theme editor, `s` saves, `S` saves as and

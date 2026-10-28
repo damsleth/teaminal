@@ -108,6 +108,7 @@ const EMPHASIS_KEYS = new Set<keyof NonNullable<ThemeOverrides['emphasis']>>([
   'modalTitleBold',
   'sectionHeadingBold',
   'selectedBold',
+  'focusedBold',
   'unreadBold',
   'senderBold',
   'inlineKeyBold',

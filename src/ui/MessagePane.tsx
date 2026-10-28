@@ -710,7 +710,7 @@ function MessageRow(props: {
       }
       backgroundColor={bodyBg}
       italic={isDeleted}
-      bold={props.focused && !isDeleted}
+      bold={props.focused && !isDeleted && theme.emphasis.focusedBold}
       wrap="wrap"
     >
       {bodyRuns.map((run, i) => {

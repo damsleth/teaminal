@@ -95,6 +95,8 @@ export type ThemeEmphasis = {
   sectionHeadingBold: boolean
   // ChatList / MenuModal / AccountsModal / NewChatPrompt selected rows.
   selectedBold: boolean
+  // MessagePane focused message body.
+  focusedBold: boolean
   // ChatList unread previews.
   unreadBold: boolean
   // MessagePane sender column.
@@ -180,6 +182,7 @@ const EMPHASIS_DEFAULT: ThemeEmphasis = {
   modalTitleBold: true,
   sectionHeadingBold: true,
   selectedBold: true,
+  focusedBold: true,
   unreadBold: true,
   senderBold: true,
   inlineKeyBold: true,
