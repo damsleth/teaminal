@@ -199,6 +199,15 @@ In the theme editor, `s` saves and `S` saves as. Edits made in the editor
 into the file and clears them. Loading a preset keeps any unsaved edits on
 top, like any other theme switch.
 
+A preset also saves the look-related Settings menu toggles under
+`"settings"`: status bar and header options, chat list options (sort,
+grouping, short names, preview lines, presence dots) and message options
+(chat name header, short names, timestamps, sender names, reactions,
+images, right-aligned own messages, focus marker). Loading the preset
+applies them. Built-in themes carry none, so switching to one leaves them
+as they are. Behavior settings (notifications, presence, scrolling, Enter
+sends) are not part of a preset.
+
 Presets are JSON files at `~/.config/teaminal/themes/<name>.json`; you can
 also write one by hand and set `"theme": "<name>"` in `config.json`. The
 file is a partial theme layered on its `base` (`dark` when absent); any

@@ -478,6 +478,68 @@ function errMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
+// Settings-menu toggles that shape the look (Appearance, header, chat list,
+// messages). Theme presets carry these alongside the theme tokens.
+// Behavior settings (notifications, presence, scrolling, Enter sends,
+// realtime, tail panels) stay per-config.
+export const PRESET_SETTING_KEYS = [
+  'statusBarPosition',
+  'statusBarShowKeyHints',
+  'headerBarCentered',
+  'headerElements',
+  'headerUserFormat',
+  'chatListSort',
+  'chatListGroupByType',
+  'chatListSectionCap',
+  'chatListShortNames',
+  'chatListPreviewLines',
+  'showPresenceInList',
+  'showChatNameHeader',
+  'messagePaneShortNames',
+  'showTimestampsInPane',
+  'showSenderNamesInPane',
+  'showReactions',
+  'inlineImages',
+  'inlineImageMaxRows',
+  'selfMessagesOnRight',
+  'showOwnNameInPane',
+  'messageFocusIndicatorEnabled',
+  'messageFocusIndicatorChar',
+] as const satisfies readonly (keyof Settings)[]
+export type PresetSettings = Partial<Pick<Settings, (typeof PRESET_SETTING_KEYS)[number]>>
+
+export function pickPresetSettings(settings: Settings): PresetSettings {
+  const out: Record<string, unknown> = {}
+  for (const key of PRESET_SETTING_KEYS) {
+    const value = settings[key]
+    out[key] = typeof value === 'object' && value !== null ? { ...value } : value
+  }
+  return out as PresetSettings
+}
+
+// The valid preset-setting keys of a theme file's `settings` block.
+export function validatePresetSettings(
+  value: unknown,
+  warnings: string[],
+  scope = 'theme.settings',
+): PresetSettings | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    warnings.push(`config: "${scope}" must be a JSON object`)
+    return null
+  }
+  const scratch = cloneSettings(defaultSettings)
+  const out: Record<string, unknown> = {}
+  for (const [key, raw] of Object.entries(value)) {
+    if (!(PRESET_SETTING_KEYS as readonly string[]).includes(key)) {
+      warnings.push(`config: unknown ${scope} key "${key}" ignored`)
+      continue
+    }
+    const k = key as keyof Settings
+    if (validateAndAssign(scratch, k, raw, warnings)) out[key] = scratch[k]
+  }
+  return out as PresetSettings
+}
+
 function validateAndAssign(
   out: Settings,
   key: keyof Settings,

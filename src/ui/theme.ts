@@ -338,6 +338,9 @@ export type PartialTheme = {
   borders?: Partial<ThemeBorders>
   emphasis?: Partial<ThemeEmphasis>
   fontSize?: Partial<ThemeFontSize>
+  // Settings-menu UI toggles, applied to Settings when the preset loads
+  // (see PRESET_SETTING_KEYS); not part of the resolved Theme.
+  settings?: Partial<Settings>
 }
 
 // Built-in base a theme setting renders on: 'auto' follows the OS, a user
@@ -433,7 +436,16 @@ function flattenAlpha(theme: Theme): Theme {
 }
 
 function mergePartial(theme: Theme, partial: PartialTheme): Theme {
-  const { base: _base, presence, layout, borders, emphasis, fontSize, ...flat } = partial
+  const {
+    base: _base,
+    settings: _settings,
+    presence,
+    layout,
+    borders,
+    emphasis,
+    fontSize,
+    ...flat
+  } = partial
   for (const [key, value] of Object.entries(flat) as [keyof PartialTheme, unknown][]) {
     if (value !== undefined) {
       ;(theme as Record<string, unknown>)[key] = value
