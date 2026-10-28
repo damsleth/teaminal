@@ -235,7 +235,7 @@ export type ThemePresenceKey =
 // which is where the theme editor writes, so switching themes stays visible.
 export type ThemeColorOverrides = {
   appBackground?: string | null
-  background?: string | null
+  modalBackground?: string | null
   text?: string
   mutedText?: string
   border?: string

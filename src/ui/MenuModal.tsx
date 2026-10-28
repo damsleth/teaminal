@@ -256,7 +256,7 @@ export function MenuModal() {
         flexDirection="column"
         borderStyle={inkBorder(theme.borders.modal)}
         borderColor={theme.borderActive}
-        backgroundColor={theme.background ?? undefined}
+        backgroundColor={theme.modalBackground ?? undefined}
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
       >
@@ -268,31 +268,31 @@ export function MenuModal() {
           <>
             <Box flexDirection="column">
               {LOGO.map((line, i) => (
-                <Text key={i} color="cyan" backgroundColor={theme.background ?? undefined}>
+                <Text key={i} color="cyan" backgroundColor={theme.modalBackground ?? undefined}>
                   {pad(line)}
                 </Text>
               ))}
             </Box>
-            <Text color="gray" backgroundColor={theme.background ?? undefined}>
+            <Text color="gray" backgroundColor={theme.modalBackground ?? undefined}>
               {pad(`teaminal ${VERSION}`)}
             </Text>
-            <Text color="gray" backgroundColor={theme.background ?? undefined}>
+            <Text color="gray" backgroundColor={theme.modalBackground ?? undefined}>
               {pad(REPOSITORY_URL)}
             </Text>
-            <Text backgroundColor={theme.background ?? undefined}>{pad('')}</Text>
+            <Text backgroundColor={theme.modalBackground ?? undefined}>{pad('')}</Text>
           </>
         ) : null}
         {breadcrumb && (
           <>
-            <Text color="gray" backgroundColor={theme.background ?? undefined}>
+            <Text color="gray" backgroundColor={theme.modalBackground ?? undefined}>
               {pad(breadcrumb)}
             </Text>
-            <Text backgroundColor={theme.background ?? undefined}>{pad('')}</Text>
+            <Text backgroundColor={theme.modalBackground ?? undefined}>{pad('')}</Text>
           </>
         )}
         <Box flexDirection="column">
           {moreAbove && (
-            <Text color="gray" backgroundColor={theme.background ?? undefined}>
+            <Text color="gray" backgroundColor={theme.modalBackground ?? undefined}>
               {pad('  ⋯')}
             </Text>
           )}
@@ -309,7 +309,7 @@ export function MenuModal() {
               <Text
                 key={item.id}
                 color={color}
-                backgroundColor={theme.background ?? undefined}
+                backgroundColor={theme.modalBackground ?? undefined}
                 bold={selected && !item.disabled && theme.emphasis.selectedBold}
               >
                 {pad(`${marker}${item.label}${valueSuffix}${hint}`)}
@@ -317,13 +317,13 @@ export function MenuModal() {
             )
           })}
           {moreBelow && (
-            <Text color="gray" backgroundColor={theme.background ?? undefined}>
+            <Text color="gray" backgroundColor={theme.modalBackground ?? undefined}>
               {pad('  ⋯')}
             </Text>
           )}
         </Box>
-        <Text backgroundColor={theme.background ?? undefined}>{pad('')}</Text>
-        <Text color="gray" backgroundColor={theme.background ?? undefined}>
+        <Text backgroundColor={theme.modalBackground ?? undefined}>{pad('')}</Text>
+        <Text color="gray" backgroundColor={theme.modalBackground ?? undefined}>
           {pad('↑/↓ navigate · enter select · esc back')}
         </Text>
       </Box>

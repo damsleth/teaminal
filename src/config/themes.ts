@@ -51,7 +51,7 @@ const NAMED_COLORS = new Set([
 ])
 
 const COLOR_KEYS = new Set([
-  'background',
+  'modalBackground',
   'text',
   'mutedText',
   'border',
@@ -72,7 +72,7 @@ const COLOR_KEYS = new Set([
 ])
 
 const NULLABLE_COLOR_KEYS = new Set([
-  'background',
+  'modalBackground',
   'appBackground',
   'messageFocusBackground',
   'selectedRowBackground',
@@ -165,7 +165,9 @@ function validatePartialTheme(
   warnings: string[],
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(input)) {
+  for (const [rawKey, value] of Object.entries(input)) {
+    // `background` is the pre-0.25 name of modalBackground.
+    const key = rawKey === 'background' ? 'modalBackground' : rawKey
     if (key === 'presence') {
       const presence = validatePresence(value, warnings)
       if (presence) out.presence = presence

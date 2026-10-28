@@ -101,7 +101,7 @@ export function NetworkModal() {
         flexDirection="column"
         borderStyle={inkBorder(theme.borders.modal)}
         borderColor={theme.borderActive}
-        backgroundColor={theme.background ?? undefined}
+        backgroundColor={theme.modalBackground ?? undefined}
         paddingX={theme.layout.modalPaddingX}
         paddingY={theme.layout.modalPaddingY}
         width={100}

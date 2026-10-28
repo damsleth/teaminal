@@ -161,8 +161,8 @@ describe('nextFieldValue', () => {
 
 describe('fieldValue', () => {
   test('reads the resolved theme for theme-backed fields', () => {
-    expect(fieldValue(field('color.background'), baseTheme, baseSettings)).toBe(
-      baseTheme.background,
+    expect(fieldValue(field('color.modalBackground'), baseTheme, baseSettings)).toBe(
+      baseTheme.modalBackground,
     )
     expect(fieldValue(field('layout.panePaddingX'), baseTheme, baseSettings)).toBe(
       baseTheme.layout.panePaddingX,
@@ -185,8 +185,8 @@ describe('isOverridden', () => {
   })
 
   test('true once a color override is present', () => {
-    const s = withOverrides({ background: 'magenta' })
-    expect(isOverridden(field('color.background'), s, 'dark')).toBe(true)
+    const s = withOverrides({ modalBackground: 'magenta' })
+    expect(isOverridden(field('color.modalBackground'), s, 'dark')).toBe(true)
     expect(isOverridden(field('color.text'), s, 'dark')).toBe(false)
   })
 
@@ -213,14 +213,16 @@ describe('applyField', () => {
   })
 
   test('color edits are scoped to the edited base', () => {
-    const patch = applyField(baseSettings, field('color.background'), '#102030', 'light')
+    const patch = applyField(baseSettings, field('color.modalBackground'), '#102030', 'light')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
     const s = withOverrides(patch.overrides)
-    expect(resolveTheme({ ...s, theme: 'light' }).background).toBe('#102030')
-    expect(resolveTheme({ ...s, theme: 'dark' }).background).toBe(getTheme('dark').background)
-    expect(resolveTheme({ ...s, theme: 'auto' }, null, 'light').background).toBe('#102030')
-    expect(isOverridden(field('color.background'), s, 'light')).toBe(true)
-    expect(isOverridden(field('color.background'), s, 'dark')).toBe(false)
+    expect(resolveTheme({ ...s, theme: 'light' }).modalBackground).toBe('#102030')
+    expect(resolveTheme({ ...s, theme: 'dark' }).modalBackground).toBe(
+      getTheme('dark').modalBackground,
+    )
+    expect(resolveTheme({ ...s, theme: 'auto' }, null, 'light').modalBackground).toBe('#102030')
+    expect(isOverridden(field('color.modalBackground'), s, 'light')).toBe(true)
+    expect(isOverridden(field('color.modalBackground'), s, 'dark')).toBe(false)
   })
 
   test('layout field nests under layout', () => {
@@ -237,10 +239,10 @@ describe('applyField', () => {
   })
 
   test('preserves sibling overrides', () => {
-    const s = withOverrides({ background: 'red', layout: { panePaddingX: 2 } })
+    const s = withOverrides({ modalBackground: 'red', layout: { panePaddingX: 2 } })
     const patch = applyField(s, field('color.text'), 'white', 'dark')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
-    expect(patch.overrides.background).toBe('red')
+    expect(patch.overrides.modalBackground).toBe('red')
     expect(patch.overrides.dark?.text).toBe('white')
     expect(patch.overrides.layout?.panePaddingX).toBe(2)
   })
@@ -248,16 +250,16 @@ describe('applyField', () => {
 
 describe('resetField', () => {
   test('removes a flat color override', () => {
-    const s = withOverrides({ background: 'red', text: 'white' })
-    const patch = resetField(s, field('color.background'), 'dark')
+    const s = withOverrides({ modalBackground: 'red', text: 'white' })
+    const patch = resetField(s, field('color.modalBackground'), 'dark')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
-    expect('background' in patch.overrides).toBe(false)
+    expect('modalBackground' in patch.overrides).toBe(false)
     expect(patch.overrides.text).toBe('white')
   })
 
   test('clears the base bucket and a legacy global value together', () => {
-    const s = withOverrides({ background: 'red', dark: { background: 'blue' } })
-    const patch = resetField(s, field('color.background'), 'dark')
+    const s = withOverrides({ modalBackground: 'red', dark: { modalBackground: 'blue' } })
+    const patch = resetField(s, field('color.modalBackground'), 'dark')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
     expect(patch.overrides).toEqual({})
   })
@@ -322,10 +324,10 @@ describe('editor output validates without warnings', () => {
   })
 
   test('an applied override is reflected in the resolved theme', () => {
-    const patch = applyField(baseSettings, field('color.background'), '#102030', 'dark')
+    const patch = applyField(baseSettings, field('color.modalBackground'), '#102030', 'dark')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
     const resolved = resolveTheme(withOverrides(patch.overrides), null, 'dark')
-    expect(resolved.background).toBe('#102030')
+    expect(resolved.modalBackground).toBe('#102030')
   })
 
   test('a cleared nullable color resolves to null', () => {
