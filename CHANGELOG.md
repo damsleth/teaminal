@@ -10,9 +10,9 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 - **App background color.** The theme editor's new **Background**
   (`appBackground`) paints the whole app. The old setting that only colored
-  menus and modals is now labelled **Modal bg** (`background`, config key
-  unchanged). Both accept `none` (`null`) to use the terminal's own
-  background.
+  menus and modals is now **Modal bg** (`modalBackground`; the old
+  `background` key still loads and is rewritten on the next theme edit).
+  Both accept `none` (`null`) to use the terminal's own background.
 
 - **Focusable reply badges.** In a channel, `j`/`k` now stops on a message's
   `N replies` badge like it does on links and images; Space or `l` opens the

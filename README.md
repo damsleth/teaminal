@@ -183,7 +183,7 @@ theme layered on top of `dark`; any subset of these keys is accepted:
 {
   // Color roles (named color or `#rrggbb`):
   "appBackground": "#001100", // whole app; null = terminal background
-  "background": "#002200", // modals / overlays; null = terminal background
+  "modalBackground": "#002200", // menus / modals; null = terminal background
   "text": "white",
   "border": "#444",
   "borderActive": "magentaBright",

@@ -340,14 +340,14 @@ describe('replaceThemeOverrides', () => {
       }),
     )
 
-    const next = await replaceThemeOverrides({ background: 'magenta' }, cfgPath)
+    const next = await replaceThemeOverrides({ modalBackground: 'magenta' }, cfgPath)
 
     // The new set wins entirely — old keys are gone, not merged.
-    expect(next.themeOverrides).toEqual({ background: 'magenta' })
+    expect(next.themeOverrides).toEqual({ modalBackground: 'magenta' })
     expect(next.theme).toBe('dark') // other settings untouched
 
     const loaded = loadSettings(cfgPath)
-    expect(loaded.settings.themeOverrides).toEqual({ background: 'magenta' })
+    expect(loaded.settings.themeOverrides).toEqual({ modalBackground: 'magenta' })
     expect(loaded.warnings).toEqual([])
   })
 
@@ -377,19 +377,24 @@ describe('replaceThemeOverrides', () => {
       cfgPath,
       JSON.stringify({
         themeOverrides: {
-          light: { background: '#ffffff', layout: { tailGap: 2 } },
+          light: { modalBackground: '#ffffff', layout: { tailGap: 2 } },
           dark: { text: 'notacolor' },
         },
       }),
     )
     const loaded = loadSettings(cfgPath)
-    expect(loaded.settings.themeOverrides).toEqual({ light: { background: '#ffffff' }, dark: {} })
+    expect(loaded.settings.themeOverrides).toEqual({
+      light: { modalBackground: '#ffffff' },
+      dark: {},
+    })
     expect(loaded.warnings).toEqual([
       'config: unknown themeOverrides.light key "layout" ignored',
       'config: "themeOverrides.dark.text" must be a named color or hex color',
     ])
     await replaceThemeOverrides(loaded.settings.themeOverrides, cfgPath)
-    expect(loadSettings(cfgPath).settings.themeOverrides.light).toEqual({ background: '#ffffff' })
+    expect(loadSettings(cfgPath).settings.themeOverrides.light).toEqual({
+      modalBackground: '#ffffff',
+    })
   })
 })
 
@@ -532,16 +537,32 @@ describe('Settings ↔ config.json parity', () => {
     expect(settings.chatRoutingByAccount).toEqual({ a: 'ic3-only' })
   })
 
-  test('background and appBackground accept null (terminal default)', () => {
+  test('legacy background key loads as modalBackground', () => {
     const w: string[] = []
     const s = configToSettings(
-      { themeOverrides: { dark: { background: null, appBackground: '#101010' } } } as Record<
+      { themeOverrides: { background: 'red', light: { background: '#ffffff' } } } as Record<
         string,
         unknown
       >,
       w,
     )
-    expect(s.themeOverrides.dark).toEqual({ background: null, appBackground: '#101010' })
+    expect(s.themeOverrides).toMatchObject({
+      modalBackground: 'red',
+      light: { modalBackground: '#ffffff' },
+    })
+    expect(w).toEqual([])
+  })
+
+  test('background and appBackground accept null (terminal default)', () => {
+    const w: string[] = []
+    const s = configToSettings(
+      { themeOverrides: { dark: { modalBackground: null, appBackground: '#101010' } } } as Record<
+        string,
+        unknown
+      >,
+      w,
+    )
+    expect(s.themeOverrides.dark).toEqual({ modalBackground: null, appBackground: '#101010' })
     expect(w).toEqual([])
   })
 

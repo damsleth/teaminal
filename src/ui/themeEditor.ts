@@ -164,7 +164,7 @@ export const FIELDS: readonly EditableField[] = [
   num('layout', 'textBackgroundPaddingX', 'Text bg padding X', 'Spacing / Layout', 0, 3),
   // — Colors —
   color('appBackground', 'Background', true),
-  color('background', 'Modal bg', true),
+  color('modalBackground', 'Modal bg', true),
   color('text', 'Text'),
   color('mutedText', 'Muted text'),
   color('border', 'Border'),

@@ -62,17 +62,17 @@ describe('resolveTheme', () => {
 
   test('auto theme resolves to the dark base under a dark system appearance', () => {
     const theme = resolveTheme({ ...defaultSettings, theme: 'auto' }, null, 'dark')
-    expect(theme.background).toBe(builtinThemes.dark.background)
+    expect(theme.modalBackground).toBe(builtinThemes.dark.modalBackground)
   })
 
   test('auto theme resolves to the light base under a light system appearance', () => {
     const theme = resolveTheme({ ...defaultSettings, theme: 'auto' }, null, 'light')
-    expect(theme.background).toBe(builtinThemes.light.background)
+    expect(theme.modalBackground).toBe(builtinThemes.light.modalBackground)
   })
 
   test('explicit theme ignores system appearance', () => {
     const theme = resolveTheme({ ...defaultSettings, theme: 'dark' }, null, 'light')
-    expect(theme.background).toBe(builtinThemes.dark.background)
+    expect(theme.modalBackground).toBe(builtinThemes.dark.modalBackground)
   })
 
   test('layered partial theme is applied between built-in base and overrides', () => {
@@ -107,7 +107,7 @@ describe('resolveTheme', () => {
 
   test('unknown theme name falls back to dark base', () => {
     const theme = resolveTheme({ ...defaultSettings, theme: 'does-not-exist' })
-    expect(theme.background).toBe(builtinThemes.dark.background)
+    expect(theme.modalBackground).toBe(builtinThemes.dark.modalBackground)
     expect(theme.layout).toEqual(builtinThemes.dark.layout)
   })
 

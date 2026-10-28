@@ -110,7 +110,7 @@ export type Theme = {
   // Whole-app background; null = the terminal's own.
   appBackground: string | null
   // Modal / overlay background; null = the terminal's own.
-  background: string | null
+  modalBackground: string | null
   text: string
   mutedText: string
   border: string
@@ -206,7 +206,7 @@ export function isBuiltinTheme(name: string): name is BuiltinThemeName {
 
 const DARK: Theme = {
   appBackground: null,
-  background: 'black',
+  modalBackground: 'black',
   text: 'white',
   mutedText: 'gray',
   border: 'gray',
@@ -246,7 +246,7 @@ const DARK: Theme = {
 // independent on truecolor terminals.
 const LIGHT: Theme = {
   appBackground: null,
-  background: '#ffffff',
+  modalBackground: '#ffffff',
   text: '#1c1c1c',
   mutedText: 'gray',
   border: 'gray',
@@ -290,7 +290,7 @@ export function getTheme(mode: string): Theme {
 // Theme but every field optional, with sub-objects partial too.
 export type PartialTheme = {
   appBackground?: string | null
-  background?: string | null
+  modalBackground?: string | null
   text?: string
   mutedText?: string
   border?: string
@@ -389,7 +389,7 @@ function flattenAlpha(theme: Theme): Theme {
     raw[key] = value
     return blendAlpha(
       value,
-      key === 'background' || key === 'appBackground' ? null : theme.background,
+      key === 'modalBackground' || key === 'appBackground' ? null : theme.modalBackground,
     )
   }
   for (const [key, value] of Object.entries(theme)) {

@@ -195,7 +195,7 @@ export function ThemeEditorModal() {
   const capacity = Math.max(5, Math.min(16, rows - 22))
   const { start, end } = fieldWindow(FIELDS.length, cursor, capacity)
 
-  const bg = theme.background ?? undefined
+  const bg = theme.modalBackground ?? undefined
   let lastSection: string | null = null
   const rowNodes: ReactNode[] = []
   for (let gi = start; gi < end; gi++) {
@@ -273,7 +273,7 @@ function FieldRow(props: {
   theme: ReturnType<typeof useTheme>
 }): ReactElement {
   const { field, selected, overridden, value, hexBuffer, theme } = props
-  const bg = theme.background ?? undefined
+  const bg = theme.modalBackground ?? undefined
   const marker = selected ? '> ' : '  '
   const dot = overridden ? '• ' : '  '
   const label = field.label.padEnd(LABEL_W)
@@ -288,7 +288,9 @@ function FieldRow(props: {
     valueNode = (
       <>
         <Text
-          color={isHexColor(hexBuffer) ? blendAlpha(hexBuffer, theme.background) : theme.errorText}
+          color={
+            isHexColor(hexBuffer) ? blendAlpha(hexBuffer, theme.modalBackground) : theme.errorText
+          }
           backgroundColor={bg}
         >
           {hexBuffer}
@@ -311,7 +313,7 @@ function FieldRow(props: {
       valueText = `██ ${name}`
       valueNode = (
         <>
-          <Text color={blendAlpha(name, theme.background)} backgroundColor={bg}>
+          <Text color={blendAlpha(name, theme.modalBackground)} backgroundColor={bg}>
             ██
           </Text>
           <Text color={labelColor} backgroundColor={bg}>
@@ -362,7 +364,7 @@ function FieldRow(props: {
 // theme, so it re-renders on every edit.
 function ThemePreview(props: { theme: ReturnType<typeof useTheme> }): ReactElement {
   const { theme } = props
-  const bg = theme.background ?? undefined
+  const bg = theme.modalBackground ?? undefined
   return (
     <Box
       flexDirection="column"

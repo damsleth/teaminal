@@ -33,7 +33,7 @@ describe('loadThemeFile', () => {
     writeFileSync(
       join(dir, 'neon.json'),
       JSON.stringify({
-        background: '#001100',
+        background: '#001100', // legacy name for modalBackground
         selected: 'magenta',
         layout: { modalPaddingX: 5, panePaddingX: 0 },
         borders: { panel: 'double', modal: 'bold' },
@@ -47,7 +47,7 @@ describe('loadThemeFile', () => {
     expect(r.source).toBe('file')
     expect(r.data).toBeTruthy()
     const d = r.data as Record<string, unknown>
-    expect(d.background).toBe('#001100')
+    expect(d.modalBackground).toBe('#001100')
     expect(d.selected).toBe('magenta')
     expect(d.layout).toEqual({ modalPaddingX: 5, panePaddingX: 0 })
     expect(d.borders).toEqual({ panel: 'double', modal: 'bold' })

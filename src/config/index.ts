@@ -43,7 +43,7 @@ export type LoadResult = {
 type Env = Record<string, string | undefined>
 
 const THEME_KEYS = new Set<keyof ThemeOverrides>([
-  'background',
+  'modalBackground',
   'text',
   'mutedText',
   'border',
@@ -750,7 +750,8 @@ export function validateThemeOverrides(
   const nested = scope !== 'themeOverrides'
   const out: ThemeOverrides = {}
   for (const [rawKey, rawValue] of Object.entries(value)) {
-    const key = rawKey as keyof ThemeOverrides
+    // `background` is the pre-0.25 name of modalBackground.
+    const key = (rawKey === 'background' ? 'modalBackground' : rawKey) as keyof ThemeOverrides
     if (!THEME_KEYS.has(key) || (nested && NESTED_ONLY_KEYS.has(key))) {
       warnings.push(`config: unknown ${scope} key "${rawKey}" ignored`)
       continue
@@ -793,7 +794,7 @@ export function validateThemeOverrides(
     }
 
     if (
-      (key === 'background' ||
+      (key === 'modalBackground' ||
         key === 'appBackground' ||
         key === 'messageFocusBackground' ||
         key === 'selectedRowBackground' ||
