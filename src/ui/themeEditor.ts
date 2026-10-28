@@ -153,7 +153,6 @@ const bool = (
 // iterated-on tokens), then borders / emphasis / image sizing.
 export const FIELDS: readonly EditableField[] = [
   // — Spacing / Layout —
-  num('layout', 'panePaddingX', 'Pane padding X', 'Spacing / Layout', 0, 6),
   num('layout', 'modalPaddingX', 'Modal padding X', 'Spacing / Layout', 0, 8),
   num('layout', 'modalPaddingY', 'Modal padding Y', 'Spacing / Layout', 0, 4),
   num('layout', 'paneHeaderPaddingLeft', 'Message body indent', 'Spacing / Layout', 0, 6),

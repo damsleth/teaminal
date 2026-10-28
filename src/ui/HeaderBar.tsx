@@ -85,6 +85,7 @@ export function HeaderBar() {
   const realtimeState = useAppState((s) => s.realtimeState)
   const show = useAppState((s) => s.settings.headerElements)
   const userFormat = useAppState((s) => s.settings.headerUserFormat)
+  const centered = useAppState((s) => s.settings.headerBarCentered)
   const theme = useTheme()
 
   const [now, setNow] = useState(() => Date.now())
@@ -179,7 +180,7 @@ export function HeaderBar() {
   // jump as dynamic segments like push/updated change). truncate-end keeps it
   // to exactly one row no matter the width or content.
   return (
-    <Box paddingX={theme.layout.panePaddingX}>
+    <Box paddingX={1} justifyContent={centered ? 'center' : 'flex-start'}>
       <Text wrap="truncate-end">
         {segments.map((seg, i) => (
           <Fragment key={i}>

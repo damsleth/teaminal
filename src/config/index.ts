@@ -87,7 +87,6 @@ const NESTED_ONLY_KEYS = new Set<keyof ThemeOverrides>([
 ])
 
 const LAYOUT_KEYS = new Set<keyof NonNullable<ThemeOverrides['layout']>>([
-  'panePaddingX',
   'modalPaddingX',
   'modalPaddingY',
   'paneHeaderPaddingLeft',
@@ -311,6 +310,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     headerElements: { ...settings.headerElements },
     headerUserFormat: settings.headerUserFormat,
     statusBarShowKeyHints: settings.statusBarShowKeyHints,
+    headerBarCentered: settings.headerBarCentered,
     chatRoutingByAccount: { ...settings.chatRoutingByAccount },
     chatListCollapsedSections: { ...settings.chatListCollapsedSections },
     chatListWidth: settings.chatListWidth,
@@ -545,6 +545,7 @@ function validateAndAssign(
     case 'selfMessagesOnRight':
     case 'scrollOnNewMessages':
     case 'statusBarShowKeyHints':
+    case 'headerBarCentered':
       if (typeof value === 'boolean') {
         out[key] = value
         return true
@@ -831,6 +832,8 @@ export function validateLayoutOverrides(
   }
   const out: NonNullable<ThemeOverrides['layout']> = {}
   for (const [rawKey, rawValue] of Object.entries(value)) {
+    // Removed setting; pane padding is pinned at 1. Drop quietly.
+    if (rawKey === 'panePaddingX') continue
     if (!LAYOUT_KEYS.has(rawKey as keyof NonNullable<ThemeOverrides['layout']>)) {
       warnings.push(`config: unknown ${scope} key "${rawKey}" ignored`)
       continue

@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Center header bar.** New setting (`headerBarCentered`, menu → Settings
+  → Center header bar) centers the header bar segments. Off keeps them
+  left-aligned.
+
 - **App background color.** The theme editor's new **Background**
   (`appBackground`) paints the whole app. The old setting that only colored
   menus and modals is now **Modal bg** (`modalBackground`; the old
@@ -180,6 +184,11 @@ adheres to [Semantic Versioning](https://semver.org/).
   save can no longer recreate the files right after they are deleted.
 - **Test and demo runs (`TEAMINAL_SEED`) no longer touch your real caches.**
   The tui-test suite used to overwrite `~/.cache/teaminal` with fixture chats.
+
+### Removed
+
+- **Pane padding X theme setting** (`layout.panePaddingX`). Pane padding is
+  fixed at 1; an existing value in config or a theme file is ignored.
 
 ## [0.23.0] - 2026-09-25
 

@@ -82,7 +82,7 @@ describe('FIELDS descriptor list', () => {
 })
 
 describe('clampNumeric', () => {
-  const f = field('layout.panePaddingX') as NumericField // 0..6
+  const f = field('layout.senderIndent') as NumericField // 0..6
 
   test('clamps below min and above max', () => {
     expect(clampNumeric(f, -3)).toBe(f.min)
@@ -164,8 +164,8 @@ describe('fieldValue', () => {
     expect(fieldValue(field('color.modalBackground'), baseTheme, baseSettings)).toBe(
       baseTheme.modalBackground,
     )
-    expect(fieldValue(field('layout.panePaddingX'), baseTheme, baseSettings)).toBe(
-      baseTheme.layout.panePaddingX,
+    expect(fieldValue(field('layout.senderIndent'), baseTheme, baseSettings)).toBe(
+      baseTheme.layout.senderIndent,
     )
     expect(fieldValue(field('borders.panel'), baseTheme, baseSettings)).toBe(
       baseTheme.borders.panel,
@@ -191,8 +191,8 @@ describe('isOverridden', () => {
   })
 
   test('true for nested layout override', () => {
-    const s = withOverrides({ layout: { panePaddingX: 3 } })
-    expect(isOverridden(field('layout.panePaddingX'), s, 'dark')).toBe(true)
+    const s = withOverrides({ layout: { senderIndent: 3 } })
+    expect(isOverridden(field('layout.senderIndent'), s, 'dark')).toBe(true)
     expect(isOverridden(field('layout.modalPaddingX'), s, 'dark')).toBe(false)
   })
 
@@ -239,12 +239,12 @@ describe('applyField', () => {
   })
 
   test('preserves sibling overrides', () => {
-    const s = withOverrides({ modalBackground: 'red', layout: { panePaddingX: 2 } })
+    const s = withOverrides({ modalBackground: 'red', layout: { senderIndent: 2 } })
     const patch = applyField(s, field('color.text'), 'white', 'dark')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
     expect(patch.overrides.modalBackground).toBe('red')
     expect(patch.overrides.dark?.text).toBe('white')
-    expect(patch.overrides.layout?.panePaddingX).toBe(2)
+    expect(patch.overrides.layout?.senderIndent).toBe(2)
   })
 })
 
@@ -265,15 +265,15 @@ describe('resetField', () => {
   })
 
   test('removes a nested override and prunes the empty sub-object', () => {
-    const s = withOverrides({ layout: { panePaddingX: 3 } })
-    const patch = resetField(s, field('layout.panePaddingX'), 'dark')
+    const s = withOverrides({ layout: { senderIndent: 3 } })
+    const patch = resetField(s, field('layout.senderIndent'), 'dark')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
     expect(patch.overrides.layout).toBeUndefined()
   })
 
   test('keeps sibling keys inside a sub-object', () => {
-    const s = withOverrides({ layout: { panePaddingX: 3, modalPaddingX: 5 } })
-    const patch = resetField(s, field('layout.panePaddingX'), 'dark')
+    const s = withOverrides({ layout: { senderIndent: 3, modalPaddingX: 5 } })
+    const patch = resetField(s, field('layout.senderIndent'), 'dark')
     if (patch.kind !== 'overrides') throw new Error('expected overrides')
     expect(patch.overrides.layout).toEqual({ modalPaddingX: 5 })
   })

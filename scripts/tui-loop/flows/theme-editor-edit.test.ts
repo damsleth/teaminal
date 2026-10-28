@@ -2,7 +2,7 @@
  * Flow: theme-editor (live edit → persist → reset)
  *
  * Drives a real edit through the seeded app and asserts it round-trips to disk:
- *   open editor → `+` steps "Pane padding X" 1 → 2 → config gains the override
+ *   open editor → `+` steps "Modal padding X" 3 → 4 → config gains the override
  *               → `r` resets the field          → the override key is removed
  *
  * This exercises the full keypress → store → re-render → persist pipeline,
@@ -74,18 +74,18 @@ test('theme-editor: a live edit persists and resets through the real app', async
   terminal.submit()
   await expect(terminal.getByText('= overridden')).toBeVisible()
 
-  // The cursor opens on the first field, "Pane padding X" (default 1). `+`
+  // The cursor opens on the first field, "Modal padding X" (default 3). `+`
   // steps it forward; the change is written to the isolated config.
   terminal.write('+')
-  const afterEdit = await waitForConfig((cfg) => cfg?.themeOverrides?.layout?.panePaddingX === 2)
+  const afterEdit = await waitForConfig((cfg) => cfg?.themeOverrides?.layout?.modalPaddingX === 4)
   // tui-test's expect() only carries locator/terminal matchers, so assert the
   // persisted value with node:assert.
-  assert.equal(afterEdit?.themeOverrides?.layout?.panePaddingX, 2)
+  assert.equal(afterEdit?.themeOverrides?.layout?.modalPaddingX, 4)
 
   // `r` resets the focused field — the override key is removed, not merged.
   terminal.write('r')
   const afterReset = await waitForConfig(
-    (cfg) => cfg?.themeOverrides?.layout?.panePaddingX === undefined,
+    (cfg) => cfg?.themeOverrides?.layout?.modalPaddingX === undefined,
   )
-  assert.equal(afterReset?.themeOverrides?.layout?.panePaddingX, undefined)
+  assert.equal(afterReset?.themeOverrides?.layout?.modalPaddingX, undefined)
 })

@@ -35,7 +35,7 @@ describe('loadThemeFile', () => {
       JSON.stringify({
         background: '#001100', // legacy name for modalBackground
         selected: 'magenta',
-        layout: { modalPaddingX: 5, panePaddingX: 0 },
+        layout: { modalPaddingX: 5 },
         borders: { panel: 'double', modal: 'bold' },
         emphasis: { selectedBold: false, modalTitleBold: true },
         presence: { Available: 'greenBright', Bogus: 'red' },
@@ -49,7 +49,7 @@ describe('loadThemeFile', () => {
     const d = r.data as Record<string, unknown>
     expect(d.modalBackground).toBe('#001100')
     expect(d.selected).toBe('magenta')
-    expect(d.layout).toEqual({ modalPaddingX: 5, panePaddingX: 0 })
+    expect(d.layout).toEqual({ modalPaddingX: 5 })
     expect(d.borders).toEqual({ panel: 'double', modal: 'bold' })
     expect(d.emphasis).toEqual({ selectedBold: false, modalTitleBold: true })
     expect((d.presence as Record<string, string>).Available).toBe('greenBright')
