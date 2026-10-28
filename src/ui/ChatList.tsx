@@ -14,7 +14,7 @@ import { useRef } from 'react'
 import {
   buildSelectableList,
   chatLabel,
-  clampCursor,
+  resolveCursor,
   itemMatchesFilter,
   shortName,
   type SelectableItem,
@@ -215,6 +215,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const teams = useAppState((s) => s.teams)
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
   const cursor = useAppState((s) => s.cursor)
+  const cursorKey = useAppState((s) => s.cursorKey)
   const me = useAppState((s) => s.me)
   const conn = useAppState((s) => s.conn)
   const filter = useAppState((s) => s.filter)
@@ -270,7 +271,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     filter && items.length === 0 && isNewChatQueryCandidate(filter) ? filter.trim() : null
 
   const selectableCount = items.length + (syntheticNewChatQuery ? 1 : 0)
-  const safeCursor = clampCursor(cursor, selectableCount)
+  const safeCursor = resolveCursor(items, selectableCount, cursorKey, cursor)
   const rows = buildRows(items, density, syntheticNewChatQuery, chatListGroupByType)
   const chatListGap = theme.layout.chatListGap
 

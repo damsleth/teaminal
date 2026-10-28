@@ -338,6 +338,19 @@ describe('handleListKeys', () => {
   })
 })
 
+describe('list cursor follows its row', () => {
+  test('j stores the row key; after a reorder ctrl+d targets that same chat', () => {
+    const a = makeCtx()
+    handleListKeys({ input: 'j', key: makeKey() }, a.ctx)
+    expect(a.store.get().cursorKey).toBe('chat:b')
+    // A poll moves b to the top. The stored index (1) now points at a.
+    const { cursor, cursorKey } = a.store.get()
+    const b = makeCtx({ chats: [chat('b'), chat('a'), chat('c')], cursor, cursorKey })
+    handleListKeys({ input: 'd', key: makeKey({ ctrl: true }) }, b.ctx)
+    expect(b.store.get().modal).toMatchObject({ kind: 'confirm-delete-chat', chatId: 'b' })
+  })
+})
+
 describe('ctrl+d delete chat', () => {
   test('opens the confirm modal for the row under the cursor', () => {
     const a = makeCtx({ cursor: 1 })

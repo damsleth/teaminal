@@ -269,6 +269,54 @@ export function chatLabel(
   return chat.chatType === 'oneOnOne' ? '(1:1)' : chat.chatType === 'group' ? '(group)' : '(chat)'
 }
 
+// Stable identity of a list row, so the cursor stays on the same chat when a
+// poll reorders the list. The synthetic "new chat" row (shown after a filter
+// that matches nothing) sits at index visible.length and has key NEW_CHAT_ROW.
+export const NEW_CHAT_ROW = 'new-chat'
+export function selectableKey(item: SelectableItem): string {
+  switch (item.kind) {
+    case 'chat':
+      return `chat:${item.chat.id}`
+    case 'channel':
+      return `channel:${item.team.id}/${item.channel.id}`
+    case 'team':
+      return `team:${item.team.id}`
+    case 'section':
+      return `section:${item.section}`
+    case 'more':
+      return `more:${item.section}`
+  }
+}
+
+// The cursor's row index: where `key` sits now, else the stored `fallback`
+// index (the row went away, e.g. a chat was deleted or filtered out), clamped
+// to `rowCount` (visible rows plus the synthetic new-chat row, if any).
+export function resolveCursor(
+  visible: SelectableItem[],
+  rowCount: number,
+  key: string | null,
+  fallback: number,
+): number {
+  if (key === NEW_CHAT_ROW && rowCount > visible.length) return visible.length
+  if (key !== null) {
+    const i = visible.findIndex((it) => selectableKey(it) === key)
+    if (i >= 0) return i
+  }
+  return clampCursor(fallback, rowCount)
+}
+
+// Store patch that moves the cursor to `index` of `visible`.
+export function cursorAt(
+  visible: SelectableItem[],
+  index: number,
+): { cursor: number; cursorKey: string | null } {
+  const item = visible[index]
+  return {
+    cursor: index,
+    cursorKey: item ? selectableKey(item) : index === visible.length ? NEW_CHAT_ROW : null,
+  }
+}
+
 // Clamps the stored cursor index to the current list length. Returns 0 for
 // an empty list. Stable so consumers can treat the result as definitive.
 export function clampCursor(cursor: number, listLength: number): number {

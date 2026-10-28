@@ -145,6 +145,7 @@ export function App() {
 
   const focus = useAppState((s) => s.focus)
   const cursor = useAppState((s) => s.cursor)
+  const cursorKey = useAppState((s) => s.cursorKey)
   const chats = useAppState((s) => s.chats)
   const teams = useAppState((s) => s.teams)
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
@@ -434,6 +435,7 @@ export function App() {
         filter,
         expandedChatSections,
         cursor,
+        cursorKey,
         focus,
         exit,
         refresh,
