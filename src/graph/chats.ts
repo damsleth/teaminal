@@ -14,6 +14,7 @@ import { GraphError, type GraphClient } from './client'
 import { listChatMessagesViaChatsvc, sendChannelMessageViaChatsvc } from './teamsChatsvc'
 import { createOneOnOneThreadViaChatsvc } from './teamsFederation'
 import { recordEvent } from '../log'
+import { teamsMessageBody } from '../text/html'
 import type { Chat, ChatMessage, DirectoryUser, Person } from '../types'
 
 // Chat message reads/sends route between graph.microsoft.com and the Teams
@@ -316,7 +317,7 @@ function graphSend(
   return client.graph<ChatMessage>({
     method: 'POST',
     path: `/chats/${encodeURIComponent(chatId)}/messages`,
-    body: { body: { contentType: 'text', content } },
+    body: { body: teamsMessageBody(content) },
     signal: opts?.signal,
   })
 }
@@ -379,7 +380,7 @@ export async function editMessage(
   await client.graph<void>({
     method: 'PATCH',
     path: `/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}`,
-    body: { body: { contentType: 'text', content } },
+    body: { body: teamsMessageBody(content) },
     signal: opts?.signal,
   })
 }

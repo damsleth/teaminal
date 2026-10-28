@@ -357,6 +357,15 @@ function trimSpans(spans: RichSpan[]): RichSpan[] {
   return spans
 }
 
+// Outgoing message body. Single-line text goes as plain text (unchanged
+// from before); multi-line text goes as escaped HTML with <br> so Teams
+// keeps the line breaks.
+export function teamsMessageBody(text: string): { contentType: 'text' | 'html'; content: string } {
+  if (!text.includes('\n')) return { contentType: 'text', content: text }
+  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return { contentType: 'html', content: escaped.replace(/\n/g, '<br>') }
+}
+
 export function htmlToText(html: string, opts?: HtmlToTextOpts): string {
   const text = richText(htmlToRich(html, opts))
   if (opts?.preserveNewlines) return text

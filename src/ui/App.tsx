@@ -66,6 +66,7 @@ import { handleFilterKeys } from './keybinds/filterKeys'
 import { handleListKeys } from './keybinds/listKeys'
 import { handleMessageSearchKeys } from './keybinds/messageSearchKeys'
 import { handleResizeKeys } from './keybinds/resizeKeys'
+import { COMPOSER_TEXT_CHROME, wrapComposer } from './composerWrap'
 import { computeLayout } from './layout'
 import { readMessagePageState, type LoadMoreState } from './messageRows'
 import { messagesForTimelineNavigation } from './renderableMessage'
@@ -212,7 +213,7 @@ export function App() {
   // Compute dynamic layout dimensions from terminal size + settings.
   const activeConvForDraft = focusKey(focus)
   const activeDraft = activeConvForDraft ? (draftsByConvo[activeConvForDraft] ?? '') : ''
-  const draftLines = activeDraft ? activeDraft.split('\n').length : 1
+  const draftLines = wrapComposer(activeDraft, terminalCols - COMPOSER_TEXT_CHROME).length
   const layout = computeLayout({
     cols: terminalCols,
     rows: terminalRows,
@@ -629,7 +630,7 @@ export function App() {
       </Box>
       {showTailPanels && <TailPanels />}
       <Box {...paneBorder('composer')} height={resolvedComposerHeight}>
-        <Composer />
+        <Composer columns={terminalCols} />
       </Box>
       {statusBarPosition === 'bottom' && <StatusBar />}
     </Box>

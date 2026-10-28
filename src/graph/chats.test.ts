@@ -494,17 +494,30 @@ describe('sendMessage', () => {
     expect(created.id).toBe('new-id')
   })
 
-  test('preserves multi-line content and unicode verbatim', async () => {
+  test('sends multi-line content as escaped HTML with <br>, unicode verbatim', async () => {
     primeAuth()
     let seenBody = ''
     __setTransportForTests(async (_url, init) => {
       seenBody = typeof init.body === 'string' ? init.body : ''
       return jsonResponse({ ...SAMPLE_MESSAGE, body: { contentType: 'text', content: '' } })
     })
-    const content =
-      'first line\nsecond line\nNo - emdash 🙃 — wait, that one is allowed in user content'
+    const content = 'first <line>\nsecond & line\nemdash 🙃 — fine'
     await sendMessage(testClient(), '19:abc@unq.gbl.spaces', content)
-    expect(JSON.parse(seenBody).body.content).toBe(content)
+    expect(JSON.parse(seenBody).body).toEqual({
+      contentType: 'html',
+      content: 'first &lt;line&gt;<br>second &amp; line<br>emdash 🙃 — fine',
+    })
+  })
+
+  test('sends single-line content as plain text, unchanged', async () => {
+    primeAuth()
+    let seenBody = ''
+    __setTransportForTests(async (_url, init) => {
+      seenBody = typeof init.body === 'string' ? init.body : ''
+      return jsonResponse({ ...SAMPLE_MESSAGE, body: { contentType: 'text', content: '' } })
+    })
+    await sendMessage(testClient(), '19:abc@unq.gbl.spaces', 'a <b> & c')
+    expect(JSON.parse(seenBody).body).toEqual({ contentType: 'text', content: 'a <b> & c' })
   })
 
   test('forwards AbortSignal', async () => {

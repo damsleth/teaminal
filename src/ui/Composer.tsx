@@ -49,15 +49,9 @@ import {
   initialParserState,
   type ParserState,
 } from './bracketedPaste'
-import {
-  cursorLineCol,
-  emptyBuffer,
-  reduce,
-  splitLines,
-  type ComposerAction,
-  type ComposerBuffer,
-} from './composerReducer'
+import { emptyBuffer, reduce, type ComposerAction, type ComposerBuffer } from './composerReducer'
 import { htmlToText } from '../text/html'
+import { COMPOSER_TEXT_CHROME, cursorRowCol, wrapComposer } from './composerWrap'
 import { shortName } from '../state/selectables'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useSessionApi } from './SessionContext'
@@ -82,7 +76,7 @@ export function findRootQuote(
   return { sender, preview }
 }
 
-export function Composer() {
+export function Composer({ columns = 80 }: { columns?: number }) {
   const store = useAppStore()
   const session = useSessionApi()
   const { isRawModeSupported } = useStdin()
@@ -129,8 +123,11 @@ export function Composer() {
     const msg = (store.get().messagesByConvo[editConv] ?? []).find((m) => m.id === editingMessageId)
     if (!msg) return
     const raw = msg.body?.content ?? ''
+    // Line breaks survive; inline formatting does not (the composer is plain text).
     const text =
-      msg.body?.contentType === 'text' ? raw.replace(/\s+/g, ' ').trim() : htmlToText(raw).trim()
+      msg.body?.contentType === 'text'
+        ? raw.trim()
+        : htmlToText(raw, { preserveNewlines: true }).replace(/ /g, ' ')
     setBuf({ text, cursor: text.length })
   }, [editingMessageId, focus, store])
 
@@ -285,8 +282,9 @@ export function Composer() {
   }
 
   // --- Render ---
-  const lines = splitLines(buf.text)
-  const { line: cursorLine, col: cursorCol } = cursorLineCol(buf.text, buf.cursor)
+  // Long lines soft-wrap to the composer width instead of truncating.
+  const lines = wrapComposer(buf.text, columns - COMPOSER_TEXT_CHROME)
+  const { row: cursorLine, col: cursorCol } = cursorRowCol(lines, buf.cursor)
   // Show up to MAX_VISIBLE_LINES around the cursor; bias toward the
   // last lines so a long buffer stays anchored to the most recent
   // content while typing.
@@ -295,7 +293,7 @@ export function Composer() {
   let firstVisible = Math.max(0, totalLines - MAX_VISIBLE_LINES)
   // If the cursor is inside the hidden head, scroll up so it's visible.
   if (cursorLine < firstVisible) firstVisible = cursorLine
-  const visible = lines.slice(firstVisible, firstVisible + MAX_VISIBLE_LINES)
+  const visible = lines.slice(firstVisible, firstVisible + MAX_VISIBLE_LINES).map((r) => r.text)
 
   const quote = focus.kind === 'thread' ? findRootQuote(focus, messagesByConvo) : null
 

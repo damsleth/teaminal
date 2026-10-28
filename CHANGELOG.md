@@ -13,6 +13,13 @@ adheres to [Semantic Versioning](https://semver.org/).
   bulleted and numbered lists (nested lists indent) and quotes. Teams code
   blocks, which used to be dropped, now show. Tables are still dropped.
 
+- **Composer wraps long lines.** Text past the composer width wraps onto
+  the next row instead of ending in `…`, and the composer grows to fit.
+
+- **Multi-line messages keep their line breaks in Teams.** A message with
+  line breaks is sent as HTML with `<br>`; single-line messages are sent as
+  plain text as before. Editing a multi-line message keeps its lines.
+
 - **Chat name header.** New setting (`showChatNameHeader`, menu → Settings
   → Chat name header, default off) shows the open conversation's name above
   the messages: the other person in a 1:1, the group chat's name, or
