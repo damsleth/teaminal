@@ -102,6 +102,15 @@ content.replace(/<[^>]+>/g, '') // breaks on <at> mentions and entities
 - JWT and HTTP-response fixtures only — never put real tokens or real account IDs in tests
 - Test boundaries: token expiry edge cases, 401-then-retry, 429 with `Retry-After`, AppleScript escaping
 
+## Debugging live behaviour
+
+`bun run dev` and `bun run dev:watch` mirror logs to disk (gitignored, redacted):
+
+- `.tmp/events.log` — every event-log record (`recordEvent`, `debug`, `warn`), timestamped.
+- `.tmp/network.log` — every Graph request: method, status, duration, path with ids replaced by `:id`, profile.
+
+Read these first when the maintainer reports something that "stopped working" in a dev session: grep by source or path, e.g. `grep photo .tmp/network.log`. The installed binary only logs when started with `--log-file` / `--network-log`.
+
 ## Commands
 
 ```bash
