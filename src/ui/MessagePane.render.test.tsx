@@ -120,6 +120,40 @@ test('an overflowing pane clips whole rows at the top instead of overlapping the
   expect(clipped.at(-1)).toContain('third day, newest message')
 })
 
+test('an HTML body keeps its line breaks, bullets and bold run', () => {
+  const store = createAppStore()
+  store.set({
+    focus: { kind: 'chat', chatId: 'c1' },
+    messagesByConvo: {
+      'chat:c1': [
+        {
+          ...msg('h1', '2026-01-01T09:00:00Z', 'Ada', ''),
+          body: {
+            contentType: 'html',
+            content: '<p>git clone</p><p>cd <strong>SKILLS</strong></p><ul><li>one</li></ul>',
+          },
+        },
+      ],
+    },
+  })
+  const raw = renderToString(
+    <StoreProvider store={store}>
+      <SessionProvider api={session}>
+        <Box flexDirection="column" height={20}>
+          <MessagePane focusedMessageId={null} />
+        </Box>
+      </SessionProvider>
+    </StoreProvider>,
+    { columns: 80 },
+  )
+  // eslint-disable-next-line no-control-regex
+  const out = raw.replace(/\x1b\[[0-9;]*m/g, '').split('\n')
+  const at = out.findIndex((l) => l.includes('git clone'))
+  expect(out[at + 1]).toContain('cd SKILLS')
+  expect(out[at + 2]).toContain('• one')
+  expect(raw).toMatch(/\x1b\[1mSKILLS/)
+})
+
 test('the search bar stays intact above an overflowing timeline', () => {
   const out = lines(8, null, 'newest')
   expect(out.filter((l) => l.includes('hit(s)'))).toHaveLength(1)
