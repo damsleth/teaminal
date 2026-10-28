@@ -33,7 +33,6 @@ import type {
 // toggles. Restricting at the type level keeps the menu schema honest.
 export type ToggleKey =
   | 'theme'
-  | 'chatListDensity'
   | 'chatListSort'
   | 'chatListGroupByType'
   | 'chatListSectionCap'
@@ -41,6 +40,7 @@ export type ToggleKey =
   | 'chatListShortNames'
   | 'showMessagePreviews'
   | 'messagePaneShortNames'
+  | 'showChatNameHeader'
   | 'showPresenceInList'
   | 'showTimestampsInPane'
   | 'showReactions'
@@ -213,11 +213,6 @@ export const ROOT_MENU: MenuItem[] = [
       },
       // — Chat list —
       {
-        id: 'chatListDensity',
-        label: 'Chat list density',
-        action: { kind: 'toggle-setting', key: 'chatListDensity' },
-      },
-      {
         id: 'chatListSort',
         label: 'Chat list sort',
         action: { kind: 'toggle-setting', key: 'chatListSort' },
@@ -250,6 +245,12 @@ export const ROOT_MENU: MenuItem[] = [
         action: { kind: 'toggle-setting', key: 'showPresenceInList' },
       },
       // — Messages —
+      {
+        id: 'showChatNameHeader',
+        label: 'Chat name header',
+        action: { kind: 'toggle-setting', key: 'showChatNameHeader' },
+        hint: 'person, group or channel name',
+      },
       {
         id: 'messagePaneShortNames',
         label: 'Short names in chats',
@@ -465,8 +466,6 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
       const next = order[(idx === -1 ? -1 : idx) + 1] ?? order[0]!
       return next as Settings[K]
     }
-    case 'chatListDensity':
-      return (current === 'cozy' ? 'compact' : 'cozy') as Settings[K]
     case 'chatListSort':
       return (current === 'recent' ? 'alphabetical' : 'recent') as Settings[K]
     case 'headerUserFormat':
@@ -482,6 +481,7 @@ export function cycleSetting<K extends ToggleKey>(key: K, current: Settings[K]):
     case 'chatListShortNames':
     case 'showMessagePreviews':
     case 'messagePaneShortNames':
+    case 'showChatNameHeader':
     case 'showPresenceInList':
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':
@@ -528,7 +528,6 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
       // appear in the pane: drawn inline, or as openable text placeholders.
       return value === 'auto' ? 'inline' : 'as links'
     case 'theme':
-    case 'chatListDensity':
     case 'chatListSort':
     case 'showReactions':
     case 'statusBarPosition':
@@ -540,6 +539,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'chatListShortNames':
     case 'showMessagePreviews':
     case 'messagePaneShortNames':
+    case 'showChatNameHeader':
     case 'showPresenceInList':
     case 'showTimestampsInPane':
     case 'messageFocusIndicatorEnabled':

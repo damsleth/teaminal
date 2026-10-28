@@ -66,12 +66,12 @@ const ImageSlotsContext = createContext<InlineImageSlots>(new Map())
 
 // Reserve for surrounding chrome so the message pane doesn't overflow the
 // terminal. Header bar (3) + composer box (3) + status bar (1) + pane
-// border (2) + safety pad (1) = 10. Cozy density adds an in-pane header
+// border (2) + safety pad (1) = 10. The chat name header adds an in-pane
 // row plus a spacer below it (2), the loading-older indicator (when
 // present) is one extra line, and the typing indicator (when present)
 // is another.
 const CHROME_RESERVED_ROWS = 10
-const COZY_HEADER_ROWS = 2
+const CHAT_HEADER_ROWS = 2
 const MIN_VISIBLE_ROWS = 5
 // Fallback for LIST_PANE_WIDTH when no prop is provided. Kept to avoid
 // breaking isolated renders; App.tsx always passes the resolved width.
@@ -103,7 +103,7 @@ export function MessagePane(props: {
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
   const showTimestamps = useAppState((s) => s.settings.showTimestampsInPane)
   const shortNames = useAppState((s) => s.settings.messagePaneShortNames)
-  const density = useAppState((s) => s.settings.chatListDensity)
+  const showChatNameHeader = useAppState((s) => s.settings.showChatNameHeader)
   const reactionDisplayMode = useAppState((s) => s.settings.showReactions)
   const inputZone = useAppState((s) => s.inputZone)
   const searchQuery = useAppState((s) => s.messageSearchQuery)
@@ -213,7 +213,7 @@ export function MessagePane(props: {
           ? 'idle'
           : 'unavailable')
   const isLoadingOlder = loadMoreState === 'loading'
-  const cozyRows = density === 'cozy' ? COZY_HEADER_ROWS : 0
+  const chatHeaderRows = showChatNameHeader ? CHAT_HEADER_ROWS : 0
   const typingActive = (typingByConvo[conv] ?? []).length > 0
   const reservedDynamic = (isLoadingOlder ? 1 : 0) + (typingActive ? 1 : 0)
   const chromeRows = CHROME_RESERVED_ROWS - (statusBarHidden ? 1 : 0)
@@ -221,7 +221,7 @@ export function MessagePane(props: {
     MIN_VISIBLE_ROWS,
     terminalSize.rows -
       chromeRows -
-      cozyRows -
+      chatHeaderRows -
       reservedDynamic -
       tailRows -
       (composerRows - DEFAULT_COMPOSER_ROWS) -
@@ -373,11 +373,11 @@ export function MessagePane(props: {
     for (let i = 0; i < idx; i++) rowsBefore += messageRenderRowHeight(rows[i]!, heightOpts)
     // Chrome above the pane content: header bar (3) + message-pane top border
     // (1); pane content then starts on the next row. Add the in-pane prelude
-    // (cozy header, search bar, loading-older line) that pushes messages down,
+    // (chat name header, search bar, loading-older line) that pushes messages down,
     // plus the focused message's own sender-header line so the anchor lands on
     // the body rather than the name.
     const preludeRows =
-      cozyRows + (searchActive ? 1 : 0) + (isLoadingOlder && !showingHistoryTop ? 1 : 0)
+      chatHeaderRows + (searchActive ? 1 : 0) + (isLoadingOlder && !showingHistoryTop ? 1 : 0)
     const row = 4 + 1 + preludeRows + rowsBefore + 1 + bodyPaddingY
     // Compute the column at the end of the focused message body's last wrapped
     // line. `messageBodyTerminalColumn` gives the 1-based terminal column where
@@ -419,7 +419,7 @@ export function MessagePane(props: {
         overflow="hidden"
         paddingX={0}
       >
-        {density === 'cozy' && (
+        {showChatNameHeader && (
           <Box paddingLeft={bodyIndent} marginBottom={1} flexShrink={0}>
             <Text bold={theme.emphasis.sectionHeadingBold}>
               {fs(headerLabel, theme.fontSize.paneHeader, theme.fontSize.tightSpacing)}

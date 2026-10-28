@@ -6,19 +6,19 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 ││  teaminal · You (example.com) · presence ● · graph ● · 3 chats                                   ││
 │╰──────────────────────────────╭────────────────────────────────────────────────────────────────╮──╯│
 │╭──────────────────────────╮╭──│                                                                │──╮│
-││Chats                     ││Se│   Theme editor · dark colors                                   │  ││
-││ ◯ > Ada Byron            ││  │   • = overridden · adjust live, persists to config             │  ││
-││     Ada: The launch      ││  │   ── Spacing / Layout                                          │  ││
-││     notes are ready for  ││  │   >   Modal padding X       3 (0–8)                            │  ││
-││     rev…                 ││  │       Modal padding Y       1                                  │  ││
-││    Design Sync          ││  │       Message body indent   2                                  │  ││
-││     Nina: Nina shared    ││  │       Sender indent         2                                  │  ││
-││     two compact layout   ││  │       Message gap           1                                  │  ││
-││     op…                  ││  │       Tail strip gap        1                                  │  ││
-││    Ops Channel          ││  │       Chat list pad R       1                                  │  ││
-││     Mina: Deploy is      ││  │       Chat list gap         0                                  │  ││
-││     green in the EU      ││  │      ↓ 44 more                                                 │  ││
-││     region.              ││  │                                                                │  ││
+││ ◯ Ada Byron              ││Se│   Theme editor · dark colors                                   │  ││
+││   Ada: The launch notes  ││  │   • = overridden · adjust live, persists to config             │  ││
+││   are ready for review.  ││  │   ── Spacing / Layout                                          │  ││
+││  Design Sync            ││  │   >   Modal padding X       3 (0–8)                            │  ││
+││   Nina: Nina shared two  ││  │       Modal padding Y       1                                  │  ││
+││   compact layout option… ││  │       Message body indent   2                                  │  ││
+││  Ops Channel            ││  │       Sender indent         2                                  │  ││
+││   Mina: Deploy is green  ││  │       Message gap           1                                  │  ││
+││   in the EU region.      ││  │       Chat list indent      1                                  │  ││
+││                          ││  │       Chat list gap         0                                  │  ││
+││                          ││  │       Text bg padding X     0                                  │  ││
+││                          ││  │      ↓ 43 more                                                 │  ││
+││                          ││  │                                                                │  ││
 ││                          ││  │   ╭────────────────────────────────────────────────────────╮   │  ││
 ││                          ││  │   │Ada  Sample message body  12:34                         │   │  ││
 ││                          ││  │   │  Selected chat row                                     │   │  ││
@@ -106,11 +106,23 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": 8
   },
   "1,4": {
+    "bgColorMode": 33554432,
+    "bgColor": 235
+  },
+  "3,4": {
     "fgColorMode": 0,
-    "fgColor": -1,
+    "fgColor": -1
+  },
+  "4,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 6,
     "bold": 134217728
   },
-  "6,4": {
+  "26,4": {
+    "bgColorMode": 0,
+    "bgColor": -1,
+    "fgColorMode": 0,
+    "fgColor": -1,
     "bold": 0
   },
   "27,4": {
@@ -148,22 +160,16 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": 8
   },
   "1,5": {
-    "bgColorMode": 33554432,
-    "bgColor": 235
+    "fgColorMode": 0,
+    "fgColor": -1
   },
   "4,5": {
     "fgColorMode": 16777216,
-    "fgColor": 6
-  },
-  "6,5": {
-    "bold": 134217728
+    "fgColor": 8
   },
   "26,5": {
-    "bgColorMode": 0,
-    "bgColor": -1,
     "fgColorMode": 0,
-    "fgColor": -1,
-    "bold": 0
+    "fgColor": -1
   },
   "27,5": {
     "fgColorMode": 16777216,
@@ -209,11 +215,11 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "6,6": {
+  "4,6": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "22,6": {
+  "25,6": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -257,15 +263,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,7": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "6,7": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "26,7": {
+  "2,7": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -329,11 +327,11 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "6,8": {
+  "4,8": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "10,8": {
+  "26,8": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -385,7 +383,15 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "3,9": {
+  "1,9": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 8
+  },
+  "26,9": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -437,15 +443,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "1,10": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "6,10": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "24,10": {
+  "2,10": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -501,11 +499,11 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "6,11": {
+  "4,11": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "25,11": {
+  "26,11": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -561,11 +559,11 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "6,12": {
+  "4,12": {
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "9,12": {
+  "21,12": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -617,7 +615,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "3,13": {
+  "1,13": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -673,14 +671,6 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "6,14": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "22,14": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
   "27,14": {
     "fgColorMode": 16777216,
     "fgColor": 8
@@ -733,14 +723,6 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 0,
     "fgColor": -1
   },
-  "6,15": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "22,15": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
   "27,15": {
     "fgColorMode": 16777216,
     "fgColor": 8
@@ -782,14 +764,6 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": 8
   },
   "1,16": {
-    "fgColorMode": 0,
-    "fgColor": -1
-  },
-  "6,16": {
-    "fgColorMode": 16777216,
-    "fgColor": 8
-  },
-  "13,16": {
     "fgColorMode": 0,
     "fgColor": -1
   },

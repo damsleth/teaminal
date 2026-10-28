@@ -85,7 +85,6 @@ warnings and fall back to defaults.
   "theme": "dark",
   "accounts": [],
   "activeAccount": null,
-  "chatListDensity": "cozy",
   "chatListShortNames": false,
   "showMessagePreviews": true,
   "messagePaneShortNames": true,
@@ -129,10 +128,10 @@ warnings and fall back to defaults.
 | `theme`                        | `dark`, `light`, `compact`, `comfortable`, or a custom name | `dark` | Terminal palette + layout preset. Custom names load `~/.config/teaminal/themes/<name>.json` (see [Themes](#themes) below). |
 | `accounts`                     | string array         |    `[]` | owa-piggy profile aliases managed by Accounts.                                           |
 | `activeAccount`                | string or null       |  `null` | Default profile alias used at startup when `--profile` is not passed.                    |
-| `chatListDensity`              | `cozy`, `compact`    |  `cozy` | Row spacing in the chat list.                                                            |
 | `chatListShortNames`           | boolean              | `false` | Show first names in chat list rows.                                                      |
 | `showMessagePreviews`          | boolean              |  `true` | Show up to two last-message preview lines in chat list rows.                             |
 | `messagePaneShortNames`        | boolean              |  `true` | Show first names in the message-pane sender column.                                      |
+| `showChatNameHeader`           | boolean              | `false` | Show the conversation name (1:1 partner, group chat, or team · # channel) above the messages. |
 | `showPresenceInList`           | boolean              |  `true` | Show presence dots in the chat list when available.                                      |
 | `showTimestampsInPane`         | boolean              |  `true` | Show message timestamps in the message pane.                                             |
 | `showReactions`                | `off`, `current`, `all` | `current` | Show message reactions never, only on the focused message, or on every message.      |
@@ -201,8 +200,7 @@ theme layered on top of `dark`; any subset of these keys is accepted:
     "paneHeaderPaddingLeft": 1, // message body indent
     "senderIndent": 1, // sender name + timestamp indent
     "paneHeaderMarginBottom": 1, // message gap; 0.5 steps give half-row gaps in kitty
-    "tailGap": 1,
-    "chatListPaddingRight": 1,
+    "chatListIndent": 1, // columns between the presence dot and the chat name
     "chatListGap": 0, // blank rows between chats in the list
     "textBackgroundPaddingX": 0, // bg-colored columns around focused / own message bodies
     "textBackgroundPaddingY": 0, // bg-colored rows above / below them

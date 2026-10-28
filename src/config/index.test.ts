@@ -82,7 +82,7 @@ describe('loadSettings', () => {
     expect(r.settings.themeOverrides.timestamp).toBe('#abcdef')
     expect(r.settings.themeOverrides.presence?.Available).toBe('greenBright')
     // Untouched keys keep their default
-    expect(r.settings.chatListDensity).toBe(defaultSettings.chatListDensity)
+    expect(r.settings.chatListSort).toBe(defaultSettings.chatListSort)
     expect(r.warnings).toEqual([])
   })
 
@@ -377,7 +377,7 @@ describe('replaceThemeOverrides', () => {
       cfgPath,
       JSON.stringify({
         themeOverrides: {
-          light: { modalBackground: '#ffffff', layout: { tailGap: 2 } },
+          light: { modalBackground: '#ffffff', layout: { chatListGap: 2 } },
           dark: { text: 'notacolor' },
         },
       }),
@@ -420,13 +420,13 @@ describe('Settings ↔ config.json parity', () => {
     },
     accounts: ['profile-a', 'profile-b'],
     activeAccount: 'profile-a',
-    chatListDensity: 'compact',
     chatListSort: 'alphabetical',
     chatListGroupByType: !defaultSettings.chatListGroupByType,
     chatListSectionCap: !defaultSettings.chatListSectionCap,
     chatListShortNames: !defaultSettings.chatListShortNames,
     showMessagePreviews: !defaultSettings.showMessagePreviews,
     messagePaneShortNames: !defaultSettings.messagePaneShortNames,
+    showChatNameHeader: !defaultSettings.showChatNameHeader,
     showPresenceInList: !defaultSettings.showPresenceInList,
     showTimestampsInPane: !defaultSettings.showTimestampsInPane,
     showReactions: 'all',
@@ -691,7 +691,7 @@ test('themeOverrides.fontSize keeps known keys in 50-100 and warns on the rest',
 test('layout message gap takes halves, other layout keys stay integers', () => {
   const warnings: string[] = []
   const out = validateThemeOverrides(
-    { layout: { paneHeaderMarginBottom: 0.5, tailGap: 0.5 } },
+    { layout: { paneHeaderMarginBottom: 0.5, chatListGap: 0.5 } },
     warnings,
   )
   expect(out?.layout).toEqual({ paneHeaderMarginBottom: 0.5 })

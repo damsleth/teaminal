@@ -183,7 +183,6 @@ export type AccountManagerModalState =
 export type ThemeMode = string
 // Resolved OS appearance the 'auto' theme follows.
 export type SystemAppearance = 'dark' | 'light'
-export type ChatListDensity = 'cozy' | 'compact'
 export type BorderStyleName =
   | 'none'
   | 'single'
@@ -269,8 +268,7 @@ export type ThemeOverrides = ThemeColorOverrides & {
     paneHeaderPaddingLeft: number
     senderIndent: number
     paneHeaderMarginBottom: number
-    tailGap: number
-    chatListPaddingRight: number
+    chatListIndent: number
     chatListGap: number
     textBackgroundPaddingX: number
     textBackgroundPaddingY: number
@@ -310,7 +308,6 @@ export type Settings = {
   themeOverrides: ThemeOverrides
   accounts: string[]
   activeAccount: string | null
-  chatListDensity: ChatListDensity
   // Order chats appear in the sidebar. 'recent' (default) preserves the
   // server's last-message ordering; 'alphabetical' sorts by display label.
   chatListSort: ChatListSort
@@ -334,14 +331,16 @@ export type Settings = {
   chatListShortNames: boolean
   // When true (default), each chat row in the sidebar renders up to two
   // non-indented lines with the start of the last message — light gray for
-  // read chats, the unread color for chats with unread messages. Independent
-  // of chatListDensity. Turn off for a denser, single-line-per-chat list.
+  // read chats, the unread color for chats with unread messages. Turn off for a denser, single-line-per-chat list.
   showMessagePreviews: boolean
   // When true (default), the message pane renders the sender column as
   // first-name only ("Finn") instead of the full display name
   // ("Nordling, Finn Saethre"). Independent of `chatListShortNames` so
   // users can short-name one place and not the other.
   messagePaneShortNames: boolean
+  // Show the open conversation's name (1:1 partner, group chat name, or
+  // team · # channel) above the messages. Default false.
+  showChatNameHeader: boolean
   showPresenceInList: boolean
   showTimestampsInPane: boolean
   showReactions: ReactionDisplayMode
@@ -506,7 +505,6 @@ export const defaultSettings: Settings = {
   themeOverrides: {},
   accounts: [],
   activeAccount: null,
-  chatListDensity: 'cozy',
   chatListSort: 'recent',
   chatListGroupByType: false,
   chatListSectionCap: true,
@@ -514,6 +512,7 @@ export const defaultSettings: Settings = {
   chatListShortNames: false,
   showMessagePreviews: true,
   messagePaneShortNames: true,
+  showChatNameHeader: false,
   showPresenceInList: true,
   showTimestampsInPane: true,
   showReactions: 'current',

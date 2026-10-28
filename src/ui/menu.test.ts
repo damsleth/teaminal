@@ -97,11 +97,6 @@ describe('cycleSetting', () => {
     expect(cycleSetting('theme', 'light')).toBe('auto')
   })
 
-  test('flips chat list density between cozy and compact', () => {
-    expect(cycleSetting('chatListDensity', 'cozy')).toBe('compact')
-    expect(cycleSetting('chatListDensity', 'compact')).toBe('cozy')
-  })
-
   test('cycles status bar position bottom → top → hidden → bottom', () => {
     expect(cycleSetting('statusBarPosition', 'bottom')).toBe('top')
     expect(cycleSetting('statusBarPosition', 'top')).toBe('hidden')
@@ -147,7 +142,6 @@ describe('cycleSetting', () => {
 describe('renderSettingValue', () => {
   test('renders enum values verbatim', () => {
     expect(renderSettingValue('theme', 'dark')).toBe('dark')
-    expect(renderSettingValue('chatListDensity', 'compact')).toBe('compact')
     expect(renderSettingValue('chatListSort', 'alphabetical')).toBe('alphabetical')
     expect(renderSettingValue('showReactions', 'current')).toBe('current')
   })
@@ -203,7 +197,6 @@ describe('ROOT_MENU shape', () => {
       'statusBarShowKeyHints',
       'headerBarCentered',
       // Chat list
-      'chatListDensity',
       'chatListSort',
       'chatListGroupByType',
       'chatListSectionCap',
@@ -211,6 +204,7 @@ describe('ROOT_MENU shape', () => {
       'showMessagePreviews',
       'showPresenceInList',
       // Messages
+      'showChatNameHeader',
       'messagePaneShortNames',
       'showTimestampsInPane',
       'showReactions',
