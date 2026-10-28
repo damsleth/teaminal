@@ -83,6 +83,7 @@ const COLOR_KEYS = new Set([
 ])
 
 const NULLABLE_COLOR_KEYS = new Set([
+  'chatListPreviewText',
   'selfMessage',
   'modalBackground',
   'appBackground',

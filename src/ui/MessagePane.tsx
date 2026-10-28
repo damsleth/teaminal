@@ -219,7 +219,9 @@ export function MessagePane(props: {
   // Profile pictures (kitty graphics only): rows tall, plus a gap column.
   const avRows = isKittyCapable() ? avatarRows(avatarSize) : 0
   const avCols = avatarCols(avRows)
-  const avatarColumn = avRows > 0 ? avCols + 1 : 0
+  // Picture indent, the picture, then a one-column gap.
+  const avatarIndent = avRows > 0 ? Math.max(0, theme.layout.avatarIndent) : 0
+  const avatarColumn = avRows > 0 ? avatarIndent + avCols + 1 : 0
   const avatarStarts = avRows > 0 ? avatarRunStarts(messages, me?.id) : null
   const avatarFor = (m: ChatMessage): MessageAvatar | null =>
     avRows > 0
@@ -1064,7 +1066,12 @@ function MessageRow(props: {
   if (!avatar || flip) return block
   return (
     <Box flexDirection="row" flexShrink={0}>
-      <Box width={avatar.column} flexShrink={0} flexDirection="column">
+      <Box
+        width={avatar.column}
+        flexShrink={0}
+        flexDirection="column"
+        paddingLeft={Math.max(0, theme.layout.avatarIndent)}
+      >
         {avatar.userId && (
           <PictureSlot
             slots={slots}

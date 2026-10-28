@@ -90,3 +90,22 @@ test('thumbnails: a picture column on chat rows, rows at least as tall as the pi
     else process.env.KITTY_WINDOW_ID = prev
   }
 })
+
+test('chatListPreviewText colors the previews of read chats', () => {
+  const store = createAppStore()
+  applySeededState(store)
+  store.set({
+    settings: { ...store.get().settings, themeOverrides: { chatListPreviewText: '#ff0000' } },
+    unreadByChatId: {},
+  })
+  const out = renderToString(
+    <StoreProvider store={store}>
+      <SessionProvider api={session}>
+        <ChatList listPaneWidth={40} />
+      </SessionProvider>
+    </StoreProvider>,
+    { columns: 40 },
+  )
+  const preview = out.split('\n').find((l) => l.includes('The launch notes'))!
+  expect(preview).toContain('38;2;255;0;0m')
+})

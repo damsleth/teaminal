@@ -8,6 +8,13 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Chat list preview color and picture indent.** Theme editor **Chat
+  list → Preview text** (`chatListPreviewText`, default: muted text) colors
+  the last-message preview of read chats; unread ones keep the unread
+  color. **Sender & time → Picture indent** (`layout.avatarIndent`, 0-40)
+  puts columns before the profile picture in conversations, moving the
+  message with it.
+
 - **Profile pictures and chat list thumbnails.** Menu → **Messages →
   Profile pictures** (`messageAvatars`) and **Chat list → Thumbnails**
   (`chatListThumbnails`) take `off` / `small` / `medium` / `large` (1, 2 or

@@ -343,10 +343,14 @@ test('profile pictures: a column per message, initials at the start of each run'
       msg('r2', '2026-01-03T09:01:00Z', 'Ada Lovelace', 'ada second'),
       msg('r3', '2026-01-03T09:02:00Z', 'Bob', 'bob reply'),
     ]
-    const render = (messageAvatars: string) => {
+    const render = (messageAvatars: string, avatarIndent = 0) => {
       const store = createAppStore()
       store.set({
-        settings: { ...store.get().settings, messageAvatars } as never,
+        settings: {
+          ...store.get().settings,
+          messageAvatars,
+          themeOverrides: { layout: { avatarIndent } },
+        } as never,
         focus: { kind: 'chat', chatId: 'c1' },
         messagesByConvo: { 'chat:c1': run },
       })
@@ -373,6 +377,11 @@ test('profile pictures: a column per message, initials at the start of each run'
     expect(above('ada first').trimStart()).toMatch(/^AL\s+Ada/)
     expect(above('bob reply').trimStart()).toMatch(/^B\s+Bob/)
     expect(above('ada second')).not.toMatch(/AL/)
+    // Picture indent moves the picture and the message right together.
+    const indented = render('medium', 3)
+    expect(col(indented, 'ada first') - col(medium, 'ada first')).toBe(3)
+    const pictureAt = (ls: string[]) => ls[ls.findIndex((l) => l.includes('ada first')) - 1]!
+    expect(pictureAt(indented).indexOf('AL') - pictureAt(medium).indexOf('AL')).toBe(3)
   } finally {
     if (prev === undefined) delete process.env.KITTY_WINDOW_ID
     else process.env.KITTY_WINDOW_ID = prev

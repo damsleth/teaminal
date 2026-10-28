@@ -543,7 +543,7 @@ function ThemePreview(props: {
         {fs('Design Sync', theme.fontSize.chatListName, tight)}
         <Text color={theme.unread}>{' · 3'}</Text>
       </Text>
-      <Text color={theme.mutedText}>
+      <Text color={theme.chatListPreviewText ?? theme.mutedText}>
         {` ${listIndent}`}
         {fs('Nina: shared two drafts', theme.fontSize.chatListPreview, tight)}
       </Text>

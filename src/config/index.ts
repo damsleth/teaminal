@@ -59,6 +59,7 @@ const THEME_KEYS = new Set<keyof ThemeOverrides>([
   'selfMessageBackground',
   'senderMessage',
   'senderMessageBackground',
+  'chatListPreviewText',
   'appBackground',
   'systemEvent',
   'dateMarker',
@@ -102,6 +103,7 @@ const LAYOUT_KEYS = new Set<keyof NonNullable<ThemeOverrides['layout']>>([
   'dateMarkerIndent',
   'messageMaxWidth',
   'textBackgroundRadius',
+  'avatarIndent',
 ])
 
 const BORDERS_KEYS = new Set<keyof NonNullable<ThemeOverrides['borders']>>([
@@ -914,6 +916,7 @@ export function validateThemeOverrides(
         key === 'senderMessage' ||
         key === 'selfMessage' ||
         key === 'senderMessageBackground' ||
+        key === 'chatListPreviewText' ||
         key === 'messageFocusText') &&
       rawValue === null
     ) {

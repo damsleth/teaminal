@@ -10,7 +10,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 ││   Ada: The lau│       Text                  ██ white                             │               ││
 ││  Design Sync │       Muted text            ██ gray                              │               ││
 ││   Nina: Nina s│       Border                ██ gray                              │               ││
-││  Ops Channel │      ↓ 56 more                                                   │               ││
+││  Ops Channel │      ↓ 58 more                                                   │               ││
 ││   Mina: Deploy│                                                                  │               ││
 ││               │   ╭──────────────────────────────────────╮                       │               ││
 ││               │   │Chats                                 │                       │               ││
