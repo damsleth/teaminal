@@ -56,6 +56,7 @@ import { COMPOSER_TEXT_CHROME, cursorRowCol, wrapComposer } from './composerWrap
 import { shortName } from '../state/selectables'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useSessionApi } from './SessionContext'
+import { kittyKeyboardEnabled } from './kittyKeyboard'
 
 const MAX_VISIBLE_LINES = 5
 
@@ -104,7 +105,8 @@ export function Composer({ columns = 80 }: { columns?: number }) {
   const drafts = useAppState((s) => s.draftsByConvo)
   const messagesByConvo = useAppState((s) => s.messagesByConvo)
   const editingMessageId = useAppState((s) => s.editingMessageId)
-  const enterSends = useAppState((s) => s.settings.enterSends)
+  // Only honored where Shift+Enter is distinguishable from Enter.
+  const enterSends = useAppState((s) => s.settings.enterSends) && kittyKeyboardEnabled()
   const theme = useTheme()
   const [buf, setBuf] = useState<ComposerBuffer>(emptyBuffer)
   const [sending, setSending] = useState(false)

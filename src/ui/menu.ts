@@ -21,6 +21,7 @@
 // implying the feature works yet.
 
 import { updateSettings } from '../config'
+import { kittyKeyboardEnabled } from './kittyKeyboard'
 import type {
   AccountManagerModalState,
   AppState,
@@ -117,6 +118,8 @@ export type MenuItem = {
   children?: MenuItem[]
   hint?: string
   disabled?: boolean
+  // Left out of the menu when true (checked each time the level resolves).
+  hidden?: () => boolean
 }
 
 export const ROOT_MENU: MenuItem[] = [
@@ -316,6 +319,9 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'enterSends',
         label: 'Enter sends (Shift/Ctrl+Enter newline)',
         action: { kind: 'toggle-setting', key: 'enterSends' },
+        // Without the kitty keyboard protocol Shift+Enter reads as Enter,
+        // so this mode would send half-written messages.
+        hidden: () => !kittyKeyboardEnabled(),
       },
       // — Notifications —
       {
@@ -427,7 +433,7 @@ export function resolveMenuPath(root: MenuItem[], path: string[]): MenuItem[] | 
     if (!node || !node.children) return null
     level = node.children
   }
-  return level
+  return level.filter((m) => !m.hidden?.())
 }
 
 // Slice of items to show so a long submenu (e.g. Settings) doesn't overflow

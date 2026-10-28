@@ -14,6 +14,7 @@ import {
   updateSetting,
 } from './menu'
 import { createAppStore } from '../state/store'
+import { setKittyKeyboardEnabled } from './kittyKeyboard'
 
 const enabled = (id: string, label = id): MenuItem => ({
   id,
@@ -29,12 +30,14 @@ const disabled = (id: string, label = id): MenuItem => ({
 
 describe('resolveMenuPath', () => {
   test('returns root for empty path', () => {
-    expect(resolveMenuPath(ROOT_MENU, [])).toBe(ROOT_MENU)
+    expect(resolveMenuPath(ROOT_MENU, [])).toEqual(ROOT_MENU)
   })
 
   test('descends into a submenu', () => {
     const settings = ROOT_MENU.find((i) => i.id === 'settings')
-    expect(resolveMenuPath(ROOT_MENU, ['settings'])).toBe(settings?.children!)
+    expect(resolveMenuPath(ROOT_MENU, ['settings'])).toEqual(
+      settings!.children!.filter((c) => !c.hidden?.()),
+    )
   })
 
   test('returns null for an unknown id', () => {
@@ -308,4 +311,13 @@ describe('renderQuietHoursValue', () => {
   test('renders the window when both are set', () => {
     expect(renderQuietHoursValue('22:00', '07:00')).toBe('22:00 - 07:00')
   })
+})
+
+test('Enter sends is only offered with the kitty keyboard protocol', () => {
+  const ids = () => (resolveMenuPath(ROOT_MENU, ['settings']) ?? []).map((i) => i.id)
+  setKittyKeyboardEnabled(false)
+  expect(ids()).not.toContain('enterSends')
+  setKittyKeyboardEnabled(true)
+  expect(ids()).toContain('enterSends')
+  setKittyKeyboardEnabled(false)
 })
