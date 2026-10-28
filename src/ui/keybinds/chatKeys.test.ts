@@ -154,18 +154,42 @@ describe('handleChatKeys', () => {
     expect(a.movements[0]).toBe(10)
   })
 
-  test('l jumps to bottom even with cursor at top', () => {
+  test('G jumps to bottom even with cursor at top', () => {
     const a = makeCtx(CHAT_FOCUS, { activeMessageCursor: 0 })
-    handleChatKeys({ input: 'l', key: makeKey() }, a.ctx)
+    handleChatKeys({ input: 'G', key: makeKey({ shift: true }) }, a.ctx)
     expect(a.loadOlderCalls).toBe(0)
     expect(a.bottomCalls).toBe(1)
   })
 
-  test('l with cursor mid-list jumps to bottom', () => {
+  test('gg jumps to the top; a lone g or g-then-other does not', () => {
+    const a = makeCtx(CHAT_FOCUS, { activeMessageCursor: 7 })
+    handleChatKeys({ input: 'g', key: makeKey() }, a.ctx)
+    expect(a.movements).toEqual([])
+    handleChatKeys({ input: 'g', key: makeKey() }, a.ctx)
+    expect(a.movements).toEqual([-7])
+    handleChatKeys({ input: 'g', key: makeKey() }, a.ctx)
+    handleChatKeys({ input: 'd', key: makeKey() }, a.ctx)
+    handleChatKeys({ input: 'g', key: makeKey() }, a.ctx)
+    expect(a.movements).toEqual([-7, 10])
+  })
+
+  test('l no longer jumps to bottom and does not fall through', () => {
     const a = makeCtx(CHAT_FOCUS, { activeMessageCursor: 5 })
-    handleChatKeys({ input: 'l', key: makeKey() }, a.ctx)
-    expect(a.bottomCalls).toBe(1)
-    expect(a.loadOlderCalls).toBe(0)
+    expect(handleChatKeys({ input: 'l', key: makeKey() }, a.ctx)).toBe('handled')
+    expect(a.bottomCalls).toBe(0)
+  })
+
+  test('space / l on a focused reply badge opens the thread', () => {
+    const focus: Focus = { kind: 'channel', teamId: 't1', channelId: 'c1' }
+    for (const input of [' ', 'l']) {
+      const a = makeCtx(focus, {
+        focusedMessageId: 'root1',
+        focusables: [{ kind: 'message' }, { kind: 'thread', count: 3 }],
+        focusedAttachmentIndex: 1,
+      })
+      expect(handleChatKeys({ input, key: makeKey() }, a.ctx)).toBe('handled')
+      expect(a.store.get().focus).toEqual({ ...focus, kind: 'thread', rootId: 'root1' })
+    }
   })
 
   test('Enter at top passes through instead of loading older', () => {

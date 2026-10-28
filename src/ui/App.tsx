@@ -69,7 +69,7 @@ import { handleResizeKeys } from './keybinds/resizeKeys'
 import { computeLayout } from './layout'
 import { readMessagePageState, type LoadMoreState } from './messageRows'
 import { messagesForTimelineNavigation } from './renderableMessage'
-import { messageFocusables } from './messageFocusables'
+import { channelReplyCount, messageFocusables } from './messageFocusables'
 import { openExternal } from './openExternal'
 import { usePollerHandleRef } from './PollerContext'
 import { StatusBar } from './StatusBar'
@@ -235,10 +235,13 @@ export function App() {
       : 0
   const focusedMessage = activeNavigationMessages[activeMessageCursor]
   const focusedMessageId = focusedMessage?.id
-  // Focus ring for the focused message ([message, ...images, ...links]).
+  // Focus ring for the focused message ([message, ...images, ...links, thread?]).
   // The stored index is clamped here so a message changing underneath the
   // cursor (new reaction, edit) can't leave focus pointing past the end.
-  const focusables = messageFocusables(focusedMessage)
+  const focusables = messageFocusables(
+    focusedMessage,
+    channelReplyCount(focus, activeMessages, focusedMessageId),
+  )
   const attachmentIndex = clampCursor(focusedAttachmentIndex, focusables.length)
   const pageState = readMessagePageState(activeCache ?? activeMessages)
   const loadOlderState: LoadMoreState = pageState.loading
@@ -274,7 +277,10 @@ export function App() {
         activeNavigationMessages.length,
       ),
       focusedAttachmentIndex: atEnd
-        ? messageFocusables(activeNavigationMessages[next]).length - 1
+        ? messageFocusables(
+            activeNavigationMessages[next],
+            channelReplyCount(focus, activeMessages, activeNavigationMessages[next]?.id),
+          ).length - 1
         : 0,
     }))
   }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { messageFocusables, selectFocusedAttachment } from './messageFocusables'
+import { channelReplyCount, messageFocusables, selectFocusedAttachment } from './messageFocusables'
 import { initialAppState } from '../state/store'
 import type { AppState } from '../state/store'
 import type { ChatMessage } from '../types'
@@ -34,6 +34,15 @@ describe('messageFocusables', () => {
     })
     const focusables = messageFocusables(m)
     expect(focusables.map((f) => f.kind)).toEqual(['message', 'image', 'link'])
+  })
+
+  test('a channel root with replies gets a trailing thread focusable', () => {
+    const stream = [msg(), msg({ id: 'r1', replyToId: 'm1' }), msg({ id: 'r2', replyToId: 'm1' })]
+    const channel = { kind: 'channel', teamId: 't', channelId: 'c' } as const
+    const count = channelReplyCount(channel, stream, 'm1')
+    expect(count).toBe(2)
+    expect(messageFocusables(msg(), count).at(-1)).toEqual({ kind: 'thread', count: 2 })
+    expect(channelReplyCount({ kind: 'chat', chatId: 'c1' }, stream, 'm1')).toBe(0)
   })
 })
 

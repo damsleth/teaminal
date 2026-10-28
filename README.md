@@ -266,10 +266,11 @@ The in-app Settings menu persists changes back to `config.json`.
 | `h` / Left     | chat / channel    | Return to chat list.                                                    |
 | `j` / Down     | chat / channel    | Focus next message.                                                     |
 | `k` / Up       | chat / channel    | Focus previous message, or load older when focused at the top.          |
-| `l` / Right    | chat / channel    | Jump to latest message.                                                 |
+| `gg` / `G`     | chat / channel    | Jump to the oldest loaded / latest message.                             |
 | `u` / PageUp   | chat / channel    | Move up half a page, or load older if that reaches the top.             |
 | `d` / PageDown | chat / channel    | Move down half a page.                                                  |
 | `t`            | channel           | Open the thread for the focused channel message.                        |
+| Space / `l`    | channel           | Open the thread when `j`/`k` has focused a message's `N replies` badge. |
 | `/`            | chat / channel    | Search messages in the open conversation.                               |
 | Ctrl+A         | any               | Open notifications (also in the Esc menu).                              |
 | Ctrl+X         | list              | Enter resize mode (h/l chat list, j/k composer, 0 reset, Esc done).     |

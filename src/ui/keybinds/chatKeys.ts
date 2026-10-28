@@ -2,8 +2,8 @@
 //
 // Active when the user has a chat or channel focused AND inputZone ===
 // 'list' (i.e. the message pane has focus, not the composer or filter).
-// Owns: h/j/k/l/u/d message-cursor motion, u/k-at-top to load older,
-// Esc to return to chat list. Tab to composer is handled by the
+// Owns: h/j/k/u/d/gg/G message-cursor motion, u/k-at-top to load older,
+// l / space into a focused thread, Esc to return to chat list. Tab to composer is handled by the
 // shared App-level dispatcher because it is identical across zones.
 
 import {
@@ -69,13 +69,54 @@ function isOwnEditableMessage(
   return true
 }
 
+// Open the thread overlay for a channel root. Seed the thread from the
+// already-loaded channel stream so it shows instantly; the active loop then
+// refreshes/completes it via the chatsvc sub-conversation door. Both write
+// the same threadConv, so render + cursor stay consistent.
+function openThread(
+  store: Store<AppState>,
+  focus: Extract<Focus, { kind: 'channel' }>,
+  rootId: string,
+  root: ChatMessage | undefined,
+): void {
+  const { teamId, channelId } = focus
+  const nextFocus: Focus = { kind: 'thread', teamId, channelId, rootId }
+  const threadConv = focusKey(nextFocus)
+  const channelConv = focusKey(focus)
+  store.set((s) => {
+    // Don't clobber a thread already loaded from a previous open; let the
+    // active loop refresh it instead.
+    if (!threadConv || s.messageCacheByConvo[threadConv]) return { focus: nextFocus }
+    const stream = channelConv ? (s.messagesByConvo[channelConv] ?? []) : []
+    const { repliesByRoot } = groupChannelThreads(stream)
+    const seeded = [...(root ? [root] : []), ...(repliesByRoot[rootId] ?? [])]
+    if (seeded.length === 0) return { focus: nextFocus }
+    return {
+      focus: nextFocus,
+      messagesByConvo: { ...s.messagesByConvo, [threadConv]: seeded },
+      messageCacheByConvo: { ...s.messageCacheByConvo, [threadConv]: emptyMessageCache(seeded) },
+    }
+  })
+}
+
 // Half-page step used by U / D / PageUp / PageDown.
 const HALF_PAGE = Math.ceil(20 / 2)
+
+// First half of a vim-style `gg` (jump to top). Any other key clears it.
+let pendingG = false
 
 export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyResult {
   const { store, moveMessageCursor, jumpMessageBottom, tryLoadOlder } = ctx
   const ch = input.toLowerCase()
   if (ctx.focus.kind === 'list') return 'pass'
+
+  const wasPendingG = pendingG
+  pendingG = false
+  if (input === 'g') {
+    if (wasPendingG) moveMessageCursor(-ctx.activeMessageCursor)
+    else pendingG = true
+    return 'handled'
+  }
 
   // Thread-specific routing: h / Left return to the parent channel.
   // Has to come before the generic 'h → list' rule below. Esc is
@@ -127,6 +168,16 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
       return 'handled'
     }
   }
+  // Space or l / Right on the focused reply badge enters the thread.
+  if (
+    (input === ' ' || ch === 'l' || key.rightArrow) &&
+    ctx.focusables[ctx.focusedAttachmentIndex]?.kind === 'thread' &&
+    ctx.focus.kind === 'channel' &&
+    ctx.focusedMessageId
+  ) {
+    openThread(store, ctx.focus, ctx.focusedMessageId, ctx.focusedMessage)
+    return 'handled'
+  }
   if (ch === 'u' || (key as typeof key & { pageUp?: boolean }).pageUp) {
     if (ctx.activeMessageCursor <= HALF_PAGE) {
       moveMessageCursor(-HALF_PAGE)
@@ -141,37 +192,16 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
     moveMessageCursor(HALF_PAGE)
     return 'handled'
   }
-  if (ch === 'l' || key.rightArrow) {
+  if (input === 'G') {
     jumpMessageBottom()
     return 'handled'
   }
-  // 't' opens the thread overlay when a channel root is focused. Seed the
-  // thread from the already-loaded channel stream so it shows instantly; the
-  // active loop then refreshes/completes it via the chatsvc sub-conversation
-  // door. Both write the same threadConv, so render + cursor stay consistent.
+  // l / Right only enter a focused reply badge (above); swallow them otherwise
+  // so they don't fall through to the list dispatcher.
+  if (ch === 'l' || key.rightArrow) return 'handled'
+  // 't' opens the thread overlay when a channel root is focused.
   if (ch === 't' && ctx.focus.kind === 'channel' && ctx.focusedMessageId) {
-    const { teamId, channelId } = ctx.focus
-    const rootId = ctx.focusedMessageId
-    const nextFocus: Focus = { kind: 'thread', teamId, channelId, rootId }
-    const threadConv = focusKey(nextFocus)
-    const channelConv = focusKey(ctx.focus)
-    store.set((s) => {
-      // Don't clobber a thread already loaded from a previous open; let the
-      // active loop refresh it instead.
-      if (!threadConv || s.messageCacheByConvo[threadConv]) return { focus: nextFocus }
-      const stream = channelConv ? (s.messagesByConvo[channelConv] ?? []) : []
-      const { repliesByRoot } = groupChannelThreads(stream)
-      const seeded = [
-        ...(ctx.focusedMessage ? [ctx.focusedMessage] : []),
-        ...(repliesByRoot[rootId] ?? []),
-      ]
-      if (seeded.length === 0) return { focus: nextFocus }
-      return {
-        focus: nextFocus,
-        messagesByConvo: { ...s.messagesByConvo, [threadConv]: seeded },
-        messageCacheByConvo: { ...s.messageCacheByConvo, [threadConv]: emptyMessageCache(seeded) },
-      }
-    })
+    openThread(store, ctx.focus, ctx.focusedMessageId, ctx.focusedMessage)
     return 'handled'
   }
   // Write actions are chat-only for now (channel message write paths differ).
