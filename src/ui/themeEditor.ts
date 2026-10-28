@@ -207,7 +207,7 @@ export const FIELDS: readonly EditableField[] = [
   color('selfName', 'Self name', 'Sender & time'),
   bool('senderBold', 'Sender bold', 'Sender & time'),
   num('fontSize', 'sender', 'Sender size', 'Sender & time', 50, 100, 10),
-  num('layout', 'senderIndent', 'Sender indent', 'Sender & time', 0, 6),
+  num('layout', 'senderIndent', 'Sender indent', 'Sender & time', 0, 40),
   color('timestamp', 'Timestamp', 'Sender & time'),
   num('fontSize', 'timestamp', 'Timestamp size', 'Sender & time', 50, 100, 10),
   // — Message text —
@@ -217,7 +217,7 @@ export const FIELDS: readonly EditableField[] = [
   color('selfMessageBackground', 'Self message bg', 'Message text', true),
   color('systemEvent', 'System event', 'Message text'),
   num('fontSize', 'messageText', 'Text size', 'Message text', 50, 100, 10),
-  num('layout', 'paneHeaderPaddingLeft', 'Body indent', 'Message text', 0, 6),
+  num('layout', 'paneHeaderPaddingLeft', 'Body indent', 'Message text', 0, 40),
   num('layout', 'paneHeaderMarginBottom', 'Message gap', 'Message text', 0, 4, 0.5),
   num('layout', 'messageMaxWidth', 'Conversation width %', 'Message text', 10, 100, 10),
   num('layout', 'textBackgroundPaddingX', 'Bg padding X', 'Message text', 0, 3),
