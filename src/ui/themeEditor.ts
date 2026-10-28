@@ -88,6 +88,7 @@ export const COLOR_PALETTE: readonly string[] = [
   '#262626',
   '#3a3a3a',
   '#767676',
+  '#999999',
   '#e6e6e6',
   '#ffffff',
 ]
@@ -162,6 +163,7 @@ export const FIELDS: readonly EditableField[] = [
   num('layout', 'chatListGap', 'Chat list gap', 'Spacing / Layout', 0, 3),
   num('layout', 'textBackgroundPaddingX', 'Text bg padding X', 'Spacing / Layout', 0, 3),
   num('layout', 'textBackgroundPaddingY', 'Text bg padding Y', 'Spacing / Layout', 0, 2),
+  num('layout', 'textBackgroundRadius', 'Text bg rounded', 'Spacing / Layout', 0, 1),
   num('layout', 'dateMarkerIndent', 'Date marker indent', 'Spacing / Layout', 0, 12),
   num('layout', 'messageMaxWidth', 'Message max width %', 'Spacing / Layout', 10, 100, 10),
   // — Colors —
@@ -181,6 +183,8 @@ export const FIELDS: readonly EditableField[] = [
   color('selfMessage', 'Self message'),
   color('selfName', 'Self name'),
   color('selfMessageBackground', 'Self message bg', true),
+  color('senderMessage', 'Sender message', true),
+  color('senderMessageBackground', 'Sender message bg', true),
   color('systemEvent', 'System event'),
   color('dateMarker', 'Date marker'),
   color('errorText', 'Error text'),

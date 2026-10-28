@@ -88,6 +88,8 @@ const NULLABLE_COLOR_KEYS = new Set([
   'messageFocusBackground',
   'selectedRowBackground',
   'selfMessageBackground',
+  'senderMessage',
+  'senderMessageBackground',
   'messageFocusText',
 ])
 

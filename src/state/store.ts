@@ -259,6 +259,8 @@ export type ThemeColorOverrides = {
   selfMessage?: string
   selfName?: string
   selfMessageBackground?: string | null
+  senderMessage?: string | null
+  senderMessageBackground?: string | null
   systemEvent?: string
   dateMarker?: string
   errorText?: string
@@ -286,6 +288,7 @@ export type ThemeOverrides = ThemeColorOverrides & {
     textBackgroundPaddingY: number
     dateMarkerIndent: number
     messageMaxWidth: number
+    textBackgroundRadius: number
   }>
   borders?: Partial<{
     panel: BorderStyleName
@@ -359,7 +362,11 @@ export type Settings = {
   // team · # channel) above the messages. Default false.
   showChatNameHeader: boolean
   showPresenceInList: boolean
-  showTimestampsInPane: boolean
+  // 'transient': only on a message sent a while after the previous one
+  // (TRANSIENT_TIMESTAMP_GAP_MS in MessagePane).
+  showTimestampsInPane: 'off' | 'on' | 'transient'
+  // Day separators ("Today") centered in the message pane.
+  centerDateMarkers: boolean
   // Sender name above message bodies; showOwnNameInPane covers your own.
   showSenderNamesInPane: boolean
   showOwnNameInPane: boolean
@@ -536,7 +543,8 @@ export const defaultSettings: Settings = {
   messagePaneShortNames: true,
   showChatNameHeader: false,
   showPresenceInList: true,
-  showTimestampsInPane: true,
+  showTimestampsInPane: 'on',
+  centerDateMarkers: false,
   showSenderNamesInPane: true,
   showOwnNameInPane: true,
   showReactions: 'current',

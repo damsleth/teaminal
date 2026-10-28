@@ -81,7 +81,7 @@ describe('preset UI settings', () => {
     const ui = pickPresetSettings({
       ...defaultSettings,
       selfMessagesOnRight: true,
-      showTimestampsInPane: false,
+      showTimestampsInPane: 'off',
     })
     expect(ui.selfMessagesOnRight).toBe(true)
     expect('notifyMuted' in ui).toBe(false)
@@ -93,7 +93,7 @@ describe('preset UI settings', () => {
     const loaded = loadThemeFile('ui', e)
     const settings = loaded.data?.settings as Record<string, unknown>
     expect(settings.selfMessagesOnRight).toBe(true)
-    expect(settings.showTimestampsInPane).toBe(false)
+    expect(settings.showTimestampsInPane).toBe('off')
     expect('chatListPreviewLines' in settings).toBe(false)
     expect('notifyMuted' in settings).toBe(false)
     expect(loaded.warnings.length).toBe(2)
@@ -105,7 +105,7 @@ describe('preset UI settings', () => {
       await loadThemePreset(store, 'ui')
       expect(store.get().settings.theme).toBe('ui')
       expect(store.get().settings.selfMessagesOnRight).toBe(true)
-      expect(store.get().settings.showTimestampsInPane).toBe(false)
+      expect(store.get().settings.showTimestampsInPane).toBe('off')
       expect(store.get().settings.chatListPreviewLines).toBe(defaultSettings.chatListPreviewLines)
     } finally {
       if (prev === undefined) delete process.env.XDG_CONFIG_HOME

@@ -104,6 +104,7 @@ export function MessagePane(props: {
   const teams = useAppState((s) => s.teams)
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
   const showTimestamps = useAppState((s) => s.settings.showTimestampsInPane)
+  const centerDates = useAppState((s) => s.settings.centerDateMarkers)
   const showSenderNames = useAppState((s) => s.settings.showSenderNamesInPane)
   const showOwnName = useAppState((s) => s.settings.showOwnNameInPane)
   const shortNames = useAppState((s) => s.settings.messagePaneShortNames)
@@ -197,8 +198,11 @@ export function MessagePane(props: {
   // The sender line holds the name and/or timestamp; with neither it's gone.
   const showNameFor = (m: ChatMessage): boolean =>
     showSenderNames && (showOwnName || !me?.id || m.from?.user?.id !== me.id)
+  const transientTimes = showTimestamps === 'transient' ? transientTimestampIds(messages) : null
+  const showTimeFor = (m: ChatMessage): boolean =>
+    showTimestamps === 'on' || (transientTimes?.has(m.id) ?? false)
   const headerRows = (m: ChatMessage): number =>
-    showTimestamps || showNameFor(m) ? (tallHeaders ? 2 : 1) : 0
+    showTimeFor(m) || showNameFor(m) ? (tallHeaders ? 2 : 1) : 0
   const cache = messageCacheByConvo[conv]
   const headerLabel = isListFocus
     ? ''
@@ -238,8 +242,10 @@ export function MessagePane(props: {
   // Body wrap width estimate for the viewport budget: pane content (terminal
   // minus the chat-list pane and its border) minus the body indent. Bodies now
   // start near the left edge instead of after a deep sender column.
-  const bgPadX = theme.layout.textBackgroundPaddingX
-  const bodyPaddingY = theme.layout.textBackgroundPaddingY
+  // A rounded background adds a half-block frame row / column on each side.
+  const bubble = theme.layout.textBackgroundRadius > 0 ? 1 : 0
+  const bgPadX = theme.layout.textBackgroundPaddingX + bubble
+  const bodyPaddingY = theme.layout.textBackgroundPaddingY + bubble
   const messageTextColumns = Math.max(
     12,
     Math.floor(
@@ -509,7 +515,10 @@ export function MessagePane(props: {
                     messageGap={messageGap}
                     tallHeader={tallHeaders}
                     shortNames={shortNames}
-                    showTimestamp={showTimestamps}
+                    showTimestamp={
+                      row.kind === 'message' ? showTimeFor(row.message) : showTimestamps !== 'off'
+                    }
+                    centerDate={centerDates}
                     showSenderName={
                       row.kind === 'message' ? showNameFor(row.message) : showSenderNames
                     }
@@ -531,6 +540,45 @@ export function MessagePane(props: {
   )
 }
 
+// Gap after which 'transient' timestamps show again.
+const TRANSIENT_TIMESTAMP_GAP_MS = 15 * 60 * 1000
+
+// Messages that get a timestamp in 'transient' mode: the first one, and any
+// sent at least TRANSIENT_TIMESTAMP_GAP_MS after the message before it.
+export function transientTimestampIds(messages: ChatMessage[]): Set<string> {
+  const ids = new Set<string>()
+  let prev: number | null = null
+  for (const m of messages) {
+    const at = Date.parse(m.createdDateTime)
+    if (prev === null || Number.isNaN(at) || at - prev >= TRANSIENT_TIMESTAMP_GAP_MS) ids.add(m.id)
+    if (!Number.isNaN(at)) prev = at
+  }
+  return ids
+}
+
+// Half blocks drawn in the background color: half a cell of air on each
+// side and chamfered corners, the terminal's closest thing to a rounded box.
+const BUBBLE_BORDER = {
+  topLeft: '▗',
+  top: '▄',
+  topRight: '▖',
+  left: '▐',
+  right: '▌',
+  bottomLeft: '▝',
+  bottom: '▀',
+  bottomRight: '▘',
+}
+const BLANK_BUBBLE_BORDER = {
+  topLeft: ' ',
+  top: ' ',
+  topRight: ' ',
+  left: ' ',
+  right: ' ',
+  bottomLeft: ' ',
+  bottom: ' ',
+  bottomRight: ' ',
+}
+
 function TimelineRow(props: {
   row: MessageRenderRow
   focused: boolean
@@ -550,15 +598,16 @@ function TimelineRow(props: {
   shortNames: boolean
   showTimestamp: boolean
   showSenderName: boolean
+  centerDate: boolean
   theme: Theme
   threadMeta?: ReplyBadge
 }) {
   if (props.row.kind === 'date') {
     const theme = props.theme
     return (
-      <Box>
-        {props.showTimestamp && <Box width={1} flexShrink={0} />}
-        {theme.layout.dateMarkerIndent > 0 && (
+      <Box justifyContent={props.centerDate ? 'center' : undefined}>
+        {!props.centerDate && props.showTimestamp && <Box width={1} flexShrink={0} />}
+        {!props.centerDate && theme.layout.dateMarkerIndent > 0 && (
           <Box width={theme.layout.dateMarkerIndent} flexShrink={0} />
         )}
         <Text color={theme.dateMarker} bold={theme.emphasis.dateMarkerBold}>
@@ -686,6 +735,7 @@ function MessageRow(props: {
   else if (isSending) color = theme.systemEvent
   else if (isSystem) color = theme.systemEvent
   else if (isSelf) color = theme.selfMessage
+  else color = theme.senderMessage ?? undefined
 
   // The marker column carries the focus arrow when this row is focused;
   // otherwise the send-status glyph (failed / sending). It sits on the body
@@ -698,8 +748,11 @@ function MessageRow(props: {
   const senderIndent = Math.max(0, theme.layout.senderIndent)
   const align = flip ? 'flex-end' : undefined
 
+  // On the first text row, below any background padding / bubble frame.
+  const markerTop =
+    theme.layout.textBackgroundPaddingY + (theme.layout.textBackgroundRadius > 0 ? 1 : 0)
   const marker = (
-    <Box width={markerWidth} flexShrink={0}>
+    <Box width={markerWidth} flexShrink={0} paddingTop={markerTop}>
       {/* No background: the marker color stands on its own, and the focus
           background belongs to the focused message body. */}
       <Text color={props.focused ? theme.messageFocusIndicator : undefined}>{indicator}</Text>
@@ -721,9 +774,9 @@ function MessageRow(props: {
 
   const bodyBg = props.focused
     ? (theme.messageFocusBackground ?? undefined)
-    : isSelf && !isDeleted
-      ? (theme.selfMessageBackground ?? undefined)
-      : undefined
+    : isDeleted || isSystem
+      ? undefined
+      : ((isSelf ? theme.selfMessageBackground : theme.senderMessageBackground) ?? undefined)
   const bodyTextNode = (
     <Text
       color={
@@ -775,9 +828,18 @@ function MessageRow(props: {
   // wrapped lines, so the padded body reads as one solid block.
   const bgPadX = theme.layout.textBackgroundPaddingX
   const bgPadY = theme.layout.textBackgroundPaddingY
+  // Rounded: a half-block frame in the background color around the padded
+  // body, kept (blank) on bodies without one so focusing doesn't shift text.
+  const rounded = theme.layout.textBackgroundRadius > 0
   const bodyNode =
-    bgPadX > 0 || bgPadY > 0 ? (
-      <Box paddingX={bgPadX} paddingY={bgPadY} backgroundColor={bodyBg}>
+    bgPadX > 0 || bgPadY > 0 || rounded ? (
+      <Box
+        paddingX={bgPadX}
+        paddingY={bgPadY}
+        backgroundColor={bodyBg}
+        borderStyle={rounded ? (bodyBg ? BUBBLE_BORDER : BLANK_BUBBLE_BORDER) : undefined}
+        borderColor={bodyBg}
+      >
         {bodyTextNode}
       </Box>
     ) : (

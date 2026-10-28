@@ -106,10 +106,16 @@ describe('cycleSetting', () => {
     expect(cycleSetting('statusBarPosition', 'hidden')).toBe('bottom')
   })
 
+  test('cycles timestamps on -> transient -> off', () => {
+    expect(cycleSetting('showTimestampsInPane', 'on')).toBe('transient')
+    expect(cycleSetting('showTimestampsInPane', 'transient')).toBe('off')
+    expect(cycleSetting('showTimestampsInPane', 'off')).toBe('on')
+  })
+
   test('negates booleans', () => {
     expect(cycleSetting('showPresenceInList', true)).toBe(false)
     expect(cycleSetting('showPresenceInList', false)).toBe(true)
-    expect(cycleSetting('showTimestampsInPane', true)).toBe(false)
+    expect(cycleSetting('centerDateMarkers', false)).toBe(true)
     expect(cycleSetting('messageFocusIndicatorEnabled', true)).toBe(false)
     expect(cycleSetting('realtimeEnabled', false)).toBe(true)
     expect(cycleSetting('chatListGroupByType', false)).toBe(true)
@@ -210,6 +216,7 @@ describe('ROOT_MENU shape', () => {
       'showChatNameHeader',
       'messagePaneShortNames',
       'showTimestampsInPane',
+      'centerDateMarkers',
       'showSenderNamesInPane',
       'showReactions',
       'inlineImages',
