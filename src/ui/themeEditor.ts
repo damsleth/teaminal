@@ -194,6 +194,7 @@ export const FIELDS: readonly EditableField[] = [
   bool('modalTitleBold', 'Modal title bold'),
   bool('sectionHeadingBold', 'Section heading bold'),
   bool('selectedBold', 'Selected bold'),
+  bool('focusedBold', 'Focused message bold'),
   bool('unreadBold', 'Unread bold'),
   bool('senderBold', 'Sender bold'),
   bool('inlineKeyBold', 'Inline key bold'),

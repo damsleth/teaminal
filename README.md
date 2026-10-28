@@ -230,6 +230,7 @@ subset of these keys is accepted:
     "modalTitleBold": true,
     "sectionHeadingBold": true,
     "selectedBold": true,
+    "focusedBold": true, // focused message body
     "unreadBold": true,
     "senderBold": true,
     "inlineKeyBold": true,

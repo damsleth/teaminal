@@ -97,6 +97,31 @@ test('text background padding paints bg columns around the body', () => {
   expect(body).toMatch(/48;2;255;0;0m(\x1b\[[0-9;]*m)*  (\x1b\[[0-9;]*m)*second day/)
 })
 
+test('focusedBold off leaves the focused message body unbolded', () => {
+  const bodyLine = (focusedBold: boolean) => {
+    const store = createAppStore()
+    store.set({
+      settings: { ...store.get().settings, themeOverrides: { emphasis: { focusedBold } } },
+      focus: { kind: 'chat', chatId: 'c1' },
+      messagesByConvo: { 'chat:c1': MESSAGES },
+    })
+    return renderToString(
+      <StoreProvider store={store}>
+        <SessionProvider api={session}>
+          <Box flexDirection="column" height={40}>
+            <MessagePane focusedMessageId="m4" focusIndicatorActive />
+          </Box>
+        </SessionProvider>
+      </StoreProvider>,
+      { columns: 80 },
+    )
+      .split('\n')
+      .find((l) => l.includes('second day, second message'))!
+  }
+  expect(bodyLine(true)).toMatch(/\x1b\[1m[^\n]*second day/)
+  expect(bodyLine(false)).not.toMatch(/\x1b\[1m[^\n]*second day/)
+})
+
 test('the focus marker sits on the message body line, not the sender name', () => {
   const out = lines(40, 'm4')
   const body = out.find((l) => l.includes('second day, second message'))!

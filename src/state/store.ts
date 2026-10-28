@@ -293,6 +293,7 @@ export type ThemeOverrides = ThemeColorOverrides & {
     modalTitleBold: boolean
     sectionHeadingBold: boolean
     selectedBold: boolean
+    focusedBold: boolean
     unreadBold: boolean
     senderBold: boolean
     inlineKeyBold: boolean
