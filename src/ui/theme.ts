@@ -75,6 +75,8 @@ export type ThemeLayout = {
   // (focus / self-message background). Reserved on every body so focusing
   // one doesn't shift its text.
   textBackgroundPaddingX: number
+  // Rows of background color above and below each message body.
+  textBackgroundPaddingY: number
 }
 
 export type ThemeBorders = {
@@ -171,6 +173,7 @@ const LAYOUT_DEFAULT: ThemeLayout = {
   chatListPaddingRight: 1,
   chatListGap: 0,
   textBackgroundPaddingX: 0,
+  textBackgroundPaddingY: 0,
 }
 
 const BORDERS_DEFAULT: ThemeBorders = { panel: 'round', modal: 'round', active: 'round' }

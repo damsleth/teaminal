@@ -32,6 +32,8 @@ export type MessageRowHeightOpts = {
   messageGap?: number
   // Rows the sender header takes: 2 when headers render tall (half-row gap).
   headerRows?: number
+  // Text bg padding Y: blank rows above and below every message body.
+  bodyPaddingY?: number
   // Total rows the message's inline images occupy, resolved dynamically from
   // the loaded image's fitted height (loaded → fitted rows, no label;
   // pending → one `[img]` label row). When omitted, falls back to the static
@@ -125,6 +127,7 @@ export function messageRenderRowHeight(row: MessageRenderRow, opts?: MessageRowH
   let height =
     (hasSenderHeader ? (opts?.headerRows ?? 1) : 0) +
     estimateWrappedRows(messageTextForHeight(row, opts), opts?.messageTextColumns)
+  height += 2 * Math.max(0, opts?.bodyPaddingY ?? 0)
   if (message._sendError) height++
   // Reply preview row (only present for chat-pane quoted replies).
   if (getQuotedReply(message)) height++

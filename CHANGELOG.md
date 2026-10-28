@@ -37,6 +37,11 @@ adheres to [Semantic Versioning](https://semver.org/).
   from there. Terminals without the kitty text sizing protocol round to
   whole rows.
 
+- **Text background padding Y.** **Text bg padding Y**
+  (`themeOverrides.layout.textBackgroundPaddingY`, 0-2) adds rows of
+  background color above and below message bodies, next to the existing
+  **Text bg padding X**.
+
 - **Text background padding.** **Text bg padding X**
   (`themeOverrides.layout.textBackgroundPaddingX`, 0-3) adds columns of
   background color on each side of message bodies, so the focus and

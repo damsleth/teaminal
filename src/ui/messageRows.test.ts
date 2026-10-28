@@ -66,6 +66,11 @@ describe('message row viewport budgeting', () => {
     ).toBe(3)
   })
 
+  test('text bg padding Y adds rows above and below the body', () => {
+    const row: MessageRenderRow = { kind: 'message', key: 'a', message: msg('a') }
+    expect(messageRenderRowHeight(row, { bodyPaddingY: 1 })).toBe(4)
+  })
+
   test('adds +1 row for chat-pane quoted replies', () => {
     const replyMsg = {
       ...msg('reply'),
