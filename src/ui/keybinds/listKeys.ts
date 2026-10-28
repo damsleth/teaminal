@@ -297,8 +297,10 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
         // so the cursor stays where it is and lands on real content.
         const section = it.section
         const expandedChatSections = { ...store.get().expandedChatSections, [section]: true }
-        store.set({ expandedChatSections })
-        store.set(cursorAt(buildSelectableList({ ...ctx, expandedChatSections }), safe))
+        store.set({
+          expandedChatSections,
+          ...cursorAt(buildSelectableList({ ...ctx, expandedChatSections }), safe),
+        })
         return 'handled'
       }
       if (it.kind === 'chat') {

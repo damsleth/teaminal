@@ -10,10 +10,11 @@
 // re-computed each render.
 
 import { Box, Text } from 'ink'
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   buildSelectableList,
   chatLabel,
+  cursorAt,
   resolveCursor,
   itemMatchesFilter,
   shortName,
@@ -24,7 +25,7 @@ import type { Presence } from '../types'
 import { htmlToText } from '../text/html'
 import { chromeRowsForChatList, computeChatListViewport } from './chatListViewport'
 import { useTerminalRows } from './hooks/useTerminalRows'
-import { useAppState, useTheme } from './StoreContext'
+import { useAppState, useAppStore, useTheme } from './StoreContext'
 import type { PresenceColorKey, Theme } from './theme'
 import { fs } from './textSizing'
 
@@ -272,6 +273,13 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
 
   const selectableCount = items.length + (syntheticNewChatQuery ? 1 : 0)
   const safeCursor = resolveCursor(items, selectableCount, cursorKey, cursor)
+  // Keep the fallback index on the row the key resolved to, so if that row
+  // later goes away (deleted, filtered out) the cursor stays near it rather
+  // than jumping to where it was before a reorder.
+  const store = useAppStore()
+  useEffect(() => {
+    if (safeCursor !== cursor) store.set(cursorAt(items, safeCursor))
+  })
   const rows = buildRows(items, density, syntheticNewChatQuery, chatListGroupByType)
   const chatListGap = theme.layout.chatListGap
 
