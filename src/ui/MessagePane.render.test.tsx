@@ -372,13 +372,13 @@ test('profile pictures: a column per message, initials at the start of each run'
       msg('r2', '2026-01-03T09:01:00Z', 'Ada Lovelace', 'ada second'),
       msg('r3', '2026-01-03T09:02:00Z', 'Bob', 'bob reply'),
     ]
-    const render = (messageAvatars: string, avatarIndent = 0) => {
+    const render = (messageAvatars: string, avatarIndent = 0, layout: object = {}) => {
       const store = createAppStore()
       store.set({
         settings: {
           ...store.get().settings,
           messageAvatars,
-          themeOverrides: { layout: { avatarIndent } },
+          themeOverrides: { layout: { avatarIndent, ...layout } },
         } as never,
         focus: { kind: 'chat', chatId: 'c1' },
         messagesByConvo: { 'chat:c1': run },
@@ -411,6 +411,14 @@ test('profile pictures: a column per message, initials at the start of each run'
     expect(col(indented, 'ada first') - col(medium, 'ada first')).toBe(3)
     const pictureAt = (ls: string[]) => ls[ls.findIndex((l) => l.includes('ada first')) - 1]!
     expect(pictureAt(indented).indexOf('AL') - pictureAt(medium).indexOf('AL')).toBe(3)
+    // Pinned: the picture follows the narrowed conversation column, at the
+    // same distance from the message as unpinned.
+    const narrow = render('medium', 0, { messageMaxWidth: 50 })
+    const pinned = render('medium', 0, { messageMaxWidth: 50, avatarPinned: 1 })
+    expect(col(pinned, 'ada first')).toBe(col(narrow, 'ada first'))
+    const gap = (ls: string[]) => col(ls, 'ada first') - pictureAt(ls).indexOf('AL')
+    expect(gap(pinned)).toBe(gap(medium))
+    expect(pictureAt(narrow).indexOf('AL')).toBe(0)
   } finally {
     if (prev === undefined) delete process.env.KITTY_WINDOW_ID
     else process.env.KITTY_WINDOW_ID = prev
