@@ -56,7 +56,8 @@ import { ReactionPickerModal } from './ReactionPickerModal'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
 import { EditReactionsModal } from './EditReactionsModal'
 import { ImageModal } from './ImageModal'
-import { MessageSearchModal } from './MessageSearchModal'
+import { MessageSearchModal, openMessageSearch } from './MessageSearchModal'
+import { CommandPalette, openCommandPalette } from './CommandPalette'
 import { TailPanels } from './TailPanels'
 import { findExistingOneOnOne } from './derive'
 import { useClampMessageCursor } from './hooks/useClampMessageCursor'
@@ -368,6 +369,42 @@ export function App() {
     pollerRef.current?.refresh()
   }
 
+  // Key actions the command palette offers besides menu items and chats.
+  const paletteKeyActions = [
+    {
+      id: 'new-chat',
+      title: 'New chat / find a person',
+      keys: 'p',
+      run: () => openNewChatPrompt(''),
+    },
+    { id: 'search', title: 'Search all messages', keys: 's', run: () => openMessageSearch(store) },
+    { id: 'refresh', title: 'Refresh', keys: 'r', run: () => refresh() },
+    {
+      id: 'hard-refresh',
+      title: 'Hard refresh (refetch everything)',
+      keys: 'R',
+      run: () => hardRefresh(),
+    },
+    {
+      id: 'activity',
+      title: 'Activity / notifications',
+      keys: 'Ctrl+A',
+      run: () => openActivity(store),
+    },
+    {
+      id: 'toggle-list',
+      title: 'Show / hide the chat list',
+      keys: 'Ctrl+B',
+      run: () => store.set((s) => ({ chatListCollapsed: !s.chatListCollapsed })),
+    },
+    {
+      id: 'resize',
+      title: 'Resize panes',
+      keys: 'Ctrl+X',
+      run: () => store.set({ inputZone: 'resize' }),
+    },
+  ]
+
   const hardRefresh = (): void => {
     pollerRef.current?.hardRefresh?.()
   }
@@ -379,6 +416,10 @@ export function App() {
     (input, key) => {
       if (input === 'R') {
         hardRefresh()
+        return
+      }
+      if (key.ctrl && input === 'p') {
+        openCommandPalette(store)
         return
       }
       if (key.ctrl && input === 'a') {
@@ -522,6 +563,7 @@ export function App() {
     | 'confirm-delete'
     | 'confirm-delete-chat'
     | 'message-search-global'
+    | 'command-palette'
     | 'image'
     | 'edit-reactions'
     | null = modal && modal.kind !== 'auth-expired' ? modal.kind : null
@@ -618,6 +660,8 @@ export function App() {
               <ConfirmDeleteModal />
             ) : overlayModalKind === 'message-search-global' ? (
               <MessageSearchModal />
+            ) : overlayModalKind === 'command-palette' ? (
+              <CommandPalette keyActions={paletteKeyActions} />
             ) : overlayModalKind === 'image' ? (
               <ImageModal />
             ) : overlayModalKind === 'edit-reactions' ? (

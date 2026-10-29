@@ -56,6 +56,7 @@ import { COMPOSER_TEXT_CHROME, cursorRowCol, wrapComposer } from './composerWrap
 import { shortName } from '../state/selectables'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { elementRect } from './inlineImageLayout'
+import { openCommandPalette } from './CommandPalette'
 import { useSessionApi } from './SessionContext'
 import { kittyKeyboardEnabled } from './kittyKeyboard'
 
@@ -206,6 +207,10 @@ export function Composer({ columns = 80 }: { columns?: number }) {
         return
       }
 
+      if (key.ctrl && input === 'p') {
+        openCommandPalette(store)
+        return
+      }
       if (key.escape || key.tab) {
         // Cancel an in-progress edit and restore the conversation's draft.
         if (editingMessageId) {

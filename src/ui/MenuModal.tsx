@@ -74,6 +74,124 @@ function padTo(text: string, width: number): string {
   return text + ' '.repeat(width - text.length)
 }
 
+type AppStoreApi = ReturnType<typeof useAppStore>
+export type MenuItemDeps = {
+  store: AppStoreApi
+  session: ReturnType<typeof useSessionApi>
+  exit: () => void
+}
+
+// What a menu item does, shared by the menu and the command palette.
+// Step a value item; false when the item has no value to step.
+export function adjustMenuItem(store: AppStoreApi, item: MenuItem, dir: 1 | -1): boolean {
+  switch (item.action.kind) {
+    case 'toggle-setting': {
+      const key = item.action.key
+      const current = store.get().settings[key]
+      if (key === 'theme') {
+        // Built-ins and saved presets; loading a preset also applies its
+        // UI settings, like Theme presets → Enter.
+        const names = themeChoices().map((c) => c.name)
+        void loadThemePreset(store, stepIn(names, current as string, dir))
+        return true
+      }
+      const next = cycleSetting(key, current, dir)
+      void updateSetting(store, key, next).catch((err) => {
+        warn(`config: failed to persist "${key}":`, errMessage(err))
+      })
+      return true
+    }
+    case 'toggle-header-element': {
+      const key = item.action.key
+      const cur = store.get().settings.headerElements
+      const nextElements = { ...cur, [key]: !cur[key] }
+      store.set((s) => ({ settings: { ...s.settings, headerElements: nextElements } }))
+      void updateSettings({ headerElements: nextElements }).catch((err) => {
+        warn(`config: failed to persist headerElements.${key}:`, errMessage(err))
+      })
+      return true
+    }
+    case 'cycle-quiet-hours': {
+      const cur = store.get().settings
+      const next = cycleQuietHoursPreset(
+        { start: cur.quietHoursStart, end: cur.quietHoursEnd },
+        dir,
+      )
+      store.set((s) => ({
+        settings: { ...s.settings, quietHoursStart: next.start, quietHoursEnd: next.end },
+      }))
+      void updateSettings({
+        quietHoursStart: next.start,
+        quietHoursEnd: next.end,
+      }).catch((err) => {
+        warn('config: failed to persist quiet hours:', errMessage(err))
+      })
+      return true
+    }
+    default:
+      return false
+  }
+}
+
+export function runMenuItem(item: MenuItem, path: string[], deps: MenuItemDeps): void {
+  const { store, session, exit } = deps
+  if (adjustMenuItem(store, item, 1)) return
+  switch (item.action.kind) {
+    case 'resume':
+      store.set({ modal: null, inputZone: 'list' })
+      return
+    case 'quit':
+      store.set({ modal: null, inputZone: 'list' })
+      exit()
+      return
+    case 'submenu':
+      openMenu(store, [...path, item.id])
+      return
+    case 'show-theme-editor':
+      openThemeEditor(store)
+      return
+    case 'show-theme-presets':
+      openThemePresets(store, 'menu')
+      return
+    case 'show-keybinds':
+      store.set({ modal: { kind: 'keybinds' }, inputZone: 'menu' })
+      return
+    case 'show-diagnostics':
+      store.set({ modal: { kind: 'diagnostics' }, inputZone: 'menu' })
+      return
+    case 'show-events':
+      store.set({ modal: { kind: 'events' }, inputZone: 'menu' })
+      return
+    case 'show-network':
+      store.set({ modal: { kind: 'network' }, inputZone: 'menu' })
+      return
+    case 'clear-cache': {
+      const profile = session.getActiveProfile()
+      try {
+        const { removed } = clearProfileCaches(profile)
+        recordEvent(
+          'app',
+          'info',
+          `cache cleared for profile=${profile ?? '(default)'}: removed ${removed.length} item(s)`,
+        )
+      } catch (err) {
+        warn('cache: clear failed:', errMessage(err))
+      }
+      store.set({ modal: null, inputZone: 'list' })
+      return
+    }
+    case 'show-accounts':
+      openAccounts(store)
+      return
+    case 'show-notifications':
+      openActivity(store)
+      return
+    case 'noop':
+      // placeholders until backed by real flows
+      return
+  }
+}
+
 export function openMenu(store: ReturnType<typeof useAppStore>, path: string[] = []): void {
   const items = resolveMenuPath(ROOT_MENU, path) ?? ROOT_MENU
   const idx = firstSelectable(items)
@@ -157,130 +275,21 @@ export function MenuModal() {
         const item = items[m.cursor]
         if (!item || item.disabled) return
         if (item.action.kind === 'submenu') {
-          if (key.rightArrow) activate(item, m.path)
+          if (key.rightArrow) runMenuItem(item, m.path, { store, session, exit })
           return
         }
-        adjust(item, key.rightArrow ? 1 : -1)
+        adjustMenuItem(store, item, key.rightArrow ? 1 : -1)
         return
       }
       // Space activates like Enter, in the root menu and every submenu.
       if (key.return || input === ' ') {
         const item = items[m.cursor]
         if (!item || item.disabled) return
-        activate(item, m.path)
+        runMenuItem(item, m.path, { store, session, exit })
       }
     },
     { isActive: isOpen },
   )
-
-  // Step a value item; false when the item has no value to step.
-  function adjust(item: MenuItem, dir: 1 | -1): boolean {
-    switch (item.action.kind) {
-      case 'toggle-setting': {
-        const key = item.action.key
-        const current = store.get().settings[key]
-        if (key === 'theme') {
-          // Built-ins and saved presets; loading a preset also applies its
-          // UI settings, like Theme presets → Enter.
-          const names = themeChoices().map((c) => c.name)
-          void loadThemePreset(store, stepIn(names, current as string, dir))
-          return true
-        }
-        const next = cycleSetting(key, current, dir)
-        void updateSetting(store, key, next).catch((err) => {
-          warn(`config: failed to persist "${key}":`, errMessage(err))
-        })
-        return true
-      }
-      case 'toggle-header-element': {
-        const key = item.action.key
-        const cur = store.get().settings.headerElements
-        const nextElements = { ...cur, [key]: !cur[key] }
-        store.set((s) => ({ settings: { ...s.settings, headerElements: nextElements } }))
-        void updateSettings({ headerElements: nextElements }).catch((err) => {
-          warn(`config: failed to persist headerElements.${key}:`, errMessage(err))
-        })
-        return true
-      }
-      case 'cycle-quiet-hours': {
-        const cur = store.get().settings
-        const next = cycleQuietHoursPreset(
-          { start: cur.quietHoursStart, end: cur.quietHoursEnd },
-          dir,
-        )
-        store.set((s) => ({
-          settings: { ...s.settings, quietHoursStart: next.start, quietHoursEnd: next.end },
-        }))
-        void updateSettings({
-          quietHoursStart: next.start,
-          quietHoursEnd: next.end,
-        }).catch((err) => {
-          warn('config: failed to persist quiet hours:', errMessage(err))
-        })
-        return true
-      }
-      default:
-        return false
-    }
-  }
-
-  function activate(item: MenuItem, path: string[]): void {
-    if (adjust(item, 1)) return
-    switch (item.action.kind) {
-      case 'resume':
-        store.set({ modal: null, inputZone: 'list' })
-        return
-      case 'quit':
-        store.set({ modal: null, inputZone: 'list' })
-        exit()
-        return
-      case 'submenu':
-        openMenu(store, [...path, item.id])
-        return
-      case 'show-theme-editor':
-        openThemeEditor(store)
-        return
-      case 'show-theme-presets':
-        openThemePresets(store, 'menu')
-        return
-      case 'show-keybinds':
-        store.set({ modal: { kind: 'keybinds' }, inputZone: 'menu' })
-        return
-      case 'show-diagnostics':
-        store.set({ modal: { kind: 'diagnostics' }, inputZone: 'menu' })
-        return
-      case 'show-events':
-        store.set({ modal: { kind: 'events' }, inputZone: 'menu' })
-        return
-      case 'show-network':
-        store.set({ modal: { kind: 'network' }, inputZone: 'menu' })
-        return
-      case 'clear-cache': {
-        const profile = session.getActiveProfile()
-        try {
-          const { removed } = clearProfileCaches(profile)
-          recordEvent(
-            'app',
-            'info',
-            `cache cleared for profile=${profile ?? '(default)'}: removed ${removed.length} item(s)`,
-          )
-        } catch (err) {
-          warn('cache: clear failed:', errMessage(err))
-        }
-        store.set({ modal: null, inputZone: 'list' })
-        return
-      }
-      case 'show-accounts':
-        openAccounts(store)
-        return
-      case 'show-notifications':
-        openActivity(store)
-        return
-      case 'noop':
-        // placeholders until backed by real flows
-        return
-    }
-  }
 
   if (!isOpen || !modal || modal.kind !== 'menu') return null
 
