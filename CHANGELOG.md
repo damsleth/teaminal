@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-29
+
 ### Added
 
 - **Context menu (`.` or Ctrl+.).** On a chat-list row: open, mark read /
@@ -1700,7 +1702,8 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/damsleth/teaminal/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/damsleth/teaminal/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/damsleth/teaminal/compare/v0.21.1...v0.22.0
 [0.21.1]: https://github.com/damsleth/teaminal/compare/v0.21.0...v0.21.1
