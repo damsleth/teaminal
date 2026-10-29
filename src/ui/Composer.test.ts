@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { enterKeyAction, findRootQuote } from './Composer'
+import { enterKeyAction, failedSendPlacement, findRootQuote } from './Composer'
 import type { ChatMessage } from '../types'
 
 const ROOT_FOCUS = {
@@ -61,4 +61,30 @@ test('enterKeyAction: Ctrl+Enter sends by default, enterSends flips it', () => {
   expect(enterKeyAction('\r', ctrlEnter, true)).toBe('newline')
   expect(enterKeyAction('j', { ctrl: true }, true)).toBe('newline')
   expect(enterKeyAction('x', {}, true)).toBeNull()
+})
+
+describe('failedSendPlacement: a failed send only goes back to its own conversation', () => {
+  const base = { sentConv: 'chat:a', accountCurrent: true, boxText: '' }
+  test('same conversation, empty box: back into the box', () => {
+    expect(failedSendPlacement({ ...base, currentConv: 'chat:a' })).toEqual({
+      kind: 'box',
+      prepend: false,
+    })
+  })
+  test('same conversation, new text typed since: above that text', () => {
+    expect(failedSendPlacement({ ...base, currentConv: 'chat:a', boxText: 'next' })).toEqual({
+      kind: 'box',
+      prepend: true,
+    })
+  })
+  test('switched to another conversation: its own draft, never the open box', () => {
+    expect(failedSendPlacement({ ...base, currentConv: 'chat:b' })).toEqual({ kind: 'draft' })
+    expect(failedSendPlacement({ ...base, currentConv: 'channel:t:c' })).toEqual({ kind: 'draft' })
+    expect(failedSendPlacement({ ...base, currentConv: null })).toEqual({ kind: 'draft' })
+  })
+  test('switched account: dropped', () => {
+    expect(failedSendPlacement({ ...base, currentConv: 'chat:a', accountCurrent: false })).toEqual({
+      kind: 'drop',
+    })
+  })
 })

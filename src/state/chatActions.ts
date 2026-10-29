@@ -177,10 +177,18 @@ export async function sendMessage(
     return { ok: true }
   } catch (err) {
     const error = err instanceof Error ? err.message : 'send failed'
-    store.set((s) => ({
-      messagesByConvo: replaceTemp(s, (m) => ({ ...m, _sending: false, _sendError: error })),
-      draftsByConvo: { ...s.draftsByConvo, [conv]: content },
-    }))
+    // The text goes back to this conversation's own draft only, above
+    // anything typed there since (never replacing it).
+    store.set((s) => {
+      const since = s.draftsByConvo[conv]
+      return {
+        messagesByConvo: replaceTemp(s, (m) => ({ ...m, _sending: false, _sendError: error })),
+        draftsByConvo: {
+          ...s.draftsByConvo,
+          [conv]: since && since !== content ? `${content}\n${since}` : content,
+        },
+      }
+    })
     return { ok: false, error }
   }
 }
