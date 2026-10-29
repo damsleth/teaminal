@@ -53,6 +53,7 @@ import {
 } from './kittyGraphics'
 import {
   ensureImageFetched,
+  imageCacheGeneration,
   ensureUserPhoto,
   getImageData,
   isPhotoKey,
@@ -169,7 +170,7 @@ export function MessagePane(props: {
     ? TAIL_PANEL_ROWS
     : 0
 
-  const [, setImageRevision] = useState(0)
+  const [imageRevision, setImageRevision] = useState(0)
   const kittyEnabled = inlineImages === 'auto' && isKittyCapable()
 
   // Track terminal height live so the message slice fills the available
@@ -358,11 +359,16 @@ export function MessagePane(props: {
   // render. ensureImageFetched is idempotent per key. The imageRevision
   // counter is bumped by its onChange callback so the component re-renders
   // once an image transitions loading → ready.
+  // Includes what decides the images and picture of a message: body,
+  // attachments and sender, besides the id and edit time.
   const visibleKey = rows
-    .map((r) =>
-      r.kind === 'message' ? `${r.message.id}:${r.message.lastModifiedDateTime ?? ''}` : '',
-    )
+    .map((r) => {
+      if (r.kind !== 'message') return ''
+      const m = r.message
+      return `${m.id}:${m.lastModifiedDateTime ?? ''}:${m.body.content.length}:${m.attachments?.length ?? 0}:${m.from?.user?.id ?? ''}`
+    })
     .join('|')
+  const cacheGen = imageCacheGeneration()
   useEffect(() => {
     if (!kittyEnabled) return
     const client = session.client()
@@ -384,7 +390,7 @@ export function MessagePane(props: {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on visibleKey
-  }, [visibleKey, kittyEnabled, accountId])
+  }, [visibleKey, kittyEnabled, accountId, cacheGen])
 
   // Profile photos for the visible run starts (same idempotent pattern).
   useEffect(() => {
@@ -400,7 +406,7 @@ export function MessagePane(props: {
         })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on visibleKey
-  }, [visibleKey, avRows, accountId])
+  }, [visibleKey, avRows, accountId, cacheGen, imageRevision])
 
   // Yoga owns the positions, including unused space below short timelines,
   // wrapped text and dynamic chrome. Wait for Ink's throttled text frame

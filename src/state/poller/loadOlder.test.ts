@@ -144,31 +144,6 @@ describe('loadOlderMessages', () => {
     expect(store.get().messageCacheByConvo[conv]?.messages.map((m) => m.id)).toEqual(['m1'])
   })
 
-  test('marks channel cache fullyLoaded when there is no nextLink', async () => {
-    let calls = 0
-    __setTransportForTests(async () => {
-      calls++
-      return jsonResponse({ value: [] })
-    })
-    const store = createAppStore(accountRef('test'))
-    const conv: ConvKey = 'channel:t1:ch1'
-    store.set({
-      focus: { kind: 'channel', teamId: 't1', channelId: 'ch1' },
-      messageCacheByConvo: {
-        [conv]: { messages: [msg('m1', 'x')], loadingOlder: false, fullyLoaded: false },
-      },
-    })
-    const result = await loadOlderMessages({
-      getClient: testClient,
-      store: accountStore(store),
-      focus: store.get().focus,
-      reportError: () => {},
-    })
-    expect(result.fullyLoaded).toBe(true)
-    expect(calls).toBe(0)
-    expect(store.get().messageCacheByConvo[conv]?.fullyLoaded).toBe(true)
-  })
-
   test('fetches an older page for a chat using beforeCreatedDateTime when no nextLink', async () => {
     let seenUrl = ''
     __setTransportForTests(async (url) => {

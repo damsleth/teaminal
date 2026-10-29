@@ -31,22 +31,46 @@ export function backoff429Ms(attempt: number, retryAfterMs: number, random = Mat
   return Math.max(retryAfterMs, jittered)
 }
 
-let sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms))
+type Sleep = (ms: number, signal?: AbortSignal | null) => Promise<void>
 
-export function __setBackoffSleepForTests(s: ((ms: number) => Promise<void>) | null): void {
-  sleep = s ?? ((ms) => new Promise((r) => setTimeout(r, ms)))
+// Resolves after `ms`, or rejects with an AbortError as soon as `signal`
+// fires; the timer is cleared either way, so an aborted wait doesn't keep
+// the process alive.
+const realSleep: Sleep = (ms, signal) =>
+  new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(abortReason(signal))
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    const onAbort = () => {
+      clearTimeout(timer)
+      reject(abortReason(signal!))
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+
+function abortReason(signal: AbortSignal): unknown {
+  return signal.reason ?? new DOMException('Aborted', 'AbortError')
+}
+
+let sleep: Sleep = realSleep
+
+export function __setBackoffSleepForTests(s: Sleep | null): void {
+  sleep = s ?? realSleep
 }
 
 export async function sleepUnlessAborted(ms: number, signal?: AbortSignal | null): Promise<void> {
-  if (!signal) return sleep(ms)
+  if (!signal || sleep === realSleep) return sleep(ms, signal)
+  // Test sleeps may ignore the signal: race them against it.
   signal.throwIfAborted()
   let onAbort: (() => void) | undefined
   const aborted = new Promise<never>((_, reject) => {
-    onAbort = () => reject(signal.reason ?? new DOMException('Aborted', 'AbortError'))
+    onAbort = () => reject(abortReason(signal))
     signal.addEventListener('abort', onAbort, { once: true })
   })
   try {
-    await Promise.race([sleep(ms), aborted])
+    await Promise.race([sleep(ms, signal), aborted])
   } finally {
     signal.removeEventListener('abort', onAbort!)
   }

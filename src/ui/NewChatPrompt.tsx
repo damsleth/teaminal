@@ -47,9 +47,8 @@ export function NewChatPrompt(props: {
   const { exit } = useApp()
   const session = useSessionApi()
   const [query, setQuery] = useState(props.initialQuery)
-  // The query as last rendered: a search answer for an older query is dropped.
-  const queryRef = useRef(query)
-  queryRef.current = query
+  // Each external search gets a number; only the latest one's answer counts.
+  const lookupGen = useRef(0)
   const [results, setResults] = useState<DirectoryUser[]>([])
   const [cursor, setCursor] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -155,12 +154,10 @@ export function NewChatPrompt(props: {
         if (results.length === 0 && isNewChatQueryCandidate(trimmed)) {
           setExternalLookup('in-flight')
           setError(null)
+          const gen = ++lookupGen.current
           searchExternalUsers(session.client(), trimmed, { top: RESULT_LIMIT })
             .then((users) => {
-              if (queryRef.current.trim() !== trimmed) {
-                setExternalLookup('idle')
-                return
-              }
+              if (gen !== lookupGen.current) return
               if (users.length === 0) {
                 setExternalLookup('no-hit')
                 return
@@ -171,19 +168,23 @@ export function NewChatPrompt(props: {
               setExternalLookup('idle')
             })
             .catch((err) => {
+              if (gen !== lookupGen.current) return
               setExternalLookup('idle')
-              if (queryRef.current.trim() !== trimmed) return
               setError(err instanceof Error ? err.message : 'external search failed')
             })
         }
         return
       }
       if (key.backspace || key.delete) {
+        lookupGen.current++
+        setExternalLookup('idle')
         setZone('input')
         setQuery((q) => q.slice(0, -1))
         return
       }
       if (input && !key.ctrl && !key.meta) {
+        lookupGen.current++
+        setExternalLookup('idle')
         setZone('input')
         setQuery((q) => q + input)
       }
