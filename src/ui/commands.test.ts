@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 import { applySeededState } from '../state/seedFixtures'
 import { createAppStore } from '../state/store'
 import { buildCommands, filterCommands, fuzzyScore, type CommandRunners } from './commands'
+import { fitCells } from './CommandPalette'
 import type { MenuItem } from './menu'
 
 function setup() {
@@ -50,4 +51,19 @@ test('fuzzy matching: in-order characters, word starts and runs rank higher', ()
   const top = filterCommands(commands, 'center dates')[0]!
   expect(top.id).toBe('menu:settings/centerDateMarkers')
   expect(filterCommands(commands, '')).toHaveLength(commands.length)
+})
+
+test('a query that names an item ranks it above chats that merely contain it', () => {
+  const run = () => {}
+  const commands = [
+    { id: 'chat:park', title: 'Go to Theme park', group: 'Chats', run },
+    { id: 'menu:settings/theme', title: 'Settings › Theme', group: 'Settings', run },
+  ]
+  expect(filterCommands(commands, 'theme')[0]!.id).toBe('menu:settings/theme')
+})
+
+test('fitCells pads and cuts by terminal cells, never splitting a character', () => {
+  expect(fitCells('ab', 4)).toBe('ab  ')
+  expect(fitCells('漢字漢字', 5)).toBe('漢字…')
+  expect(Bun.stringWidth(fitCells('👍👍👍', 4))).toBe(4)
 })

@@ -65,4 +65,13 @@ test('command-palette: filter, run a setting, jump to a chat', async ({ terminal
   await expect(terminal.getByText('enter runs')).not.toBeVisible()
   // The Design Sync conversation is open: its seeded message shows.
   await expect(terminal.getByText('The second one scans faster.')).toBeVisible()
+
+  // Opened from the composer, Esc goes back to the composer.
+  terminal.write('\t')
+  await expect(terminal.getByText('Ctrl+Enter send')).toBeVisible()
+  terminal.write('\x10')
+  await expect(terminal.getByText('enter runs')).toBeVisible()
+  terminal.keyEscape()
+  await expect(terminal.getByText('enter runs')).not.toBeVisible()
+  await expect(terminal.getByText('Ctrl+Enter send')).toBeVisible()
 })
