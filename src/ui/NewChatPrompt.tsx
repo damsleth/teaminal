@@ -8,7 +8,7 @@
 import { Box, Text, useApp } from 'ink'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { searchChatUsers, searchExternalUsers } from '../state/chatActions'
 import { clampCursor } from '../state/selectables'
 import type { DirectoryUser } from '../types'
@@ -47,6 +47,9 @@ export function NewChatPrompt(props: {
   const { exit } = useApp()
   const session = useSessionApi()
   const [query, setQuery] = useState(props.initialQuery)
+  // The query as last rendered: a search answer for an older query is dropped.
+  const queryRef = useRef(query)
+  queryRef.current = query
   const [results, setResults] = useState<DirectoryUser[]>([])
   const [cursor, setCursor] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -154,6 +157,10 @@ export function NewChatPrompt(props: {
           setError(null)
           searchExternalUsers(session.client(), trimmed, { top: RESULT_LIMIT })
             .then((users) => {
+              if (queryRef.current.trim() !== trimmed) {
+                setExternalLookup('idle')
+                return
+              }
               if (users.length === 0) {
                 setExternalLookup('no-hit')
                 return
@@ -165,6 +172,7 @@ export function NewChatPrompt(props: {
             })
             .catch((err) => {
               setExternalLookup('idle')
+              if (queryRef.current.trim() !== trimmed) return
               setError(err instanceof Error ? err.message : 'external search failed')
             })
         }

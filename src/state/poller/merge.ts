@@ -148,13 +148,22 @@ export function sameMessage(a: ChatMessage, b: ChatMessage): boolean {
     a.body.contentType === b.body.contentType &&
     a.from?.user?.id === b.from?.user?.id &&
     a.from?.user?.displayName === b.from?.user?.displayName &&
-    (a.attachments?.length ?? 0) === (b.attachments?.length ?? 0) &&
-    (a.mentions?.length ?? 0) === (b.mentions?.length ?? 0) &&
+    sameJson(a.attachments, b.attachments) &&
+    sameJson(a.mentions, b.mentions) &&
+    sameJson(a.eventDetail, b.eventDetail) &&
     a._sending === b._sending &&
     a._sendError === b._sendError &&
     a._tempId === b._tempId &&
     sameReactions(a.reactions, b.reactions)
   )
+}
+
+// Structural equality for the small nested parts of a message (attachments,
+// mentions, event detail): same reference, or the same JSON.
+function sameJson(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (a == null || b == null) return (a ?? null) === (b ?? null)
+  return JSON.stringify(a) === JSON.stringify(b)
 }
 
 /** True when two message lists are render-equivalent, element for element. */

@@ -308,6 +308,29 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Throttling (429) back-off everywhere.** Every request now retries a
+  429 with exponential back-off (1s, 2s, 4s, capped at 30s, with jitter,
+  never shorter than the server's Retry-After): Graph, the Teams-service
+  clients, the realtime registration and external images. Before, Graph
+  retried at a flat second and the Teams-service clients not at all. A
+  back-off wait now ends at once when the request is cancelled (account
+  switch, quit).
+
+- A failed channel-list request no longer empties that team's channels;
+  the ones already known stay.
+
+- Saved message history trimmed to the newest 200 no longer claims to be
+  complete, so older messages can still be loaded.
+
+- Edits to a message's attachments, mentions or event details are picked
+  up by polling (before, only a changed count was).
+
+- Failing cache writes (full disk, permissions) are logged once instead of
+  silently dropped.
+
+- A new-chat search answer for an older query no longer replaces the
+  results for what you've typed since.
+
 - **The selected chat row is highlighted as a whole**: its background now
   covers the picture column and the preview line, not just the name.
 

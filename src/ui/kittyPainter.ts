@@ -41,9 +41,9 @@ export function setKittyOwner(id: string, owner: KittyOwner | null): void {
 export function requestKittyPaint(next?: KittyPaintContext): void {
   if (next) ctx = next
   if (!ctx) return
-  // Drop the old placements right away, as the layout is about to move;
-  // the pass after the flush puts them back where the new frame has them.
-  clearKittyImages(ctx.stdout)
+  // No clear here: paintNow clears and re-places in one pass after the
+  // flush, so a re-render that moved nothing doesn't blink every picture.
+  // ponytail: a picture whose row moved sits one frame at the old spot.
   if (pending) {
     again = true
     return

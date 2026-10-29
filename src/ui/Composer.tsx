@@ -201,10 +201,8 @@ export function Composer({ columns = 80 }: { columns?: number }) {
       if (input.includes('\x1b[200~') || parserRef.current.inPaste) {
         const r = feed(parserRef.current, input)
         parserRef.current = r.state
-        for (const ev of r.events) {
-          if (ev.kind === 'paste') dispatch({ kind: 'insert', chars: ev.chars })
-          else dispatch({ kind: 'insert', chars: ev.chars })
-        }
+        // Pasted and typed runs both insert as-is (newlines kept).
+        for (const ev of r.events) dispatch({ kind: 'insert', chars: ev.chars })
         return
       }
 
