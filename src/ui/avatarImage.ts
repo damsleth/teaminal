@@ -48,15 +48,70 @@ function decodeJpeg(key: string, data: Buffer): Pixels | null {
   return pixels
 }
 
+// Presence drawn onto a picture, Teams-style: a dot in the bottom-right
+// corner (badge) or a solid strip down the left edge, like old Lync (bar).
+export type PresenceStamp = { rgb: [number, number, number]; style: 'badge' | 'bar' }
+
+// Stamped copies by stamped key, so a repaint doesn't redraw them.
+// ponytail: unbounded, one small entry per (picture, presence color) seen.
+const stampedPixels = new Map<string, Pixels>()
+
+function withStamp(
+  key: string,
+  pixels: Pixels,
+  stamp: PresenceStamp | undefined,
+): { key: string; pixels: Pixels } {
+  if (!stamp) return { key, pixels }
+  const stampedKey = `${key}|${stamp.style}:${stamp.rgb.join(',')}`
+  let out = stampedPixels.get(stampedKey)
+  if (!out) {
+    out = stampPresence(pixels, stamp)
+    stampedPixels.set(stampedKey, out)
+  }
+  return { key: stampedKey, pixels: out }
+}
+
+// A copy of `pixels` with the presence drawn on; the source stays untouched
+// (decoded photos and icons are cached).
+export function stampPresence(pixels: Pixels, stamp: PresenceStamp): Pixels {
+  const { width: w, height: h } = pixels
+  const rgba = new Uint8Array(pixels.rgba)
+  const n = Math.min(w, h)
+  const r = 0.2 * n
+  const cx = w - r - 0.04 * n
+  const cy = h - r - 0.04 * n
+  const bar = Math.max(2, Math.round(0.12 * w))
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const on =
+        stamp.style === 'bar' ? x < bar : (x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= r * r
+      if (!on) continue
+      const i = (y * w + x) * 4
+      rgba[i] = stamp.rgb[0]
+      rgba[i + 1] = stamp.rgb[1]
+      rgba[i + 2] = stamp.rgb[2]
+      rgba[i + 3] = 255
+    }
+  return { rgba, width: w, height: h }
+}
+
 // Kitty escape placing `data` (PNG or JPEG) into rows x avatarCols(rows)
-// cells; '' when the image can't be shown.
-export function avatarEscape(ownedKey: string, data: Buffer, rows: number): string {
+// cells; '' when the image can't be shown. Only JPEGs (what Graph serves for
+// people) take a presence stamp: PNGs go to the terminal undecoded.
+export function avatarEscape(
+  ownedKey: string,
+  data: Buffer,
+  rows: number,
+  stamp?: PresenceStamp,
+): string {
   const placement = { rows, cols: avatarCols(rows), reservedRows: rows, exact: true }
   const format = detectImageFormat(data)
   if (format === 'png') return buildKittyImageEscape(ownedKey, data, placement)
   if (format !== 'jpeg') return ''
   const pixels = decodeJpeg(ownedKey, data)
-  return pixels ? buildKittyRawEscape(ownedKey, pixels, placement) : ''
+  if (!pixels) return ''
+  const s = withStamp(ownedKey, pixels, stamp)
+  return buildKittyRawEscape(s.key, s.pixels, placement)
 }
 
 // Chat-type icons drawn as pictures, so group and meeting chats get a mark
@@ -231,10 +286,11 @@ export function isGeneratedKey(key: string): boolean {
 }
 
 // Kitty escape for an icon / initials key into a rows x avatarCols(rows) box.
-export function iconEscape(key: string, rows: number): string {
+export function iconEscape(key: string, rows: number, stamp?: PresenceStamp): string {
   const pixels = key.startsWith('initials:') ? initialsPixels(key) : iconPixels(key)
   if (!pixels) return ''
-  return buildKittyRawEscape(key, pixels, {
+  const s = withStamp(key, pixels, stamp)
+  return buildKittyRawEscape(s.key, s.pixels, {
     rows,
     cols: avatarCols(rows),
     reservedRows: rows,
@@ -245,4 +301,5 @@ export function iconEscape(key: string, rows: number): string {
 export function __resetAvatarDecodeCacheForTests(): void {
   decoded.clear()
   icons.clear()
+  stampedPixels.clear()
 }

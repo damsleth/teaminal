@@ -432,6 +432,7 @@ describe('Settings ↔ config.json parity', () => {
     centerDateMarkers: !defaultSettings.centerDateMarkers,
     messageAvatars: 'large',
     chatListThumbnails: 'small',
+    chatListPresenceStyle: 'badge',
     showReactions: 'all',
     messageFocusIndicatorEnabled: !defaultSettings.messageFocusIndicatorEnabled,
     messageFocusIndicatorChar: '|',

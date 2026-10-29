@@ -7,6 +7,7 @@
 // painting independently would erase each other's pictures.
 
 import type { DOMElement } from 'ink'
+import type { PresenceStamp } from './avatarImage'
 import { clearKittyImages } from './kittyGraphics'
 import { paintInlineImages, type InlineImageSlots } from './inlineImageLayout'
 
@@ -15,7 +16,7 @@ export type KittyOwner = {
   viewport: () => DOMElement | null
   slots: InlineImageSlots
   // Escape for one slot; '' paints nothing.
-  escape: (cacheKey: string, rows: number, fallbackKey?: string) => string
+  escape: (cacheKey: string, rows: number, fallbackKey?: string, stamp?: PresenceStamp) => string
 }
 
 export type KittyPaintContext = {

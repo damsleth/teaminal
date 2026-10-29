@@ -245,6 +245,12 @@ adheres to [Semantic Versioning](https://semver.org/).
   `themeOverrides.layout.avatarPinned: 1`). The profile picture moves in
   from the pane edge to sit just left of the conversation column, so it
   follows the conversation width.
+- **Presence on chat-list thumbnails** (menu → Chat list → Presence on
+  thumbnails, or `chatListPresenceStyle`). With thumbnails on, `badge` puts
+  the presence dot on the picture's corner the way Teams does, and `bar`
+  draws a colored strip down its left edge like Lync did. Both drop the
+  separate dot column, giving the name more room. `dot` (the default) keeps
+  it as before.
 
 ### Changed
 

@@ -234,6 +234,7 @@ describe('ROOT_MENU shape', () => {
       'chatListPreviewLines',
       'showPresenceInList',
       'chatListThumbnails',
+      'chatListPresenceStyle',
       // Messages
       'showChatNameHeader',
       'messagePaneShortNames',

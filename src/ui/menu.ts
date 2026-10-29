@@ -48,6 +48,7 @@ export type ToggleKey =
   | 'centerDateMarkers'
   | 'messageAvatars'
   | 'chatListThumbnails'
+  | 'chatListPresenceStyle'
   | 'showSenderNamesInPane'
   | 'showOwnNameInPane'
   | 'showReactions'
@@ -273,6 +274,13 @@ export const ROOT_MENU: MenuItem[] = [
         action: { kind: 'toggle-setting', key: 'chatListThumbnails' },
         hint: 'photos and team pictures',
         // Pictures need the kitty graphics protocol.
+        hidden: () => !isKittyCapable(),
+      },
+      {
+        id: 'chatListPresenceStyle',
+        label: 'Presence on thumbnails',
+        action: { kind: 'toggle-setting', key: 'chatListPresenceStyle' },
+        hint: 'dot by the name, badge on the picture, or a bar down its side',
         hidden: () => !isKittyCapable(),
       },
       heading('Messages'),
@@ -552,6 +560,8 @@ export function cycleSetting<K extends ToggleKey>(
       return step(['off', 'small', 'medium', 'large'])
     case 'chatListPreviewLines':
       return step([0, 1, 2, 3])
+    case 'chatListPresenceStyle':
+      return step(['dot', 'badge', 'bar'])
     case 'chatListGroupByType':
     case 'chatListSectionCap':
     case 'chatListShortNames':
@@ -612,6 +622,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'showTimestampsInPane':
     case 'messageAvatars':
     case 'chatListThumbnails':
+    case 'chatListPresenceStyle':
       return String(value)
     case 'headerUserFormat':
       return value === 'tenant' ? 'tenant only' : 'name + tenant'
