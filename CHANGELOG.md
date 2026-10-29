@@ -320,6 +320,18 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A failed send can no longer end up in another chat.** When a send
+  failed after you had switched conversations, its text was put back into
+  the message box of the chat you were now in, where Enter would send it to
+  the wrong person. The text now only ever goes back to the conversation
+  it was typed in: into its box if it is still open, otherwise into that
+  chat's saved draft, above anything typed there since. The text in the box
+  now belongs to one account and conversation: it is only saved as that
+  chat's draft and only sent there, so in the moment between a chat or
+  account switch and the box refilling, nothing can reach the wrong chat or
+  go out from the wrong account. A failed edit resumes with your revised
+  text, only in the chat it was made in.
+
 - **Throttling (429) back-off everywhere.** Every request now retries a
   429 with exponential back-off (1s, 2s, 4s, capped at 30s, with jitter,
   never shorter than the server's Retry-After): Graph, the Teams-service

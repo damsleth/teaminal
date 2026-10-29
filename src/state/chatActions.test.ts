@@ -258,6 +258,20 @@ describe('sendMessage', () => {
     expect(store.get().draftsByConvo['chat:c1']).toBe('hi')
   })
 
+  it('a failed send goes above a draft typed in that chat since, not over it', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const store = setup(async (...args: unknown[]) => {
+      await gate
+      return (fail as (...a: unknown[]) => Promise<Response>)(...args)
+    })
+    const pending = sendMessage(testClient(), accountStore(store), chat, 'hi')
+    store.set((s) => ({ draftsByConvo: { ...s.draftsByConvo, 'chat:c1': 'typed since' } }))
+    release()
+    await pending
+    expect(store.get().draftsByConvo['chat:c1']).toBe('hi\ntyped since')
+  })
+
   it('writes nothing after the call once the account changed', async () => {
     let release!: () => void
     const gate = new Promise<void>((r) => (release = r))

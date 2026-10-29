@@ -36,12 +36,13 @@
 //   appended verbatim (newlines preserved) instead of being treated
 //   as a sequence of individual key events.
 
+import { recordEvent } from '../log'
 import { Box, Text, useCursor, useStdin, useStdout, type DOMElement } from 'ink'
 import { useInput } from './useInput'
 import { useEffect, useRef, useState } from 'react'
 import { accountStore } from '../state/accountStore'
 import { editChatMessageContent, sendMessage } from '../state/chatActions'
-import { focusKey } from '../state/store'
+import { focusKey, type AppState } from '../state/store'
 import type { ChatMessage } from '../types'
 import {
   DISABLE_BRACKETED_PASTE,
@@ -81,6 +82,29 @@ export function enterKeyAction(
   return enterSends && !key.shift ? 'send' : 'newline'
 }
 
+// Who the composer's text belongs to: the account (its id and incarnation)
+// and the focused conversation. null with nothing to compose in.
+export function composerOwner(s: AppState): string | null {
+  const conv = focusKey(s.focus)
+  if (!conv || !s.account) return null
+  return `${s.accountGeneration}\u0000${s.account.id}\u0000${conv}`
+}
+
+// Where a failed send's text goes. Only ever the conversation it was typed
+// in: back into the box when the box still shows that conversation (above
+// anything typed since), else into that conversation's saved draft. After
+// an account switch it goes nowhere: the old account's state is gone.
+export function failedSendPlacement(p: {
+  sentConv: string
+  currentConv: string | null
+  accountCurrent: boolean
+  boxText: string
+}): { kind: 'box'; prepend: boolean } | { kind: 'draft' } | { kind: 'drop' } {
+  if (!p.accountCurrent) return { kind: 'drop' }
+  if (p.currentConv === p.sentConv) return { kind: 'box', prepend: p.boxText.trim() !== '' }
+  return { kind: 'draft' }
+}
+
 export function findRootQuote(
   focus: { kind: 'thread'; teamId: string; channelId: string; rootId: string },
   messagesByConvo: Record<string, ChatMessage[]>,
@@ -110,7 +134,30 @@ export function Composer({ columns = 80 }: { columns?: number }) {
   // Only honored where Shift+Enter is distinguishable from Enter.
   const enterSends = useAppState((s) => s.settings.enterSends) && kittyKeyboardEnabled()
   const theme = useTheme()
-  const [buf, setBuf] = useState<ComposerBuffer>(emptyBuffer)
+  // The text in the box belongs to one owner: an account (incarnation) and
+  // a conversation (composerOwner). It is only saved into that owner's draft
+  // and only sent as that owner, so in the moments between a chat or
+  // account switch and the box being refilled, the previous text can't leak
+  // into another conversation or out through another account.
+  const owner = useAppState(composerOwner)
+  const [owned, setOwned] = useState<{ owner: string | null; buf: ComposerBuffer }>(() => ({
+    owner: composerOwner(store.get()),
+    buf: emptyBuffer,
+  }))
+  const buf = owned.buf
+  const setBuf = (next: ComposerBuffer | ((b: ComposerBuffer) => ComposerBuffer)): void =>
+    setOwned((o) => ({ owner: o.owner, buf: typeof next === 'function' ? next(o.buf) : next }))
+  // The latest buffer, for async completions (send / edit) that outlive a render.
+  const bufRef = useRef(buf)
+  bufRef.current = buf
+  const ownedRef = useRef(owned.owner)
+  ownedRef.current = owned.owner
+  // The box may be sent / edited only when it belongs to the current owner
+  // (read from the store, not the last render) and shows what's focused.
+  const boxIsCurrent = (): boolean => {
+    const s = store.get()
+    return ownedRef.current !== null && ownedRef.current === composerOwner(s)
+  }
   const [sending, setSending] = useState(false)
   const parserRef = useRef<ParserState>(initialParserState)
 
@@ -127,26 +174,32 @@ export function Composer({ columns = 80 }: { columns?: number }) {
   setCursorPosition(undefined)
   const rootRef = useRef<DOMElement>(null)
 
-  // Re-seed the buffer from the per-conversation draft when focus changes.
-  // Tracked by `conv` (a string), so equality comparison is cheap. Switching
-  // conversations also cancels any in-progress edit.
-  const lastConvRef = useRef<string | null>(conv)
+  // Re-seed the buffer from the owner's draft when the conversation or the
+  // account changes. Switching also cancels any in-progress edit.
+  const lastOwnerRef = useRef<string | null>(owner)
   useEffect(() => {
-    if (conv === lastConvRef.current) return
-    lastConvRef.current = conv
+    if (owner === lastOwnerRef.current) return
+    lastOwnerRef.current = owner
     if (store.get().editingMessageId) store.set({ editingMessageId: null })
-    const draft = conv ? (drafts[conv] ?? '') : ''
-    setBuf({ text: draft, cursor: draft.length })
-  }, [conv, drafts, store])
+    const draft = conv ? (store.get().draftsByConvo[conv] ?? '') : ''
+    setOwned({ owner, buf: { text: draft, cursor: draft.length } })
+  }, [owner, conv, store])
 
   // Seed the buffer with the target message's body when an edit begins, so
   // the user tweaks the existing text rather than retyping it. Reads
   // messages from the store (not a dep) so a background poll mid-edit can't
   // re-seed over the user's changes.
   const lastEditingRef = useRef<string | null>(editingMessageId)
+  // Set when a failed edit is resumed with the user's revised text, which
+  // must not be replaced by the message's (rolled-back) body.
+  const resumeEditRef = useRef(false)
   useEffect(() => {
     if (editingMessageId === lastEditingRef.current) return
     lastEditingRef.current = editingMessageId
+    if (resumeEditRef.current) {
+      resumeEditRef.current = false
+      return
+    }
     if (!editingMessageId || focus.kind !== 'chat') return
     const editConv = `chat:${focus.chatId}`
     const msg = (store.get().messagesByConvo[editConv] ?? []).find((m) => m.id === editingMessageId)
@@ -173,11 +226,16 @@ export function Composer({ columns = 80 }: { columns?: number }) {
   // switch immediately after typing doesn't drop the last keystroke.
   useEffect(() => {
     if (!conv) return
+    // Only the owner the text belongs to (see `owned`).
+    if (owned.owner === null || owned.owner !== owner) return
     // While editing, the buffer holds an existing message's body — not a
     // draft of a new message — so don't mirror it into draftsByConvo.
     if (editingMessageId) return
     if ((drafts[conv] ?? '') === buf.text) return
     store.set((s) => {
+      // Re-checked at write time: an account switch can land between the
+      // render and this effect.
+      if (composerOwner(s) !== owned.owner) return {}
       const next = { ...s.draftsByConvo }
       if (buf.text === '') {
         delete next[conv]
@@ -266,18 +324,58 @@ export function Composer({ columns = 80 }: { columns?: number }) {
     if (!trimmed) return
     if (focus.kind !== 'chat' && focus.kind !== 'channel' && focus.kind !== 'thread') return
     if (sending) return
+    // The text must belong to the account and conversation it would go to.
+    if (!boxIsCurrent() || focusKey(store.get().focus) !== focusKey(focus)) return
 
     setSending(true)
     setBuf(emptyBuffer)
-    // A reply landing after an account switch belongs to the old session:
-    // the handle drops its writes, and the buffer is left alone.
+    // The message is pinned to the conversation (and account) it was typed
+    // in: the send targets `focus` as of now, and a failure only ever gives
+    // the text back to that same conversation.
+    const sentConv = focusKey(focus)
+    const sentOwner = ownedRef.current
     const acc = accountStore(store)
     try {
       const result = await sendMessage(session.client(), acc, focus, trimmed)
-      // Restore the buffer so the user can edit + retry.
-      if (!result.ok && acc.isCurrent()) setBuf({ text: trimmed, cursor: trimmed.length })
+      if (!result.ok && sentConv) restoreFailedSend(sentConv, sentOwner, trimmed, acc)
     } finally {
       setSending(false)
+    }
+  }
+
+  // Give a failed send's text back so it can be retried — never into another
+  // conversation's box (see failedSendPlacement).
+  function restoreFailedSend(
+    sentConv: string,
+    sentOwner: string | null,
+    text: string,
+    acc: ReturnType<typeof accountStore>,
+  ) {
+    const placement = failedSendPlacement({
+      sentConv,
+      currentConv: focusKey(store.get().focus),
+      accountCurrent: acc.isCurrent(),
+      boxText: ownedRef.current === sentOwner ? bufRef.current.text : '',
+    })
+    // sendMessage already put the text back into that conversation's own
+    // draft; refill the box only when it still shows that conversation.
+    if (placement.kind === 'box') {
+      setOwned((o) =>
+        o.owner !== sentOwner
+          ? o
+          : {
+              owner: o.owner,
+              // Above whatever the box holds now (typed since the send).
+              buf: {
+                text: o.buf.text ? `${text}\n${o.buf.text}` : text,
+                cursor: text.length,
+              },
+            },
+      )
+    } else if (placement.kind === 'draft') {
+      recordEvent('app', 'warn', `send failed; the text is back in that chat's draft (${sentConv})`)
+    } else {
+      recordEvent('app', 'warn', 'send failed after switching account; the text was not restored')
     }
   }
 
@@ -286,17 +384,34 @@ export function Composer({ columns = 80 }: { columns?: number }) {
     const id = store.get().editingMessageId
     if (focus.kind !== 'chat' || !id || sending) return
     if (!trimmed) return
+    if (!boxIsCurrent() || focusKey(store.get().focus) !== focusKey(focus)) return
 
     setSending(true)
     setBuf(emptyBuffer)
     store.set({ editingMessageId: null, inputZone: 'list' })
+    const editConv = focusKey(focus)
+    const editOwner = ownedRef.current
+    const acc = accountStore(store)
     try {
       // editChatMessageContent updates the message optimistically and rolls
-      // back on failure; restore the buffer so the user can retry.
-      await editChatMessageContent(session.client(), accountStore(store), focus.chatId, id, trimmed)
+      // back on failure.
+      await editChatMessageContent(session.client(), acc, focus.chatId, id, trimmed)
     } catch {
-      setBuf({ text: trimmed, cursor: trimmed.length })
-      store.set({ editingMessageId: id, inputZone: 'composer' })
+      // Resume the edit only where it was made, and only if the box is
+      // still free; otherwise the message simply stays as it was.
+      const placement = failedSendPlacement({
+        sentConv: editConv ?? '',
+        currentConv: focusKey(store.get().focus),
+        accountCurrent: acc.isCurrent(),
+        boxText: bufRef.current.text,
+      })
+      if (placement.kind === 'box' && !placement.prepend && ownedRef.current === editOwner) {
+        resumeEditRef.current = true
+        setBuf({ text: trimmed, cursor: trimmed.length })
+        store.set({ editingMessageId: id, inputZone: 'composer' })
+      } else {
+        recordEvent('app', 'warn', 'edit failed; the message is unchanged')
+      }
     } finally {
       setSending(false)
     }
