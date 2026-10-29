@@ -8,6 +8,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Context menu (`.` or Ctrl+.).** On a chat-list row: open, mark read /
+  unread, delete. On a message: react, edit reactions, and edit / delete
+  your own; in a channel, open its thread. It opens beside the row or under
+  the message and shows each action's key. Ctrl+. needs the kitty keyboard
+  protocol; `.` works in every terminal.
+
 - **Command palette (Ctrl+P).** From the chat list, a conversation or the
   composer: type to filter every command (all menu items and settings with
   their current values, every chat and channel, and key actions like new
