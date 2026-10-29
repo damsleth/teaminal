@@ -132,7 +132,7 @@ export type ModalState =
   // query / results / cursor live in the modal component's local state.
   | { kind: 'message-search-global' }
   // Command palette (Ctrl+P); query and cursor live in the component.
-  | { kind: 'command-palette' }
+  | { kind: 'command-palette'; returnTo?: InputZone }
   // Context menu ('.' / Ctrl+.) for a chat-list row or a message.
   | {
       kind: 'context-menu'

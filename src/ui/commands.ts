@@ -107,11 +107,20 @@ function menuItemValue(item: MenuItem, state: AppState): string | undefined {
 }
 
 // Fuzzy match: the query's characters in order (case-insensitive), scored
-// higher for matches at word starts and in runs. null = no match.
+// higher for matches at word starts and in runs, and highest when the query
+// appears whole. null = no match.
 export function fuzzyScore(query: string, text: string): number | null {
   const q = query.toLowerCase().replace(/\s+/g, '')
   if (!q) return 0
   const t = text.toLowerCase()
+  // The query as written, found whole: far ahead of scattered letters,
+  // more so at a word start ("theme" ranks "Settings › Theme" first).
+  const phrase = query.toLowerCase().trim()
+  const at = t.indexOf(phrase)
+  if (at !== -1) {
+    const wordStart = at === 0 || /[\s›:/(-]/.test(t[at - 1]!)
+    return 1000 + (wordStart ? 500 : 0) - at - t.length / 100
+  }
   let score = 0
   let ti = 0
   let prev = -2
@@ -131,8 +140,21 @@ export function fuzzyScore(query: string, text: string): number | null {
 // Commands matching `query`, best first; all of them, in order, when empty.
 export function filterCommands(commands: Command[], query: string): Command[] {
   if (!query.trim()) return commands
+  const phrase = query.trim().toLowerCase()
+  // A query that is exactly one step of a title ("Settings › Theme" for
+  // "theme") is the item asked for by name.
+  const exact = (title: string) =>
+    title
+      .toLowerCase()
+      .split(' › ')
+      .some((part) => part.trim() === phrase)
+      ? 300
+      : 0
   return commands
-    .map((c, i) => ({ c, i, score: fuzzyScore(query, `${c.title} ${c.group}`) }))
+    .map((c, i) => {
+      const score = fuzzyScore(query, `${c.title} ${c.group}`)
+      return { c, i, score: score === null ? null : score + exact(c.title) }
+    })
     .filter((m): m is { c: Command; i: number; score: number } => m.score !== null)
     .sort((a, b) => b.score - a.score || a.i - b.i)
     .map((m) => m.c)
