@@ -338,7 +338,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     if (row.item.kind === 'team' || row.item.kind === 'section') return 1
     let h = visualLines(label + unreadBadge, cw)
     if (row.item.kind === 'chat') {
-      const preview = previewLineForChat(row.item.chat, cw, previewLines)
+      const preview = previewLineForChat(row.item.chat, cw, previewLines, me?.id)
       if (preview) h += preview.split('\n').length
     }
     if (hasPictureColumn(row.item)) h = Math.max(h, thumbRows)
@@ -519,7 +519,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         const labelWidth = labelWidthFor
         const preview =
           row.item.kind === 'chat'
-            ? previewLineForChat(row.item.chat, labelWidth, previewLines)
+            ? previewLineForChat(row.item.chat, labelWidth, previewLines, me?.id)
             : ''
         // Background highlight for the selected row. Pad the label to fill
         // its column width so the background renders as a continuous bar
@@ -637,19 +637,24 @@ export function clampToLines(text: string, width: number, maxLines: number): str
   return kept.join('\n')
 }
 
-// "Sender: message" preview (plain message in 1:1 chats) for a chat's last message, clamped to `maxLines`.
-// Empty string when the chat has no last-message preview or previews are off.
-function previewLineForChat(
+// "Sender: message" preview for a chat's last message, clamped to `maxLines`:
+// "You: " for your own, no prefix for the other person in a 1:1 chat (the row
+// already names them). Empty when there is no preview or previews are off.
+export function previewLineForChat(
   chat: Extract<SelectableItem, { kind: 'chat' }>['chat'],
   width: number,
   maxLines: number,
+  meId?: string,
 ): string {
   if (maxLines <= 0) return ''
   const text = previewChat(chat)
   if (!text) return ''
-  // A 1:1 chat's row already names the other person; the prefix only costs room.
-  const sender =
-    chat.chatType === 'oneOnOne' ? undefined : chat.lastMessagePreview?.from?.user?.displayName
-  const line = sender ? `${shortName(sender)}: ${text}` : text
-  return clampToLines(line, width, maxLines)
+  const from = chat.lastMessagePreview?.from?.user
+  const prefix =
+    meId && from?.id === meId
+      ? 'You'
+      : chat.chatType === 'oneOnOne' || !from?.displayName
+        ? ''
+        : shortName(from.displayName)
+  return clampToLines(prefix ? `${prefix}: ${text}` : text, width, maxLines)
 }
