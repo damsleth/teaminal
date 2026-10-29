@@ -6,22 +6,24 @@ teaminal is a lightweight terminal Microsoft Teams client written in TypeScript.
 
 ## Module Responsibilities
 
-| Module       | Purpose                                              | Key Files                                                                                |
-| ------------ | ---------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `src/auth`   | owa-piggy subprocess wrapper, in-process token cache | `owaPiggy.ts`                                                                            |
-| `src/graph`  | Microsoft Graph HTTP client + per-resource calls     | `client.ts`, `me.ts`, `chats.ts`, `teams.ts`, `presence.ts`, `capabilities.ts`           |
-| `src/state`  | Pub/sub store + adaptive polling loops               | `store.ts`, `poller.ts`                                                                  |
-| `src/ui`     | Ink components + HTML→ANSI rendering + keybinds      | `App.tsx`, `ChatList.tsx`, `MessagePane.tsx`, `Composer.tsx`, `StatusBar.tsx`, `html.ts` |
-| `src/config` | JSON config loader                                   | `index.ts`                                                                               |
-| `src/notify` | Terminal bell + system notifications                 | `notify.ts`                                                                              |
-| `bin`        | CLI entry point                                      | `teaminal.tsx`                                                                           |
+| Module        | Purpose                                              | Key Files                                                                                                              |
+| ------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `src/account` | Account context (`AccountContext`), layer-neutral    | `index.ts`                                                                                                             |
+| `src/auth`    | owa-piggy subprocess wrapper, in-process token cache | `owaPiggy.ts`                                                                                                          |
+| `src/graph`   | Microsoft Graph HTTP client + per-resource calls     | `client.ts`, `me.ts`, `chats.ts`, `teams.ts`, `presence.ts`, `capabilities.ts`                                         |
+| `src/state`   | Pub/sub store + adaptive polling loops               | `store.ts`, `poller.ts`, `accountManager.ts`, `accountStore.ts`, `chatActions.ts`                                      |
+| `src/ui`      | Ink components + HTML→ANSI rendering + keybinds      | `App.tsx`, `ChatList.tsx`, `MessagePane.tsx`, `Composer.tsx`, `StatusBar.tsx`, `CommandPalette.tsx`, `ContextMenu.tsx` |
+| `src/config`  | JSON config loader                                   | `index.ts`                                                                                                             |
+| `src/notify`  | Terminal bell + system notifications                 | `notify.ts`                                                                                                            |
+| `src/text`    | Teams HTML → plain text, links, inline images (pure) | `html.ts`, `links.ts`, `inlineImages.ts`                                                                               |
+| `bin`         | CLI entry point                                      | `teaminal.tsx`                                                                                                         |
 
 ## Architecture Rules
 
 1. **Dependency direction:** `bin/` → `src/ui/` → `src/state/` → `src/graph/` → `src/auth/`. Lower layers never import upward. `src/auth/` has no dependencies on graph/state/ui. Boundary-tested in `src/architecture.test.ts`.
 2. **Polling for freshness:** All background data freshness comes from `src/state/poller.ts`. UI components read freshness from the store, never by calling Graph.
 3. **Imperative actions through state:** One-shot user actions (create chat, send message, directory search, hydrate-by-id) live in `src/state/chatActions.ts` (or a sibling actions module). UI calls the action; the action wraps the Graph call. UI may still import `import type` from `src/graph/*` for shared shapes, and may import error classes (`GraphError`, `RateLimitError`) from `src/graph/client.ts` for `instanceof` checks.
-4. **Explicit account context:** every Graph call runs on a bound `GraphClient` (`createGraphClient(ctx)` in `src/graph/client.ts`) whose `AccountContext` names the account (`src/account/`, layer-neutral, imports nothing). Graph and Teams-service functions take the client or `account` explicitly; there is no fallback to an ambient active profile. The session owns its client (`SessionHandle.client`); UI actions take it from `useSessionApi().client()` at the moment they run. Session code and state actions write through an `AccountStore` (`accountStore(store)` in `src/state/accountStore.ts`, bound when the work starts): it accepts only account-owned fields and drops writes once the store is reset for another account or a fresh incarnation. Global UI writes (focus, modal, inputZone) go through the raw `Store` in the caller. `setActiveProfile` / `setAudiencePreference` / `currentAccountContext()` are the M1 shim only — don't add new callers.
+4. **Explicit account context:** every Graph call runs on a bound `GraphClient` (`createGraphClient(ctx)` in `src/graph/client.ts`) whose `AccountContext` names the account (`src/account/`, layer-neutral, imports nothing). Graph and Teams-service functions take the client or `account` explicitly; there is no fallback to an ambient active profile. The session owns its client (`SessionHandle.client`); UI actions take it from `useSessionApi().client()` at the moment they run. Session code and state actions write through an `AccountStore` (`accountStore(store)` in `src/state/accountStore.ts`, bound when the work starts): it accepts only account-owned fields and drops writes once the store is reset for another account or a fresh incarnation. Global UI writes (focus, modal, inputZone) go through the raw `Store` in the caller. `setActiveProfile` / `setAudiencePreference` / `currentAccountContext()` are the M1 shim only. Don't add new callers.
 5. **Auth boundary:** Only `src/auth/owaPiggy.ts` spawns subprocesses. Only `src/graph/client.ts` injects `Authorization` headers.
 6. **HTML utilities are layer-neutral:** Teams-HTML → plain text lives in `src/text/html.ts` (pure, no Ink dependency). Both UI and `src/notify` consume it.
 
@@ -36,7 +38,7 @@ After every meaningful set of changes (new feature, bug fix that affects users, 
    - `PATCH` for bug fixes and tightening
 3. **Keep packaging in sync:** when changing the released version, supported platforms, artifact names, or install flow, update `scripts/build.sh`, `README.md`, `docs/release.md`, and the Homebrew tap formula together. The tap formula should match the release artifacts produced by `scripts/build.sh`.
 4. **Promote the Unreleased section** to the new version on tagged releases: rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add a fresh empty `## [Unreleased]` above it, and update the comparison links at the bottom.
-5. **A release is not done until GitHub CI is green.** After pushing, wait for every workflow on the pushed commits — the `Release` run on the tag _and_ the `CI` run on `main` — and confirm success (`gh run list --limit 5`, `gh run watch <id> --exit-status`). A green `Release` run does not cover `CI`: only `CI` runs the tui-test flows, which catch menu-order and snapshot regressions that `bun test` misses. Run them locally before tagging: `CI=1 TEAMINAL_SEED=fixtures node node_modules/@microsoft/tui-test/index.js`.
+5. **A release is not done until GitHub CI is green.** After pushing, wait for every workflow on the pushed commits (the `Release` run on the tag _and_ the `CI` run on `main`) and confirm success (`gh run list --limit 5`, `gh run watch <id> --exit-status`). A green `Release` run does not cover `CI`: only `CI` runs the tui-test flows, which catch menu-order and snapshot regressions that `bun test` misses. Run them locally before tagging: `CI=1 TEAMINAL_SEED=fixtures node node_modules/@microsoft/tui-test/index.js`.
 
 Trivial commits (typo fixes, comment-only edits, README polish) do not need a changelog entry or version bump.
 
@@ -93,7 +95,7 @@ content.replace(/<[^>]+>/g, '') // breaks on <at> mentions and entities
 7. **Notification scope is chats + active channel only** in v1. There is no efficient way to detect mentions in non-active channels under delegated auth.
 8. **Seed the seen-message-ID set on startup** — otherwise the first poll after launch notifies on every existing message.
 9. **`bun init` writes a tsconfig with `verbatimModuleSyntax: true`** — type-only imports must use `import type`, not bare `import`.
-10. **Never `stdin.pause()` from inside a stdin `'data'` handler before Ink starts.** Under Bun the stream then never emits `'readable'`, Ink's reader stays dead, and the app ignores every key including Ctrl-C. Defer with `setImmediate`. Only reproduces in a terminal that answers the query (kitty, Ghostty) — the tui-test xterm.js harness and Terminal.app stay silent, so they take the timeout path and look fine. `python3 -I scripts/check-probe-handoff.py` runs the app in a pty that answers the probes (kitty / DA1-only / silent) and fails if `q` no longer quits; run it after touching any pre-Ink probe.
+10. **Never `stdin.pause()` from inside a stdin `'data'` handler before Ink starts.** Under Bun the stream then never emits `'readable'`, Ink's reader stays dead, and the app ignores every key including Ctrl-C. Defer with `setImmediate`. Only reproduces in a terminal that answers the query (kitty, Ghostty). The tui-test xterm.js harness and Terminal.app stay silent, so they take the timeout path and look fine. `python3 -I scripts/check-probe-handoff.py` runs the app in a pty that answers the probes (kitty / DA1-only / silent) and fails if `q` no longer quits; run it after touching any pre-Ink probe.
 
 ## Testing
 
@@ -106,8 +108,8 @@ content.replace(/<[^>]+>/g, '') // breaks on <at> mentions and entities
 
 `bun run dev` and `bun run dev:watch` mirror logs to disk (gitignored, redacted):
 
-- `.tmp/events.log` — every event-log record (`recordEvent`, `debug`, `warn`), timestamped.
-- `.tmp/network.log` — every Graph request: method, status, duration, path with ids replaced by `:id`, profile.
+- `.tmp/events.log`: every event-log record (`recordEvent`, `debug`, `warn`), timestamped.
+- `.tmp/network.log`: every Graph request: method, status, duration, path with ids replaced by `:id`, profile.
 
 Read these first when the maintainer reports something that "stopped working" in a dev session: grep by source or path, e.g. `grep photo .tmp/network.log`. The installed binary only logs when started with `--log-file` / `--network-log`.
 
