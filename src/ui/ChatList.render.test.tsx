@@ -57,11 +57,15 @@ test('thumbnails: a picture column on chat rows, rows at least as tall as the pi
   const prev = process.env.KITTY_WINDOW_ID
   process.env.KITTY_WINDOW_ID = '1'
   try {
-    const renderList = (chatListThumbnails: string) => {
+    const renderList = (chatListThumbnails: string, chatListPresenceStyle = 'dot') => {
       const store = createAppStore()
       applySeededState(store)
       store.set({
-        settings: { ...store.get().settings, chatListThumbnails } as never,
+        settings: {
+          ...store.get().settings,
+          chatListThumbnails,
+          chatListPresenceStyle,
+        } as never,
         cursor: 0,
       })
       return renderToString(
@@ -85,6 +89,12 @@ test('thumbnails: a picture column on chat rows, rows at least as tall as the pi
     // The group's type glyph (U+F0C0) moves into the picture: not repeated.
     expect(off[at(off, 'Design Sync')]).toContain('\uf0c0')
     expect(medium[at(medium, 'Design Sync')]).not.toContain('\uf0c0')
+    // Presence on the picture: the text dot and its gutter go, so names
+    // move left by the gutter (2 glyph cols + chatListIndent 1).
+    expect(medium[at(medium, 'Ada Byron')]).toContain('◯')
+    const badge = renderList('medium', 'badge')
+    expect(badge[at(badge, 'Ada Byron')]).not.toContain('◯')
+    expect(col(medium, 'Ada Byron') - col(badge, 'Ada Byron')).toBe(3)
   } finally {
     if (prev === undefined) delete process.env.KITTY_WINDOW_ID
     else process.env.KITTY_WINDOW_ID = prev

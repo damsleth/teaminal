@@ -307,6 +307,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     centerDateMarkers: settings.centerDateMarkers,
     messageAvatars: settings.messageAvatars,
     chatListThumbnails: settings.chatListThumbnails,
+    chatListPresenceStyle: settings.chatListPresenceStyle,
     showSenderNamesInPane: settings.showSenderNamesInPane,
     showOwnNameInPane: settings.showOwnNameInPane,
     showReactions: settings.showReactions,
@@ -513,6 +514,7 @@ export const PRESET_SETTING_KEYS = [
   'chatListPreviewLines',
   'showPresenceInList',
   'chatListThumbnails',
+  'chatListPresenceStyle',
   'showChatNameHeader',
   'messagePaneShortNames',
   'showTimestampsInPane',
@@ -673,6 +675,13 @@ function validateAndAssign(
         return true
       }
       warnings.push(`config: "${key}" must be "off", "small", "medium", or "large"`)
+      return false
+    case 'chatListPresenceStyle':
+      if (value === 'dot' || value === 'badge' || value === 'bar') {
+        out.chatListPresenceStyle = value
+        return true
+      }
+      warnings.push('config: "chatListPresenceStyle" must be "dot", "badge", or "bar"')
       return false
     case 'showReactions':
       if (value === 'off' || value === 'current' || value === 'all') {

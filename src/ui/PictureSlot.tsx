@@ -1,4 +1,5 @@
 import { Box } from 'ink'
+import type { PresenceStamp } from './avatarImage'
 import { Text } from './Text'
 import type { InlineImageSlots } from './inlineImageLayout'
 import type { Theme } from './theme'
@@ -21,12 +22,14 @@ export function PictureSlot(props: {
   cacheKey: string | null
   // Drawn when cacheKey has nothing to show (initials image).
   fallbackKey?: string | null
+  // Presence drawn onto the picture (chat list).
+  stamp?: PresenceStamp
   rows: number
   cols: number
   label: string
   theme: Theme
 }) {
-  const { slots, rows } = props
+  const { slots, rows, stamp } = props
   const cacheKey = props.cacheKey ?? props.fallbackKey ?? null
   const fallbackKey = props.cacheKey ? (props.fallbackKey ?? undefined) : undefined
   return (
@@ -36,7 +39,7 @@ export function PictureSlot(props: {
       flexShrink={0}
       ref={(node) => {
         if (!node || !cacheKey) return
-        slots.set(node, { cacheKey, rows, inset: 0, fallbackKey })
+        slots.set(node, { cacheKey, rows, inset: 0, fallbackKey, stamp })
         return () => {
           slots.delete(node)
         }

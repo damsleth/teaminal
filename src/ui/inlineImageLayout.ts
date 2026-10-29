@@ -1,10 +1,11 @@
 import type { DOMElement } from 'ink'
+import type { PresenceStamp } from './avatarImage'
 
 export type InlineImageSlots = Map<
   DOMElement,
   // fallbackKey: drawn when cacheKey has nothing to show (e.g. initials for a
-  // missing photo).
-  { cacheKey: string; rows: number; inset: number; fallbackKey?: string }
+  // missing photo). stamp: presence drawn onto the picture.
+  { cacheKey: string; rows: number; inset: number; fallbackKey?: string; stamp?: PresenceStamp }
 >
 
 // Ink exposes Yoga coordinates relative to each parent. The app fills the
@@ -28,7 +29,12 @@ export function paintInlineImages(
   stdout: NodeJS.WriteStream,
   pane: DOMElement,
   slots: InlineImageSlots,
-  imageEscape: (cacheKey: string, rows: number, fallbackKey?: string) => string,
+  imageEscape: (
+    cacheKey: string,
+    rows: number,
+    fallbackKey?: string,
+    stamp?: PresenceStamp,
+  ) => string,
 ): void {
   const viewport = elementRect(pane)
   let output = ''
@@ -43,7 +49,7 @@ export function paintInlineImages(
       rect.left + slot.inset >= stdout.columns
     )
       continue
-    const apc = imageEscape(slot.cacheKey, slot.rows, slot.fallbackKey)
+    const apc = imageEscape(slot.cacheKey, slot.rows, slot.fallbackKey, slot.stamp)
     if (apc)
       output += `\x1b[${Math.round(rect.top) + 1};${Math.round(rect.left + slot.inset) + 1}H${apc}`
   }

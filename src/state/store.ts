@@ -393,6 +393,9 @@ export type Settings = {
   // chat list (kitty graphics terminals only). Size = rows tall.
   messageAvatars: 'off' | 'small' | 'medium' | 'large'
   chatListThumbnails: 'off' | 'small' | 'medium' | 'large'
+  // Where chat-list presence shows with thumbnails on: a dot beside the
+  // name, a dot on the picture's corner (badge), or a strip down its side.
+  chatListPresenceStyle: 'dot' | 'badge' | 'bar'
   // Sender name above message bodies; showOwnNameInPane covers your own.
   showSenderNamesInPane: boolean
   showOwnNameInPane: boolean
@@ -573,6 +576,7 @@ export const defaultSettings: Settings = {
   centerDateMarkers: false,
   messageAvatars: 'off',
   chatListThumbnails: 'off',
+  chatListPresenceStyle: 'dot',
   showSenderNamesInPane: true,
   showOwnNameInPane: true,
   showReactions: 'current',

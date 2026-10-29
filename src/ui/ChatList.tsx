@@ -176,6 +176,19 @@ function presenceForChatItem(
   return { dot: '●', color }
 }
 
+// Pixel color for a presence color. The default theme names ANSI colors,
+// which have no fixed RGB, so those take Teams' own presence colors.
+const PRESENCE_RGB: Record<string, [number, number, number]> = {
+  green: [0x6b, 0xb7, 0x00],
+  yellow: [0xff, 0xaa, 0x44],
+  red: [0xc4, 0x31, 0x4b],
+  gray: [0x8a, 0x88, 0x86],
+}
+
+function presenceRgb(color: string): [number, number, number] {
+  return rgbOf(color) ?? PRESENCE_RGB[color] ?? PRESENCE_RGB.gray!
+}
+
 // Nerd-font glyphs distinguishing non-1:1 chats in the gutter where 1:1
 // chats show their presence dot.  (U+EAB0) marks meeting chats,
 //  (U+F0C0) marks group chats. 1:1 chats return null so the presence dot
@@ -214,6 +227,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const shortNames = useAppState((s) => s.settings.chatListShortNames)
   const previewLines = useAppState((s) => s.settings.chatListPreviewLines)
   const showPresence = useAppState((s) => s.settings.showPresenceInList)
+  const presenceStyle = useAppState((s) => s.settings.chatListPresenceStyle)
   const memberPresence = useAppState((s) => s.memberPresence)
   const nameByUserId = useAppState((s) => s.nameByUserId)
   const unreadByChatId = useAppState((s) => s.unreadByChatId)
@@ -236,6 +250,10 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const thumbRows = isKittyCapable() ? avatarRows(thumbnailSize) : 0
   const thumbCols = avatarCols(thumbRows)
   const thumbColumn = thumbRows > 0 ? thumbCols + 1 : 0
+  // Badge / bar draw presence onto the picture, so the text gutter goes:
+  // with thumbnails on it only ever held presence dots.
+  const stampStyle = showPresence && thumbRows > 0 && presenceStyle !== 'dot' ? presenceStyle : null
+  const textGutter = showPresence && !stampStyle
   // Full row width: the list pane minus the round border and the column
   // container's paddingRight.
   const previewContentWidth = listPaneWidth - 2 - 1
@@ -286,7 +304,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const rowFrame = theme.borders.selectedRow !== 'none' ? 2 : 0
   const labelWidthFor = Math.max(
     1,
-    labelContentWidth(showPresence, chatListIndent, listPaneWidth) - thumbColumn - rowFrame,
+    labelContentWidth(textGutter, chatListIndent, listPaneWidth) - thumbColumn - rowFrame,
   )
   // Picture for a row: the other person's photo for 1:1 chats, the team
   // picture for channels. Group / meeting chats have no picture in Graph, so
@@ -387,12 +405,14 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     setKittyOwner('chat-list', {
       viewport: () => listRef.current,
       slots: pictureSlots.current,
-      escape: (cacheKey, rows, fallbackKey) => {
-        if (isGeneratedKey(cacheKey)) return iconEscape(cacheKey, rows)
+      escape: (cacheKey, rows, fallbackKey, stamp) => {
+        if (isGeneratedKey(cacheKey)) return iconEscape(cacheKey, rows, stamp)
         const data = getImageData(accountId, cacheKey)
         const photo =
-          data && accountId ? avatarEscape(ownedImageKey(accountId, cacheKey), data, rows) : ''
-        return photo || (fallbackKey ? iconEscape(fallbackKey, rows) : '')
+          data && accountId
+            ? avatarEscape(ownedImageKey(accountId, cacheKey), data, rows, stamp)
+            : ''
+        return photo || (fallbackKey ? iconEscape(fallbackKey, rows, stamp) : '')
       },
     })
     requestKittyPaint({ stdout, flush: waitUntilRenderFlush, suppressed: modalOpen })
@@ -533,6 +553,9 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
             : labelText
         const withPicture = hasPictureColumn(row.item)
         const picture = withPicture ? pictureFor(row.item) : null
+        // Resolved presence only: the hollow loading dot has no stamp.
+        const stampRgb = stampStyle && presence?.dot === '●' ? presenceRgb(presence.color) : null
+        const stamp = stampStyle && stampRgb ? { rgb: stampRgb, style: stampStyle } : undefined
         const rowWidth = previewContentWidth - rowFrame - (withPicture ? thumbColumn : 0)
         // The selected background covers the whole element: picture column,
         // name line and preview.
@@ -554,6 +577,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
                   cacheKey={picture?.key ?? null}
                   rows={thumbRows}
                   cols={thumbCols}
+                  stamp={stamp}
                   label={picture?.kind === 'icon' ? '' : initialsOf(label)}
                   fallbackKey={
                     picture?.kind === 'icon'
@@ -570,7 +594,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
             )}
             <Box flexDirection="column" flexShrink={0}>
               <Box flexDirection="row" backgroundColor={rowBg}>
-                {showPresence && (
+                {textGutter && (
                   <Box width={GLYPH_WIDTH + chatListIndent} flexShrink={0}>
                     <Text color={presenceColor} backgroundColor={rowBg}>
                       {presenceText}

@@ -8,6 +8,7 @@ import {
   iconEscape,
   iconKey,
   initialsKey,
+  stampPresence,
 } from './avatarImage'
 import { __resetKittyImageIdsForTests, kittyImageId } from './kittyGraphics'
 import { __resetKittyPainterForTests, requestKittyPaint, setKittyOwner } from './kittyPainter'
@@ -125,4 +126,21 @@ test('initials are drawn centered on a neutral square', () => {
   expect(Math.abs(minY - (65 - maxY))).toBeLessThanOrEqual(1)
   // The rest is the opaque background.
   expect([px[0], px[3]]).toEqual([140, 255])
+})
+
+test('presence stamp: badge in the bottom-right corner, bar down the left edge, source untouched', () => {
+  const n = 48
+  const src = { rgba: new Uint8Array(n * n * 4), width: n, height: n }
+  const px = (p: { rgba: Uint8Array }, x: number, y: number) =>
+    Array.from(p.rgba.slice((y * n + x) * 4, (y * n + x) * 4 + 4))
+  const green: [number, number, number] = [0x6b, 0xb7, 0x00]
+  const badge = stampPresence(src, { rgb: green, style: 'badge' })
+  expect(px(badge, n - 10, n - 10)).toEqual([...green, 255])
+  expect(px(badge, 0, 0)).toEqual([0, 0, 0, 0])
+  expect(px(badge, 0, n - 1)).toEqual([0, 0, 0, 0])
+  const bar = stampPresence(src, { rgb: green, style: 'bar' })
+  expect(px(bar, 0, 0)).toEqual([...green, 255])
+  expect(px(bar, 0, n - 1)).toEqual([...green, 255])
+  expect(px(bar, n - 1, n - 1)).toEqual([0, 0, 0, 0])
+  expect(src.rgba.every((v) => v === 0)).toBe(true)
 })
