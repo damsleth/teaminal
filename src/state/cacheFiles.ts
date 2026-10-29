@@ -1,6 +1,7 @@
 // Shared plumbing for the per-account cache files (messages, list, names,
 // images): where they live, and a debounced writer per file.
 
+import { recordEvent } from '../log'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { accountRef, profileSlug } from '../account'
@@ -32,11 +33,22 @@ export function profileCachePath(
 // window both land (a single shared slot let the last scheduler win).
 export function debouncedWriter<T>(write: (snapshot: T, path: string) => void) {
   const pending = new Map<string, { snapshot: T; timer: ReturnType<typeof setTimeout> }>()
+  // Paths whose write failure was already logged (once each, not per save).
+  const failed = new Set<string>()
   const writeNow = (snapshot: T, path: string): void => {
     try {
       write(snapshot, path)
-    } catch {
-      // swallow: persistence is best-effort; no UI impact
+      failed.delete(path)
+    } catch (err) {
+      // Best-effort: the app keeps working without the cache file, but say so.
+      if (!failed.has(path)) {
+        failed.add(path)
+        recordEvent(
+          'app',
+          'warn',
+          `cache write failed for ${path}: ${err instanceof Error ? err.message : String(err)}`,
+        )
+      }
     }
   }
   return {

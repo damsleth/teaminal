@@ -111,8 +111,13 @@ export function MessagePane(props: {
   composerRows?: number
 }) {
   const focus = useAppState((s) => s.focus)
-  const messagesByConvo = useAppState((s) => s.messagesByConvo)
-  const messageCacheByConvo = useAppState((s) => s.messageCacheByConvo)
+  // Only the open conversation's slices: polls of other chats leave this
+  // pane alone.
+  const conv = focusKey(focus) ?? ''
+  const convMessages = useAppState((s) => s.messagesByConvo[conv])
+  const convCache = useAppState((s) => s.messageCacheByConvo[conv])
+  const convTyping = useAppState((s) => s.typingByConvo[conv])
+  const convReceipts = useAppState((s) => s.readReceiptsByConvo[conv])
   const me = useAppState((s) => s.me)
   // Owner of every image in this pane (in-memory image maps are per account).
   const accountId = useAppState((s) => s.account?.id)
@@ -133,8 +138,6 @@ export function MessagePane(props: {
   const focusIndicatorVisible = useAppState((s) => s.settings.messageFocusIndicatorEnabled)
   const focusIndicatorChar = useAppState((s) => s.settings.messageFocusIndicatorChar)
   const selfMessagesOnRight = useAppState((s) => s.settings.selfMessagesOnRight)
-  const typingByConvo = useAppState((s) => s.typingByConvo)
-  const readReceiptsByConvo = useAppState((s) => s.readReceiptsByConvo)
   const inlineImages = useAppState((s) => s.settings.inlineImages)
   const inlineImageMaxRows = useAppState((s) => s.settings.inlineImageMaxRows)
   // True when no status bar occupies the bottom row (hidden, or moved to the
@@ -191,8 +194,7 @@ export function MessagePane(props: {
   const { waitUntilRenderFlush } = useApp()
 
   const isListFocus = focus.kind === 'list'
-  const conv = focusKey(focus) ?? ''
-  const rawMessages = messagesByConvo[conv] ?? []
+  const rawMessages = convMessages ?? []
   // The navigable/rendered timeline: unrenderable system rows dropped (blank
   // "(system)" rows and undecodable events), and for a CHANNEL focus reduced
   // to thread roots — replies are reached via the thread view. This is the
@@ -238,7 +240,7 @@ export function MessagePane(props: {
     showTimestamps === 'on' || (transientTimes?.has(m.id) ?? false)
   const headerRows = (m: ChatMessage): number =>
     showTimeFor(m) || showNameFor(m) ? (tallHeaders ? 2 : 1) : 0
-  const cache = messageCacheByConvo[conv]
+  const cache = convCache
   const headerLabel = isListFocus
     ? ''
     : headerForFocus(
@@ -261,7 +263,7 @@ export function MessagePane(props: {
           : 'unavailable')
   const isLoadingOlder = loadMoreState === 'loading'
   const chatHeaderRows = showChatNameHeader ? CHAT_HEADER_ROWS : 0
-  const typingActive = (typingByConvo[conv] ?? []).length > 0
+  const typingActive = (convTyping ?? []).length > 0
   const reservedDynamic = (isLoadingOlder ? 1 : 0) + (typingActive ? 1 : 0)
   const chromeRows = CHROME_RESERVED_ROWS - (statusBarHidden ? 1 : 0)
   const rowBudget = Math.max(
@@ -351,11 +353,16 @@ export function MessagePane(props: {
   const searchActive = inputZone === 'message-search'
   const hits = searchActive ? searchMessages(messages, searchQuery) : []
 
-  // Trigger image fetches for every visible message. Cheap and idempotent:
-  // ensureImageFetched short-circuits on any key already loading/ready, so
-  // running this on each render costs a map lookup per image. The
-  // imageRevision counter is bumped by its onChange callback so the component
-  // re-renders once an image transitions loading → ready.
+  // Trigger image fetches for the visible messages when that set (or an edit
+  // to one) changes; extracting images parses message HTML, so not on every
+  // render. ensureImageFetched is idempotent per key. The imageRevision
+  // counter is bumped by its onChange callback so the component re-renders
+  // once an image transitions loading → ready.
+  const visibleKey = rows
+    .map((r) =>
+      r.kind === 'message' ? `${r.message.id}:${r.message.lastModifiedDateTime ?? ''}` : '',
+    )
+    .join('|')
   useEffect(() => {
     if (!kittyEnabled) return
     const client = session.client()
@@ -376,7 +383,8 @@ export function MessagePane(props: {
         )
       }
     }
-  })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on visibleKey
+  }, [visibleKey, kittyEnabled, accountId])
 
   // Profile photos for the visible run starts (same idempotent pattern).
   useEffect(() => {
@@ -391,7 +399,8 @@ export function MessagePane(props: {
           onChange: () => setImageRevision((r) => r + 1),
         })
     }
-  })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on visibleKey
+  }, [visibleKey, avRows, accountId])
 
   // Yoga owns the positions, including unused space below short timelines,
   // wrapped text and dynamic chrome. Wait for Ink's throttled text frame
@@ -566,7 +575,7 @@ export function MessagePane(props: {
                     focusedAttachmentIndex={focusedAttachmentIndex}
                     myUserId={me?.id}
                     reactionDisplayMode={reactionDisplayMode}
-                    readReceipts={readReceiptsByConvo[conv]}
+                    readReceipts={convReceipts}
                     imgCols={imgCols}
                     inlineImageMaxRows={inlineImageMaxRows}
                     inlineImagesPainted={kittyEnabled}
@@ -591,7 +600,7 @@ export function MessagePane(props: {
                     }
                   />
                 ))}
-                <TypingLine typing={conv ? (typingByConvo[conv] ?? []) : []} theme={theme} />
+                <TypingLine typing={conv ? (convTyping ?? []) : []} theme={theme} />
               </>
             )}
           </Box>

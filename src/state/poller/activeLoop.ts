@@ -117,6 +117,7 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
             const kind = notifyKind(msg, myId, chatType, s0.settings.notifyChatMessages)
             if (kind) toNotify.push({ msg, kind })
           }
+          capSeen(seenSet)
           seen.set(conv, seenSet)
           store.set((s) => ({
             ...mergeActivePagePatch(s, conv, page, focus),
@@ -157,5 +158,19 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
       }
       await sleeper.sleep(jitter(backoff(getIntervalMs(), consecutiveErrors)))
     }
+  }
+}
+
+// Seen ids per conversation are only needed for the newest page, which old
+// ids never re-enter, so keep the newest SEEN_CAP (a Set keeps insertion
+// order: the oldest are first).
+const SEEN_CAP = 2000
+
+export function capSeen(set: Set<string>, cap = SEEN_CAP): void {
+  if (set.size <= cap) return
+  let drop = set.size - cap
+  for (const id of set) {
+    if (drop-- <= 0) break
+    set.delete(id)
   }
 }

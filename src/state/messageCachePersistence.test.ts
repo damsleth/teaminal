@@ -71,6 +71,18 @@ describe('serializeMessageCache', () => {
     expect(file.caches['chat:c1']?.fullyLoaded).toBe(false)
   })
 
+  test('trimming to the newest 200 drops the paging state that no longer fits', () => {
+    const messages = Array.from({ length: 250 }, (_, i) => makeMessage(`m${i}`) as never)
+    const file = serializeMessageCache({
+      'chat:c1': { messages, loadingOlder: false, fullyLoaded: true, nextLink: 'https://x/next' },
+    })
+    const saved = file.caches['chat:c1']!
+    expect(saved.messages).toHaveLength(200)
+    expect(saved.messages[0]!.id).toBe('m50')
+    expect(saved.fullyLoaded).toBe(false)
+    expect(saved.nextLink).toBeUndefined()
+  })
+
   test('drops conversations whose messages are all optimistic', () => {
     const caches: Record<string, MessageCache> = {
       'chat:c1': {

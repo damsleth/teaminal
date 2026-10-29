@@ -37,11 +37,32 @@ export function useTheme(): Theme {
   const settings = useAppState((s) => s.settings)
   const customTheme = useAppState((s) => s.customTheme)
   const systemAppearance = useAppState((s) => s.systemAppearance)
-  return resolveTheme(
-    settings,
-    activeCustomThemeData(settings.theme, customTheme),
-    systemAppearance,
-  )
+  return cachedTheme(settings, activeCustomThemeData(settings.theme, customTheme), systemAppearance)
+}
+
+// The last resolved theme and what it was resolved from. Every component
+// calls useTheme, so resolving once per change (not per render per
+// component) also keeps the theme object stable for memo / effect deps.
+let lastTheme: { inputs: unknown[]; theme: Theme } | null = null
+
+function cachedTheme(
+  settings: AppState['settings'],
+  custom: PartialTheme | null,
+  appearance: AppState['systemAppearance'],
+): Theme {
+  // Exactly the settings resolveTheme reads.
+  const inputs = [
+    settings.theme,
+    settings.themeOverrides,
+    settings.messageFocusIndicatorColor,
+    settings.messageFocusBackgroundColor,
+    custom,
+    appearance,
+  ]
+  if (lastTheme && lastTheme.inputs.every((v, i) => v === inputs[i])) return lastTheme.theme
+  const theme = resolveTheme(settings, custom, appearance)
+  lastTheme = { inputs, theme }
+  return theme
 }
 
 export function activeCustomThemeData(

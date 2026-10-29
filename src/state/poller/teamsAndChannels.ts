@@ -1,8 +1,8 @@
 // Per-list-poll fetch of joined teams plus their channel lists.
 //
 // Per-team channel-list failures are reported but don't poison the
-// whole list refresh: the team gets an empty channel list and the loop
-// keeps going. Abort signals (focus change, stop()) are re-thrown so
+// whole list refresh: the team keeps the channels it had (`previous`), or
+// an empty list when there were none, and the loop keeps going. Abort signals (focus change, stop()) are re-thrown so
 // the caller's outer try/catch can short-circuit cleanly.
 
 import type { GraphClient } from '../../graph/client'
@@ -21,6 +21,7 @@ export async function fetchTeamsAndChannels(
   client: GraphClient,
   signal: AbortSignal,
   reportError: (err: unknown) => void,
+  previous: Record<string, Channel[]> = {},
 ): Promise<FetchTeamsResult> {
   recordEvent('poller', 'info', 'joined teams fetch started')
   const teams = await listJoinedTeams(client, { signal })
@@ -39,7 +40,7 @@ export async function fetchTeamsAndChannels(
       } catch (err) {
         if (isAbortError(err)) throw err
         reportError(err)
-        return [team.id, []]
+        return [team.id, previous[team.id] ?? []]
       }
     }),
   )

@@ -84,7 +84,7 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
     const client = deps.getClient()
     const [chats, tc] = await Promise.all([
       listChats(client, { signal }),
-      fetchTeamsAndChannels(client, signal, reportError),
+      fetchTeamsAndChannels(client, signal, reportError, store.get().channelsByTeam),
     ])
     return { chats, teams: tc.teams, channelsByTeam: tc.channelsByTeam }
   }

@@ -94,12 +94,16 @@ export function serializeMessageCache(caches: Record<ConvKey, MessageCache>): Pe
       const cleaned = cache.messages.filter((m) => !m._sending && !m._sendError)
       if (cleaned.length === 0) return null
       const trimmed = cleaned.slice(-MAX_MESSAGES_PER_CONV)
+      // Dropping older messages invalidates the paging state: the saved
+      // next link points past messages that are no longer kept, and "fully
+      // loaded" is no longer true. The next fetch brings a fresh link.
+      const cut = trimmed.length < cleaned.length
       return [
         conv,
         {
           messages: trimmed,
-          nextLink: cache.nextLink,
-          fullyLoaded: cache.fullyLoaded,
+          nextLink: cut ? undefined : cache.nextLink,
+          fullyLoaded: cut ? false : cache.fullyLoaded,
           savedAt: new Date().toISOString(),
         },
       ]
