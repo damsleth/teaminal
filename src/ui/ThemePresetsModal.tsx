@@ -156,7 +156,7 @@ export function ThemePresetsModal() {
             `Theme presets · active: ${activeTheme === 'auto' ? `auto → ${appearance}` : activeTheme}`,
           )}
         </Text>
-        <Text color="gray" backgroundColor={bg}>
+        <Text muted backgroundColor={bg}>
           {pad('● = active · saving folds your edits into the preset')}
         </Text>
         <Text backgroundColor={bg}>{pad('')}</Text>
@@ -165,7 +165,7 @@ export function ThemePresetsModal() {
           const isActive = c.name === activeTheme
           return (
             <Text key={c.name} backgroundColor={bg}>
-              <Text color={isSel ? theme.selected : 'gray'} backgroundColor={bg}>
+              <Text color={isSel ? theme.selected : theme.mutedText} backgroundColor={bg}>
                 {isSel ? '> ' : '  '}
               </Text>
               <Text color={theme.warnText} backgroundColor={bg}>
@@ -178,7 +178,7 @@ export function ThemePresetsModal() {
               >
                 {c.name}
               </Text>
-              <Text color="gray" backgroundColor={bg}>
+              <Text muted backgroundColor={bg}>
                 {pad(
                   c.name === 'auto'
                     ? `  light or dark to match the terminal (${appearance})`
@@ -198,7 +198,7 @@ export function ThemePresetsModal() {
             <Text color={theme.selected} backgroundColor={bg}>
               {modal.prompt}
             </Text>
-            <Text color="gray" backgroundColor={bg}>
+            <Text muted backgroundColor={bg}>
               {pad('_').slice(0, Math.max(1, CONTENT_W - 9 - modal.prompt.length))}
             </Text>
           </Text>
@@ -209,7 +209,7 @@ export function ThemePresetsModal() {
             {pad(modal.message)}
           </Text>
         )}
-        <Text color="gray" backgroundColor={bg}>
+        <Text muted backgroundColor={bg}>
           {pad(footer)}
         </Text>
       </Box>

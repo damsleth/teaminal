@@ -206,16 +206,16 @@ export function NewChatPrompt(props: {
         <Text bold={theme.emphasis.modalTitleBold}>New chat</Text>
         <Box height={1} />
         <Text>
-          <Text color="gray">To: </Text>
+          <Text muted>To: </Text>
           {query}
           <Text color={zone === 'input' ? 'cyan' : 'gray'}>█</Text>
         </Text>
-        {loading && <Text color="gray">Searching...</Text>}
+        {loading && <Text muted>Searching...</Text>}
         {externalLookup === 'in-flight' && (
-          <Text color="gray">Searching external tenants for {query.trim()}...</Text>
+          <Text muted>Searching external tenants for {query.trim()}...</Text>
         )}
         {externalLookup === 'no-hit' && (
-          <Text color="gray">
+          <Text muted>
             No external match for {query.trim()} - paste their AAD object id to chat anyway
           </Text>
         )}
@@ -226,9 +226,9 @@ export function NewChatPrompt(props: {
           results.length === 0 &&
           query.trim() &&
           (looksLikeAadOid(query) ? (
-            <Text color="gray">Enter starts a chat with OID {query.trim().slice(0, 8)}...</Text>
+            <Text muted>Enter starts a chat with OID {query.trim().slice(0, 8)}...</Text>
           ) : (
-            <Text color="gray">No matches (Enter to search externally)</Text>
+            <Text muted>No matches (Enter to search externally)</Text>
           ))}
         {results.map((user, i) => {
           const selected = zone === 'results' && i === clampCursor(cursor, results.length)
@@ -245,13 +245,13 @@ export function NewChatPrompt(props: {
             >
               {selected ? '> ' : '  '}
               {user.displayName ?? detail}
-              {isSelf ? <Text color="gray"> (You)</Text> : null}
-              <Text color="gray">{`  ${detail}`}</Text>
+              {isSelf ? <Text muted> (You)</Text> : null}
+              <Text muted>{`  ${detail}`}</Text>
             </Text>
           )
         })}
         <Box height={1} />
-        <Text color="gray">Tab results · Enter opens selected 1:1 chat · Esc closes</Text>
+        <Text muted>Tab results · Enter opens selected 1:1 chat · Esc closes</Text>
       </Box>
     </Box>
   )

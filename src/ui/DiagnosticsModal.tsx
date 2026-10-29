@@ -131,34 +131,34 @@ export function DiagnosticsModal() {
         <Box height={1} />
 
         <Text>
-          <Text color="gray">profile: </Text>
+          <Text muted>profile: </Text>
           <Text>{profile}</Text>
         </Text>
         <Text>
-          <Text color="gray">conn: </Text>
+          <Text muted>conn: </Text>
           <Text>{conn}</Text>
         </Text>
         <Text>
-          <Text color="gray">realtime: </Text>
+          <Text muted>realtime: </Text>
           <Text>{realtimeState}</Text>
         </Text>
         <Text>
-          <Text color="gray">user: </Text>
+          <Text muted>user: </Text>
           <Text>{me?.displayName ?? '?'}</Text>
-          <Text color="gray">{me?.userPrincipalName ? ` <${me.userPrincipalName}>` : ''}</Text>
+          <Text muted>{me?.userPrincipalName ? ` <${me.userPrincipalName}>` : ''}</Text>
         </Text>
         <Text>
-          <Text color="gray">last poll: </Text>
+          <Text muted>last poll: </Text>
           <Text>{lastListPollAt ? lastListPollAt.toISOString() : '(none yet)'}</Text>
         </Text>
         <Text>
-          <Text color="gray">loaded: </Text>
+          <Text muted>loaded: </Text>
           <Text>{`${chats.length} chats, ${teams.length} teams, ${countChannels(channelsByTeam)} channels, ${countMessages(messagesByConvo)} messages`}</Text>
         </Text>
         <Text>
-          <Text color="gray">focus: </Text>
+          <Text muted>focus: </Text>
           <Text>{terminalFocused ? 'focused' : 'blurred'}</Text>
-          <Text color="gray">
+          <Text muted>
             {' · DEC 1004: '}
             {focusReportingHealthy ? 'healthy' : 'unhealthy (fallback)'}
           </Text>
@@ -174,29 +174,29 @@ export function DiagnosticsModal() {
             <CapabilityRow label="presence" cap={capabilities.presence} theme={theme} />
           </>
         ) : (
-          <Text color="gray">(probe not yet complete)</Text>
+          <Text muted>(probe not yet complete)</Text>
         )}
 
         <Box height={1} />
         <Text bold={theme.emphasis.sectionHeadingBold}>Token</Text>
-        {load.status === 'loading' && <Text color="gray">loading...</Text>}
+        {load.status === 'loading' && <Text muted>loading...</Text>}
         {load.status === 'error' && <Text color={theme.errorText}>{load.message}</Text>}
         {load.status === 'ready' && (
           <>
             <Text>
-              <Text color="gray">tid: </Text>
+              <Text muted>tid: </Text>
               <Text>{asString(load.claims.tid)}</Text>
             </Text>
             <Text>
-              <Text color="gray">appid: </Text>
+              <Text muted>appid: </Text>
               <Text>{asString(load.claims.appid ?? load.claims.azp)}</Text>
             </Text>
             <Text>
-              <Text color="gray">aud: </Text>
+              <Text muted>aud: </Text>
               <Text>{asString(load.claims.aud)}</Text>
             </Text>
             <Text>
-              <Text color="gray">upn: </Text>
+              <Text muted>upn: </Text>
               <Text>
                 {asString(
                   load.claims.upn ?? load.claims.unique_name ?? load.claims.preferred_username,
@@ -204,11 +204,11 @@ export function DiagnosticsModal() {
               </Text>
             </Text>
             <Text>
-              <Text color="gray">oid: </Text>
+              <Text muted>oid: </Text>
               <Text>{asString(load.claims.oid)}</Text>
             </Text>
             <Text>
-              <Text color="gray">exp: </Text>
+              <Text muted>exp: </Text>
               <Text>{formatExp(load.claims.exp)}</Text>
             </Text>
             <Box height={1} />
@@ -221,7 +221,7 @@ export function DiagnosticsModal() {
                 </Text>
               ))
             ) : (
-              <Text color="gray"> (no scp claim - app permission token?)</Text>
+              <Text muted> (no scp claim - app permission token?)</Text>
             )}
             {Array.isArray(load.claims.roles) && load.claims.roles.length > 0 && (
               <>
@@ -239,7 +239,7 @@ export function DiagnosticsModal() {
         )}
 
         <Box height={1} />
-        <Text color="gray">r: retry realtime · esc / enter to close</Text>
+        <Text muted>r: retry realtime · esc / enter to close</Text>
       </Box>
     </Box>
   )
@@ -264,7 +264,7 @@ function CapabilityRow(props: {
       <Text>
         <Text color={theme.presence.Available}>● </Text>
         <Text>{label.padEnd(13)}</Text>
-        <Text color="gray">ok</Text>
+        <Text muted>ok</Text>
       </Text>
     )
   }
@@ -273,7 +273,7 @@ function CapabilityRow(props: {
       ? theme.errorText
       : cap.reason === 'unavailable'
         ? theme.warnText
-        : 'gray'
+        : theme.mutedText
   const status = cap.status ? ` ${cap.status}` : ''
   return (
     <Text>

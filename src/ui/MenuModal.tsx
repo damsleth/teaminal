@@ -365,10 +365,10 @@ export function MenuModal() {
                 </Text>
               ))}
             </Box>
-            <Text color="gray" backgroundColor={modalBg(theme)}>
+            <Text muted backgroundColor={modalBg(theme)}>
               {pad(`teaminal ${VERSION}`)}
             </Text>
-            <Text color="gray" backgroundColor={modalBg(theme)}>
+            <Text muted backgroundColor={modalBg(theme)}>
               {pad(REPOSITORY_URL)}
             </Text>
             <Text backgroundColor={modalBg(theme)}>{pad('')}</Text>
@@ -376,7 +376,7 @@ export function MenuModal() {
         ) : null}
         {breadcrumb && (
           <>
-            <Text color="gray" backgroundColor={modalBg(theme)}>
+            <Text muted backgroundColor={modalBg(theme)}>
               {pad(breadcrumb)}
             </Text>
             <Text backgroundColor={modalBg(theme)}>{pad('')}</Text>
@@ -384,7 +384,7 @@ export function MenuModal() {
         )}
         <Box flexDirection="column">
           {moreAbove && (
-            <Text color="gray" backgroundColor={modalBg(theme)}>
+            <Text muted backgroundColor={modalBg(theme)}>
               {pad('  ⋯')}
             </Text>
           )}
@@ -393,7 +393,7 @@ export function MenuModal() {
             // Use theme.text (not the terminal default fg) so rows stay
             // readable on the themed modal background even when the active
             // terminal palette's default foreground doesn't match the theme.
-            const color = item.disabled ? 'gray' : selected ? theme.selected : theme.text
+            const color = item.disabled ? theme.mutedText : selected ? theme.selected : theme.text
             return (
               <Text
                 key={item.id}
@@ -407,13 +407,13 @@ export function MenuModal() {
             )
           })}
           {moreBelow && (
-            <Text color="gray" backgroundColor={modalBg(theme)}>
+            <Text muted backgroundColor={modalBg(theme)}>
               {pad('  ⋯')}
             </Text>
           )}
         </Box>
         <Text backgroundColor={modalBg(theme)}>{pad('')}</Text>
-        <Text color="gray" backgroundColor={modalBg(theme)}>
+        <Text muted backgroundColor={modalBg(theme)}>
           {pad(footer)}
         </Text>
       </Box>

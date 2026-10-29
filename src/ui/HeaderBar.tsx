@@ -133,14 +133,14 @@ export function HeaderBar() {
         teaminal
       </Text>,
     )
-  if (show.user) segments.push(<Text color="gray">{userDisplay}</Text>)
+  if (show.user) segments.push(<Text muted>{userDisplay}</Text>)
   if (show.presence) {
     segments.push(
       presenceUnavailable ? (
-        <Text color="gray">presence n/a</Text>
+        <Text muted>presence n/a</Text>
       ) : (
         <>
-          <Text color="gray">{'presence '}</Text>
+          <Text muted>{'presence '}</Text>
           <Text color={presenceColor(theme, myPresence?.availability)}>{DOT}</Text>
         </>
       ),
@@ -149,12 +149,12 @@ export function HeaderBar() {
   if (show.graph) {
     segments.push(
       <>
-        <Text color="gray">{'graph '}</Text>
+        <Text muted>{'graph '}</Text>
         <Text color={connColor(conn)}>{DOT}</Text>
       </>,
     )
   }
-  if (show.chats) segments.push(<Text color="gray">{`${chats.length} chats`}</Text>)
+  if (show.chats) segments.push(<Text muted>{`${chats.length} chats`}</Text>)
   if (show.unread && unreadText) {
     segments.push(<Text color={theme.unread}>{unreadText.toLowerCase()}</Text>)
   }
@@ -164,15 +164,15 @@ export function HeaderBar() {
   if (show.push && realtimeState !== 'off') {
     segments.push(
       <>
-        <Text color="gray">{'push '}</Text>
+        <Text muted>{'push '}</Text>
         <Text color={realtimeColor(realtimeState)}>{DOT}</Text>
       </>,
     )
   }
-  if (show.updated && updated) segments.push(<Text color="gray">{`upd ${updated}`}</Text>)
+  if (show.updated && updated) segments.push(<Text muted>{`upd ${updated}`}</Text>)
   // Capability warnings are not vanity chrome, so they're always shown.
   if (hints.length > 0 && !presenceUnavailable) {
-    segments.push(<Text color="gray">{hints.join(', ')}</Text>)
+    segments.push(<Text muted>{hints.join(', ')}</Text>)
   }
 
   // Render the whole bar as a single truncating line. Without this the
@@ -185,7 +185,7 @@ export function HeaderBar() {
       <Text wrap="truncate-end">
         {segments.map((seg, i) => (
           <Fragment key={i}>
-            {i > 0 && <Text color="gray">{' · '}</Text>}
+            {i > 0 && <Text muted>{' · '}</Text>}
             {seg}
           </Fragment>
         ))}

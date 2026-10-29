@@ -281,13 +281,13 @@ export function ThemeEditorModal() {
   const fieldColumn = (
     <Box flexDirection="column" flexShrink={0}>
       {fieldsAbove > 0 && (
-        <Text color="gray" backgroundColor={bg}>
+        <Text muted backgroundColor={bg}>
           {pad(`   ↑ ${fieldsAbove} more`)}
         </Text>
       )}
       {rowNodes}
       {fieldsBelow > 0 && (
-        <Text color="gray" backgroundColor={bg}>
+        <Text muted backgroundColor={bg}>
           {pad(`   ↓ ${fieldsBelow} more`)}
         </Text>
       )}
@@ -313,7 +313,7 @@ export function ThemeEditorModal() {
                 : `Theme editor · ${settings.theme} (${base})`,
           )}
         </Text>
-        <Text color="gray" backgroundColor={bg}>
+        <Text muted backgroundColor={bg}>
           {pad('• = unsaved edit · s saves them into a preset')}
         </Text>
         {side ? (
@@ -330,7 +330,7 @@ export function ThemeEditorModal() {
             </Box>
           </>
         )}
-        <Text color="gray" backgroundColor={bg}>
+        <Text muted backgroundColor={bg}>
           {pad(
             hexEdit
               ? 'type hex · enter commit · esc cancel'
@@ -338,7 +338,7 @@ export function ThemeEditorModal() {
           )}
         </Text>
         {!hexEdit && (
-          <Text color="gray" backgroundColor={bg}>
+          <Text muted backgroundColor={bg}>
             {pad('s save preset · S save as · p presets (load / delete)')}
           </Text>
         )}
@@ -378,7 +378,7 @@ function FieldRow(props: {
         >
           {hexBuffer}
         </Text>
-        <Text color="gray" backgroundColor={bg}>
+        <Text muted backgroundColor={bg}>
           _
         </Text>
       </>
@@ -387,7 +387,7 @@ function FieldRow(props: {
     if (value === null) {
       valueText = 'none'
       valueNode = (
-        <Text color="gray" backgroundColor={bg}>
+        <Text muted backgroundColor={bg}>
           none
         </Text>
       )
@@ -418,7 +418,7 @@ function FieldRow(props: {
           {base}
         </Text>
         {hint && (
-          <Text color="gray" backgroundColor={bg}>
+          <Text muted backgroundColor={bg}>
             {hint}
           </Text>
         )}
@@ -431,7 +431,7 @@ function FieldRow(props: {
 
   return (
     <Text backgroundColor={bg}>
-      <Text color={selected ? theme.selected : 'gray'} backgroundColor={bg}>
+      <Text color={selected ? theme.selected : theme.mutedText} backgroundColor={bg}>
         {marker}
       </Text>
       <Text color={theme.warnText} backgroundColor={bg}>
