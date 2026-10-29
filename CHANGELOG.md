@@ -241,6 +241,10 @@ adheres to [Semantic Versioning](https://semver.org/).
   `themeOverrides.layout.senderPinned: 1`). The sender name and time move
   into the conversation column and line up with the left edge of the
   message, following the conversation width, the way Teams shows them.
+- **Pin sender image to message** (theme editor → Sender & time, or
+  `themeOverrides.layout.avatarPinned: 1`). The profile picture moves in
+  from the pane edge to sit just left of the conversation column, so it
+  follows the conversation width.
 
 ### Changed
 

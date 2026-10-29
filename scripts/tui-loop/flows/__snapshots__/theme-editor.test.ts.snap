@@ -10,7 +10,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 ││   The launch n│       Text                  ██ white                             │               ││
 ││  Design Sync │       Muted text            ██ gray                              │               ││
 ││   Nina: Nina s│       Border                ██ gray                              │               ││
-││  Ops Channel │      ↓ 68 more                                                   │               ││
+││  Ops Channel │      ↓ 69 more                                                   │               ││
 ││   Mina: Deploy│                                                                  │               ││
 ││               │   ╭──────────────────────────────────────╮                       │               ││
 ││               │   │Chats                                 │                       │               ││

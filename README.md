@@ -249,6 +249,7 @@ subset of these keys is accepted:
     "textBackgroundRadius": 0, // 1 = rounded "speech bubble" corners on message backgrounds
     "avatarIndent": 0, // columns before the profile picture in conversations
     "senderPinned": 0, // 1 = sender line sits on the message, following the conversation width
+    "avatarPinned": 0, // 1 = profile picture sits beside the message, following the conversation width
     "dateMarkerIndent": 0, // extra indent of the day separator ("Today")
     "messageMaxWidth": 100, // conversation column width, % of the pane, centered (10-100, steps of 10)
   },

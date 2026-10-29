@@ -109,6 +109,7 @@ const LAYOUT_KEYS = new Set<keyof NonNullable<ThemeOverrides['layout']>>([
   'textBackgroundRadius',
   'avatarIndent',
   'senderPinned',
+  'avatarPinned',
 ])
 
 const BORDERS_KEYS = new Set<keyof NonNullable<ThemeOverrides['borders']>>([

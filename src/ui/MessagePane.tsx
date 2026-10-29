@@ -997,8 +997,13 @@ function MessageRow(props: {
   // via the existing thread tree; double-decorating both would be visual noise.
   const quotedReply = !isSystem ? getQuotedReply(m) : null
 
-  const conversationWidth =
-    theme.layout.messageMaxWidth < 100 ? `${theme.layout.messageMaxWidth}%` : undefined
+  const avatar = props.avatar
+  // Pinned (layout.avatarPinned): the picture leaves the pane edge and sits
+  // beside the narrowed conversation column, so the row below does the
+  // narrowing and the column inside it takes the full width.
+  const maxWidth = theme.layout.messageMaxWidth
+  const avatarPinned = !!avatar && !flip && theme.layout.avatarPinned > 0 && maxWidth < 100
+  const conversationWidth = maxWidth < 100 && !avatarPinned ? `${maxWidth}%` : undefined
   const bodyRow = (
     <Box flexDirection="row" ref={props.focused ? messageAnchorRef : undefined}>
       {!flip && marker}
@@ -1129,10 +1134,13 @@ function MessageRow(props: {
   // Profile pictures: a column left of the message, the picture at the top of
   // a sender's run. Every non-flipped message keeps the column so bodies
   // line up; flipped own messages (right-aligned) have none.
-  const avatar = props.avatar
   if (!avatar || flip) return block
+  // Pinned: margins and the column split what's left beside the picture in
+  // the messageMaxWidth ratio, the same split the centered column gets.
+  const spacer = avatarPinned && <Box flexGrow={(100 - maxWidth) / 2} flexBasis={0} />
   return (
     <Box flexDirection="row" flexShrink={0}>
+      {spacer}
       <Box
         width={avatar.column}
         flexShrink={0}
@@ -1153,13 +1161,15 @@ function MessageRow(props: {
       </Box>
       <Box
         flexDirection="column"
-        flexGrow={1}
+        flexGrow={avatarPinned ? maxWidth : 1}
+        flexBasis={avatarPinned ? 0 : undefined}
         flexShrink={1}
         minWidth={0}
         minHeight={avatar.userId ? avatar.rows : undefined}
       >
         {block}
       </Box>
+      {spacer}
     </Box>
   )
 }

@@ -306,6 +306,7 @@ export type ThemeOverrides = ThemeColorOverrides & {
     textBackgroundRadius: number
     avatarIndent: number
     senderPinned: number
+    avatarPinned: number
   }>
   borders?: Partial<{
     panel: BorderStyleName
