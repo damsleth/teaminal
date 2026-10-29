@@ -97,6 +97,9 @@ export type ThemeLayout = {
   textBackgroundRadius: number
   // MessagePane: columns before the profile picture (when shown).
   avatarIndent: number
+  // MessagePane: 1 puts the sender line in the conversation column, lined up
+  // with the message body; 0 keeps it at senderIndent across the full pane.
+  senderPinned: number
 }
 
 export type ThemeBorders = {
@@ -224,6 +227,7 @@ const LAYOUT_DEFAULT: ThemeLayout = {
   messageMaxWidth: 100,
   textBackgroundRadius: 0,
   avatarIndent: 0,
+  senderPinned: 0,
 }
 
 const BORDERS_DEFAULT: ThemeBorders = {

@@ -237,6 +237,11 @@ adheres to [Semantic Versioning](https://semver.org/).
   editor, or with `borderActive` and `themeOverrides.borders.active`.
 - **Space works like Enter in the menu**, including every submenu.
 
+- **Pin sender to message** (theme editor → Sender & time, or
+  `themeOverrides.layout.senderPinned: 1`). The sender name and time move
+  into the conversation column and line up with the left edge of the
+  message, following the conversation width, the way Teams shows them.
+
 ### Changed
 
 - **Chat list previews say "You:" for your own last message**, in every

@@ -153,7 +153,7 @@ test('date marker theme settings drive its color, bold and indent', () => {
 })
 
 test('sender name toggles and message max width', () => {
-  const renderWith = (settings: Record<string, unknown>, maxWidth = 100) => {
+  const renderWith = (settings: Record<string, unknown>, maxWidth = 100, senderPinned = 0) => {
     const store = createAppStore()
     store.set({
       me: { id: 'u-Ada', displayName: 'Ada' } as never,
@@ -161,7 +161,7 @@ test('sender name toggles and message max width', () => {
         ...store.get().settings,
         showTimestampsInPane: 'off',
         ...settings,
-        themeOverrides: { layout: { messageMaxWidth: maxWidth } },
+        themeOverrides: { layout: { messageMaxWidth: maxWidth, senderPinned } },
       },
       focus: { kind: 'chat', chatId: 'c1' },
       messagesByConvo: {
@@ -213,6 +213,9 @@ test('sender name toggles and message max width', () => {
     return ls[ls.findIndex((l) => l.includes('word')) - 1]!.search(/\S/)
   }
   expect(senderCol(renderWith({}, 50))).toBe(senderCol(renderWith({})))
+  // Pinned: the sender line moves into the column, level with the body text.
+  const pinned = renderWith({}, 50, 1)
+  expect(senderCol(pinned)).toBe(span(pinned).start)
 })
 
 function renderWithSettings(settings: Record<string, unknown>, themeOverrides: object = {}) {
