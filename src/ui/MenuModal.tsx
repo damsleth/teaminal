@@ -16,7 +16,8 @@
 // Menu structure lives in ./menu - this component is the renderer + input
 // dispatcher. Add menu items there, not here.
 
-import { Box, Text, useApp, useStdout } from 'ink'
+import { Box, useApp, useStdout } from 'ink'
+import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import {

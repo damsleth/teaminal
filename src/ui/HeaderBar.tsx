@@ -1,4 +1,5 @@
-import { Box, Text } from 'ink'
+import { Box } from 'ink'
+import { Text } from './Text'
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { chatLabel } from '../state/selectables'
 import {

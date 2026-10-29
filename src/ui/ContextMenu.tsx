@@ -3,7 +3,8 @@
 // (./contextMenu). j/k / ↑↓ move, Enter / Space / → run, an entry's key
 // runs it directly, Esc / ← / h close.
 
-import { Box, Text, useStdout, type DOMElement } from 'ink'
+import { Box, useStdout, type DOMElement } from 'ink'
+import { Text } from './Text'
 import { useEffect, useRef, useState } from 'react'
 import type { AppState, Store } from '../state/store'
 import { anchorRect } from './contextAnchor'

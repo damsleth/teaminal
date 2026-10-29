@@ -2,7 +2,8 @@
 // or top of the layout per settings.statusBarPosition. Profile, presence,
 // capability, unread, and refresh details live in HeaderBar.
 
-import { Box, Text } from 'ink'
+import { Box } from 'ink'
+import { Text } from './Text'
 import { focusedReplyCount, selectFocusedAttachment } from './messageFocusables'
 import { useAppState, useTheme } from './StoreContext'
 import { kittyKeyboardEnabled } from './kittyKeyboard'

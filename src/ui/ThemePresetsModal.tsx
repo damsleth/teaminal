@@ -11,7 +11,8 @@
 //   d             delete the selected preset (y to confirm)
 //   esc           back to where it was opened from
 
-import { Box, Text } from 'ink'
+import { Box } from 'ink'
+import { Text } from './Text'
 import { useInput } from './useInput'
 import type { AppState, Store } from '../state/store'
 import { openMenu } from './MenuModal'

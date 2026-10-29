@@ -37,7 +37,8 @@
 //   as a sequence of individual key events.
 
 import { recordEvent } from '../log'
-import { Box, Text, useCursor, useStdin, useStdout, type DOMElement } from 'ink'
+import { Box, useCursor, useStdin, useStdout, type DOMElement } from 'ink'
+import { Text } from './Text'
 import { useInput } from './useInput'
 import { useEffect, useRef, useState } from 'react'
 import { accountStore } from '../state/accountStore'

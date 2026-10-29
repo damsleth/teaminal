@@ -4,7 +4,8 @@
 // Esc closes and returns to where it was opened. Commands come from
 // ./commands.
 
-import { Box, Text, useApp, useStdout, type DOMElement } from 'ink'
+import { Box, useApp, useStdout, type DOMElement } from 'ink'
+import { Text } from './Text'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppState, Store } from '../state/store'
 import { buildCommands, filterCommands, type Command, type CommandRunners } from './commands'
