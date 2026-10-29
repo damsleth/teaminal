@@ -5,7 +5,8 @@
 // to its parent which decides whether to open an existing chat or
 // create a new one.
 
-import { Box, Text, useApp } from 'ink'
+import { Box, useApp } from 'ink'
+import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useRef, useState } from 'react'

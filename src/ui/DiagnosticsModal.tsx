@@ -15,7 +15,8 @@
 // shown but not redacted: the user is looking at their own session and
 // owns whatever they decide to share.
 
-import { Box, Text, useApp } from 'ink'
+import { Box, useApp } from 'ink'
+import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useState } from 'react'

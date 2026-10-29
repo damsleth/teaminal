@@ -8,7 +8,8 @@
 // To add a keybind row, append to the BINDINGS table; columns are
 // [key, when, action]. Group rows with a divider when sections grow.
 
-import { Box, Text, useApp } from 'ink'
+import { Box, useApp } from 'ink'
+import { Text } from './Text'
 import { useState } from 'react'
 import { useTerminalRows } from './hooks/useTerminalRows'
 import { inkBorder, modalBg } from './theme'

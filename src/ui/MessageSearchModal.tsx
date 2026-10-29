@@ -6,7 +6,8 @@
 // hit's conversation (chat hits only — channel hits lack a team mapping here
 // and render as non-jumpable rows); Esc closes.
 
-import { Box, Text, useApp } from 'ink'
+import { Box, useApp } from 'ink'
+import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useState } from 'react'

@@ -74,6 +74,8 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": -1
   },
   "3,1": {
+    "fgColorMode": 16777216,
+    "fgColor": 7,
     "bold": 134217728
   },
   "11,1": {
@@ -92,9 +94,13 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": -1
   },
   "20,1": {
+    "fgColorMode": 16777216,
+    "fgColor": 7,
     "bold": 134217728
   },
   "72,1": {
+    "fgColorMode": 0,
+    "fgColor": -1,
     "bold": 0
   },
   "83,1": {
@@ -210,6 +216,10 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "bold": 0
   },
   "50,4": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "72,4": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -261,7 +271,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 16777216,
     "fgColor": 7
   },
-  "54,5": {
+  "72,5": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -280,6 +290,14 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": 8
   },
   "2,6": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,6": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "15,6": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -313,7 +331,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 16777216,
     "fgColor": 7
   },
-  "53,6": {
+  "72,6": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -369,7 +387,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColorMode": 16777216,
     "fgColor": 7
   },
-  "53,7": {
+  "72,7": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -388,6 +406,14 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
     "fgColor": 8
   },
   "2,8": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "15,8": {
     "fgColorMode": 0,
     "fgColor": -1
   },

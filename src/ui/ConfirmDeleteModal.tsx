@@ -2,7 +2,8 @@
 // user's own chat message (chat-zone `x`) and deleting a whole chat
 // (ctrl+d). `y` / Enter confirms, `n` / Esc cancels.
 
-import { Box, Text, useApp } from 'ink'
+import { Box, useApp } from 'ink'
+import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { accountStore } from '../state/accountStore'

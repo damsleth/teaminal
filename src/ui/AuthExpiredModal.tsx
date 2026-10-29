@@ -8,7 +8,8 @@
 // teaminal process can recover without the user having to start the
 // CLI over.
 
-import { Box, Text, useApp } from 'ink'
+import { Box, useApp } from 'ink'
+import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { reseed } from '../auth/owaPiggy'

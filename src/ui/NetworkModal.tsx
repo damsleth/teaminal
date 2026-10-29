@@ -7,7 +7,8 @@
 //
 // Esc closes. j/k or ↓/↑ scroll. g jumps to the tail.
 
-import { Box, Text, useApp } from 'ink'
+import { Box, useApp } from 'ink'
+import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useState } from 'react'

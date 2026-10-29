@@ -11,7 +11,8 @@
 
 import { Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
-import { Box, Text } from 'ink'
+import { Box } from 'ink'
+import { Text } from './Text'
 import { warn } from '../log'
 
 type Props = { children: ReactNode }

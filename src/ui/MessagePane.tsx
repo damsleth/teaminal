@@ -7,7 +7,8 @@
 // <a>, and entity refs render correctly.
 
 import { messageAnchorRef } from './contextAnchor'
-import { Box, Text, useStdout, useApp, type DOMElement } from 'ink'
+import { Box, useStdout, useApp, type DOMElement } from 'ink'
+import { Text } from './Text'
 import { createContext, useContext, type ReactNode, useEffect, useRef, useState } from 'react'
 import { chatLabel, shortName } from '../state/selectables'
 import { focusKey, type ReadReceipt, type TypingIndicator } from '../state/store'

@@ -9,7 +9,8 @@
 // activity arriving twice — once via initial hydrate, once via trouter
 // push reconcile — renders as one row.
 
-import { Box, Text, useApp } from 'ink'
+import { Box, useApp } from 'ink'
+import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { useEffect } from 'react'

@@ -10,7 +10,8 @@
 // "Tail diagnostics". Off by default; the modal panels remain the
 // canonical surface, the tails are for users who want a live feed.
 
-import { Box, Text } from 'ink'
+import { Box } from 'ink'
+import { Text } from './Text'
 import { inkBorder } from './theme'
 import { useEffect, useState } from 'react'
 import {

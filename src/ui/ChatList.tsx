@@ -10,7 +10,8 @@
 // re-computed each render.
 
 import { listAnchorRef } from './contextAnchor'
-import { Box, Text, useApp, useStdout, type DOMElement } from 'ink'
+import { Box, useApp, useStdout, type DOMElement } from 'ink'
+import { Text } from './Text'
 import { useEffect, useRef, useState } from 'react'
 import {
   ensureTeamPhoto,

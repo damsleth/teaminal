@@ -66,6 +66,8 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": -1
   },
   "3,2": {
+    "fgColorMode": 16777216,
+    "fgColor": 7,
     "bold": 134217728
   },
   "11,2": {
@@ -215,6 +217,14 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 0,
     "fgColor": -1
   },
+  "4,8": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "10,8": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
   "11,8": {
     "fgColorMode": 16777216,
     "fgColor": 6
@@ -236,6 +246,14 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,9": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "9,9": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -299,6 +317,14 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 0,
     "fgColor": -1
   },
+  "4,11": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "10,11": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
   "11,11": {
     "fgColorMode": 16777216,
     "fgColor": 6
@@ -320,6 +346,14 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColor": 6
   },
   "1,12": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,12": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "9,12": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -752,6 +786,8 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": -1
   },
   "3,2": {
+    "fgColorMode": 16777216,
+    "fgColor": 7,
     "bold": 134217728
   },
   "11,2": {
@@ -873,6 +909,14 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 0,
     "fgColor": -1
   },
+  "4,7": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "15,7": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
   "27,7": {
     "fgColorMode": 16777216,
     "fgColor": 6
@@ -930,6 +974,14 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColor": 8
   },
   "2,9": {
+    "fgColorMode": 0,
+    "fgColor": -1
+  },
+  "4,9": {
+    "fgColorMode": 16777216,
+    "fgColor": 7
+  },
+  "15,9": {
     "fgColorMode": 0,
     "fgColor": -1
   },

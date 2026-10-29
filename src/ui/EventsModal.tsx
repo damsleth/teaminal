@@ -9,7 +9,8 @@
 // The list auto-tails (newest at the bottom) until the user moves the
 // cursor; then it stays put until they hit g to jump to the bottom.
 
-import { Box, Text, useApp } from 'ink'
+import { Box, useApp } from 'ink'
+import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
