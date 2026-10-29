@@ -9,6 +9,7 @@
 // Scrolling is tracked in a ref since it derives from cursor changes;
 // re-computed each render.
 
+import { listAnchorRef } from './contextAnchor'
 import { Box, Text, useApp, useStdout, type DOMElement } from 'ink'
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -540,6 +541,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
             flexDirection="row"
             flexShrink={0}
             marginBottom={chatListGap}
+            ref={isSelected ? listAnchorRef : undefined}
             backgroundColor={rowBg}
             borderStyle={reservedBorder(theme.borders.selectedRow, isSelected)}
             borderColor={theme.selectedRowBorder ?? theme.borderActive}

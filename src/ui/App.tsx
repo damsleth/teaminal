@@ -58,6 +58,7 @@ import { EditReactionsModal } from './EditReactionsModal'
 import { ImageModal } from './ImageModal'
 import { MessageSearchModal, openMessageSearch } from './MessageSearchModal'
 import { CommandPalette, openCommandPalette } from './CommandPalette'
+import { ContextMenu } from './ContextMenu'
 import { TailPanels } from './TailPanels'
 import { findExistingOneOnOne } from './derive'
 import { useClampMessageCursor } from './hooks/useClampMessageCursor'
@@ -564,6 +565,7 @@ export function App() {
     | 'confirm-delete-chat'
     | 'message-search-global'
     | 'command-palette'
+    | 'context-menu'
     | 'image'
     | 'edit-reactions'
     | null = modal && modal.kind !== 'auth-expired' ? modal.kind : null
@@ -660,6 +662,8 @@ export function App() {
               <ConfirmDeleteModal />
             ) : overlayModalKind === 'message-search-global' ? (
               <MessageSearchModal />
+            ) : overlayModalKind === 'context-menu' ? (
+              <ContextMenu />
             ) : overlayModalKind === 'command-palette' ? (
               <CommandPalette keyActions={paletteKeyActions} />
             ) : overlayModalKind === 'image' ? (

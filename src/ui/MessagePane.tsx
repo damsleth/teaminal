@@ -6,6 +6,7 @@
 // HTML bodies are converted via src/ui/html.htmlToText so <at>, <emoji>,
 // <a>, and entity refs render correctly.
 
+import { messageAnchorRef } from './contextAnchor'
 import { Box, Text, useStdout, useApp, type DOMElement } from 'ink'
 import { createContext, useContext, type ReactNode, useEffect, useRef, useState } from 'react'
 import { chatLabel, shortName } from '../state/selectables'
@@ -996,7 +997,7 @@ function MessageRow(props: {
   const conversationWidth =
     theme.layout.messageMaxWidth < 100 ? `${theme.layout.messageMaxWidth}%` : undefined
   const bodyRow = (
-    <Box flexDirection="row">
+    <Box flexDirection="row" ref={props.focused ? messageAnchorRef : undefined}>
       {!flip && marker}
       <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
         {bodyNode}

@@ -6,14 +6,7 @@
 
 import type { Channel, Chat, Team } from '../../types'
 import type { Me } from '../../graph/me'
-import {
-  focusKey,
-  toggleChatUnread,
-  type AppState,
-  type Focus,
-  type Settings,
-  type Store,
-} from '../../state/store'
+import { focusKey, type AppState, type Focus, type Settings, type Store } from '../../state/store'
 import {
   buildSelectableList,
   clampCursor,
@@ -32,7 +25,9 @@ import { warn } from '../../log'
 import { isNewChatQueryCandidate } from '../ChatList'
 import { openKeybinds } from '../KeybindsModal'
 import { openMenu } from '../MenuModal'
+import { openContextMenu } from '../ContextMenu'
 import { openMessageSearch } from '../MessageSearchModal'
+import { confirmDeleteChat, toggleChatRead } from './itemActions'
 import type { KeyResult, RawKey } from './types'
 
 const HALF_PAGE = 10
@@ -114,15 +109,21 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
     return 'handled'
   }
 
+  // '.' (Ctrl+. where the terminal reports it) opens the context menu for
+  // the chat row under the cursor.
+  if (input === '.' && ctx.focus.kind === 'list') {
+    const target = deleteTarget(ctx)
+    if (target)
+      openContextMenu(store, { kind: 'chat', chatId: target.chat.id, label: target.label })
+    return 'handled'
+  }
+
   // ctrl+d deletes a chat: the open one when a chat is focused, otherwise
   // the row under the list cursor. Confirmation lives in the modal.
   if (key.ctrl && ch === 'd') {
     const target = deleteTarget(ctx)
     if (target) {
-      store.set({
-        modal: { kind: 'confirm-delete-chat', chatId: target.chat.id, label: target.label },
-        inputZone: 'list',
-      })
+      confirmDeleteChat(store, target.chat.id, target.label)
     }
     return 'handled'
   }
@@ -188,12 +189,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       const visible = ctx.filter ? items.filter((it) => itemMatchesFilter(it, ctx.filter)) : items
       const safe = resolveCursor(visible, selectableCount, ctx.cursorKey ?? null, ctx.cursor)
       const it = visible[safe]
-      if (it && it.kind === 'chat') {
-        const chat = it.chat
-        store.set((s) => ({
-          unreadByChatId: toggleChatUnread(s.unreadByChatId, chat),
-        }))
-      }
+      if (it && it.kind === 'chat') toggleChatRead(store, it.chat)
       return 'handled'
     }
     if (selectableCount === 0) {

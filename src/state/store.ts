@@ -133,6 +133,14 @@ export type ModalState =
   | { kind: 'message-search-global' }
   // Command palette (Ctrl+P); query and cursor live in the component.
   | { kind: 'command-palette' }
+  // Context menu ('.' / Ctrl+.) for a chat-list row or a message.
+  | {
+      kind: 'context-menu'
+      target:
+        | { kind: 'chat'; chatId: string; label: string }
+        | { kind: 'message'; focus: FocusChat | FocusChannel; messageId: string }
+      cursor: number
+    }
   // Reaction picker for the focused chat message. Delegates to the macOS
   // system emoji picker and captures the glyph it inserts (see
   // ReactionPickerModal); toggleReaction resolves the existing reaction itself.

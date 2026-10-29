@@ -15,9 +15,16 @@ import {
 } from '../../state/store'
 import { groupChannelThreads } from '../../state/channelThreads'
 import type { ChatMessage } from '../../types'
-import { htmlToText } from '../../text/html'
 import { openMenu } from '../MenuModal'
+import { openContextMenu } from '../ContextMenu'
 import type { Focusable } from '../messageFocusables'
+import {
+  confirmDeleteMessage,
+  openEditReactions,
+  openReactionPicker,
+  startEditMessage,
+} from './itemActions'
+import { isOwnEditableMessage } from './itemActions'
 import type { KeyResult, RawKey } from './types'
 
 export type ChatKeysCtx = {
@@ -49,31 +56,11 @@ export type ChatKeysCtx = {
   openLink: (href: string) => void
 }
 
-const DELETE_PREVIEW_MAX = 60
-
-function messagePreview(m: ChatMessage): string {
-  const raw = m.body?.content ?? ''
-  const text =
-    m.body?.contentType === 'text' ? raw.replace(/\s+/g, ' ').trim() : htmlToText(raw).trim()
-  return text.length > DELETE_PREVIEW_MAX ? `${text.slice(0, DELETE_PREVIEW_MAX - 1)}…` : text
-}
-
-function isOwnEditableMessage(
-  m: ChatMessage | undefined,
-  myUserId: string | undefined,
-): m is ChatMessage {
-  if (!m || !myUserId) return false
-  if (m.from?.user?.id !== myUserId) return false
-  if (m.messageType === 'systemEventMessage') return false
-  if (m.deletedDateTime) return false
-  return true
-}
-
 // Open the thread overlay for a channel root. Seed the thread from the
 // already-loaded channel stream so it shows instantly; the active loop then
 // refreshes/completes it via the chatsvc sub-conversation door. Both write
 // the same threadConv, so render + cursor stay consistent.
-function openThread(
+export function openThread(
   store: Store<AppState>,
   focus: Extract<Focus, { kind: 'channel' }>,
   rootId: string,
@@ -200,6 +187,16 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
   // so they don't fall through to the list dispatcher.
   if (ch === 'l' || key.rightArrow) return 'handled'
   // 't' opens the thread overlay when a channel root is focused.
+  // '.' (Ctrl+. where the terminal reports it) opens the context menu for
+  // the focused message.
+  if (
+    input === '.' &&
+    ctx.focusedMessageId &&
+    (ctx.focus.kind === 'chat' || ctx.focus.kind === 'channel')
+  ) {
+    openContextMenu(store, { kind: 'message', focus: ctx.focus, messageId: ctx.focusedMessageId })
+    return 'handled'
+  }
   if (ch === 't' && ctx.focus.kind === 'channel' && ctx.focusedMessageId) {
     openThread(store, ctx.focus, ctx.focusedMessageId, ctx.focusedMessage)
     return 'handled'
@@ -211,32 +208,23 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
     // 'r' opens the reaction picker for the focused message (delegates to the
     // macOS system emoji picker — see ReactionPickerModal).
     if (ch === 'r') {
-      store.set({
-        modal: { kind: 'reaction-picker', chatId, messageId: msg.id },
-        inputZone: 'menu',
-      })
+      openReactionPicker(store, chatId, msg.id)
       return 'handled'
     }
     // 't' opens the edit-reactions modal to view / remove the user's
     // existing reactions on the focused message.
     if (ch === 't') {
-      store.set({
-        modal: { kind: 'edit-reactions', chatId, messageId: msg.id },
-        inputZone: 'menu',
-      })
+      openEditReactions(store, chatId, msg.id)
       return 'handled'
     }
     // 'e' edits the focused message (own, non-deleted, non-system only).
     if (ch === 'e' && isOwnEditableMessage(msg, ctx.myUserId)) {
-      store.set({ editingMessageId: msg.id, inputZone: 'composer' })
+      startEditMessage(store, msg.id)
       return 'handled'
     }
     // 'x' deletes the focused message after a confirmation prompt.
     if (ch === 'x' && isOwnEditableMessage(msg, ctx.myUserId)) {
-      store.set({
-        modal: { kind: 'confirm-delete', chatId, messageId: msg.id, preview: messagePreview(msg) },
-        inputZone: 'menu',
-      })
+      confirmDeleteMessage(store, chatId, msg)
       return 'handled'
     }
   }

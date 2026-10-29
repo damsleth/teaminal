@@ -19,6 +19,7 @@ type Binding = { keys: string; when: string; action: string }
 
 const BINDINGS: Binding[] = [
   { keys: 'Ctrl+P', when: 'list / chat / composer', action: 'command palette' },
+  { keys: '. / Ctrl+.', when: 'list / chat', action: 'context menu for the row / message' },
   { keys: 'j / ↓', when: 'list', action: 'cursor down' },
   { keys: 'k / ↑', when: 'list', action: 'cursor up' },
   { keys: 'u/d', when: 'list', action: 'half-page sidebar' },
