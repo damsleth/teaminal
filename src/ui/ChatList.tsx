@@ -415,7 +415,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         <Text color="cyan">█</Text>
       </Text>
     ) : filter ? (
-      <Text color="gray">{`/ ${filter}  (Esc to clear)`}</Text>
+      <Text muted>{`/ ${filter}  (Esc to clear)`}</Text>
     ) : null
 
   if (selectableCount === 0) {

@@ -508,7 +508,7 @@ export function Composer({ columns = 80 }: { columns?: number }) {
       })}
       {sending && (
         <Box>
-          <Text color="gray" wrap="truncate-end">
+          <Text muted wrap="truncate-end">
             sending...
           </Text>
         </Box>

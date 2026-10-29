@@ -8,7 +8,7 @@ import { createContext, useContext, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import type { AppState, Store } from '../state/store'
 import { resolveTheme, type PartialTheme, type Theme } from './theme'
-import { TextColorContext } from './Text'
+import { TextThemeContext } from './Text'
 
 const StoreContext = createContext<Store<AppState> | null>(null)
 
@@ -21,8 +21,8 @@ export function StoreProvider(props: { store: Store<AppState>; children: ReactNo
 }
 
 function ThemeTextColor(props: { children: ReactNode }) {
-  const text = useTheme().text
-  return <TextColorContext.Provider value={text}>{props.children}</TextColorContext.Provider>
+  const theme = useTheme()
+  return <TextThemeContext.Provider value={theme}>{props.children}</TextThemeContext.Provider>
 }
 
 export function useAppStore(): Store<AppState> {

@@ -35,8 +35,8 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <Box flexDirection="column" paddingX={1}>
           <Text color="red">teaminal crashed during render.</Text>
-          <Text color="gray">{this.state.error.message}</Text>
-          <Text color="gray">Press Ctrl+C to exit.</Text>
+          <Text muted>{this.state.error.message}</Text>
+          <Text muted>Press Ctrl+C to exit.</Text>
         </Box>
       )
     }

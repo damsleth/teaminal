@@ -128,12 +128,12 @@ export function KeybindsModal() {
         {BINDINGS.slice(top, top + capacity).map((b, i) => (
           <Text key={top + i} wrap="truncate-end">
             <Text color={theme.selected}>{b.keys.padEnd(keyW)}</Text>
-            <Text color="gray">{b.when.padEnd(whenW)}</Text>
+            <Text muted>{b.when.padEnd(whenW)}</Text>
             <Text>{b.action}</Text>
           </Text>
         ))}
         <Box height={1} />
-        <Text color="gray" wrap="truncate-end">
+        <Text muted wrap="truncate-end">
           {maxOffset > 0
             ? `${top + 1}-${Math.min(top + capacity, BINDINGS.length)} of ${BINDINGS.length} · j/k u/d scroll · esc / enter to close`
             : 'esc / enter to close'}

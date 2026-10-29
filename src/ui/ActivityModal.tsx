@@ -179,7 +179,7 @@ export function ActivityModal() {
         </Text>
         <Box height={1} />
         {items.length === 0 ? (
-          <Text color="gray">(no notifications)</Text>
+          <Text muted>(no notifications)</Text>
         ) : (
           visible.map((it, i) => {
             const absIdx = top + i
@@ -196,14 +196,14 @@ export function ActivityModal() {
                 <Text>{kindGlyph(it.kind)} </Text>
                 <Text bold={focused}>{sender}</Text>
                 <Text> </Text>
-                <Text color="gray">{preview}</Text>
-                <Text color="gray"> {when}</Text>
+                <Text muted>{preview}</Text>
+                <Text muted> {when}</Text>
               </Text>
             )
           })
         )}
         <Box height={1} />
-        <Text color="gray">j/k: move · enter: open · a: mark all read · esc: close</Text>
+        <Text muted>j/k: move · enter: open · a: mark all read · esc: close</Text>
       </Box>
     </Box>
   )

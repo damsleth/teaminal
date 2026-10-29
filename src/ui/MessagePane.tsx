@@ -499,7 +499,7 @@ export function MessagePane(props: {
   if (isListFocus) {
     return (
       <Box flexDirection="column" flexGrow={1} paddingX={0}>
-        <Text color="gray">Select a chat or channel · Enter to open · q to quit</Text>
+        <Text muted>Select a chat or channel · Enter to open · q to quit</Text>
       </Box>
     )
   }
@@ -560,7 +560,7 @@ export function MessagePane(props: {
         >
           <Box flexDirection="column" flexGrow={1} flexShrink={0}>
             {messages.length === 0 ? (
-              <Text color="gray"> loading...</Text>
+              <Text muted> loading...</Text>
             ) : (
               <>
                 {rows.map((row) => (
@@ -753,7 +753,7 @@ function TimelineRow(props: {
     return (
       <Box>
         {props.showTimestamp && <Box width={1} flexShrink={0} />}
-        <Text color={active ? props.theme.selected : 'gray'} wrap="truncate-end">
+        <Text color={active ? props.theme.selected : props.theme.mutedText} wrap="truncate-end">
           {active ? 'U/K ' : ''}
           {props.row.label}
         </Text>

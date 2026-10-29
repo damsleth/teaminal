@@ -324,7 +324,10 @@ adheres to [Semantic Versioning](https://semver.org/).
   group headers, the header row and other text without a color of its own
   used the terminal's foreground, which could render black on a dark theme
   background. It now uses the theme's General → text color, as do message
-  bodies whose own color is set to none.
+  bodies whose own color is set to none. Secondary text that was fixed to
+  the terminal's gray (the menu version line and key hints, header bar
+  labels, the empty-pane hint, modal help lines) now uses General → muted
+  text.
 
 - **A failed send can no longer end up in another chat.** When a send
   failed after you had switched conversations, its text was put back into

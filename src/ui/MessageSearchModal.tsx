@@ -135,14 +135,14 @@ export function MessageSearchModal() {
         <Text bold={theme.emphasis.modalTitleBold}>Search all messages</Text>
         <Box height={1} />
         <Text>
-          <Text color="gray">/ </Text>
+          <Text muted>/ </Text>
           {query}
           <Text color="cyan">█</Text>
         </Text>
-        {loading && <Text color="gray">Searching…</Text>}
+        {loading && <Text muted>Searching…</Text>}
         {error && <Text color={theme.errorText}>{error.slice(0, 120)}</Text>}
         {!loading && !error && query.trim().length >= 2 && results.length === 0 && (
-          <Text color="gray">No matches</Text>
+          <Text muted>No matches</Text>
         )}
         {visible.map((hit, i) => {
           const idx = top + i
@@ -161,7 +161,7 @@ export function MessageSearchModal() {
               >
                 {selected ? '> ' : '  '}
                 {sender}
-                <Text color="gray">{`  ${time}${jumpable ? '' : '  (channel)'}`}</Text>
+                <Text muted>{`  ${time}${jumpable ? '' : '  (channel)'}`}</Text>
               </Text>
               <Text color={theme.mutedText} wrap="truncate-end">
                 {`    ${hit.snippet}`}
@@ -170,7 +170,7 @@ export function MessageSearchModal() {
           )
         })}
         <Box height={1} />
-        <Text color="gray">↑/↓ move · Enter opens chat · Esc closes</Text>
+        <Text muted>↑/↓ move · Enter opens chat · Esc closes</Text>
       </Box>
     </Box>
   )
