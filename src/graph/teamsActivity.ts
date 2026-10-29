@@ -18,6 +18,7 @@
 // 401s flow through withSkypeAuth so a stale cache hit doesn't kill the
 // hydration.
 
+import { sendWithBackoff } from './backoff'
 import { owaProfile, type AccountRef } from '../account'
 import { recordEvent, recordRequest } from '../log'
 import { csaHeaders, getCsaToken, withCsaAuth } from './csaAuth'
@@ -270,7 +271,7 @@ export async function listActivityFeed(opts: ActivityOpts): Promise<ActivityPage
     const startedAt = Date.now()
     let res: Response
     try {
-      res = await transport(url, {
+      res = await sendWithBackoff(transport, url, {
         method: 'GET',
         headers: csaHeaders(token),
         signal: opts?.signal,

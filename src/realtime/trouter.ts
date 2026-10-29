@@ -17,6 +17,7 @@
 // SECURITY: The Skype token is as sensitive as the Graph token. It is
 // cached in-process only, never logged, never written to disk.
 
+import { sendWithBackoff } from '../graph/backoff'
 import { accountRef } from '../account'
 import { decodeJwtClaims } from '../auth/owaPiggy'
 import { getSkypeToken } from '../graph/teamsFederation'
@@ -550,7 +551,7 @@ export class TrouterTransport implements RealtimeTransport {
       ic3Token,
       skypeToken: this.skypeToken,
     })
-    const res = await fetch(url, init)
+    const res = await sendWithBackoff(fetch, url, init)
 
     if (!res.ok) {
       const text = await res.text().catch(() => '')

@@ -17,6 +17,7 @@
 //
 // See docs/external-user-search.md for the full design rationale.
 
+import { sendWithBackoff } from './backoff'
 import { owaProfile, type AccountRef } from '../account'
 import { getToken } from '../auth/owaPiggy'
 import { recordEvent, recordRequest } from '../log'
@@ -163,7 +164,7 @@ async function searchFederated(
   const startedAt = Date.now()
   let res: Response
   try {
-    res = await transport(url, {
+    res = await sendWithBackoff(transport, url, {
       method: 'GET',
       headers: searchHeaders(spacesToken),
       signal: opts?.signal,
@@ -261,7 +262,7 @@ export async function searchExternalUsers(
   const startedAt = Date.now()
   let res: Response
   try {
-    res = await transport(url, {
+    res = await sendWithBackoff(transport, url, {
       method: 'POST',
       headers: { ...searchHeaders(spacesToken), 'Content-Type': 'application/json;charset=UTF-8' },
       body: JSON.stringify(trimmed),

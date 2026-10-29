@@ -15,6 +15,7 @@
 // each message into the ChannelMessage shape the rest of the app
 // already consumes.
 
+import { sendWithBackoff } from './backoff'
 import type { AccountRef } from '../account'
 import { recordEvent, recordRequest } from '../log'
 import { teamsMessageBody } from '../text/html'
@@ -85,7 +86,7 @@ async function chatsvcGet<T>(
   const path = new URL(url).pathname + new URL(url).search
   let res: Response
   try {
-    res = await transport(url, {
+    res = await sendWithBackoff(transport, url, {
       method: 'GET',
       headers: chatsvcHeaders(token),
       signal: opts?.signal,
@@ -530,7 +531,7 @@ export async function sendChannelMessageViaChatsvc(
     const path = new URL(url).pathname
     let res: Response
     try {
-      res = await transport(url, {
+      res = await sendWithBackoff(transport, url, {
         method: 'POST',
         headers: chatsvcHeaders(skypeToken),
         body: JSON.stringify(body),

@@ -10,6 +10,7 @@
 // if Teams already knows the canonical equivalent conversation, open it
 // instead of creating another detached one.
 
+import { sendWithBackoff } from './backoff'
 import { owaProfile, type AccountRef } from '../account'
 import { getToken } from '../auth/owaPiggy'
 import { recordEvent, recordRequest } from '../log'
@@ -111,7 +112,7 @@ async function requestTeams<T>(
   const path = new URL(url).pathname + new URL(url).search
   let res: Response
   try {
-    res = await transport(url, {
+    res = await sendWithBackoff(transport, url, {
       method,
       headers: federationHeaders(token),
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -180,7 +181,7 @@ async function postAuthz(bearerToken: string, signal?: AbortSignal): Promise<Res
   const startedAt = Date.now()
   let res: Response
   try {
-    res = await transport(TEAMS_AUTHZ_URL, {
+    res = await sendWithBackoff(transport, TEAMS_AUTHZ_URL, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${bearerToken}`,
@@ -345,7 +346,7 @@ export async function requestChatsvcMe<T>(
   const path = new URL(url).pathname + new URL(url).search
   let res: Response
   try {
-    res = await transport(url, {
+    res = await sendWithBackoff(transport, url, {
       method,
       headers: chatsvcMeHeaders(token),
       body: body === undefined ? undefined : JSON.stringify(body),

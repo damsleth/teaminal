@@ -5,6 +5,7 @@
 // The cache key is messageId::attachmentId - never contains signed URLs or
 // other credentials. Blobs are rejected above MAX_IMAGE_BYTES to bound disk use.
 
+import { sendWithBackoff } from '../graph/backoff'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -249,7 +250,7 @@ export function getImageData(account: AccountId | undefined, key: string): Buffe
 // contentUrl is an external CDN URL (giphy/tenor) that rejects Bearer
 // tokens.
 async function fetchExternalImage(url: string, signal?: AbortSignal): Promise<Uint8Array> {
-  const res = await fetch(url, { signal })
+  const res = await sendWithBackoff(fetch, url, { signal })
   if (!res.ok) {
     throw new Error(`external image fetch ${res.status} ${res.statusText}`)
   }
