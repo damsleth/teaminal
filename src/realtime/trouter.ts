@@ -314,6 +314,9 @@ export class TrouterTransport implements RealtimeTransport {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private keepaliveTimer: ReturnType<typeof setInterval> | null = null
   private disconnecting = false
+  // The registrar request in flight: aborted on disconnect or a new
+  // registration, so a long 429 back-off can't outlive the connection.
+  private registrarAbort: AbortController | null = null
 
   constructor(opts: TransportOpts) {
     this.bus = opts.bus
@@ -346,6 +349,8 @@ export class TrouterTransport implements RealtimeTransport {
 
   disconnect(): void {
     this.disconnecting = true
+    this.registrarAbort?.abort()
+    this.registrarAbort = null
     this.clearTimers()
     if (this.ws) {
       // Detach handlers before closing. close() fires onclose
@@ -551,7 +556,10 @@ export class TrouterTransport implements RealtimeTransport {
       ic3Token,
       skypeToken: this.skypeToken,
     })
-    const res = await sendWithBackoff(fetch, url, init)
+    this.registrarAbort?.abort()
+    const abort = new AbortController()
+    this.registrarAbort = abort
+    const res = await sendWithBackoff(fetch, url, { ...init, signal: abort.signal })
 
     if (!res.ok) {
       const text = await res.text().catch(() => '')

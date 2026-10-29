@@ -62,3 +62,16 @@ test('every Teams-service request goes through the 429 back-off', () => {
     expect({ file, bare: /await transport\(/.test(src) }).toEqual({ file, bare: false })
   }
 })
+
+test('the real back-off timer stops when the request is cancelled', async () => {
+  __setBackoffSleepForTests(null)
+  const ctrl = new AbortController()
+  const started = Date.now()
+  const pending = fetchWithBackoff(
+    async () => new Response('', { status: 429, headers: { 'Retry-After': '600' } }),
+    ctrl.signal,
+  ).catch((e) => e)
+  setTimeout(() => ctrl.abort(), 5)
+  expect(((await pending) as Error).name).toBe('AbortError')
+  expect(Date.now() - started).toBeLessThan(1000)
+})

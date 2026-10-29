@@ -17,7 +17,7 @@
 import type { AccountStore } from '../accountStore'
 import { listMessagesNextPage, listMessagesPage } from '../../graph/chats'
 import type { GraphClient } from '../../graph/client'
-import { listChannelMessagesNextPage } from '../../graph/teams'
+import { listChannelMessagesNextPage, listChannelMessagesPage } from '../../graph/teams'
 import {
   cacheMessagesFromLegacy,
   emptyMessageCache,
@@ -67,27 +67,6 @@ export async function loadOlderMessages(deps: LoadOlderDeps): Promise<LoadOlderM
 
   const anchorMessageId = initialCache.messages[0]?.id
 
-  // Channel paging is nextLink-only. Without a cursor we cannot reach
-  // older messages; mark the cache exhausted so the UI stops offering
-  // "Load older" on a channel that's already shown its first page.
-  if (focus.kind === 'channel' && !initialCache.nextLink) {
-    store.set((s) => {
-      const cache = s.messageCacheByConvo[conv] ?? initialCache
-      const nextCaches = {
-        ...s.messageCacheByConvo,
-        [conv]: { ...cache, fullyLoaded: true, loadingOlder: false },
-      }
-      return {
-        messageCacheByConvo: nextCaches,
-        messagesByConvo: {
-          ...s.messagesByConvo,
-          [conv]: nextCaches[conv]?.messages ?? [],
-        },
-      }
-    })
-    return { conv, added: 0, fullyLoaded: true, anchorMessageId }
-  }
-
   // Mark loadingOlder so the UI can render a spinner. Migrate any
   // legacy in-memory cache (pre-shipping the structured cache) into
   // the new shape on first write, otherwise the patch below loses
@@ -125,6 +104,13 @@ export async function loadOlderMessages(deps: LoadOlderDeps): Promise<LoadOlderM
           signal,
         })
       }
+    } else if (focus.kind === 'channel') {
+      // Channel paging is nextLink-only. Without a cursor (e.g. the saved
+      // cache was trimmed) start again from the newest page: its link walks
+      // back through what's already here (merged without duplicates) and on
+      // to older history. A channel with a single page comes back without a
+      // link and is marked fully loaded below.
+      page = await listChannelMessagesPage(client, focus.teamId, focus.channelId, { signal })
     } else {
       page = { messages: [] }
     }

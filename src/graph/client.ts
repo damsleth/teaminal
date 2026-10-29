@@ -301,6 +301,8 @@ async function executeRequest<T>(
     }
     const retryRaw = parseRetryAfter(res.headers.get('Retry-After'), Date.now())
     const waitMs = backoff429Ms(retried429Count, retryRaw)
+    // Release the throttled response before waiting.
+    await res.body?.cancel().catch(() => {})
     await sleepUnlessAborted(waitMs, opts.signal)
     return executeRequest<T>(url, opts, ctx, { ...state, retried429Count: retried429Count + 1 })
   }
@@ -395,6 +397,8 @@ async function executeBinaryRequest(
     }
     const retryRaw = parseRetryAfter(res.headers.get('Retry-After'), Date.now())
     const waitMs = backoff429Ms(retried429Count, retryRaw)
+    // Release the throttled response before waiting.
+    await res.body?.cancel().catch(() => {})
     await sleepUnlessAborted(waitMs, opts.signal)
     return executeBinaryRequest(url, opts, ctx, {
       ...state,

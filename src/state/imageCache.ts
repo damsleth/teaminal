@@ -55,7 +55,14 @@ export function getImageCacheDir(profile?: string | null): string {
 // accounts' entries stay.
 // Best-effort: a missing directory is a no-op. Returns the directory it
 // targeted so callers can log it.
+// Bumped when a cache is cleared, so panes showing images fetch again.
+let cacheGeneration = 0
+export function imageCacheGeneration(): number {
+  return cacheGeneration
+}
+
 export function clearImageCache(profile?: string | null): string {
+  cacheGeneration++
   const dir = getCacheDir(profile ?? undefined)
   try {
     rmSync(dir, { recursive: true, force: true })
@@ -436,6 +443,14 @@ function ensurePhoto(
     const waiters = photoWaiters.get(owned)
     photoWaiters.delete(owned)
     for (const notify of waiters ?? []) notify()
+    // After a transient failure, tell the same callers again once the
+    // cooldown ends, so they ask for the picture again.
+    if (photoRetryAt.has(owned) && waiters?.size) {
+      const timer = setTimeout(() => {
+        for (const notify of waiters) notify()
+      }, PHOTO_RETRY_MS)
+      timer.unref?.()
+    }
   })
 }
 
