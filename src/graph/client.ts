@@ -5,7 +5,7 @@
 //   - retry once on 401 after invalidating the token cache (covers expiry
 //     between cache validation and request)
 //   - retry up to 3x on 429, honoring Retry-After (seconds or HTTP-date)
-//     with ±20% jitter
+//     with up to 20% jitter, growing exponentially (src/graph/backoff.ts)
 //   - parse JSON and non-JSON error bodies without throwing during error
 //     handling
 //   - paginate via @odata.nextLink (absolute URLs returned by Graph)
@@ -14,14 +14,20 @@
 // All Graph endpoints in the project go through this module. UI/state code
 // must never call fetch() directly.
 
+import {
+  __setBackoffSleepForTests,
+  backoff429Ms,
+  MAX_429_RETRIES,
+  parseRetryAfter,
+  sleepUnlessAborted,
+} from './backoff'
+
 import { accountRef, owaProfile, type AccountRef } from '../account'
 import { getToken, invalidate } from '../auth/owaPiggy'
 import { recordRequest } from '../log'
 
 const BASE_V1 = 'https://graph.microsoft.com/v1.0'
 const BASE_BETA = 'https://graph.microsoft.com/beta'
-const MAX_429_RETRIES = 3
-const DEFAULT_429_BACKOFF_MS = 1000
 
 export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'PUT'
 
@@ -123,9 +129,6 @@ type Transport = (url: string, init: RequestInit) => Promise<Response>
 const realTransport: Transport = (url, init) => fetch(url, init)
 let transport: Transport = realTransport
 
-const realSleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms))
-let sleep: (ms: number) => Promise<void> = realSleep
-
 function buildUrl(opts: GraphOpts): string {
   if (opts.path.startsWith(`${BASE_V1}/`) || opts.path.startsWith(`${BASE_BETA}/`)) {
     if (!opts.query) return opts.path
@@ -147,22 +150,6 @@ function buildUrl(opts: GraphOpts): string {
   }
   const qs = params.toString()
   return qs ? `${base}${path}?${qs}` : base + path
-}
-
-export function parseRetryAfter(headerValue: string | null, now: number): number {
-  if (!headerValue) return 0
-  const trimmed = headerValue.trim()
-  if (trimmed === '') return 0
-  const seconds = Number(trimmed)
-  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1000)
-  const dateMs = Date.parse(trimmed)
-  if (Number.isFinite(dateMs)) return Math.max(0, dateMs - now)
-  return 0
-}
-
-function jitter(ms: number): number {
-  // ±20% jitter. Using Math.random is fine here; this is throttling, not crypto.
-  return Math.round(ms * (0.8 + Math.random() * 0.4))
 }
 
 async function safeReadBody(res: Response): Promise<unknown> {
@@ -313,8 +300,8 @@ async function executeRequest<T>(
       )
     }
     const retryRaw = parseRetryAfter(res.headers.get('Retry-After'), Date.now())
-    const waitMs = jitter(retryRaw > 0 ? retryRaw : DEFAULT_429_BACKOFF_MS)
-    await sleep(waitMs)
+    const waitMs = backoff429Ms(retried429Count, retryRaw)
+    await sleepUnlessAborted(waitMs, opts.signal)
     return executeRequest<T>(url, opts, ctx, { ...state, retried429Count: retried429Count + 1 })
   }
 
@@ -407,8 +394,8 @@ async function executeBinaryRequest(
       throw new RateLimitError(429, opts.path, retryMs, 'rate limited (max retries exhausted)')
     }
     const retryRaw = parseRetryAfter(res.headers.get('Retry-After'), Date.now())
-    const waitMs = jitter(retryRaw > 0 ? retryRaw : DEFAULT_429_BACKOFF_MS)
-    await sleep(waitMs)
+    const waitMs = backoff429Ms(retried429Count, retryRaw)
+    await sleepUnlessAborted(waitMs, opts.signal)
     return executeBinaryRequest(url, opts, ctx, {
       ...state,
       retried429Count: retried429Count + 1,
@@ -486,13 +473,15 @@ export function __setTransportForTests(t: Transport): void {
 }
 
 export function __setSleepForTests(s: (ms: number) => Promise<void>): void {
-  sleep = s
+  __setBackoffSleepForTests(s)
 }
 
 export function __resetForTests(): void {
   transport = realTransport
-  sleep = realSleep
+  __setBackoffSleepForTests(null)
   activeProfile = undefined
   preferredAudience = 'graph'
   audienceFallback = false
 }
+
+export { parseRetryAfter }

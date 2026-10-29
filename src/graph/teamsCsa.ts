@@ -21,6 +21,7 @@
 // Parsing is defensive: unknown / missing fields degrade to sensible
 // defaults rather than throwing, since CSA evolves.
 
+import { sendWithBackoff } from './backoff'
 import { owaProfile, type AccountRef } from '../account'
 import { recordEvent, recordRequest } from '../log'
 import type { Channel, Chat, ChatMember, ChatType, LastMessagePreview, Team } from '../types'
@@ -249,7 +250,7 @@ async function csaGet(path: string, opts: CsaOpts, diagPath: string): Promise<un
   const startedAt = Date.now()
   let res: Response
   try {
-    res = await transport(path, {
+    res = await sendWithBackoff(transport, path, {
       method: 'GET',
       headers: csaHeaders(token),
       signal: opts?.signal,

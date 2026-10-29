@@ -18,6 +18,7 @@
 // signed URL; never write it to disk. The session cookie is treated
 // with the same care as the Skype token.
 
+import { sendWithBackoff } from './backoff'
 import { owaProfile, type AccountRef } from '../account'
 import { getToken } from '../auth/owaPiggy'
 import { recordEvent, recordRequest } from '../log'
@@ -141,7 +142,7 @@ async function authViaSkypeToken(host: string, opts: AsyncGwOpts): Promise<strin
   const startedAt = Date.now()
   let res: Response
   try {
-    res = await transport(url, {
+    res = await sendWithBackoff(transport, url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
       body: `skypetoken=${encodeURIComponent(skypeToken)}`,
@@ -186,7 +187,7 @@ async function authViaAadToken(host: string, oid: string, opts: AsyncGwOpts): Pr
   const startedAt = Date.now()
   let res: Response
   try {
-    res = await transport(url, {
+    res = await sendWithBackoff(transport, url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -304,7 +305,7 @@ export async function fetchObjectByUrl(
     const startedAt = Date.now()
     let res: Response
     try {
-      res = await transport(url, {
+      res = await sendWithBackoff(transport, url, {
         method: 'GET',
         headers: authHeadersForSession(session),
         signal: opts?.signal,

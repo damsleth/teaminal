@@ -412,6 +412,24 @@ describe('429 handling', () => {
     // initial + 3 retries = 4 attempts total
     expect(httpCalls).toBe(4)
   })
+
+  test('aborting the request cuts the 429 back-off short', async () => {
+    primeAuth()
+    // A wait that never ends on its own: only the abort can end it.
+    __setSleepForTests(() => new Promise(() => {}))
+    let httpCalls = 0
+    __setTransportForTests(async () => {
+      httpCalls++
+      return new Response('throttled', { status: 429, headers: { 'retry-after': '600' } })
+    })
+    const ctrl = new AbortController()
+    const pending = graph({ method: 'GET', path: '/chats', signal: ctrl.signal }).catch((e) => e)
+    await new Promise((r) => setTimeout(r, 5))
+    ctrl.abort()
+    const err = await pending
+    expect((err as Error).name).toBe('AbortError')
+    expect(httpCalls).toBe(1)
+  })
 })
 
 describe('parseRetryAfter helper', () => {

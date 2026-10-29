@@ -20,6 +20,7 @@
 // 401 substatuscode 40102). Always go through the bulk getpresence POST,
 // even for self.
 
+import { sendWithBackoff } from './backoff'
 import { decodeJwtClaims, getToken, invalidate as invalidateOwaPiggy } from '../auth/owaPiggy'
 import { recordEvent } from '../log'
 
@@ -117,7 +118,7 @@ export async function getTeamsPresenceByOid(
   return withAadAuth(async () => {
     const token = await getToken(tokenOpts)
     const body = oids.map((oid) => ({ mri: mriFromOid(oid) }))
-    const res = await transport(ENDPOINT, {
+    const res = await sendWithBackoff(transport, ENDPOINT, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -185,7 +186,7 @@ export async function forceMyAvailability(
   await withAadAuth(async () => {
     const token = await getToken(tokenOpts)
     const url = 'https://presence.teams.microsoft.com/v1/me/forceavailability/'
-    const res = await transport(url, {
+    const res = await sendWithBackoff(transport, url, {
       method: 'PUT',
       headers: {
         Authorization: `Bearer ${token}`,
