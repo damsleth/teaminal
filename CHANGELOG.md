@@ -330,6 +330,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A focus background of "none" keeps the message's own background.**
+  Focusing one of your messages (or someone else's) with a message
+  background set used to clear it; it now stays as it is.
+
 - **All text follows the theme's text color.** Help lines, key hints, menu
   group headers, the header row and other text without a color of its own
   used the terminal's foreground, which could render black on a dark theme

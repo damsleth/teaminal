@@ -906,11 +906,13 @@ function MessageRow(props: {
     </Box>
   )
 
-  const bodyBg = props.focused
-    ? (theme.messageFocusBackground ?? undefined)
-    : isDeleted || isSystem
-      ? undefined
-      : ((isSelf ? theme.selfMessageBackground : theme.senderMessageBackground) ?? undefined)
+  // A focus background of none keeps the message's own background.
+  const bodyBg =
+    props.focused && theme.messageFocusBackground
+      ? theme.messageFocusBackground
+      : isDeleted || isSystem
+        ? undefined
+        : ((isSelf ? theme.selfMessageBackground : theme.senderMessageBackground) ?? undefined)
   const bodyTextNode = (
     <Text
       color={

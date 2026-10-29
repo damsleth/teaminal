@@ -88,6 +88,32 @@ test('the focus background colors the message body, not the focus marker', () =>
   expect(body.indexOf('>')).toBeLessThan(bg)
 })
 
+test('a focus background of none keeps the message its own background', () => {
+  const store = createAppStore()
+  store.set({
+    settings: {
+      ...store.get().settings,
+      messageFocusBackgroundColor: null,
+      themeOverrides: { senderMessageBackground: '#00ff00', selfMessageBackground: '#00ff00' },
+    },
+    focus: { kind: 'chat', chatId: 'c1' },
+    messagesByConvo: { 'chat:c1': MESSAGES },
+  })
+  const body = renderToString(
+    <StoreProvider store={store}>
+      <SessionProvider api={session}>
+        <Box flexDirection="column" height={40}>
+          <MessagePane focusedMessageId="m4" focusIndicatorActive />
+        </Box>
+      </SessionProvider>
+    </StoreProvider>,
+    { columns: 80 },
+  )
+    .split('\n')
+    .find((l) => l.includes('second day, second message'))!
+  expect(body).toContain('48;2;0;255;0')
+})
+
 test('text background padding paints bg columns around the body', () => {
   const body = render(40, 'm4', null, '#ff0000', 2)
     .split('\n')
