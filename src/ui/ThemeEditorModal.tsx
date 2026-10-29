@@ -258,7 +258,7 @@ export function ThemeEditorModal() {
   const rowNodes: ReactNode[] = displayRows.slice(start, end).map((row) => {
     if (row.kind === 'header')
       return (
-        <Text key={`h-${row.section}`} color="gray" backgroundColor={bg}>
+        <Text key={`h-${row.section}`} muted backgroundColor={bg}>
           {pad(`── ${row.section} `)}
         </Text>
       )
