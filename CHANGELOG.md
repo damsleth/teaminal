@@ -32,10 +32,10 @@ adheres to [Semantic Versioning](https://semver.org/).
   (`chatListWidth`) is auto or 16-60 columns, saved in presets; Ctrl-X
   resize mode still works.
 
-- **Every color can be "none".** All theme colors take `null` / none in
-  the editor: text and lines get no color of their own (the terminal's, or
-  the surrounding text's), backgrounds none, and frame colors fall back to
-  the border colors.
+- **Every color can be "none".** All theme colors except the per-presence
+  colors (`presence.*`) take `null` / none in the editor: text and lines
+  get no color of their own (the terminal's, or the surrounding text's),
+  backgrounds none, and frame colors fall back to the border colors.
 
 - **Chat list preview color and picture indent.** Theme editor **Chat
   list → Preview text** (`chatListPreviewText`, default: muted text) colors
@@ -44,7 +44,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   puts columns before the profile picture in conversations, moving the
   message with it.
 
-- **Profile pictures and chat list thumbnails.** Menu → **Messages →
+- **Profile pictures and chat list thumbnails.** Settings → **Messages →
   Profile pictures** (`messageAvatars`) and **Chat list → Thumbnails**
   (`chatListThumbnails`) take `off` / `small` / `medium` / `large` (1, 2 or
   3 rows tall; default off). Messages from other people get the sender's
@@ -61,19 +61,19 @@ adheres to [Semantic Versioning](https://semver.org/).
   elsewhere. Photos come from Graph; accounts without Graph access show
   initials.
 
-- **Transient timestamps.** Menu → **Show timestamps in messages** now
+- **Transient timestamps.** Settings → **Messages → Timestamps** now
   cycles `on` / `transient` / `off` (`showTimestampsInPane`). `transient`
   shows a timestamp only when a message comes 15 minutes or more after the
   previous one. `true` / `false` in config still mean `on` / `off`.
 
-- **Center dates in chat.** Menu → **Center dates in chat**
+- **Center dates in chat.** Settings → **Messages → Center dates**
   (`centerDateMarkers`, default off) centers the day separators.
 
 - **Sender message colors.** Theme editor **Sender message** and **Sender
   message bg** (`senderMessage`, `senderMessageBackground`) color other
   people's message bodies, mirroring the self message pair.
 
-- **Rounded message backgrounds.** Theme editor **Text bg rounded**
+- **Rounded message backgrounds.** Theme editor **Bg rounded**
   (`layout.textBackgroundRadius`, 0 or 1) frames message backgrounds in
   half blocks with chamfered corners, for a speech-bubble look. Pairs with
   the self / sender message backgrounds and text bg padding.
@@ -85,7 +85,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   message display options) in its `settings` block, and loading it
   applies them.
 
-- **Enter sends.** Menu → **Enter sends (Shift/Ctrl+Enter newline)**
+- **Enter sends.** Settings → **Navigation & input → Enter sends (Shift/Ctrl+Enter newline)**
   (`enterSends`, default off) flips the composer keys: Enter sends and
   Shift+Enter, Ctrl+Enter or Ctrl+J insert a newline. Only offered (and
   only honored) in terminals with the kitty keyboard protocol, where
@@ -96,19 +96,19 @@ adheres to [Semantic Versioning](https://semver.org/).
   whole conversation to that share of the message pane, with equal margins
   on both sides, so messages sit in a centered column that's easy to scan.
 
-- **Sender name toggles.** Menu → **Show sender names**
-  (`showSenderNamesInPane`) hides the name above every message, and **Show
-  my name on my messages** (`showOwnNameInPane`) hides it on your own,
+- **Sender name toggles.** Settings → **Messages → Sender names**
+  (`showSenderNamesInPane`) hides the name above every message, and **My
+  name on my messages** (`showOwnNameInPane`) hides it on your own,
   e.g. when they're right-aligned. Both default on.
 
 - **Date marker styling.** The day separators in a conversation ("Today",
   "Fri, May 15") get their own theme settings: **Date marker** color
   (`dateMarker`), **Date marker bold** (`emphasis.dateMarkerBold`),
-  **Date marker indent** (`layout.dateMarkerIndent`) and **Date marker**
-  font size (`fontSize.dateMarker`). Defaults match the old look.
+  **Date marker indent** (`layout.dateMarkerIndent`) and **Date marker
+  size** (`fontSize.dateMarker`). Defaults match the old look.
 
-- **Focused message bold toggle.** The theme editor's **Focused message
-  bold** (`emphasis.focusedBold`, default on) sets whether the focused
+- **Focused message bold toggle.** The theme editor's **Focused bold**
+  (`emphasis.focusedBold`, default on) sets whether the focused
   message's text is drawn bold.
 
 - **Theme presets.** Settings → Theme presets lists the built-in themes
@@ -138,16 +138,16 @@ adheres to [Semantic Versioning](https://semver.org/).
   plain text as before. Editing a multi-line message keeps its lines.
 
 - **Chat name header.** New setting (`showChatNameHeader`, menu → Settings
-  → Chat name header, default off) shows the open conversation's name above
+  → Messages → Chat name header, default off) shows the open conversation's name above
   the messages: the other person in a 1:1, the group chat's name, or
   `Team · # channel`.
 
-- **Chat list indent.** The theme editor's **Chat list indent**
+- **Chat list indent.** The theme editor's **Chat list → Indent**
   (`layout.chatListIndent`, default 1) sets the columns between a chat's
   presence dot or chat-type glyph and its name and preview.
 
 - **Center header bar.** New setting (`headerBarCentered`, menu → Settings
-  → Center header bar) centers the header bar segments. Off keeps them
+  → Header & status bar → Center header bar) centers the header bar segments. Off keeps them
   left-aligned.
 
 - **App background color.** The theme editor's new **Background**
@@ -179,20 +179,20 @@ adheres to [Semantic Versioning](https://semver.org/).
   from there. Terminals without the kitty text sizing protocol round to
   whole rows.
 
-- **Uncapped chat groups.** **Cap chat groups at 10** in the settings menu
+- **Uncapped chat groups.** **Chat list → Cap groups at 10** in the settings menu
   (`chatListSectionCap`, default `true`) can be turned off so grouped chat
   sections list every chat instead of the top 10 and a `… N more` row.
 
 - **Sender indent.** **Sender indent** (`themeOverrides.layout.senderIndent`,
-  0-6) sets the left indent of the sender name and timestamp line on its own.
-  **Message body indent** no longer moves the sender line.
+  0-40) sets the left indent of the sender name and timestamp line on its own.
+  **Body indent** no longer moves the sender line.
 
-- **Text background padding Y.** **Text bg padding Y**
+- **Text background padding Y.** **Bg padding Y**
   (`themeOverrides.layout.textBackgroundPaddingY`, 0-2) adds rows of
   background color above and below message bodies, next to the existing
-  **Text bg padding X**.
+  **Bg padding X**.
 
-- **Text background padding.** **Text bg padding X**
+- **Text background padding.** **Bg padding X**
   (`themeOverrides.layout.textBackgroundPaddingX`, 0-3) adds columns of
   background color on each side of message bodies, so the focus and
   self-message backgrounds read as solid blocks.
@@ -202,17 +202,18 @@ adheres to [Semantic Versioning](https://semver.org/).
   `selfMessage` body color) and `selfMessageBackground` (a background behind
   your own message bodies, `null` for none), both in the theme editor.
 
-- **Chat list gap.** A **Chat list gap** spacing setting (theme editor, or
+- **Chat list gap.** A **Chat list → Gap** spacing setting (theme editor, or
   `themeOverrides.layout.chatListGap`, 0-3) adds blank rows between chats so
   each chat and its preview read as one block.
 
-- **Per-element font sizes in kitty.** The theme editor has a **Font size**
-  section (and `themeOverrides.fontSize.*`) to shrink the chat header,
-  sender, timestamp, message text, chat list headers, chat names and
-  previews to 50-90% of the terminal font. Uses the kitty text sizing
+- **Per-element font sizes in kitty.** The theme editor has size settings
+  (and `themeOverrides.fontSize.*`) in each screen-area group (**Chat
+  header size**, **Sender size**, **Timestamp size**, **Text size**,
+  **Header size**, **Name size**, **Preview size**) to shrink those
+  elements to 50-90% of the terminal font. Uses the kitty text sizing
   protocol (OSC 66), detected at startup; other terminals render as before.
   Text only gets smaller: larger sizes would need two rows per line.
-  **Tight spacing** (on by default) also packs the letters of one-line
+  **Tight font spacing** (on by default) also packs the letters of one-line
   elements to the smaller pitch, leaving the saved space at the end; message
   text keeps full-cell spacing so wrapping stays correct.
 
@@ -245,7 +246,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   `themeOverrides.layout.avatarPinned: 1`). The profile picture moves in
   from the pane edge to sit just left of the conversation column, so it
   follows the conversation width.
-- **Presence on chat-list thumbnails** (menu → Chat list → Presence on
+- **Presence on chat-list thumbnails** (menu → Settings → Chat list → Presence on
   thumbnails, or `chatListPresenceStyle`). With thumbnails on, `badge` puts
   the presence dot on the picture's corner the way Teams does, and `bar`
   draws a colored strip down its left edge like Lync did. Both drop the
@@ -253,6 +254,10 @@ adheres to [Semantic Versioning](https://semver.org/).
   it as before.
 
 ### Changed
+
+- **`bun run dev:watch` reloads on a file change.** It used to exit when
+  bun's watcher sent SIGTERM before the reload; it now survives it and
+  restarts.
 
 - **Chat list previews say "You:" for your own last message**, in every
   kind of chat, instead of your first name. When the other person in a 1:1
@@ -302,7 +307,7 @@ adheres to [Semantic Versioning](https://semver.org/).
   Body indent and sender indent now go up to 40 columns (was 6).
 
 - **Preview lines in chat list.** `showMessagePreviews` is replaced by
-  `chatListPreviewLines` (menu → Settings → Preview lines in chat list):
+  `chatListPreviewLines` (menu → Settings → Chat list → Preview lines):
   off, 1, 2 or 3 lines, default 1. Previews now wrap on words and never run
   past that many lines (two-line previews could spill onto a third). An
   existing `showMessagePreviews: false` reads as off.
@@ -379,6 +384,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 - Saved message history trimmed to the newest 200 no longer claims to be
   complete, so older messages can still be loaded.
 
+- Scrolling up in a channel loads older messages again when the saved
+  history has no paging cursor (for example after it was trimmed to the
+  newest 200). Before, the channel stopped offering older messages.
+
+- Pictures that failed on a transient error (profile photos and inline
+  images) are asked for again once the retry delay ends. Emptying the cache
+  (**Empty cache (this profile)**) refetches the pictures on screen at once.
+
 - Edits to a message's attachments, mentions or event details are picked
   up by polling (before, only a changed count was).
 
@@ -438,8 +451,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 - **Day headers no longer vanish behind messages while scrolling.** When long
   wrapped messages made the timeline taller than the pane, rows were squeezed
   and a day header (or sender name) could be painted over by its neighbour.
-  Rows now keep their height and the overflow is clipped cleanly — at the top
-  when you're at the newest message, at the bottom when scrolled back.
+  Rows now keep their height and the overflow is clipped cleanly, at the top
+  when you're at the newest message, at the bottom when scrolled back. A tall
+  inline image at the top of the pane can no longer paint over the chat
+  header or the message search bar.
 - **You can see which chat-list heading is focused.** A focused section or team
   heading (Direct, Groups, Meetings, a collapsed team) used to change only its
   text color. That left it looking the same as the others in the light theme,

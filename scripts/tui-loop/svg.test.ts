@@ -27,6 +27,25 @@ describe('renderGridSvg', () => {
     expect(svg).toContain('fill="#0b0f14"') // the glyph, swapped to the page bg
   })
 
+  test('positions every glyph on its grid cell and omits an empty label', () => {
+    const svg = renderGridSvg([[cell('a'), cell('b'), cell('c')]], '')
+
+    expect(svg).toContain('<text x="10" y="28"')
+    expect(svg).toContain('<text x="18" y="28"')
+    expect(svg).toContain('<text x="26" y="28"')
+    expect(svg).not.toContain('font-size="11"')
+  })
+
+  test('keeps text after combining and wide characters on its own cell column', () => {
+    // 'e' + combining acute fills one cell; the wide glyph's second cell is blank.
+    const grid = [[cell('e\u0301'), cell('漢'), cell(' '), cell('z')]]
+    const svg = renderGridSvg(grid, '')
+
+    expect(svg).toContain('<text x="10" y="28" fill="#d6d6d6" font-weight="400">e\u0301</text>')
+    expect(svg).toContain('<text x="18" y="28"')
+    expect(svg).toContain('<text x="34" y="28" fill="#d6d6d6" font-weight="400">z</text>')
+  })
+
   test('escapes xml-significant characters', () => {
     const grid = [[cell('<'), cell('&')]]
     const svg = renderGridSvg(grid, 'escape & <test>')

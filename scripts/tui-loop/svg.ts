@@ -35,7 +35,11 @@ export function renderGridSvg(grid: Cell[][], label: string): string {
   const lines: string[] = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
     '<rect width="100%" height="100%" fill="#0b0f14"/>',
-    `<text x="${PADDING}" y="${PADDING - 2}" fill="#7f8b96" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11">${escapeXml(label)}</text>`,
+    ...(label
+      ? [
+          `<text x="${PADDING}" y="${PADDING - 2}" fill="#7f8b96" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11">${escapeXml(label)}</text>`,
+        ]
+      : []),
     '<g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" xml:space="preserve">',
   ]
 
@@ -64,9 +68,16 @@ export function renderGridSvg(grid: Cell[][], label: string): string {
         )
       }
       if (text.trim().length > 0) {
-        lines.push(
-          `<text x="${x}" y="${y}" fill="${fg}" font-weight="${weight}">${escapeXml(text)}</text>`,
-        )
+        // One <text> per cell pins every glyph to its own grid column. A run-level x lets the
+        // font's advance width drift the text away from the cell backgrounds, and counting
+        // code points instead of cells would shift text after combining or wide characters.
+        for (let c = start; c < col; c++) {
+          const ch = row[c]!.char
+          if (ch.trim().length === 0) continue
+          lines.push(
+            `<text x="${PADDING + c * CELL_WIDTH}" y="${y}" fill="${fg}" font-weight="${weight}">${escapeXml(ch)}</text>`,
+          )
+        }
       }
     }
   }

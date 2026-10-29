@@ -17,6 +17,13 @@ Azure AD app registration.
 > notifications are usable; the experimental real-time push transport
 > is opt-in. See [CHANGELOG.md](./CHANGELOG.md) for what's shipped.
 
+![A conversation open beside the chat list](docs/screenshots/conversation.png)
+
+![The command palette filtering settings over an open conversation](docs/screenshots/command-palette.png)
+
+The screenshots show the seeded offline mode with fixture data. Regenerate
+them with `bun run tui:shots` (see [TUI testing](#tui-testing)).
+
 ## Install
 
 Homebrew (recommended on macOS):
@@ -93,6 +100,11 @@ warnings and fall back to defaults.
   "centerDateMarkers": false,
   "showSenderNamesInPane": true,
   "showOwnNameInPane": true,
+  "showChatNameHeader": false,
+  "messageAvatars": "off",
+  "chatListThumbnails": "off",
+  "chatListPresenceStyle": "dot",
+  "headerBarCentered": false,
   "showReactions": "current",
   "messageFocusIndicatorEnabled": true,
   "messageFocusIndicatorChar": ">",
@@ -129,7 +141,7 @@ warnings and fall back to defaults.
 
 | Key                            | Values               | Default | Description                                                                              |
 | ------------------------------ | -------------------- | ------: | ---------------------------------------------------------------------------------------- |
-| `theme`                        | `auto`, `dark`, `light`, or a custom name | `dark` | Terminal palette + layout preset. `auto` isn't a theme of its own: it picks `light` or `dark` to match the terminal's background color (asked at startup), falling back to the macOS appearance when the terminal doesn't say; a later macOS appearance switch flips it too. Custom names load `~/.config/teaminal/themes/<name>.json` (see [Themes](#themes) below). |
+| `theme`                        | `auto`, `dark`, `light`, or a custom name | `auto` | Terminal palette + layout preset. `auto` isn't a theme of its own: it picks `light` or `dark` to match the terminal's background color (asked at startup), falling back to the macOS appearance when the terminal doesn't say; a later macOS appearance switch flips it too. Custom names load `~/.config/teaminal/themes/<name>.json` (see [Themes](#themes) below). |
 | `accounts`                     | string array         |    `[]` | owa-piggy profile aliases managed by Accounts.                                           |
 | `activeAccount`                | string or null       |  `null` | Default profile alias used at startup when `--profile` is not passed.                    |
 | `chatListShortNames`           | boolean              | `false` | Show first names in chat list rows.                                                      |
@@ -167,7 +179,7 @@ warnings and fall back to defaults.
 | `enterSends` | boolean | `false` | Flip the composer keys: Enter sends, Shift+Enter / Ctrl+Enter / Ctrl+J insert a newline. Only takes effect (and only shown in the menu, as **Enter sends**) in terminals with the kitty keyboard protocol, since elsewhere Shift+Enter is indistinguishable from Enter. |
 | `inlineImages`                 | `auto`, `off`        |  `auto` | `auto` renders message images inline in Kitty-compatible terminals, bounded to `inlineImageMaxRows` tall and the width of the message pane, so an image never overlaps neighbouring messages. `off` — and any terminal without Kitty graphics — renders one focusable `[img] name` row per image instead, reserving no picture rows. Space opens the focused image either way. |
 | `inlineImageMaxRows`           | integer 1-50         |    `10` | Maximum terminal rows reserved for a single inline image.                                |
-| `statusBarPosition`            | `bottom`, `hidden`   | `bottom` | Where the status bar renders. `hidden` suppresses it entirely, freeing one row of vertical space in the message pane. |
+| `statusBarPosition`            | `bottom`, `top`, `hidden` | `bottom` | Where the status bar renders: below the composer (`bottom`) or on the top row above the header (`top`). `hidden` suppresses it entirely, freeing one row of vertical space in the message pane. |
 | `chatRoutingByAccount`         | object               |    `{}` | Per-account chat transport mode: `graph+ic3`, `ic3+graph`, `ic3-only`, or `graph-only`. |
 | `chatListSort`                 | `recent`, `alphabetical` | `recent` | Order of chat rows in the sidebar. `recent` follows last-message time; `alphabetical` sorts by the displayed name. |
 | `chatListGroupByType`          | boolean              | `false` | Group sidebar chats under `Direct` / `Groups` / `Meetings` / `Other` headings. Each group shows at most 10 chats, with a `… N more` row to reveal the rest, so one busy type can't push teams and channels off the pane (turn off with `chatListSectionCap`). Headings are collapsible with `h` / `l`. |
@@ -184,9 +196,9 @@ warnings and fall back to defaults.
 
 ### Themes
 
-The four built-in themes (`dark`, `light`, `compact`, `comfortable`)
-live inside teaminal. `compact` and `comfortable` inherit the `dark`
-color palette but tighten or loosen paddings.
+The built-in themes are `dark` and `light`, plus `auto`, which picks one
+of the two to match the terminal's background. Your own presets are layered
+on one of the two (their `base`).
 
 **Presets.** Settings → Theme presets (or `p` in the theme editor) lists
 the built-in themes and your saved presets:
@@ -210,7 +222,9 @@ grouping, short names, preview lines, presence dots) and message options
 (chat name header, short names, timestamps, sender names, reactions,
 images, right-aligned own messages, focus marker, centered dates), and the
 profile pictures and chat list thumbnails sizes. Loading the preset
-applies them. Built-in themes carry none, so switching to one leaves them
+applies them.
+
+Built-in themes carry none, so switching to one leaves them
 as they are. Behavior settings (notifications, presence, scrolling, Enter
 sends) are not part of a preset.
 
@@ -234,6 +248,15 @@ subset of these keys is accepted:
   "senderMessage": null, // other people's message text; null = terminal text color
   "senderMessageBackground": null, // background behind other people's messages
   "chatListPreviewText": null, // chat list last-message preview (read chats); null = muted text
+  "selfName": "cyan", // your name above your own messages
+  "selfMessageBackground": null, // background behind your own messages
+  "messageFocusText": null, // focused message text; null = the message's own color
+  "messageFocusIndicator": "cyan", // the focus marker
+  "messageFocusBackground": null, // focused message background
+  "selectedRowBackground": "#262626", // selected chat-list row
+  "unreadRow": "yellow", // unread chat names
+  "systemEvent": "gray", // "Ada joined the chat" lines
+  "errorText": "red", // also warnText, infoText
   // Per-presence colors:
   "presence": { "Available": "greenBright", "DoNotDisturb": "red" },
   // Paddings / margins (non-negative integers):
@@ -265,7 +288,7 @@ subset of these keys is accepted:
     "selfMessage": "none", // your messages, color selfMessageBorder
     "senderMessage": "none", // other people's messages, color senderMessageBorder
   },
-  // Any color can be null ("none"): text and lines get no color of their own
+  // Any color except the presence colors can be null ("none"): text and lines get no color of their own
   // (the terminal's, or the surrounding text's), backgrounds none, and
   // frame colors fall back to "border" / "borderActive".
   // Per-role bold (true/false):
@@ -308,51 +331,57 @@ The in-app Settings menu persists changes back to `config.json`.
 
 ## Keybindings
 
-| Keys                   | When                 | Action                                                                                                                                                                                                                                                                           |
-| ---------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `j` / Down             | list                 | Move cursor down.                                                                                                                                                                                                                                                                |
-| `k` / Up               | list                 | Move cursor up.                                                                                                                                                                                                                                                                  |
-| `u` / PageUp           | list                 | Move up half a page.                                                                                                                                                                                                                                                             |
-| `d` / PageDown         | list                 | Move down half a page.                                                                                                                                                                                                                                                           |
-| Enter                  | list                 | Open selected chat or channel.                                                                                                                                                                                                                                                   |
-| Tab                    | chat / channel       | Toggle between message navigation and composer.                                                                                                                                                                                                                                  |
-| Tab                    | composer             | Return to message navigation.                                                                                                                                                                                                                                                    |
-| Esc                    | composer / filter    | Leave mode.                                                                                                                                                                                                                                                                      |
-| Esc                    | anywhere else        | Toggle the menu overlay. Use `h` / Left to step back a pane.                                                                                                                                                                                                                     |
-| Enter / Space          | menu                 | Activate the selected menu item (also in submenus).                                                                                                                                                                                                                              |
-| ← / →                  | menu                 | Step the selected setting's value backwards / forwards (Theme also cycles saved presets); → opens a submenu.                                                                                                                                                                     |
-| PgUp / PgDn, `u` / `d` | menu, theme editor   | Move half a page up / down.                                                                                                                                                                                                                                                      |
-| Ctrl+O                 | menu                 | Open the settings file in `$VISUAL` (or `$EDITOR`); reloads on exit.                                                                                                                                                                                                             |
-| Ctrl+T                 | menu                 | Open the theme file (config.json for built-in themes) the same way.                                                                                                                                                                                                              |
-| Ctrl+Enter             | composer             | Send message (or save an edit) in terminals with the kitty keyboard protocol (detected at startup). Ctrl+J also sends, in every terminal; Alt+Enter where Alt/Option sends Meta.                                                                                                 |
-| Enter                  | composer             | Insert newline.                                                                                                                                                                                                                                                                  |
-| `/`                    | list                 | Filter chats.                                                                                                                                                                                                                                                                    |
-| `n`                    | list                 | Open the new-chat prompt.                                                                                                                                                                                                                                                        |
-| `m`                    | list                 | Toggle the focused chat read/unread.                                                                                                                                                                                                                                             |
-| `h` / Left             | list                 | Collapse the focused row's section (chat type, team, or all Teams).                                                                                                                                                                                                              |
-| `l` / Right            | list                 | Expand the focused collapsed section, or show a section's hidden chats.                                                                                                                                                                                                          |
-| `a`                    | Accounts             | Find valid `owa-piggy status` profiles to add.                                                                                                                                                                                                                                   |
-| `d` / Delete           | Accounts             | Remove the focused account from teaminal's list.                                                                                                                                                                                                                                 |
-| `t`                    | Accounts             | Cycle the focused account's chat routing mode.                                                                                                                                                                                                                                   |
-| `h` / Left             | chat / channel       | Return to chat list.                                                                                                                                                                                                                                                             |
-| `j` / Down             | chat / channel       | Focus next message.                                                                                                                                                                                                                                                              |
-| `k` / Up               | chat / channel       | Focus previous message, or load older when focused at the top.                                                                                                                                                                                                                   |
-| `gg` / `G`             | chat / channel       | Jump to the oldest loaded / latest message.                                                                                                                                                                                                                                      |
-| `u` / PageUp           | chat / channel       | Move up half a page, or load older if that reaches the top.                                                                                                                                                                                                                      |
-| `d` / PageDown         | chat / channel       | Move down half a page.                                                                                                                                                                                                                                                           |
-| `t`                    | channel              | Open the thread for the focused channel message.                                                                                                                                                                                                                                 |
-| Space / `l`            | channel              | Open the thread when `j`/`k` has focused a message's `N replies` badge.                                                                                                                                                                                                          |
-| `/`                    | chat / channel       | Search messages in the open conversation.                                                                                                                                                                                                                                        |
-| Ctrl+P                 | list, chat, composer | Command palette: type to filter every command (menu items and settings, chats and channels, key actions), Enter runs it.                                                                                                                                                         |
-| `.` / Ctrl+.           | list, chat           | Context menu for the selected chat row (open, mark read / unread, delete) or the focused message (react, edit reactions, edit / delete your own, open a channel thread), shown beside it with each action's key. Ctrl+. needs the kitty keyboard protocol; `.` works everywhere. |
-| Ctrl+A                 | any                  | Open notifications (also in the Esc menu).                                                                                                                                                                                                                                       |
-| Ctrl+X                 | list                 | Enter resize mode (h/l chat list, j/k composer, 0 reset, Esc done).                                                                                                                                                                                                              |
-| Ctrl+B                 | list / chat          | Hide/show the chat list; list and chat then share one pane (h / l).                                                                                                                                                                                                              |
-| `?`                    | list                 | Show keybindings.                                                                                                                                                                                                                                                                |
-| `r`                    | any                  | Refresh now.                                                                                                                                                                                                                                                                     |
-| `Shift+R`              | any                  | Hard refresh: clear visible data and reload from Graph.                                                                                                                                                                                                                          |
-| `q`                    | list / menu          | Quit.                                                                                                                                                                                                                                                                            |
-| Ctrl+C                 | any                  | Quit.                                                                                                                                                                                                                                                                            |
+| Keys                   | When                   | Action                                                                                                                                                                                                                                                                           |
+| ---------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `j` / Down             | list                   | Move cursor down.                                                                                                                                                                                                                                                                |
+| `k` / Up               | list                   | Move cursor up.                                                                                                                                                                                                                                                                  |
+| `u` / PageUp           | list                   | Move up half a page.                                                                                                                                                                                                                                                             |
+| `d` / PageDown         | list                   | Move down half a page.                                                                                                                                                                                                                                                           |
+| Enter                  | list                   | Open selected chat or channel.                                                                                                                                                                                                                                                   |
+| Tab                    | chat / channel         | Toggle between message navigation and composer.                                                                                                                                                                                                                                  |
+| Tab                    | composer               | Return to message navigation.                                                                                                                                                                                                                                                    |
+| Esc                    | composer / filter      | Leave mode.                                                                                                                                                                                                                                                                      |
+| Esc                    | anywhere else          | Toggle the menu overlay. Use `h` / Left to step back a pane.                                                                                                                                                                                                                     |
+| Enter / Space          | menu                   | Activate the selected menu item (also in submenus).                                                                                                                                                                                                                              |
+| ← / →                  | menu                   | Step the selected setting's value backwards / forwards (Theme also cycles saved presets); → opens a submenu.                                                                                                                                                                     |
+| PgUp / PgDn, `u` / `d` | menu, theme editor     | Move half a page up / down.                                                                                                                                                                                                                                                      |
+| Ctrl+O                 | menu                   | Open the settings file in `$VISUAL` (or `$EDITOR`); reloads on exit.                                                                                                                                                                                                             |
+| Ctrl+T                 | menu                   | Open the theme file (config.json for built-in themes) the same way.                                                                                                                                                                                                              |
+| Ctrl+Enter             | composer (default)     | Send message (or save an edit) in terminals with the kitty keyboard protocol (detected at startup). Ctrl+J also sends, in every terminal; Alt+Enter where Alt/Option sends Meta.                                                                                                 |
+| Enter                  | composer (default)     | Insert newline.                                                                                                                                                                                                                                                                  |
+| Enter                  | composer, `enterSends` | Send message. Shift+Enter, Ctrl+Enter and Ctrl+J insert a newline instead (kitty keyboard protocol terminals only).                                                                                                                                                              |
+| `/`                    | list                   | Filter chats.                                                                                                                                                                                                                                                                    |
+| `n`                    | list                   | Open the new-chat prompt.                                                                                                                                                                                                                                                        |
+| `m`                    | list                   | Toggle the focused chat read/unread.                                                                                                                                                                                                                                             |
+| `h` / Left             | list                   | Collapse the focused row's section (chat type, team, or all Teams).                                                                                                                                                                                                              |
+| `l` / Right            | list                   | Expand the focused collapsed section, or show a section's hidden chats.                                                                                                                                                                                                          |
+| `a`                    | Accounts               | Find valid `owa-piggy status` profiles to add.                                                                                                                                                                                                                                   |
+| `d` / Delete           | Accounts               | Remove the focused account from teaminal's list.                                                                                                                                                                                                                                 |
+| `t`                    | Accounts               | Cycle the focused account's chat routing mode.                                                                                                                                                                                                                                   |
+| `h` / Left             | chat / channel         | Return to chat list.                                                                                                                                                                                                                                                             |
+| `j` / Down             | chat / channel         | Focus next message.                                                                                                                                                                                                                                                              |
+| `k` / Up               | chat / channel         | Focus previous message, or load older when focused at the top.                                                                                                                                                                                                                   |
+| `gg` / `G`             | chat / channel         | Jump to the oldest loaded / latest message.                                                                                                                                                                                                                                      |
+| `u` / PageUp           | chat / channel         | Move up half a page, or load older if that reaches the top.                                                                                                                                                                                                                      |
+| `d` / PageDown         | chat / channel         | Move down half a page.                                                                                                                                                                                                                                                           |
+| `t`                    | channel                | Open the thread for the focused channel message.                                                                                                                                                                                                                                 |
+| Space / `l`            | channel                | Open the thread when `j`/`k` has focused a message's `N replies` badge.                                                                                                                                                                                                          |
+| `/`                    | chat / channel         | Search messages in the open conversation.                                                                                                                                                                                                                                        |
+| Ctrl+P                 | list, chat, composer   | Command palette: type to filter every command (menu items and settings, chats and channels, key actions), Enter runs it.                                                                                                                                                         |
+| `.` / Ctrl+.           | list, chat             | Context menu for the selected chat row (open, mark read / unread, delete) or the focused message (react, edit reactions, edit / delete your own, open a channel thread), shown beside it with each action's key. Ctrl+. needs the kitty keyboard protocol; `.` works everywhere. |
+| `s`                    | list, chat             | Search all messages (server-side).                                                                                                                                                                                                                                               |
+| `p`                    | list, chat             | Find people and start a chat.                                                                                                                                                                                                                                                    |
+| Ctrl+D                 | list, chat             | Delete the chat (asks for confirmation).                                                                                                                                                                                                                                         |
+| `r` / `t`              | chat                   | React to the focused message / edit your reactions on it.                                                                                                                                                                                                                        |
+| `e` / `x`              | chat                   | Edit / delete your own focused message.                                                                                                                                                                                                                                          |
+| Ctrl+A                 | any                    | Open notifications (also in the Esc menu).                                                                                                                                                                                                                                       |
+| Ctrl+X                 | list                   | Enter resize mode (h/l chat list, j/k composer, 0 reset, Esc done).                                                                                                                                                                                                              |
+| Ctrl+B                 | list / chat            | Hide/show the chat list; list and chat then share one pane (h / l).                                                                                                                                                                                                              |
+| `?`                    | list                   | Show keybindings.                                                                                                                                                                                                                                                                |
+| `r`                    | list, channel          | Refresh now (in a chat, `r` reacts to the focused message).                                                                                                                                                                                                                      |
+| `Shift+R`              | list, chat, channel    | Hard refresh: clear visible data and reload from Graph.                                                                                                                                                                                                                          |
+| `q`                    | list / menu            | Quit.                                                                                                                                                                                                                                                                            |
+| Ctrl+C                 | any                    | Quit.                                                                                                                                                                                                                                                                            |
 
 Open the in-app keybindings reference with `?` from the list or
 through Help -> Keybindings.
@@ -404,6 +433,10 @@ bun run tui:flows
 
 Flow test files live under `scripts/tui-loop/flows/`. Add a new
 `*.test.ts` there to cover additional UI flows.
+
+The README screenshots in `docs/screenshots/` come from
+`scripts/tui-loop/flows/readme-shots.test.ts`. Running the flows rewrites
+the PNGs from the seeded fixture data, with no label and no text snapshot.
 
 ## Contributing
 
