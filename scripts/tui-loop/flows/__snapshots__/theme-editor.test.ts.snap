@@ -7,7 +7,7 @@ exports[`theme-editor: opens from Settings and renders fields + preview | 1`] = 
 │╰───────────────│   • = unsaved edit · s saves them into a preset                  │───────────────╯│
 │╭───────────────│   ── General                                                     │───────────────╮│
 ││ ◯ Ada Byron   │   >   Background            none                                 │               ││
-││   Ada: The lau│       Text                  ██ white                             │               ││
+││   The launch n│       Text                  ██ white                             │               ││
 ││  Design Sync │       Muted text            ██ gray                              │               ││
 ││   Nina: Nina s│       Border                ██ gray                              │               ││
 ││  Ops Channel │      ↓ 67 more                                                   │               ││

@@ -7,7 +7,7 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
 │╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
 ││ ◯ Ada Byron              ││Select a chat or channel · Enter to open · q to quit                  ││
-││   Ada: The launch notes… ││                                                                      ││
+││   The launch notes are…  ││                                                                      ││
 ││  Design Sync            ││                                                                      ││
 ││   Nina: Nina shared two… ││                                                                      ││
 ││  Ops Channel            ││                                                                      ││
@@ -121,11 +121,13 @@ exports[`activity-panel: Ctrl-A opens the Activity overlay | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "26,5": {
-    "bgColorMode": 0,
-    "bgColor": -1,
+  "25,5": {
     "fgColorMode": 0,
     "fgColor": -1
+  },
+  "26,5": {
+    "bgColorMode": 0,
+    "bgColor": -1
   },
   "27,5": {
     "fgColorMode": 16777216,
@@ -623,7 +625,7 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
 │╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
 ││ ◯ Ada Byron              ││ Older history unavailable until poller pagination is wired           ││
-││   Ada: The launch notes… ││ Fri, May 29                                                          ││
+││   The launch notes are…  ││ Fri, May 29                                                          ││
 ││  Design Sync            ││  You  09:00                                                          ││
 ││   Nina: Nina shared two… ││  I will read them now.                                               ││
 ││  Ops Channel            ││                                                                      ││
@@ -745,11 +747,13 @@ exports[`composer-active: Enter opens a chat and Tab focuses the composer | 1`] 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "26,5": {
-    "bgColorMode": 0,
-    "bgColor": -1,
+  "25,5": {
     "fgColorMode": 0,
     "fgColor": -1
+  },
+  "26,5": {
+    "bgColorMode": 0,
+    "bgColor": -1
   },
   "27,5": {
     "fgColorMode": 16777216,

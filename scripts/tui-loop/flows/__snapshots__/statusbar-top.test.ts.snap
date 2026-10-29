@@ -9,7 +9,7 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
 │╭──────────╮╭────────────────────────────────────╮│
 ││ ◯ Ada    ││Select a chat or channel · Enter to ││
 ││   Byron  ││open · q to quit                    ││
-││   Ada:…  ││                                    ││
+││   The…   ││                                    ││
 ││  Design ││                                    ││
 ││    Sync  ││                                    ││
 ││   Nina:… ││                                    ││
@@ -181,7 +181,7 @@ exports[`statusbar-top narrow › narrow header truncates to one row instead of 
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "9,7": {
+  "8,7": {
     "fgColorMode": 0,
     "fgColor": -1
   },
@@ -728,7 +728,7 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
 │╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
 ││ ◯ Ada Byron              ││Select a chat or channel · Enter to open · q to quit                  ││
-││   Ada: The launch notes… ││                                                                      ││
+││   The launch notes are…  ││                                                                      ││
 ││  Design Sync            ││                                                                      ││
 ││   Nina: Nina shared two… ││                                                                      ││
 ││  Ops Channel            ││                                                                      ││
@@ -875,11 +875,13 @@ exports[`statusbar-top wide › status bar renders at the top, header is a singl
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "26,6": {
-    "bgColorMode": 0,
-    "bgColor": -1,
+  "25,6": {
     "fgColorMode": 0,
     "fgColor": -1
+  },
+  "26,6": {
+    "bgColorMode": 0,
+    "bgColor": -1
   },
   "27,6": {
     "fgColorMode": 16777216,

@@ -7,7 +7,7 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
 │╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
 ││ ◯ Ada Byron              ││Select a chat or channel · Enter to open · q to quit                  ││
-││   Ada: The launch notes… ││                                                                      ││
+││   The launch notes are…  ││                                                                      ││
 ││  Design Sync            ││                                                                      ││
 ││   Nina: Nina shared two… ││                                                                      ││
 ││  Ops Channel            ││                                                                      ││
@@ -143,11 +143,13 @@ exports[`chat-list-selection: j key moves selection to Design Sync | 1`] = Strin
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "26,5": {
-    "bgColorMode": 0,
-    "bgColor": -1,
+  "25,5": {
     "fgColorMode": 0,
     "fgColor": -1
+  },
+  "26,5": {
+    "bgColorMode": 0,
+    "bgColor": -1
   },
   "27,5": {
     "fgColorMode": 16777216,
@@ -707,7 +709,7 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
 │╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
 │╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
 ││ ◯ Ada Byron              ││Select a chat or channel · Enter to open · q to quit                  ││
-││   Ada: The launch notes… ││                                                                      ││
+││   The launch notes are…  ││                                                                      ││
 ││  Design Sync            ││                                                                      ││
 ││   Nina: Nina shared two… ││                                                                      ││
 ││  Ops Channel            ││                                                                      ││
@@ -843,11 +845,13 @@ exports[`initial-shell: Ada Byron visible on startup | 1`] = String.raw`
     "fgColorMode": 16777216,
     "fgColor": 8
   },
-  "26,5": {
-    "bgColorMode": 0,
-    "bgColor": -1,
+  "25,5": {
     "fgColorMode": 0,
     "fgColor": -1
+  },
+  "26,5": {
+    "bgColorMode": 0,
+    "bgColor": -1
   },
   "27,5": {
     "fgColorMode": 16777216,
