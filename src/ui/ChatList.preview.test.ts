@@ -1,6 +1,23 @@
 import { expect, test } from 'bun:test'
 import { mergeSettings } from '../config'
-import { clampToLines } from './ChatList'
+import type { Chat } from '../types'
+import { clampToLines, previewLineForChat } from './ChatList'
+
+test('preview prefix: "You" for your own, none for the other side of a 1:1, the name in groups', () => {
+  const chat = (chatType: string, id: string, displayName: string) =>
+    ({
+      id: 'c',
+      chatType,
+      lastMessagePreview: {
+        body: { contentType: 'text', content: 'hi' },
+        from: { user: { id, displayName } },
+      },
+    }) as unknown as Chat
+  expect(previewLineForChat(chat('oneOnOne', 'me', 'Carl'), 40, 1, 'me')).toBe('You: hi')
+  expect(previewLineForChat(chat('group', 'me', 'Carl'), 40, 1, 'me')).toBe('You: hi')
+  expect(previewLineForChat(chat('oneOnOne', 'ada', 'Ada'), 40, 1, 'me')).toBe('hi')
+  expect(previewLineForChat(chat('group', 'ada', 'Ada'), 40, 1, 'me')).toBe('Ada: hi')
+})
 
 test('clamps a word-wrapped preview to N lines, ellipsis on the last kept one', () => {
   const text = 'Vibeke: Hei Kim. Håper alt står bra til:) Jeg har noen pund'

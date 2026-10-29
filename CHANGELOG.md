@@ -239,8 +239,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- **1:1 chat previews skip the sender name.** The row already names the
-  other person, so the preview line shows only the message.
+- **Chat list previews say "You:" for your own last message**, in every
+  kind of chat, instead of your first name. When the other person in a 1:1
+  chat wrote last, the preview shows only the message, since the row
+  already names them.
 
 - **The composer uses your terminal's cursor.** The caret is the real
   terminal cursor, so it has the shape, color and blink you set in the
