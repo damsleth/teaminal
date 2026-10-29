@@ -239,6 +239,9 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **1:1 chat previews skip the sender name.** The row already names the
+  other person, so the preview line shows only the message.
+
 - **The composer uses your terminal's cursor.** The caret is the real
   terminal cursor, so it has the shape, color and blink you set in the
   terminal (e.g. a blinking bar in kitty), instead of a drawn block.

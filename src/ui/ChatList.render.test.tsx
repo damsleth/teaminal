@@ -108,6 +108,8 @@ test('chatListPreviewText colors the previews of read chats', () => {
   )
   const preview = out.split('\n').find((l) => l.includes('The launch notes'))!
   expect(preview).toContain('38;2;255;0;0m')
+  // 1:1 previews skip the sender name; the row already names them.
+  expect(preview).not.toContain('Ada')
 })
 
 test('the selected row is colored as a whole and can be framed', () => {

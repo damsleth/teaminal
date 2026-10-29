@@ -637,7 +637,7 @@ export function clampToLines(text: string, width: number, maxLines: number): str
   return kept.join('\n')
 }
 
-// "Sender: message" preview for a chat's last message, clamped to `maxLines`.
+// "Sender: message" preview (plain message in 1:1 chats) for a chat's last message, clamped to `maxLines`.
 // Empty string when the chat has no last-message preview or previews are off.
 function previewLineForChat(
   chat: Extract<SelectableItem, { kind: 'chat' }>['chat'],
@@ -647,7 +647,9 @@ function previewLineForChat(
   if (maxLines <= 0) return ''
   const text = previewChat(chat)
   if (!text) return ''
-  const sender = chat.lastMessagePreview?.from?.user?.displayName
+  // A 1:1 chat's row already names the other person; the prefix only costs room.
+  const sender =
+    chat.chatType === 'oneOnOne' ? undefined : chat.lastMessagePreview?.from?.user?.displayName
   const line = sender ? `${shortName(sender)}: ${text}` : text
   return clampToLines(line, width, maxLines)
 }
