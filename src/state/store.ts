@@ -131,6 +131,8 @@ export type ModalState =
   // Tenant-wide server-side message search (Microsoft Search API). The
   // query / results / cursor live in the modal component's local state.
   | { kind: 'message-search-global' }
+  // Command palette (Ctrl+P); query and cursor live in the component.
+  | { kind: 'command-palette' }
   // Reaction picker for the focused chat message. Delegates to the macOS
   // system emoji picker and captures the glyph it inserts (see
   // ReactionPickerModal); toggleReaction resolves the existing reaction itself.

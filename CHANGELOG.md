@@ -8,6 +8,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Command palette (Ctrl+P).** From the chat list, a conversation or the
+  composer: type to filter every command (all menu items and settings with
+  their current values, every chat and channel, and key actions like new
+  chat, search, refresh, resize), Enter runs it. Fuzzy matching ranks word
+  starts and runs of letters first.
+
 - **Frames around highlighted elements.** Border style and color for the
   selected chat-list row (`borders.selectedRow`, `selectedRowBorder`), the
   focused message (`borders.focusedMessage`, `messageFocusBorder`) and your
