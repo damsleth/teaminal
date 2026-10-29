@@ -223,6 +223,7 @@ export const FIELDS: readonly EditableField[] = [
   num('fontSize', 'sender', 'Sender size', 'Sender & time', 50, 100, 10),
   num('layout', 'senderIndent', 'Sender indent', 'Sender & time', 0, 40),
   num('layout', 'avatarIndent', 'Picture indent', 'Sender & time', 0, 40),
+  num('layout', 'senderPinned', 'Pin sender to message', 'Sender & time', 0, 1),
   color('timestamp', 'Timestamp', 'Sender & time', true),
   num('fontSize', 'timestamp', 'Timestamp size', 'Sender & time', 50, 100, 10),
   // — Message text —

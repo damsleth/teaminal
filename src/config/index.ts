@@ -108,6 +108,7 @@ const LAYOUT_KEYS = new Set<keyof NonNullable<ThemeOverrides['layout']>>([
   'messageMaxWidth',
   'textBackgroundRadius',
   'avatarIndent',
+  'senderPinned',
 ])
 
 const BORDERS_KEYS = new Set<keyof NonNullable<ThemeOverrides['borders']>>([

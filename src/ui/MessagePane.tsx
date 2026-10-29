@@ -1006,43 +1006,48 @@ function MessageRow(props: {
       {flip && marker}
     </Box>
   )
+  // Pinned (layout.senderPinned): the sender line sits in the conversation
+  // column at the body indent, so it lines up with the message below it.
+  const pinned = theme.layout.senderPinned > 0
+  const headerIndent = pinned ? indent : senderIndent
+  const header = hasHeader ? (
+    <Box flexDirection="row" height={props.tallHeader ? 2 : undefined}>
+      {!flip && headerIndent > 0 && <Box width={headerIndent} flexShrink={0} />}
+      <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
+        <Text wrap="truncate-end">
+          <Text
+            color={isSelf && !sendError && !isSending ? theme.selfName : (color ?? theme.sender)}
+            bold={senderName.length > 0 && theme.emphasis.senderBold}
+          >
+            {props.tallHeader
+              ? fsTall(senderName, theme.fontSize.sender)
+              : fs(senderName, theme.fontSize.sender, theme.fontSize.tightSpacing)}
+          </Text>
+          {props.showTimestamp && (
+            <Text color={theme.timestamp}>
+              {props.tallHeader
+                ? fsTall(timeText, theme.fontSize.timestamp)
+                : fs(timeText, theme.fontSize.timestamp, theme.fontSize.tightSpacing)}
+            </Text>
+          )}
+        </Text>
+      </Box>
+      {flip && headerIndent > 0 && <Box width={headerIndent} flexShrink={0} />}
+    </Box>
+  ) : null
   const block = (
     <>
-      {hasHeader ? (
-        <Box flexDirection="row" height={props.tallHeader ? 2 : undefined}>
-          {!flip && senderIndent > 0 && <Box width={senderIndent} flexShrink={0} />}
-          <Box flexGrow={1} flexShrink={1} minWidth={0} justifyContent={align}>
-            <Text wrap="truncate-end">
-              <Text
-                color={
-                  isSelf && !sendError && !isSending ? theme.selfName : (color ?? theme.sender)
-                }
-                bold={senderName.length > 0 && theme.emphasis.senderBold}
-              >
-                {props.tallHeader
-                  ? fsTall(senderName, theme.fontSize.sender)
-                  : fs(senderName, theme.fontSize.sender, theme.fontSize.tightSpacing)}
-              </Text>
-              {props.showTimestamp && (
-                <Text color={theme.timestamp}>
-                  {props.tallHeader
-                    ? fsTall(timeText, theme.fontSize.timestamp)
-                    : fs(timeText, theme.fontSize.timestamp, theme.fontSize.tightSpacing)}
-                </Text>
-              )}
-            </Text>
-          </Box>
-          {flip && senderIndent > 0 && <Box width={senderIndent} flexShrink={0} />}
-        </Box>
-      ) : null}
+      {!pinned && header}
       {/* The message itself narrows to layout.messageMaxWidth, centered; the
-          sender line above keeps the full width and its own sender indent. */}
+          sender line above keeps the full width and its own sender indent,
+          unless pinned into this column. */}
       <Box
         flexDirection="column"
         flexShrink={0}
         width={conversationWidth}
         alignSelf={conversationWidth ? 'center' : undefined}
       >
+        {pinned && header}
         {!hasHeader && bodyRow}
         {quotedReply &&
           contentRow(
