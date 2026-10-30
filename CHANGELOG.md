@@ -6,7 +6,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.25.0] - 2026-10-30
+## [0.25.1] - 2026-10-30
 
 ### Added
 
@@ -24,6 +24,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 - "Available while terminal focused" now works: it registers a Desktop
   endpoint with the Teams presence service first. `forceavailability` alone
   was stored but ignored while only a mobile client was active.
+- Picking a presence updates the header at once instead of on the next ~60s poll.
 - A network error on the Teams presence call no longer leaves your own
   presence stale; it falls back to Graph like an auth error does.
 
@@ -1723,7 +1724,8 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.25.1...HEAD
+[0.25.1]: https://github.com/damsleth/teaminal/compare/v0.24.0...v0.25.1
 [0.24.0]: https://github.com/damsleth/teaminal/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/damsleth/teaminal/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/damsleth/teaminal/compare/v0.21.1...v0.22.0
