@@ -61,6 +61,7 @@ export function CommandPalette(props: {
   const channelsByTeam = useAppState((s) => s.channelsByTeam)
   const nameByUserId = useAppState((s) => s.nameByUserId)
   const me = useAppState((s) => s.me)
+  const presenceChoice = useAppState((s) => s.presenceChoice)
   const [query, setQuery] = useState('')
   // The selection follows a command, not a position, so a chat moving in
   // the list while the palette is open can't change what Enter runs.
@@ -72,16 +73,40 @@ export function CommandPalette(props: {
   const baseCommands = useMemo(
     () =>
       isOpen
-        ? buildCommands({ settings, chats, teams, channelsByTeam, nameByUserId, me } as AppState, {
-            runMenuItem: (item, path) => runMenuItem(item, path, { store, session, exit }),
-            focusChat: (chatId) =>
-              store.set({ focus: { kind: 'chat', chatId }, inputZone: 'list' }),
-            focusChannel: (teamId, channelId) =>
-              store.set({ focus: { kind: 'channel', teamId, channelId }, inputZone: 'list' }),
-            keyActions: [],
-          })
+        ? buildCommands(
+            {
+              settings,
+              chats,
+              teams,
+              channelsByTeam,
+              nameByUserId,
+              me,
+              presenceChoice,
+            } as AppState,
+            {
+              runMenuItem: (item, path) => runMenuItem(item, path, { store, session, exit }),
+              setPresence: (choice) => store.set({ presenceChoice: choice }),
+              focusChat: (chatId) =>
+                store.set({ focus: { kind: 'chat', chatId }, inputZone: 'list' }),
+              focusChannel: (teamId, channelId) =>
+                store.set({ focus: { kind: 'channel', teamId, channelId }, inputZone: 'list' }),
+              keyActions: [],
+            },
+          )
         : [],
-    [isOpen, settings, chats, teams, channelsByTeam, nameByUserId, me, store, session, exit],
+    [
+      isOpen,
+      settings,
+      chats,
+      teams,
+      channelsByTeam,
+      nameByUserId,
+      me,
+      presenceChoice,
+      store,
+      session,
+      exit,
+    ],
   )
   const commands: Command[] = useMemo(
     () => [

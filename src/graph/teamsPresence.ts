@@ -44,6 +44,8 @@ export type TeamsPresenceEntry = {
   activity: string
   deviceType?: string
   outOfOffice?: boolean
+  // Status message ("note"); `expiry` is absent when it never expires.
+  note?: { message: string; expiry?: string }
 }
 
 export type TeamsPresenceOpts = {
@@ -68,6 +70,7 @@ type RawPresence = {
   activity?: string
   deviceType?: string
   calendarData?: { isOutOfOffice?: boolean }
+  note?: { message?: string; expiry?: string }
 }
 
 type RawEntry = {
@@ -108,6 +111,14 @@ async function safeText(res: Response): Promise<string> {
   }
 }
 
+// The service reports "never expires" as year 9999; an empty message is no
+// note at all.
+function parseNote(raw: RawPresence['note']): TeamsPresenceEntry['note'] {
+  if (!raw?.message) return undefined
+  const expiry = raw.expiry && !raw.expiry.startsWith('9999') ? raw.expiry : undefined
+  return { message: raw.message, expiry }
+}
+
 export async function getTeamsPresenceByOid(
   oids: string[],
   opts?: TeamsPresenceOpts,
@@ -146,6 +157,7 @@ export async function getTeamsPresenceByOid(
         activity: entry.presence.activity ?? 'PresenceUnknown',
         deviceType: entry.presence.deviceType,
         outOfOffice: entry.presence.calendarData?.isOutOfOffice,
+        note: parseNote(entry.presence.note),
       })
     }
     return out
@@ -199,6 +211,86 @@ export async function forceMyAvailability(
       throw new TeamsPresenceError(
         res.status,
         `presence.teams.microsoft.com/forceavailability ${res.status}: ${await safeText(res)}`,
+      )
+    }
+  }, tokenOpts)
+}
+
+// Publish (or, with an empty message, clear) the status message shown on
+// the user's Teams profile and next to their name.
+//
+// Endpoint shape (validated 2026-10-30):
+//   PUT https://presence.teams.microsoft.com/v1/me/publishnote
+//   Body: { "message": "text", "expiry": "<ISO 8601>" }  (expiry optional)
+//   Response: 200 with empty body.
+// An empty message with no expiry is how the Teams client clears the note.
+export async function publishMyNote(
+  message: string,
+  expiry: Date | null,
+  opts?: TeamsPresenceOpts,
+): Promise<void> {
+  const tokenOpts = { profile: opts?.profile, scope: TEAMS_PRESENCE_SCOPE }
+  await withAadAuth(async () => {
+    const token = await getToken(tokenOpts)
+    const url = 'https://presence.teams.microsoft.com/v1/me/publishnote'
+    const body: { message: string; expiry?: string } = { message }
+    if (message && expiry) body.expiry = expiry.toISOString()
+    const res = await sendWithBackoff(transport, url, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: opts?.signal,
+    })
+    if (!res.ok) {
+      throw new TeamsPresenceError(
+        res.status,
+        `presence.teams.microsoft.com/publishnote ${res.status}: ${await safeText(res)}`,
+      )
+    }
+  }, tokenOpts)
+}
+
+// Register this process as an active Desktop endpoint (Available/Available).
+// forceavailability only changes the effective presence while some endpoint
+// of the user is active; without one it is stored but ignored, and a lone
+// mobile client reads as Away. The endpoint lapses on its own a few minutes
+// after the last call, so callers re-register on a timer.
+//
+// Endpoint shape (validated 2026-10-30):
+//   PUT https://presence.teams.microsoft.com/v1/me/endpoints/
+//   Body: { id, availability: "Available", activity: "Available",
+//           deviceType: "Desktop" }
+//   Response: 201 with empty body. Other availability/activity pairs 400
+//   ("Invalid Incoming Endpoint State"): force those afterwards.
+export async function registerMyEndpoint(id: string, opts?: TeamsPresenceOpts): Promise<void> {
+  const tokenOpts = { profile: opts?.profile, scope: TEAMS_PRESENCE_SCOPE }
+  await withAadAuth(async () => {
+    const token = await getToken(tokenOpts)
+    const res = await sendWithBackoff(
+      transport,
+      'https://presence.teams.microsoft.com/v1/me/endpoints/',
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id,
+          availability: 'Available',
+          activity: 'Available',
+          deviceType: 'Desktop',
+        }),
+        signal: opts?.signal,
+      },
+    )
+    if (!res.ok) {
+      throw new TeamsPresenceError(
+        res.status,
+        `presence.teams.microsoft.com/endpoints ${res.status}: ${await safeText(res)}`,
       )
     }
   }, tokenOpts)

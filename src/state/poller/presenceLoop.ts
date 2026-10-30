@@ -76,6 +76,7 @@ export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
                   id: meId,
                   availability: teams.availability as Presence['availability'],
                   activity: teams.activity as Presence['activity'],
+                  note: teams.note,
                 },
               })
               updated = true
@@ -92,7 +93,10 @@ export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
               teamsPresenceUnreachable = true
               reportError(err)
             } else {
-              throw err
+              // Transient network failure on the Teams path (DNS, reset
+              // socket): report it and let Graph supply self-presence
+              // instead of leaving the header stale.
+              reportError(err)
             }
           }
         }

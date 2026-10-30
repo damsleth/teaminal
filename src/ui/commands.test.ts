@@ -12,6 +12,7 @@ function setup() {
   const runners: CommandRunners = {
     runMenuItem: (item: MenuItem, path: string[]) =>
       ran.push(`menu:${[...path, item.id].join('/')}`),
+    setPresence: (c) => ran.push(`presence:${c}`),
     focusChat: (id) => ran.push(`chat:${id}`),
     focusChannel: (t, c) => ran.push(`channel:${t}:${c}`),
     keyActions: [{ id: 'refresh', title: 'Refresh', keys: 'r', run: () => ran.push('refresh') }],
@@ -66,4 +67,10 @@ test('fitCells pads and cuts by terminal cells, never splitting a character', ()
   expect(fitCells('ab', 4)).toBe('ab  ')
   expect(fitCells('漢字漢字', 5)).toBe('漢字…')
   expect(Bun.stringWidth(fitCells('👍👍👍', 4))).toBe(4)
+})
+
+test('presence commands set the picked presence', () => {
+  const { commands, ran } = setup()
+  commands.find((c) => c.id === 'presence:Busy')?.run()
+  expect(ran).toEqual(['presence:Busy'])
 })

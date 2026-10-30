@@ -1,6 +1,7 @@
-// Drives presence.teams.microsoft.com /v1/me/forceavailability/ while the
-// terminal window has focus, mimicking the desktop client's "I am
-// active, mark me Available" behavior.
+// Keeps an active Desktop endpoint registered and forces the picked
+// presence (default Available) on presence.teams.microsoft.com while the
+// terminal window has focus, mimicking the desktop client's "I am active,
+// mark me Available" behavior. A non-Available pick is held while blurred.
 //
 // Lifecycle:
 //   - Subscribes to the store. When (terminalFocused && setting on)
@@ -19,7 +20,7 @@
 //   - Aborts during shutdown are silent.
 
 import { owaProfile, type AccountRef } from '../account'
-import { forceMyAvailability, TeamsPresenceError } from '../graph/teamsPresence'
+import { forceMyAvailability, registerMyEndpoint, TeamsPresenceError } from '../graph/teamsPresence'
 import { warn } from '../log'
 import type { AppState, Store } from './store'
 
@@ -29,6 +30,9 @@ const REFRESH_MS = 4 * 60 * 1000
 
 export type ForceAvailabilityHandle = {
   stop: () => void
+  // Put presence back to Available when the user had picked something else.
+  // Call before stop(); bounded by a short timeout so quitting never hangs.
+  reset: () => Promise<void>
 }
 
 // `getAccount` names the account currently in the foreground; the driver
@@ -41,6 +45,8 @@ export function startForceAvailabilityDriver(
   let inFlight: AbortController | null = null
   let unreachable = false
   let stopped = false
+  // One endpoint id per run: re-registering the same id keeps it alive.
+  const endpointId = crypto.randomUUID()
 
   const cancelTimer = (): void => {
     if (timer) {
@@ -56,7 +62,10 @@ export function startForceAvailabilityDriver(
     inFlight = new AbortController()
     const signal = inFlight.signal
     try {
-      await forceMyAvailability('Available', { profile: owaProfile(getAccount()), signal })
+      const profile = owaProfile(getAccount())
+      // forceavailability is ignored unless an endpoint of ours is active.
+      await registerMyEndpoint(endpointId, { profile, signal })
+      await forceMyAvailability(store.get().presenceChoice, { profile, signal })
     } catch (err) {
       if (signal.aborted) return
       if (err instanceof Error && /abort/i.test(err.message)) return
@@ -86,6 +95,7 @@ export function startForceAvailabilityDriver(
   }
 
   let prevOn = false
+  let prevChoice = store.get().presenceChoice
   let lastAccount = getAccount().id
   const handle = (s: AppState): void => {
     // Account switch: a 403 on the previous account must not latch this one
@@ -100,7 +110,9 @@ export function startForceAvailabilityDriver(
       inFlight?.abort()
     }
     const isOn = shouldFire(s)
-    if (isOn && !prevOn) {
+    const choiceChanged = s.presenceChoice !== prevChoice
+    prevChoice = s.presenceChoice
+    if (isOn && (!prevOn || choiceChanged)) {
       void fire()
       schedule()
     } else if (!isOn && prevOn) {
@@ -116,6 +128,17 @@ export function startForceAvailabilityDriver(
   const unsub = store.subscribe(handle)
 
   return {
+    async reset() {
+      if (unreachable || store.get().presenceChoice === 'Available') return
+      try {
+        await forceMyAvailability('Available', {
+          profile: owaProfile(getAccount()),
+          signal: AbortSignal.timeout(3000),
+        })
+      } catch (err) {
+        warn('forceavailability reset:', err instanceof Error ? err.message : String(err))
+      }
+    },
     stop() {
       if (stopped) return
       stopped = true
@@ -127,6 +150,9 @@ export function startForceAvailabilityDriver(
 }
 
 function shouldFire(s: AppState): boolean {
+  // A picked presence (Busy, DND, ...) is held regardless of focus or the
+  // setting; only plain Available follows them.
+  if (s.presenceChoice !== 'Available') return true
   if (s.settings.forceAvailableWhenFocused === false) return false
   if (s.terminalFocused === false) return false
   return true

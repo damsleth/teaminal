@@ -81,6 +81,8 @@ export type MenuAction =
   | { kind: 'toggle-setting'; key: ToggleKey }
   | { kind: 'toggle-header-element'; key: keyof HeaderElementVisibility }
   | { kind: 'cycle-quiet-hours' }
+  | { kind: 'edit-status-note' }
+  | { kind: 'cycle-presence' }
   | { kind: 'show-theme-editor' }
   | { kind: 'show-theme-presets' }
   | { kind: 'show-keybinds' }
@@ -383,6 +385,18 @@ export const ROOT_MENU: MenuItem[] = [
         label: 'Quiet hours',
         action: { kind: 'cycle-quiet-hours' },
       },
+      {
+        id: 'presenceChoice',
+        label: 'My presence',
+        action: { kind: 'cycle-presence' },
+        hint: 'resets to Available on quit',
+      },
+      {
+        id: 'statusNote',
+        label: 'Status message',
+        action: { kind: 'edit-status-note' },
+        hint: 'text, optional end time',
+      },
       heading('Presence'),
       {
         id: 'forceAvailableWhenFocused',
@@ -518,6 +532,18 @@ export function pageSelectable(items: MenuItem[], from: number, delta: number): 
   for (let i = target; i >= 0 && i < items.length; i += dir) if (!items[i]!.disabled) return i
   for (let i = target; i >= 0 && i < items.length; i -= dir) if (!items[i]!.disabled) return i
   return from
+}
+
+export const PRESENCE_CHOICES = [
+  'Available',
+  'Busy',
+  'DoNotDisturb',
+  'BeRightBack',
+  'Away',
+] as const
+
+export function renderPresenceChoice(choice: string): string {
+  return choice.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
 }
 
 export const MESSAGE_FOCUS_MARKER_PRESETS = ['>', '|', '*', '-'] as const

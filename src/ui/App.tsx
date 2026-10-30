@@ -54,6 +54,7 @@ import { ThemeEditorModal } from './ThemeEditorModal'
 import { ThemePresetsModal } from './ThemePresetsModal'
 import { ReactionPickerModal } from './ReactionPickerModal'
 import { ConfirmDeleteModal } from './ConfirmDeleteModal'
+import { StatusNoteModal } from './StatusNoteModal'
 import { EditReactionsModal } from './EditReactionsModal'
 import { ImageModal } from './ImageModal'
 import { MessageSearchModal, openMessageSearch } from './MessageSearchModal'
@@ -560,6 +561,7 @@ export function App() {
     | 'events'
     | 'network'
     | 'activity'
+    | 'status-note'
     | 'reaction-picker'
     | 'confirm-delete'
     | 'confirm-delete-chat'
@@ -655,6 +657,8 @@ export function App() {
               <EventsModal />
             ) : overlayModalKind === 'activity' ? (
               <ActivityModal />
+            ) : overlayModalKind === 'status-note' ? (
+              <StatusNoteModal />
             ) : overlayModalKind === 'reaction-picker' ? (
               <ReactionPickerModal />
             ) : overlayModalKind === 'confirm-delete' ||
