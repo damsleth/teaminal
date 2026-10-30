@@ -22,6 +22,8 @@
 import { owaProfile, type AccountRef } from '../account'
 import { forceMyAvailability, registerMyEndpoint, TeamsPresenceError } from '../graph/teamsPresence'
 import { warn } from '../log'
+import type { Presence } from '../types'
+import { accountStore } from './accountStore'
 import type { AppState, Store } from './store'
 
 // Refresh well inside the server-side ~5 minute expiry. Four minutes
@@ -65,7 +67,10 @@ export function startForceAvailabilityDriver(
       const profile = owaProfile(getAccount())
       // forceavailability is ignored unless an endpoint of ours is active.
       await registerMyEndpoint(endpointId, { profile, signal })
-      await forceMyAvailability(store.get().presenceChoice, { profile, signal })
+      const choice = store.get().presenceChoice
+      await forceMyAvailability(choice, { profile, signal })
+      // Show it now; the presence poll (~60s) would otherwise lag the header.
+      if (!signal.aborted) mirrorPresence(store, choice)
     } catch (err) {
       if (signal.aborted) return
       if (err instanceof Error && /abort/i.test(err.message)) return
@@ -156,4 +161,16 @@ function shouldFire(s: AppState): boolean {
   if (s.settings.forceAvailableWhenFocused === false) return false
   if (s.terminalFocused === false) return false
   return true
+}
+
+function mirrorPresence(store: Store<AppState>, choice: Presence['availability']): void {
+  if (!store.get().account) return
+  accountStore(store).set((s) => ({
+    myPresence: {
+      id: s.me?.id ?? s.myPresence?.id ?? '',
+      ...s.myPresence,
+      availability: choice,
+      activity: choice,
+    },
+  }))
 }
