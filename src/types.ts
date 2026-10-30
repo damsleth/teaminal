@@ -303,4 +303,7 @@ export type Presence = {
   id: string
   availability: PresenceAvailability
   activity: PresenceActivity
+  // Own status message (Teams presence service only). `expiry` is an ISO
+  // time; absent = never expires.
+  note?: { message: string; expiry?: string }
 }

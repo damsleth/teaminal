@@ -230,7 +230,7 @@ const focusTracker = startFocusTracker(store)
 // Seeded/offline mode must not touch the network: the forceAvailability driver
 // PUTs to presence.teams.microsoft.com, so stub it out when seeded.
 const forceAvailability = isSeededMode()
-  ? { stop() {} }
+  ? { stop() {}, async reset() {} }
   : startForceAvailabilityDriver(store, () => accountRef(accounts.activeProfile()))
 
 function makeSessionApi(): SessionApi {
@@ -291,6 +291,9 @@ let cleanExit = false
     // flush the cache one last time.
     try {
       await accounts.stopAll()
+    } catch {}
+    try {
+      await forceAvailability.reset()
     } catch {}
     try {
       forceAvailability.stop()

@@ -5,7 +5,14 @@
 
 import { buildSelectableList } from '../state/selectables'
 import type { AppState } from '../state/store'
-import { renderQuietHoursValue, renderSettingValue, ROOT_MENU, type MenuItem } from './menu'
+import {
+  PRESENCE_CHOICES,
+  renderPresenceChoice,
+  renderQuietHoursValue,
+  renderSettingValue,
+  ROOT_MENU,
+  type MenuItem,
+} from './menu'
 
 export type Command = {
   id: string
@@ -19,6 +26,7 @@ export type Command = {
 // What running a command needs, supplied by the palette component.
 export type CommandRunners = {
   runMenuItem: (item: MenuItem, path: string[]) => void
+  setPresence: (choice: (typeof PRESENCE_CHOICES)[number]) => void
   focusChat: (chatId: string) => void
   focusChannel: (teamId: string, channelId: string) => void
   keyActions: { id: string; title: string; keys: string; run: () => void }[]
@@ -46,6 +54,16 @@ export function buildCommands(state: AppState, runners: CommandRunners): Command
     }
   }
   walk(ROOT_MENU, [], [])
+
+  for (const choice of PRESENCE_CHOICES) {
+    commands.push({
+      id: `presence:${choice}`,
+      title: `Set presence › ${renderPresenceChoice(choice)}`,
+      group: 'Presence',
+      detail: state.presenceChoice === choice ? 'current' : undefined,
+      run: () => runners.setPresence(choice),
+    })
+  }
 
   for (const action of runners.keyActions) {
     commands.push({
@@ -99,6 +117,10 @@ function menuItemValue(item: MenuItem, state: AppState): string | undefined {
       return renderSettingValue(item.action.key, s[item.action.key])
     case 'toggle-header-element':
       return s.headerElements[item.action.key] ? 'on' : 'off'
+    case 'cycle-presence':
+      return renderPresenceChoice(state.presenceChoice)
+    case 'edit-status-note':
+      return state.myPresence?.note?.message || 'none'
     case 'cycle-quiet-hours':
       return renderQuietHoursValue(s.quietHoursStart, s.quietHoursEnd)
     default:

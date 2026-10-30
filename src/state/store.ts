@@ -9,6 +9,7 @@
 import type { AccountRef } from '../account'
 import type { Capabilities } from '../graph/capabilities'
 import type { Me } from '../graph/me'
+import type { ForceAvailabilityValue as PresenceChoice } from '../graph/teamsPresence'
 import type { ActivityItem } from '../graph/teamsActivity'
 import type { Channel, Chat, ChatMessage, LastMessagePreview, Presence, Team } from '../types'
 import type { InlineImageRef } from '../text/inlineImages'
@@ -128,6 +129,9 @@ export type ModalState =
   | { kind: 'events' }
   | { kind: 'network' }
   | { kind: 'activity'; cursor: number }
+  // Set / clear the status message (message + end time); the field text
+  // lives in the component's local state.
+  | { kind: 'status-note' }
   // Tenant-wide server-side message search (Microsoft Search API). The
   // query / results / cursor live in the modal component's local state.
   | { kind: 'message-search-global' }
@@ -933,6 +937,10 @@ export type AppState = {
   // false, the force-availability driver still treats the terminal
   // as focused so the override does not silently disable.
   focusReportingHealthy: boolean
+  // The presence the user picked (menu / palette). Session-only: teaminal
+  // resets to Available on exit. Anything but Available is held even while
+  // the terminal is blurred; Available follows forceAvailableWhenFocused.
+  presenceChoice: PresenceChoice
   // Active typing indicators per conversation, keyed by ConvKey.
   // Entries expire after ~8s of inactivity (cleaned by a timer).
   typingByConvo: Record<ConvKey, TypingIndicator[]>
@@ -1029,6 +1037,7 @@ export type GlobalKey =
   // environment
   | 'terminalFocused'
   | 'focusReportingHealthy'
+  | 'presenceChoice'
   | 'customTheme'
   | 'systemAppearance'
   | 'settings'
@@ -1076,6 +1085,7 @@ export function initialAppState(): AppState {
     realtimeState: 'off',
     terminalFocused: true,
     focusReportingHealthy: false,
+    presenceChoice: 'Available',
     typingByConvo: {},
     readReceiptsByConvo: {},
     modal: null,
@@ -1114,6 +1124,7 @@ export function resetAccountScopedState(store: Store<AppState>, account: Account
   fresh.settings = prev.settings
   fresh.terminalFocused = prev.terminalFocused
   fresh.focusReportingHealthy = prev.focusReportingHealthy
+  fresh.presenceChoice = prev.presenceChoice
   fresh.systemAppearance = prev.systemAppearance
   fresh.customTheme = prev.customTheme
   store.replace(fresh)

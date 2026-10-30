@@ -27,6 +27,8 @@ import {
   firstSelectable,
   nextSelectable,
   pageSelectable,
+  PRESENCE_CHOICES,
+  renderPresenceChoice,
   renderQuietHoursValue,
   menuItemWindow,
   renderSettingValue,
@@ -112,6 +114,9 @@ export function adjustMenuItem(store: AppStoreApi, item: MenuItem, dir: 1 | -1):
       })
       return true
     }
+    case 'cycle-presence':
+      store.set((s) => ({ presenceChoice: stepIn(PRESENCE_CHOICES, s.presenceChoice, dir) }))
+      return true
     case 'cycle-quiet-hours': {
       const cur = store.get().settings
       const next = cycleQuietHoursPreset(
@@ -187,6 +192,9 @@ export function runMenuItem(item: MenuItem, path: string[], deps: MenuItemDeps):
     case 'show-notifications':
       openActivity(store)
       return
+    case 'edit-status-note':
+      store.set({ modal: { kind: 'status-note' }, inputZone: 'menu' })
+      return
     case 'noop':
       // placeholders until backed by real flows
       return
@@ -216,6 +224,8 @@ export function MenuModal() {
   const modal = useAppState((s) => s.modal)
   const settings = useAppState((s) => s.settings)
   const appearance = useAppState((s) => s.systemAppearance)
+  const myNote = useAppState((s) => s.myPresence?.note?.message)
+  const presenceChoice = useAppState((s) => s.presenceChoice)
   const theme = useTheme()
   const terminalRows = useTerminalRows()
   const { stdout } = useStdout()
@@ -315,7 +325,7 @@ export function MenuModal() {
   const moreAbove = start > 0
   const moreBelow = end < items.length
   const visibleItems = items.slice(start, end).map((item, i) => {
-    const valueSuffix = formatValueSuffix(item, settings, appearance)
+    const valueSuffix = formatValueSuffix(item, settings, appearance, myNote, presenceChoice)
     const hint = item.hint ? `  (${item.hint})` : ''
     const marker = i + start === modal.cursor && !item.disabled ? '> ' : '  '
     return { item, idx: start + i, text: `${marker}${item.label}${valueSuffix}${hint}` }
@@ -335,7 +345,7 @@ export function MenuModal() {
         (it) =>
           2 +
           it.label.length +
-          formatValueSuffix(it, settings, appearance).length +
+          formatValueSuffix(it, settings, appearance, myNote, presenceChoice).length +
           (it.hint ? it.hint.length + 4 : 0),
       ),
     ),
@@ -429,7 +439,12 @@ function formatValueSuffix(
   item: MenuItem,
   settings: Settings,
   appearance: SystemAppearance,
+  myNote?: string,
+  presenceChoice?: string,
 ): string {
+  if (item.action.kind === 'cycle-presence')
+    return ` : ${renderPresenceChoice(presenceChoice ?? 'Available')}`
+  if (item.action.kind === 'edit-status-note') return myNote ? ` : ${myNote}` : ' : none'
   if (item.action.kind === 'toggle-setting') {
     const key = item.action.key as ToggleKey
     // 'auto' isn't a theme: show the light or dark one it picked.

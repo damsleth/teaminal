@@ -6,6 +6,27 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-30
+
+### Added
+
+- **Status message.** Settings > Notifications > Status message (also in the
+  Ctrl+P palette) sets the Teams status note with an optional end time
+  (`30m`, `2h`, `today`, `tomorrow`, `15:30`, `2026-11-02`). Ctrl+X in the
+  dialog clears it. The current message shows in the menu row.
+- **My presence.** Settings > Notifications > My presence (←/→/space/enter)
+  and Ctrl+P "Set presence › ..." pick Available, Busy, Do not disturb, Be
+  right back or Away. A non-Available pick is held while the terminal is
+  blurred, and teaminal resets to Available on quit.
+
+### Fixed
+
+- "Available while terminal focused" now works: it registers a Desktop
+  endpoint with the Teams presence service first. `forceavailability` alone
+  was stored but ignored while only a mobile client was active.
+- A network error on the Teams presence call no longer leaves your own
+  presence stale; it falls back to Graph like an auth error does.
+
 ## [0.24.0] - 2026-10-29
 
 ### Added
