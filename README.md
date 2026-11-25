@@ -1,11 +1,13 @@
 <p align="center"><img src="teaminal-logo.png" alt="teaminal" width="600"></p>
 
-# teaminal
+<h1 align="center">teaminal</h1>
 
-[![CI](https://github.com/damsleth/teaminal/actions/workflows/ci.yml/badge.svg)](https://github.com/damsleth/teaminal/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/damsleth/teaminal.svg)](https://github.com/damsleth/teaminal/releases)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Bun](https://img.shields.io/badge/runtime-bun-black.svg)](https://bun.sh)
+<p align="center">
+  <a href="https://github.com/damsleth/teaminal/actions/workflows/ci.yml"><img src="https://github.com/damsleth/teaminal/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/damsleth/teaminal/releases"><img src="https://img.shields.io/github/v/release/damsleth/teaminal.svg" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://bun.sh"><img src="https://img.shields.io/badge/runtime-bun-black.svg" alt="Bun"></a>
+</p>
 
 Lightweight, keyboard-driven terminal Microsoft Teams client. Read your
 chats and channels, send messages, manage presence, and skim mentions
