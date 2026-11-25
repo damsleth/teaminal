@@ -156,7 +156,11 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
       getClient: client,
       onError: (loop, err) => {
         warn(`poller[${store.ref.label}:${loop}]:`, err.message)
-        if (opts.onAuthExpired && isRefreshExpiredError(err.message)) opts.onAuthExpired(err)
+        // Presence runs on its own scoped tokens; a challenge on one of
+        // those (MFA for one resource) must not stop the whole account.
+        if (opts.onAuthExpired && loop !== 'presence' && isRefreshExpiredError(err.message)) {
+          opts.onAuthExpired(err)
+        }
       },
       onMention: (event) => {
         const sender = event.message.from?.user?.displayName ?? 'someone'
