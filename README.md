@@ -355,15 +355,17 @@ re-reads its teams and channels (at most every 5 min), polls its own presence
 the account in front polls the open conversation (every 10 s). With push
 connected the loops slow to 60 s, and to 5 min while the terminal is
 unfocused. Background traffic therefore grows with each account you add. To
-measure it, run with a network log, leave teaminal idle for a while, then
-summarize requests per minute per account:
+measure it from a source checkout, run with a network log, leave teaminal idle
+for a while, then summarize requests per minute per account:
 
 ```bash
-teaminal --network-log /tmp/teaminal-net.log
-bun run scripts/network-log-summary.ts /tmp/teaminal-net.log --skip-minutes 5
+teaminal --network-log /tmp/teaminal-net-2.log
+bun run scripts/network-log-summary.ts /tmp/teaminal-net-2.log --skip-minutes 5
 ```
 
-Repeat with one, two, three and five aliases in `accounts` to compare.
+Repeat with one, two, three and five aliases in `accounts` to compare. Use a
+fresh log file for each run (the log appends), and keep the terminal focus and
+`realtimeEnabled` the same across runs, since both change the poll intervals.
 
 **Partial failures.** An account whose sign-in expires, or that goes offline,
 stops on its own and stays listed (`! signed out` / `! offline`); the others

@@ -43,8 +43,9 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- The owa-piggy default profile uses its own chat routing instead of the
-  routing of the `activeAccount` alias.
+- The owa-piggy default profile keeps its own chat routing when an account is
+  added (and becomes `activeAccount`) while it runs, instead of following that
+  account's routing.
 
 ## [0.25.2] - 2026-11-25
 
