@@ -223,9 +223,13 @@ describe('probeCapabilities', () => {
     const gate = new Promise<void>((resolve) => {
       release = resolve
     })
+    // Resolves when the fourth probe is in the transport at once.
+    let allIn!: () => void
+    const barrier = new Promise<void>((resolve) => (allIn = resolve))
     const handler = async (url: string): Promise<Response> => {
       inFlight++
       maxInFlight = Math.max(maxInFlight, inFlight)
+      if (inFlight === 4) allIn()
       await gate
       inFlight--
       if (url.startsWith(TEAMS_PRESENCE_URL)) return teamsPresenceOk()
@@ -236,10 +240,18 @@ describe('probeCapabilities', () => {
     __setTransportForTests(handler)
     setTeamsPresenceTransport(handler)
     const pending = probeCapabilities(testClient())
-    // Yield to let all four probes reach the transport await
-    await Bun.sleep(20)
-    expect(maxInFlight).toBe(4)
-    release!()
+    try {
+      // Fails by timeout (with the count) if the probes run serially.
+      await Promise.race([
+        barrier,
+        Bun.sleep(2000).then(() => {
+          throw new Error(`only ${maxInFlight} probes in flight at once`)
+        }),
+      ])
+      expect(maxInFlight).toBe(4)
+    } finally {
+      release!()
+    }
     const caps = await pending
     expect(caps.me.ok).toBe(true)
     expect(caps.chats.ok).toBe(true)
