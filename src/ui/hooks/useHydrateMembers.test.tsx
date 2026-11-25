@@ -57,6 +57,13 @@ test('a failed member hydrate is retried after a delay', async () => {
     client: () => createGraphClient(currentAccountContext()),
     switchAccount: async () => {},
     retryRealtime: () => {},
+    reconcile: async () => {},
+    setForeground: () => {},
+    retry: async () => {},
+    running: () => [],
+    clientFor: () => {
+      throw new Error('unused')
+    },
   }
   const stdout = Object.assign(new PassThrough(), { columns: 80, rows: 24 })
   const ink = render(

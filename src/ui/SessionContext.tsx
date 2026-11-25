@@ -9,6 +9,7 @@
 
 import { createContext, useContext } from 'react'
 import type { ReactNode } from 'react'
+import type { AccountId, AccountRef } from '../account'
 import type { GraphClient } from '../graph/client'
 
 export type SessionApi = {
@@ -27,8 +28,21 @@ export type SessionApi = {
    * `profile`. Throws if the new bootstrap fails (e.g. the new
    * profile's token is unauthorized); the caller should leave the UI
    * mounted with conn=offline so the user can pick a different account.
+   * Concurrent mode: an instant foreground swap (starting the account
+   * first if it has no session); throws when that start fails.
    */
   switchAccount: (profile: string | null) => Promise<void>
+  // Concurrent mode (concurrentAccounts) only; no-ops in single mode.
+  /** Start added accounts and stop removed ones after `settings.accounts` changed. */
+  reconcile: () => Promise<void>
+  /** Swap an open account to the foreground at once. */
+  setForeground: (profile: string) => void
+  /** Start an account again that has no session (failed start). */
+  retry: (profile: string) => Promise<void>
+  /** Accounts with a running session, in configured order. */
+  running: () => AccountRef[]
+  /** Graph client bound to any open account. */
+  clientFor: (id: AccountId) => GraphClient
 }
 
 const SessionContext = createContext<SessionApi | null>(null)

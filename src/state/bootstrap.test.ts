@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { accountRef } from '../account'
 import {
   __resetForTests as resetAuth,
@@ -13,6 +16,7 @@ import * as teamsExternalSearch from '../graph/teamsExternalSearch'
 import * as teamsFederation from '../graph/teamsFederation'
 import * as teamsPresence from '../graph/teamsPresence'
 import { __resetForTests as resetRegion, __setRegionForTests } from '../graph/teamsRegion'
+import { createAccountManager, type AccountManager } from './accountManager'
 import { accountStore, openAccount } from './accountStore'
 import type { RealtimeTransport, TransportOpts, TransportState } from '../realtime/transport'
 import { runSession, type SessionHandle } from './bootstrap'
@@ -180,5 +184,180 @@ describe('runSession', () => {
     await expect(
       runSession({ account: accountStore(store), profile: 'bob', onFatal: () => {} }),
     ).rejects.toThrow('another account')
+  })
+})
+
+// ---- concurrent sessions end to end (M2 E.4) ------------------------------
+
+// One chat, c1, in both accounts (colliding ids). Its preview and newest
+// message come from Carol; `preview` per account is the message id the
+// next list / message read returns, `topic` the chat topic.
+type Answer = { preview: string; topic: string; listStatus?: number }
+let answers: Record<string, Answer> = {}
+let hold = false
+let held: { who: string; release: () => void }[] = []
+
+const carol = { user: { id: 'carol-id', displayName: 'Carol' } }
+function respond(who: string, url: string): Response {
+  const a = answers[who]!
+  if (/\/v1\.0\/me(\?|$)/.test(url)) {
+    return json({ id: who, displayName: who, userPrincipalName: `${who}@example.com`, mail: null })
+  }
+  const message = {
+    id: a.preview,
+    createdDateTime: '2026-01-01T00:00:00Z',
+    chatId: 'c1',
+    messageType: 'message',
+    body: { contentType: 'text', content: `${a.topic} says hi` },
+    from: carol,
+  }
+  if (url.includes('/v1.0/chats/c1/messages')) return json({ value: [message] })
+  if (url.includes('/v1.0/chats?')) {
+    if (a.listStatus) return json({ error: { message: 'nope' } }, a.listStatus)
+    return json({
+      value: [
+        {
+          id: 'c1',
+          chatType: 'group',
+          topic: a.topic,
+          createdDateTime: '2026-01-01T00:00:00Z',
+          lastMessagePreview: { ...message, chatId: undefined },
+        },
+      ],
+    })
+  }
+  if (url.includes('/v1.0/me/joinedTeams')) return json({ value: [] })
+  return json({ error: { message: 'not here' } }, 404)
+}
+
+let cacheRoot = ''
+const realXdg = process.env.XDG_CACHE_HOME
+const realSeed = process.env.TEAMINAL_SEED
+const managers: AccountManager[] = []
+afterEach(async () => {
+  for (const m of managers.splice(0)) await m.stopAll()
+  hold = false
+  for (const h of held.splice(0)) h.release()
+  if (realXdg === undefined) delete process.env.XDG_CACHE_HOME
+  else process.env.XDG_CACHE_HOME = realXdg
+  if (realSeed === undefined) delete process.env.TEAMINAL_SEED
+  else process.env.TEAMINAL_SEED = realSeed
+  if (cacheRoot) rmSync(cacheRoot, { recursive: true, force: true })
+  cacheRoot = ''
+})
+
+// Two real sessions (alice in front, bob behind) on the fake transports.
+async function startConcurrent() {
+  install()
+  answers = {
+    'alice-id': { preview: 'a1', topic: 'alice topic' },
+    'bob-id': { preview: 'b1', topic: 'bob topic' },
+  }
+  graphClient.__setTransportForTests(async (url, init) => {
+    const who = oidOf(init)
+    requests.push({ who, url })
+    if (!hold) return respond(who, url)
+    // Held requests ignore abort, like a server that answers late.
+    return new Promise((resolve) => held.push({ who, release: () => resolve(respond(who, url)) }))
+  })
+  delete process.env.TEAMINAL_SEED
+  cacheRoot = mkdtempSync(join(tmpdir(), 'teaminal-concurrent-'))
+  process.env.XDG_CACHE_HOME = cacheRoot
+  const store = createAppStore()
+  store.set((s) => ({
+    settings: {
+      ...s.settings,
+      accounts: ['alice', 'bob'],
+      activeAccount: 'alice',
+      concurrentAccounts: true,
+      realtimeEnabled: true,
+      // Plain messages raise no notification (no banner from a test run).
+      notifyChatMessages: false,
+    },
+  }))
+  const transports: Record<string, FakeTransport> = {}
+  const m = createAccountManager(
+    store,
+    'alice',
+    (opts) =>
+      runSession({
+        ...opts,
+        createTransport: (o) => (transports[String(o.profile)] = new FakeTransport(o)),
+      }),
+    () => ({ stop() {}, async reset() {} }),
+    true,
+  )
+  managers.push(m)
+  await m.start(() => {})
+  const bobSlice = () => store.get().backgroundAccounts[bob.id]
+  await waitFor(() => store.get().chats.length === 1 && bobSlice()?.chats.length === 1)
+  const wake = (p: string) => transports[p]!.opts.bus.emit({ kind: 'new-message', chatId: 'c1' })
+  return { store, m, wake }
+}
+
+describe('concurrent sessions', () => {
+  test("a message in A's remembered chat while B is in front: unread, then read on the swap back", async () => {
+    const { store, m, wake } = await startConcurrent()
+    store.set({ focus: { kind: 'chat', chatId: 'c1' } })
+    await waitFor(() =>
+      requests.some((r) => r.who === 'alice-id' && r.url.includes('/c1/messages')),
+    )
+
+    await m.switchAccount('bob')
+    const aliceSlice = () => store.get().backgroundAccounts[alice.id]!
+    expect(store.get().focus).toEqual({ kind: 'list' })
+    answers['alice-id']!.preview = 'a2'
+    wake('alice')
+    // Alice's view has list focus while bob is in front, so the new
+    // message counts as unread there.
+    await waitFor(() => (aliceSlice().unreadByChatId.c1?.unreadCount ?? 0) > 0)
+    expect(store.get().unreadByChatId.c1?.unreadCount ?? 0).toBe(0)
+
+    await m.switchAccount('alice')
+    expect(store.get().focus).toEqual({ kind: 'chat', chatId: 'c1' })
+    await waitFor(() => store.get().unreadByChatId.c1?.unreadCount === 0)
+  })
+
+  test("late reads from a stopped account are dropped; B's writes land in B", async () => {
+    const { store, m, wake } = await startConcurrent()
+    hold = true
+    wake('alice')
+    wake('bob')
+    await waitFor(
+      () => held.some((h) => h.who === 'alice-id') && held.some((h) => h.who === 'bob-id'),
+    )
+    await m.switchAccount('bob')
+    await m.switchAccount('alice')
+    answers['alice-id']!.topic = 'alice late'
+    answers['bob-id']!.topic = 'bob late'
+    // Remove alice while her reads hang (her session's stop is bounded).
+    store.set((s) => ({ settings: { ...s.settings, accounts: ['bob'], activeAccount: 'bob' } }))
+    await m.reconcile()
+    expect(store.get().account?.id).toBe(bob.id)
+    hold = false
+    for (const h of held.splice(0).reverse()) h.release()
+    await waitFor(() => store.get().chats[0]?.topic === 'bob late')
+    await Bun.sleep(50)
+    const s = store.get()
+    expect(s.backgroundAccounts[alice.id]).toBeUndefined()
+    expect(JSON.stringify(s)).not.toContain('alice')
+  }, 10_000)
+
+  test("A's 401 leaves B's conn, latch and poller alone", async () => {
+    const { store, m, wake } = await startConcurrent()
+    const bobSlice = () => store.get().backgroundAccounts[bob.id]!
+    await waitFor(() => store.get().conn === 'online' && bobSlice().conn === 'online')
+    // Graph 401 on alice's list: her poller latches to Teams CSA (404 here)
+    // and goes offline.
+    answers['alice-id']!.listStatus = 401
+    wake('alice')
+    await waitFor(() => store.get().conn === 'offline')
+    expect(bobSlice().conn).toBe('online')
+    // Bob's poller still answers, still on Graph (the latch is alice's).
+    const mark = requests.length
+    wake('bob')
+    await waitFor(() => listPolls(mark, 'bob-id') > 0)
+    expect(bobSlice().conn).toBe('online')
+    expect(m.running().map((r) => r.label)).toEqual(['alice', 'bob'])
   })
 })

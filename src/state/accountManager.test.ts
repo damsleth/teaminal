@@ -8,7 +8,12 @@ import type { AccountStore } from './accountStore'
 import type { RunSessionOpts, SessionHandle } from './bootstrap'
 import type { ForceAvailabilityHandle } from './forceAvailability'
 import type { PollerHandle } from './poller'
-import { getMessageCachePath, loadMessageCache } from './messageCachePersistence'
+import {
+  flushMessageCache,
+  getMessageCachePath,
+  loadMessageCache,
+  saveMessageCacheNow,
+} from './messageCachePersistence'
 import { createAppStore, emptyMessageCache, resetAccountScopedState } from './store'
 
 const realSeed = process.env.TEAMINAL_SEED
@@ -337,3 +342,404 @@ describe('AccountManager', () => {
     await m.stopAll()
   })
 })
+
+// ---- concurrent mode (M2 E.4) ---------------------------------------------
+
+const msg = (id: string, content: string) => ({
+  id,
+  createdDateTime: '2026-01-01T00:00:00Z',
+  body: { contentType: 'text' as const, content },
+})
+
+function concurrentStore(accounts: string[], activeAccount: string | null = accounts[0]!) {
+  const store = createAppStore()
+  store.set((s) => ({
+    settings: { ...s.settings, accounts, activeAccount, concurrentAccounts: true },
+  }))
+  return store
+}
+
+// Fake sessions whose bootstraps the test releases (or fails) per profile.
+function heldSessions() {
+  const sessions: FakeSession[] = []
+  const requested: string[] = []
+  const pending: Record<string, { release: () => void; fail: (err: Error) => void }> = {}
+  const start = (opts: RunSessionOpts): Promise<SessionHandle> => {
+    const p = String(opts.profile)
+    requested.push(p)
+    return new Promise((resolve, reject) => {
+      pending[p] = {
+        release: () => {
+          const s = fakeSession(opts)
+          sessions.push(s)
+          resolve(s)
+        },
+        fail: reject,
+      }
+    })
+  }
+  return { sessions, requested, pending, start }
+}
+
+const instant = async (opts: RunSessionOpts) => fakeSession(opts)
+
+describe('concurrentMode', () => {
+  test('flag on, no --profile, at least one account', async () => {
+    const { concurrentMode } = await import('./accountManager')
+    const s = createAppStore().get().settings
+    const on = { ...s, concurrentAccounts: true, accounts: ['alpha'] }
+    expect(concurrentMode(on, undefined)).toBe(true)
+    expect(concurrentMode(on, 'alpha')).toBe(false)
+    expect(concurrentMode({ ...on, accounts: [] }, undefined)).toBe(false)
+    expect(concurrentMode({ ...on, concurrentAccounts: false }, undefined)).toBe(false)
+  })
+})
+
+describe('AccountManager (concurrent)', () => {
+  test('opens every slot; hydrates and starts the foreground first, then the others one at a time', async () => {
+    nonSeeded()
+    for (const [p, text] of [
+      ['alpha', 'alpha text'],
+      ['beta', 'beta text'],
+    ] as const) {
+      saveMessageCacheNow(
+        { 'chat:c1': emptyMessageCache([msg('m1', text)]) },
+        getMessageCachePath(process.env, p),
+      )
+    }
+    const held = heldSessions()
+    const store = concurrentStore(['alpha', 'beta', 'gamma'], 'beta')
+    const m = createAccountManager(store, 'beta', held.start, noDriver, true)
+    const s = store.get()
+    // activeAccount is in front; the others are open in the background.
+    expect(s.account?.id).toBe(accountRef('beta').id)
+    expect(Object.keys(s.backgroundAccounts).sort()).toEqual(
+      [accountRef('alpha').id, accountRef('gamma').id].sort(),
+    )
+    // Only the foreground's caches before mount.
+    expect(s.messagesByConvo['chat:c1']?.[0]?.body.content).toBe('beta text')
+    expect(s.backgroundAccounts[accountRef('alpha').id]?.messagesByConvo).toEqual({})
+
+    const starting = m.start(() => {})
+    await tick()
+    expect(held.requested).toEqual(['beta'])
+    held.pending.beta!.release()
+    await starting
+    await tick()
+    // alpha next, hydrated right before its start; gamma waits for it.
+    expect(held.requested).toEqual(['beta', 'alpha'])
+    const alphaSlice = store.get().backgroundAccounts[accountRef('alpha').id]
+    expect(alphaSlice?.messagesByConvo['chat:c1']?.[0]?.body.content).toBe('alpha text')
+    held.pending.alpha!.release()
+    await tick()
+    await tick()
+    expect(held.requested).toEqual(['beta', 'alpha', 'gamma'])
+    held.pending.gamma!.release()
+    await tick()
+    expect(m.running().map((r) => r.label)).toEqual(['alpha', 'beta', 'gamma'])
+    expect(m.pollerHandleRef.current).toBe(held.sessions[0]!.poller)
+    await m.stopAll()
+  })
+
+  test('initial foreground falls back to the first account', () => {
+    nonSeeded()
+    const store = concurrentStore(['alpha', 'beta'], 'nope')
+    const m = createAccountManager(store, 'nope', instant, noDriver, true)
+    expect(store.get().account?.id).toBe(accountRef('alpha').id)
+    expect(m.activeProfile()).toBe('alpha')
+  })
+
+  test('switchAccount swaps instantly: nothing stops, poller ref follows, focus comes back', async () => {
+    nonSeeded()
+    const sessions: FakeSession[] = []
+    const store = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => {
+        const s = fakeSession(opts)
+        sessions.push(s)
+        return s
+      },
+      noDriver,
+      true,
+    )
+    await m.start(() => {})
+    await waitFor(() => m.running().length === 2)
+    const [alpha, beta] = sessions
+    const generations = store.get().generationById
+    store.set({ focus: { kind: 'chat', chatId: 'c1' } })
+
+    await m.switchAccount('beta')
+    expect(store.get().account?.id).toBe(accountRef('beta').id)
+    expect(store.get().focus).toEqual({ kind: 'list' })
+    expect(m.activeProfile()).toBe('beta')
+    expect(m.pollerHandleRef.current).toBe(beta!.poller)
+    m.retryRealtime()
+    expect(beta!.retries).toBe(1)
+    expect((m.client() as unknown as { profile: string }).profile).toBe('beta')
+    expect((m.clientFor(accountRef('alpha').id) as unknown as { profile: string }).profile).toBe(
+      'alpha',
+    )
+
+    await m.switchAccount('alpha')
+    expect(store.get().focus).toEqual({ kind: 'chat', chatId: 'c1' })
+    expect(m.pollerHandleRef.current).toBe(alpha!.poller)
+    expect(sessions.every((s) => !s.stopped)).toBe(true)
+    expect(store.get().generationById).toEqual(generations)
+    await expect(m.switchAccount('nope')).rejects.toThrow('not a configured account')
+    await m.stopAll()
+  })
+
+  test('a failed start stays local to its account and never exits', async () => {
+    nonSeeded()
+    const held = heldSessions()
+    const { drivers, start: startDriver } = driverRecorder()
+    const store = concurrentStore(['alpha', 'beta', 'gamma'])
+    let fatalCalls = 0
+    const m = createAccountManager(store, 'alpha', held.start, startDriver, true)
+    const starting = m.start(() => fatalCalls++)
+    await tick()
+    held.pending.alpha!.release()
+    await starting
+    await tick()
+    // beta: refresh token expired -> authError, but it is in the background:
+    // no modal.
+    held.pending.beta!.fail(new Error('AADSTS700082: The refresh token has expired'))
+    await waitFor(() => held.requested.includes('gamma'))
+    const bg = (p: string) => store.get().backgroundAccounts[accountRef(p).id]
+    expect(bg('beta')?.conn).toBe('authError')
+    expect(store.get().modal).toBeNull()
+    // gamma: anything else -> offline.
+    held.pending.gamma!.fail(new Error('socket hang up'))
+    await waitFor(() => bg('gamma')?.conn === 'offline')
+    expect(m.running().map((r) => r.label)).toEqual(['alpha'])
+    expect(store.get().conn).toBe('connecting') // alpha untouched
+    expect(fatalCalls).toBe(0)
+    // Failed starts leave no driver running.
+    expect(drivers.filter((d) => !d.ops.includes('stop')).map((d) => d.account)).toEqual(['alpha'])
+
+    // Switching to a failed account starts it again; a second failure
+    // throws to the caller, opens the auth-expired modal now that it is in
+    // front, and still leaves the app running.
+    const switching = m.switchAccount('beta')
+    await tick()
+    expect(store.get().account?.id).toBe(accountRef('beta').id)
+    expect(store.get().conn).toBe('connecting')
+    held.pending.beta!.fail(new Error('AADSTS700082: expired again'))
+    await expect(switching).rejects.toThrow('expired again')
+    expect(store.get().conn).toBe('authError')
+    expect(store.get().modal?.kind).toBe('auth-expired')
+
+    // retry brings gamma up.
+    const retrying = m.retry('gamma')
+    await tick()
+    held.pending.gamma!.release()
+    await retrying
+    expect(m.running().map((r) => r.label)).toEqual(['alpha', 'gamma'])
+    await m.stopAll()
+  })
+
+  test("onFatal('unauthorized') marks the account authError instead of exiting", async () => {
+    nonSeeded()
+    const { drivers, start: startDriver } = driverRecorder()
+    const store = concurrentStore(['alpha'])
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => {
+        opts.onFatal('unauthorized', 'token rejected')
+        return { ...fakeSession(opts), poller: null }
+      },
+      startDriver,
+      true,
+    )
+    let fatalCalls = 0
+    await m.start(() => fatalCalls++)
+    expect(fatalCalls).toBe(0)
+    expect(store.get().conn).toBe('authError')
+    expect(store.get().modal?.kind).toBe('auth-expired')
+    expect(m.running()).toEqual([])
+    expect(drivers[0]!.ops).toEqual(['stop'])
+    await m.stopAll()
+  })
+
+  test('reconcile: added accounts start in the background, removed ones stop and close', async () => {
+    nonSeeded()
+    const sessions: FakeSession[] = []
+    const store = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => {
+        const s = fakeSession(opts)
+        sessions.push(s)
+        return s
+      },
+      noDriver,
+      true,
+    )
+    await m.start(() => {})
+    await waitFor(() => m.running().length === 2)
+    const setAccounts = (accounts: string[], activeAccount = accounts[0] ?? null) =>
+      store.set((s) => ({ settings: { ...s.settings, accounts, activeAccount } }))
+
+    setAccounts(['alpha', 'beta', 'gamma'])
+    await m.reconcile()
+    await waitFor(() => m.running().length === 3)
+    expect(store.get().account?.id).toBe(accountRef('alpha').id)
+
+    // Removing the foreground moves to the next configured account first.
+    store.set({ focus: { kind: 'chat', chatId: 'c1' } })
+    setAccounts(['beta', 'gamma'])
+    await m.reconcile()
+    const alpha = sessions.find((s) => s.profile === 'alpha')!
+    expect(alpha.stopped).toBe(true)
+    expect(alpha.opts.account.isCurrent()).toBe(false)
+    expect(store.get().account?.id).toBe(accountRef('beta').id)
+    expect(store.get().generationById[accountRef('alpha').id]).toBeUndefined()
+    expect(m.running().map((r) => r.label)).toEqual(['beta', 'gamma'])
+    expect(m.pollerHandleRef.current).toBe(sessions.find((s) => s.profile === 'beta')!.poller)
+
+    // Removing everything leaves no session and the Accounts modal open.
+    setAccounts([])
+    await m.reconcile()
+    expect(store.get().account).toBeNull()
+    expect(store.get().modal?.kind).toBe('accounts')
+    expect(m.running()).toEqual([])
+    expect(m.activeProfile()).toBeNull()
+    expect(m.pollerHandleRef.current).toBeNull()
+    expect(sessions.every((s) => s.stopped)).toBe(true)
+
+    // Adding one back brings it up in front.
+    setAccounts(['delta'])
+    await m.reconcile()
+    await waitFor(() => m.running().length === 1)
+    expect(store.get().account?.id).toBe(accountRef('delta').id)
+    expect(m.activeProfile()).toBe('delta')
+    await m.stopAll()
+  })
+
+  test('an account removed while queued never starts; one removed mid-start is stopped', async () => {
+    nonSeeded()
+    const held = heldSessions()
+    const store = concurrentStore(['alpha', 'beta', 'gamma'])
+    const m = createAccountManager(store, 'alpha', held.start, noDriver, true)
+    const starting = m.start(() => {})
+    await tick()
+    held.pending.alpha!.release()
+    await starting
+    await tick()
+    expect(held.requested).toEqual(['alpha', 'beta'])
+    // beta is bootstrapping, gamma is queued behind it.
+    store.set((s) => ({ settings: { ...s.settings, accounts: ['alpha'] } }))
+    await m.reconcile()
+    held.pending.beta!.release()
+    await tick()
+    await tick()
+    expect(held.requested).toEqual(['alpha', 'beta'])
+    expect(held.sessions.find((s) => s.profile === 'beta')!.stopped).toBe(true)
+    expect(m.running().map((r) => r.label)).toEqual(['alpha'])
+    await m.stopAll()
+  })
+
+  test('stopAll stops every session in parallel, resets every driver, and is idempotent', async () => {
+    nonSeeded()
+    const { drivers, start: startDriver } = driverRecorder()
+    const log: string[] = []
+    const store = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => ({
+        ...fakeSession(opts),
+        stop: async () => {
+          log.push(`${opts.profile}:stopping`)
+          await Bun.sleep(20)
+          log.push(`${opts.profile}:stopped`)
+        },
+      }),
+      startDriver,
+      true,
+    )
+    await m.start(() => {})
+    await waitFor(() => m.running().length === 2)
+    await Promise.all([m.stopAll(), m.stopAll()])
+    await m.stopAll()
+    expect(log.slice(0, 2).sort()).toEqual(['alpha:stopping', 'beta:stopping'])
+    expect(log).toHaveLength(4)
+    expect(drivers.map((d) => [d.account, d.ops])).toEqual([
+      ['alpha', ['reset', 'stop']],
+      ['beta', ['reset', 'stop']],
+    ])
+    expect(m.pollerHandleRef.current).toBeNull()
+  })
+
+  test('caches persist per account; a foreground swap schedules no write', async () => {
+    nonSeeded()
+    const sessions: FakeSession[] = []
+    const store = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => {
+        const s = fakeSession(opts)
+        sessions.push(s)
+        return s
+      },
+      noDriver,
+      true,
+    )
+    await m.start(() => {})
+    await waitFor(() => m.running().length === 2)
+    const handle = (p: string) => sessions.find((s) => s.profile === p)!.opts.account
+    const alphaPath = getMessageCachePath(process.env, 'alpha')
+    const betaPath = getMessageCachePath(process.env, 'beta')
+    handle('alpha').set({ messageCacheByConvo: { 'chat:a': emptyMessageCache([msg('m1', 'a')]) } })
+    handle('beta').set({ messageCacheByConvo: { 'chat:b': emptyMessageCache([msg('m1', 'b')]) } })
+    flushMessageCache()
+    expect(Object.keys(loadMessageCache(alphaPath))).toEqual(['chat:a'])
+    expect(Object.keys(loadMessageCache(betaPath))).toEqual(['chat:b'])
+
+    rmSync(alphaPath)
+    rmSync(betaPath)
+    await m.switchAccount('beta')
+    await m.switchAccount('alpha')
+    flushMessageCache()
+    expect(existsSync(alphaPath)).toBe(false)
+    expect(existsSync(betaPath)).toBe(false)
+    await m.stopAll()
+  })
+
+  test('seeded mode: every account gets its fixtures, no sessions', async () => {
+    process.env.TEAMINAL_SEED = 'fixtures'
+    let starts = 0
+    const store = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => {
+        starts++
+        return fakeSession(opts)
+      },
+      noDriver,
+      true,
+    )
+    await m.start(() => {})
+    await waitFor(() => m.running().length === 2)
+    const alphaTopic = store.get().chats.find((c) => c.topic)?.topic
+    await m.switchAccount('beta')
+    expect(store.get().chats.find((c) => c.topic)?.topic).toBe(alphaTopic!.toUpperCase())
+    expect(starts).toBe(0)
+    await m.stopAll()
+  })
+})
+
+async function waitFor(predicate: () => boolean, timeoutMs = 2_000): Promise<void> {
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    if (predicate()) return
+    await Bun.sleep(2)
+  }
+  throw new Error('waitFor timed out')
+}

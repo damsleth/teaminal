@@ -71,6 +71,8 @@ export function AccountsModal() {
       accounts,
       activeAccount: settings.activeAccount ?? profile,
     })
+    // Concurrent mode starts it in the background (no-op otherwise).
+    await session.reconcile()
     setMode({ kind: 'list', cursor: accounts.indexOf(profile) })
   }
 
@@ -79,6 +81,9 @@ export function AccountsModal() {
     const activeAccount =
       settings.activeAccount === profile ? (accounts[0] ?? null) : settings.activeAccount
     await persist({ accounts, activeAccount })
+    // Concurrent mode stops and closes it, moving the foreground on first
+    // when it was in front (no-op otherwise).
+    await session.reconcile()
     // Removing the account that is running must stop showing it: move to the
     // new active account (the default profile when none are left).
     if (session.getActiveProfile() === profile) await session.switchAccount(activeAccount)

@@ -4,7 +4,7 @@ import { render } from 'ink'
 import { isRefreshExpiredError } from '../src/auth/owaPiggy'
 import { loadSettings } from '../src/config'
 import { loadThemeFile } from '../src/config/themes'
-import { createAccountManager } from '../src/state/accountManager'
+import { concurrentMode, createAccountManager } from '../src/state/accountManager'
 import { startSystemAppearanceDriver } from '../src/state/systemAppearance'
 import { probeTerminalBackground } from '../src/ui/terminalBackground'
 import { createAppStore } from '../src/state/store'
@@ -182,9 +182,13 @@ if (configResult.source === 'file') {
 }
 for (const w of configResult.warnings) warn(w)
 
-// Binds the store to the initial account and hydrates its caches before
-// mounting, so the sidebar and message pane show history immediately.
-const accounts = createAccountManager(store, initialProfile)
+// Latched once: the Settings toggle only applies after a restart.
+const concurrent = concurrentMode(settings, cliProfile)
+
+// Binds the store to the initial account(s) and hydrates the foreground's
+// caches before mounting, so the sidebar and message pane show history
+// immediately.
+const accounts = createAccountManager(store, initialProfile, undefined, undefined, concurrent)
 
 // Pick the appearance 'auto' follows before the first render (terminal
 // background, else the OS), then keep it updated on an interval.
@@ -232,6 +236,11 @@ function makeSessionApi(): SessionApi {
     client: () => accounts.client(),
     retryRealtime: () => accounts.retryRealtime(),
     switchAccount: (profile) => accounts.switchAccount(profile),
+    reconcile: () => accounts.reconcile(),
+    setForeground: (profile) => accounts.setForeground(profile),
+    retry: (profile) => accounts.retry(profile),
+    running: () => accounts.running(),
+    clientFor: (id) => accounts.clientFor(id),
   }
 }
 
@@ -249,6 +258,8 @@ let cleanExit = false
 ;(async () => {
   try {
     try {
+      // Concurrent mode never calls this and never throws: a failed account
+      // keeps its slot (authError / offline) and the others run on.
       await accounts.start((kind, msg) => {
         ink.unmount()
         process.stderr.write(`teaminal: auth failed (${kind}): ${msg}\n`)
