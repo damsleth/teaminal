@@ -114,6 +114,7 @@ warnings and fall back to defaults.
   "useTeamsPresence": true,
   "forceAvailableWhenFocused": true,
   "realtimeEnabled": false,
+  "concurrentAccounts": false,
   "notifyMuted": false,
   "notifyChatMessages": true,
   "notifyActiveBanner": false,
@@ -165,6 +166,7 @@ warnings and fall back to defaults.
 | `useTeamsPresence`             | boolean              |  `true` | Use the Teams unified presence endpoint (`presence.teams.microsoft.com`) for own presence. Falls back to Graph `/me/presence` automatically on 401/403/404. Set to `false` to force Graph-only in tenants that block public-client access to that host. |
 | `forceAvailableWhenFocused`    | boolean              |  `true` | While the terminal window has focus (DEC focus reporting; CSI ?1004), register a Desktop endpoint with `presence.teams.microsoft.com` and force your picked presence (default Available) so Teams shows you active, like the desktop client does. Refreshed every 4 min; a picked non-Available presence is also held while blurred, and teaminal resets to Available on quit. Set to `false` to leave presence to Teams' own desktop client / inactivity timer. |
 | `realtimeEnabled`              | boolean              | `false` | Enables the experimental Teams trouter push transport for typing, read-receipt, presence, and immediate refresh signals. Polling remains the source of truth and fallback. |
+| `concurrentAccounts`           | boolean              | `false` | **Experimental.** Run every profile in `accounts` at the same time instead of one at a time: each keeps polling (and pushing, with `realtimeEnabled`) in the background, and picking an account in the Accounts modal swaps to it instantly, back on the conversation you had open there. The sidebar still shows the foreground account only. Read at startup (restart to apply); `--profile` forces single-account mode. Also in the menu as **Settings → All accounts at once (experimental)**. |
 | `notifyMuted`                  | boolean              | `false` | Suppress desktop notification banners while keeping terminal bells.                      |
 | `notifyChatMessages`           | boolean              |  `true` | Notify on every new 1:1 / group chat message, not just @mentions. Meeting chats and channels stay mention-only. |
 | `notifyActiveBanner`           | boolean              | `false` | Show banners even for the conversation currently open in a focused terminal.             |

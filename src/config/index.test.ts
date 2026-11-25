@@ -441,6 +441,7 @@ describe('Settings ↔ config.json parity', () => {
     useTeamsPresence: !defaultSettings.useTeamsPresence,
     forceAvailableWhenFocused: !defaultSettings.forceAvailableWhenFocused,
     realtimeEnabled: !defaultSettings.realtimeEnabled,
+    concurrentAccounts: !defaultSettings.concurrentAccounts,
     notifyMuted: !defaultSettings.notifyMuted,
     notifyChatMessages: !defaultSettings.notifyChatMessages,
     notifyActiveBanner: !defaultSettings.notifyActiveBanner,

@@ -431,6 +431,9 @@ export type Settings = {
   // undocumented trouter WebSocket upgrade is tenant/protocol-sensitive;
   // polling remains the durable path when this is off or errors.
   realtimeEnabled: boolean
+  // Experimental (M2): run every profile in `accounts` at once instead of
+  // switching between them. Read at startup; --profile forces single mode.
+  concurrentAccounts: boolean
   // Notification preferences. notifyMuted is a session-level kill switch
   // that suppresses banners (bell still rings — terminal-level mute is
   // the user's responsibility). notifyActiveBanner forces the banner
@@ -591,6 +594,7 @@ export const defaultSettings: Settings = {
   useTeamsPresence: true,
   forceAvailableWhenFocused: true,
   realtimeEnabled: false,
+  concurrentAccounts: false,
   notifyMuted: false,
   notifyChatMessages: true,
   notifyActiveBanner: false,
