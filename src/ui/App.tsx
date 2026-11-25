@@ -600,7 +600,7 @@ export function App() {
     >
       {statusBarPosition === 'top' && <StatusBar />}
       <Box borderStyle={inkBorder(theme.borders.panel)} borderColor={theme.border} paddingX={1}>
-        <HeaderBar />
+        <HeaderBar columns={terminalCols} />
       </Box>
       <Box flexDirection="row" flexGrow={1} position="relative">
         {showList && (

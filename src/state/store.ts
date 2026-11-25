@@ -814,6 +814,14 @@ export function unreadTotals(activityByChatId: Record<string, ChatUnreadActivity
   return { unreadCount, mentionCount, chats }
 }
 
+// What an account has to say in the header badge and the Accounts modal:
+// chats with unread activity plus unread activity-feed mentions.
+export function accountUnreadCount(
+  s: Pick<AccountSlice, 'unreadByChatId' | 'unreadMentionCount'>,
+): number {
+  return unreadTotals(s.unreadByChatId).chats + s.unreadMentionCount
+}
+
 export function recentUnreadNotifications(
   activityByChatId: Record<string, ChatUnreadActivity>,
   limit = 5,

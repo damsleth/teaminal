@@ -3,6 +3,7 @@ import { Text } from './Text'
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { chatLabel } from '../state/selectables'
 import {
+  accountUnreadCount,
   recentUnreadNotifications,
   unreadTotals,
   type ChatUnreadActivity,
@@ -72,7 +73,28 @@ function formatRelative(date: Date | undefined, now: number): string | null {
   return `${h}h ago`
 }
 
-export function HeaderBar() {
+// Background accounts with something to say, in configured order:
+// `beta 3 · gamma !` (unread count, `!` for auth expired / offline). Entries
+// that do not fit in `maxWidth` collapse into `+N`.
+export function formatAccountBadge(
+  entries: { label: string; mark: string }[],
+  maxWidth: number,
+): string {
+  const parts = entries.map((e) => `${e.label} ${e.mark}`)
+  let out = ''
+  for (let i = 0; i < parts.length; i++) {
+    const next = out ? `${out} · ${parts[i]}` : parts[i]!
+    const rest = parts.length - i - 1
+    if ((rest > 0 ? `${next} · +${rest}` : next).length > maxWidth) {
+      const more = `+${parts.length - i}`
+      return out ? `${out} · ${more}` : more
+    }
+    out = next
+  }
+  return out
+}
+
+export function HeaderBar({ columns = 100 }: { columns?: number }) {
   const session = useSessionApi()
   const me = useAppState((s) => s.me)
   const nameByUserId = useAppState((s) => s.nameByUserId)
@@ -87,6 +109,8 @@ export function HeaderBar() {
   const show = useAppState((s) => s.settings.headerElements)
   const userFormat = useAppState((s) => s.settings.headerUserFormat)
   const centered = useAppState((s) => s.settings.headerBarCentered)
+  const backgroundAccounts = useAppState((s) => s.backgroundAccounts)
+  const configured = useAppState((s) => s.settings.accounts)
   const theme = useTheme()
 
   const [now, setNow] = useState(() => Date.now())
@@ -120,6 +144,20 @@ export function HeaderBar() {
     if (!capabilities.me.ok) hints.push('me n/a')
   }
 
+  // Empty with one account (single mode has no background accounts).
+  const badge = formatAccountBadge(
+    Object.values(backgroundAccounts)
+      .sort((a, b) => rank(configured, a.ref.label) - rank(configured, b.ref.label))
+      .flatMap((a) => {
+        const failed = a.conn === 'authError' || a.conn === 'offline'
+        const count = accountUnreadCount(a)
+        return failed || count > 0
+          ? [{ label: a.ref.label, mark: failed ? '!' : String(count) }]
+          : []
+      }),
+    Math.max(4, Math.floor(columns / 4)),
+  )
+
   const updated = formatRelative(lastListPollAt, now)
   const unreadText = formatUnread(unreadByChatId, chats, me?.id, nameByUserId)
 
@@ -134,6 +172,7 @@ export function HeaderBar() {
       </Text>,
     )
   if (show.user) segments.push(<Text muted>{userDisplay}</Text>)
+  if (badge) segments.push(<Text color={theme.unread}>{badge}</Text>)
   if (show.presence) {
     segments.push(
       presenceUnavailable ? (
@@ -192,6 +231,11 @@ export function HeaderBar() {
       </Text>
     </Box>
   )
+}
+
+function rank(configured: string[], label: string): number {
+  const i = configured.indexOf(label)
+  return i < 0 ? Number.MAX_SAFE_INTEGER : i
 }
 
 function formatUnread(
