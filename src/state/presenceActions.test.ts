@@ -1,5 +1,8 @@
 import { expect, test } from 'bun:test'
-import { parseStatusEnd } from './presenceActions'
+import { accountRef } from '../account'
+import { openAccount, type AccountStore } from './accountStore'
+import { parseStatusEnd, setStatusNoteOnAll } from './presenceActions'
+import { createAppStore } from './store'
 
 const now = new Date(2026, 9, 30, 12, 0)
 
@@ -15,4 +18,22 @@ test('parseStatusEnd', () => {
   expect(parseStatusEnd('2026-10-01', now)).toBeNull()
   expect(parseStatusEnd('25:00', now)).toBeNull()
   expect(parseStatusEnd('soon', now)).toBeNull()
+})
+
+test('setStatusNoteOnAll: every account gets the note; failures are named by label', async () => {
+  const store = createAppStore()
+  const accs = ['alpha', 'beta', 'gamma'].map((p, i) =>
+    openAccount(store, accountRef(p), { foreground: i === 0 }),
+  )
+  const sent: string[] = []
+  const setOne = async (acc: AccountStore, message: string) => {
+    if (acc.ref.label === 'beta') throw new Error('403 forbidden')
+    sent.push(`${acc.ref.label}:${message}`)
+  }
+  await expect(setStatusNoteOnAll(accs, 'lunch', null, setOne)).rejects.toThrow(
+    'beta: 403 forbidden',
+  )
+  expect(sent).toEqual(['alpha:lunch', 'gamma:lunch'])
+  await setStatusNoteOnAll([accs[0]!, accs[2]!], '', null, setOne)
+  expect(sent).toEqual(['alpha:lunch', 'gamma:lunch', 'alpha:', 'gamma:'])
 })
