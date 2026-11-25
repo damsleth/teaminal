@@ -1,6 +1,6 @@
 import { accountRef } from '../account'
 import { createGraphClient, currentAccountContext } from '../graph/client'
-import { afterEach, describe, expect, it, mock } from 'bun:test'
+import { afterEach, describe, expect, it, mock, setSystemTime } from 'bun:test'
 import { statSync, readdirSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
@@ -703,4 +703,56 @@ it('rejects redirect responses without making another request', async () => {
   } finally {
     __setExternalImageTransportForTests()
   }
+})
+
+describe('inline image fetch: shared waiters and retry', () => {
+  const realXdg = process.env.XDG_CACHE_HOME
+  let cacheRoot = ''
+  afterEach(() => {
+    __setExternalImageTransportForTests()
+    setSystemTime()
+    if (realXdg === undefined) delete process.env.XDG_CACHE_HOME
+    else process.env.XDG_CACHE_HOME = realXdg
+    if (cacheRoot) rmSync(cacheRoot, { recursive: true, force: true })
+  })
+
+  it('tells every waiting caller, and retries a failure after a delay', async () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-inline-retry`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    let calls = 0
+    let settle!: (r: Response) => void
+    __setExternalImageTransportForTests(
+      mock(() => {
+        calls++
+        return new Promise<Response>((r) => (settle = r))
+      }),
+    )
+    const key = `inline-retry-${Date.now()}`
+    const meta = { contentType: 'image/png', name: 'x.png' }
+    const fetchIt = (onChange: () => void) =>
+      ensureImageFetched('https://example.com/x.png', key, meta, {
+        client: testClient(),
+        isExternal: true,
+        onChange,
+      })
+    let a = 0
+    let b = 0
+    fetchIt(() => a++)
+    fetchIt(() => b++)
+    for (let i = 0; i < 50 && calls === 0; i++) await new Promise((r) => setTimeout(r, 5))
+    expect(calls).toBe(1)
+    settle(new Response('nope', { status: 500 }))
+    for (let i = 0; i < 100 && a === 0; i++) await new Promise((r) => setTimeout(r, 5))
+    expect([a, b]).toEqual([1, 1])
+
+    // Within the retry window a failure is not refetched (no render loop)...
+    fetchIt(() => {})
+    await new Promise((r) => setTimeout(r, 5))
+    expect(calls).toBe(1)
+    // ...after it, the next caller fetches again.
+    setSystemTime(new Date(Date.now() + 5 * 60_000))
+    fetchIt(() => {})
+    for (let i = 0; i < 50 && calls === 1; i++) await new Promise((r) => setTimeout(r, 5))
+    expect(calls).toBe(2)
+  })
 })

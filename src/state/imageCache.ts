@@ -383,9 +383,15 @@ export async function fetchExternalImage(url: string, signal?: AbortSignal): Pro
   }
 }
 
-// Trigger an async fetch for a key. Calls onChange when the status
-// transitions so callers can schedule a re-render. Safe to call
-// repeatedly - subsequent calls while loading are no-ops.
+// Trigger an async fetch for a key. Every caller that asked while it loads
+// is told (onChange) when it settles. A failed fetch is retried by the next
+// caller after INLINE_RETRY_MS, or at once when it was cancelled.
+// ponytail: an over-size blob also retries every INLINE_RETRY_MS (one capped
+// request); split final from transient failures if that shows up in logs.
+const INLINE_RETRY_MS = 30_000
+const inlineRetryAt = new Map<string, number>() // owned key -> when an error may retry
+const inlineWaiters = new Map<string, Set<() => void>>() // owned key -> callers to notify
+
 export function ensureImageFetched(
   path: string,
   key: string,
@@ -394,7 +400,12 @@ export function ensureImageFetched(
 ): void {
   const owned = ownedImageKey(opts.client.ctx.account.id, key)
   const current = fetchStatus.get(owned)
-  if (current === 'loading' || current === 'ready' || current === 'error') return
+  if (current === 'ready') return
+  if (current === 'loading') {
+    inlineWaiters.get(owned)?.add(opts.onChange)
+    return
+  }
+  if (current === 'error' && Date.now() < (inlineRetryAt.get(owned) ?? Infinity)) return
 
   const disk = readCachedImage(key, owaProfile(opts.client.ctx.account))
   if (disk) {
@@ -409,19 +420,29 @@ export function ensureImageFetched(
   }
 
   fetchStatus.set(owned, 'loading')
+  const waiters = new Set([opts.onChange])
+  inlineWaiters.set(owned, waiters)
+  const failed = (): void => {
+    fetchStatus.set(owned, 'error')
+    inlineRetryAt.set(owned, opts.signal?.aborted ? 0 : Date.now() + INLINE_RETRY_MS)
+  }
+  const settle = (): void => {
+    inlineWaiters.delete(owned)
+    for (const notify of waiters) notify()
+  }
   fetchAndCacheImage(path, key, meta, opts)
     .then((buf) => {
       if (buf) {
         imageDataCache.set(owned, buf)
         fetchStatus.set(owned, 'ready')
       } else {
-        fetchStatus.set(owned, 'error')
+        failed()
       }
-      opts.onChange()
+      settle()
     })
     .catch(() => {
-      fetchStatus.set(owned, 'error')
-      opts.onChange()
+      failed()
+      settle()
     })
 }
 
@@ -451,6 +472,8 @@ const photoQueues = new Map<AccountId, { active: number; waiting: (() => void)[]
 export function __forgetImagesInMemoryForTests(): void {
   fetchStatus.clear()
   imageDataCache.clear()
+  inlineRetryAt.clear()
+  inlineWaiters.clear()
 }
 
 export function __resetPhotoStateForTests(): void {
