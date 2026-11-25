@@ -336,8 +336,9 @@ export function createAccountManager(
     }
   }
 
-  // Stop a slot's driver and session (bounded: a hung session must not
-  // block a switch or quitting). The slot itself stays.
+  // Stop a slot's driver and session. The slot itself stays. Concurrent
+  // mode bounds the session stop: one hung account must not block removing
+  // it or quitting.
   async function stopSlot(slot: Slot): Promise<void> {
     slot.driver?.stop()
     slot.driver = null
@@ -346,7 +347,7 @@ export function createAccountManager(
     syncPollerRef()
     if (!session) return
     try {
-      await bounded(session.stop())
+      await (concurrent ? bounded(session.stop()) : session.stop())
     } catch (err) {
       warn('session: stop failed:', err instanceof Error ? err.message : String(err))
     }
