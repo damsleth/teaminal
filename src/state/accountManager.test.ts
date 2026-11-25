@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { accountRef } from '../account'
-import { createAccountManager } from './accountManager'
+import { createAccountManager, managerTimings } from './accountManager'
 import type { AccountStore } from './accountStore'
 import type { RunSessionOpts, SessionHandle } from './bootstrap'
 import type { ForceAvailabilityHandle } from './forceAvailability'
@@ -19,6 +19,7 @@ import { createAppStore, emptyMessageCache, resetAccountScopedState } from './st
 const realSeed = process.env.TEAMINAL_SEED
 const realXdg = process.env.XDG_CACHE_HOME
 let cacheRoot = ''
+const realTimings = { ...managerTimings }
 
 const noDriver = (): ForceAvailabilityHandle => ({ stop() {}, async reset() {} })
 const tick = () => new Promise((r) => setTimeout(r, 0))
@@ -72,6 +73,7 @@ function nonSeeded(): void {
 }
 
 afterEach(() => {
+  Object.assign(managerTimings, realTimings)
   if (realSeed === undefined) delete process.env.TEAMINAL_SEED
   else process.env.TEAMINAL_SEED = realSeed
   if (realXdg === undefined) delete process.env.XDG_CACHE_HOME
@@ -640,6 +642,56 @@ describe('AccountManager (concurrent)', () => {
     expect(held.requested).toEqual(['alpha', 'beta'])
     expect(held.sessions.find((s) => s.profile === 'beta')!.stopped).toBe(true)
     expect(m.running().map((r) => r.label)).toEqual(['alpha'])
+    await m.stopAll()
+  })
+
+  test('a hung start whose account is removed releases the queue; its late stop is bounded', async () => {
+    nonSeeded()
+    managerTimings.stopBoundMs = 20
+    const held = heldSessions()
+    const store = concurrentStore(['alpha', 'beta', 'gamma'])
+    const m = createAccountManager(store, 'alpha', held.start, noDriver, true)
+    const starting = m.start(() => {})
+    await tick()
+    held.pending.alpha!.release()
+    await starting
+    await waitFor(() => held.requested.includes('beta'))
+    // beta hangs in its bootstrap; switching to it waits on that start.
+    const switching = m.switchAccount('beta')
+    await tick()
+    store.set((s) => ({ settings: { ...s.settings, accounts: ['alpha', 'gamma'] } }))
+    await m.reconcile()
+    // gamma starts although beta's bootstrap never settled.
+    await waitFor(() => held.requested.includes('gamma'))
+    held.pending.gamma!.release()
+    await waitFor(() => m.running().map((r) => r.label).join() === 'alpha,gamma')
+    // beta's bootstrap lands late with a stop that never returns: the
+    // discarded session's teardown is bounded, so the switch settles.
+    held.pending.beta!.release()
+    const beta = held.sessions.find((s) => s.profile === 'beta')!
+    beta.stop = () => new Promise(() => {})
+    await switching
+    expect(store.get().account?.id).toBe(accountRef('alpha').id)
+    await m.stopAll()
+  })
+
+  test('a hung foreground start does not keep the background accounts down', async () => {
+    nonSeeded()
+    managerTimings.foregroundHeadStartMs = 10
+    const held = heldSessions()
+    const store = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(store, 'alpha', held.start, noDriver, true)
+    // start() returns after the head start; alpha is still bootstrapping.
+    await m.start(() => {})
+    expect(held.requested).toEqual(['alpha', 'beta'])
+    held.pending.beta!.release()
+    await waitFor(() => m.running().map((r) => r.label).join() === 'beta')
+    // alpha's start keeps running and lands later.
+    held.pending.alpha!.release()
+    await waitFor(() => m.running().length === 2)
+    expect(m.pollerHandleRef.current).toBe(
+      held.sessions.find((s) => s.profile === 'alpha')!.poller,
+    )
     await m.stopAll()
   })
 

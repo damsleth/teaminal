@@ -77,7 +77,8 @@ export type AccountManager = {
   running(): AccountRef[]
   // First session(s), or fixture data in seeded mode. Single mode throws
   // what runSession throws; concurrent mode never throws and resolves once
-  // the foreground's start settled (the others start after it).
+  // the foreground's start settled or its head start ran out, whichever is
+  // first (the others start after that; the foreground start keeps going).
   start(onFatal: RunSessionOpts['onFatal']): Promise<void>
   // Single mode: tear down and start `profile`. Concurrent mode: start it
   // if it has no session, swap it to the foreground at once, then wait for
@@ -117,6 +118,10 @@ type Slot = {
   // Concurrent mode: the pending start; resolves to its failure or null.
   starting: Promise<Error | null> | null
   hydrated: boolean
+  // Resolved when the slot is removed, so a wait on its start (the
+  // background queue) is released even if that start hangs.
+  removed: Promise<void>
+  remove: () => void
   paths: { message: string; list: string; name: string }
   last: Persisted
 }
@@ -125,7 +130,15 @@ type Slot = {
 // for it (a hung bootstrap must not block a later switch or quitting).
 type Box<T> = { done: Promise<T> }
 
-const STOP_BOUND_MS = 3000
+// Test seam: tests shorten these.
+export const managerTimings = {
+  // A hung session stop must not block removing its account or quitting.
+  stopBoundMs: 3000,
+  // ponytail: FOREGROUND_HEAD_START, 1.5 s. The background accounts wait
+  // this long for the foreground's start, then start anyway: a hung
+  // foreground bootstrap must not keep them down.
+  foregroundHeadStartMs: 1500,
+}
 
 function persisted(s: AccountSlice): Persisted {
   return {
@@ -138,7 +151,7 @@ function persisted(s: AccountSlice): Persisted {
 
 // Resolve after `p` settles or `ms` passes, whichever is first; the timer
 // does not outlive it.
-async function bounded(p: Promise<unknown>, ms = STOP_BOUND_MS): Promise<void> {
+async function bounded(p: Promise<unknown>, ms = managerTimings.stopBoundMs): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     await Promise.race([p, new Promise((r) => (timer = setTimeout(r, ms)))])
@@ -236,6 +249,8 @@ export function createAccountManager(
   }
 
   function addSlot(acc: AccountStore, p: string | null): Slot {
+    let remove = () => {}
+    const removed = new Promise<void>((r) => (remove = r))
     const slot: Slot = {
       ref: acc.ref,
       profile: p,
@@ -245,6 +260,8 @@ export function createAccountManager(
       attempt: 0,
       starting: null,
       hydrated: false,
+      removed,
+      remove,
       paths: {
         message: getMessageCachePath(process.env, p),
         list: getListCachePath(process.env, p),
@@ -377,7 +394,8 @@ export function createAccountManager(
         debug('session: discarding a bootstrap superseded by a newer account transition')
         driver.stop()
         if (slot.driver === driver) slot.driver = null
-        await session.stop().catch(() => {})
+        const stopping = session.stop().catch(() => {})
+        await (concurrent ? bounded(stopping) : stopping)
         return
       }
       slot.session = session
@@ -462,7 +480,8 @@ export function createAccountManager(
         const box = await serialize(() =>
           slots.get(slot.ref.id) === slot && slot.attempt === 0 ? beginStart(slot) : null,
         )
-        await box?.done
+        // A slot removed while its start hangs releases the queue.
+        if (box) await Promise.race([box.done, slot.removed])
       }
     } finally {
       draining = false
@@ -483,6 +502,7 @@ export function createAccountManager(
     // Out of the map first: its bootstrap is no longer wanted and the
     // persistence subscriber stops looking at it.
     slots.delete(slot.ref.id)
+    slot.remove()
     await stopSlot(slot)
     flushCaches()
     if (slot.acc.isForeground()) {
@@ -531,7 +551,7 @@ export function createAccountManager(
         const box = await serialize(() =>
           slots.get(fg.ref.id) === fg && fg.attempt === 0 ? beginStart(fg) : null,
         )
-        await box?.done
+        if (box) await bounded(box.done, managerTimings.foregroundHeadStartMs)
         for (const p of store.get().settings.accounts) {
           const slot = slotForProfile(p)
           if (slot && slot !== fg) enqueue(slot)
