@@ -12,7 +12,7 @@
 
 import { spawn as nodeSpawn, type SpawnOptions } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { warn } from '../log'
@@ -24,8 +24,7 @@ let dir: string | null = null
 
 function sessionDir(): string {
   if (!dir) {
-    dir = join(tmpdir(), `teaminal-images-${process.pid}`)
-    mkdirSync(dir, { recursive: true, mode: 0o700 })
+    dir = mkdtempSync(join(tmpdir(), 'teaminal-images-'))
   }
   return dir
 }

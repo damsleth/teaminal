@@ -6,6 +6,13 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- Validate external links and open them without a Windows command shell.
+- Restrict external image downloads and bound streaming response sizes.
+- Keep cached images and viewer temporary files private.
+- Limit workflow permissions and safely pass release inputs to the shell.
+
 ## [0.25.1] - 2026-10-30
 
 ### Added

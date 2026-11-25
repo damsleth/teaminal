@@ -23,10 +23,13 @@ describe('openExternal', () => {
     expect(r.calls[0]).toEqual({ cmd: 'xdg-open', args: ['https://example.com/'] })
   })
 
-  test('uses cmd start on Windows', () => {
+  test('uses rundll32 on Windows', () => {
     const r = recorder()
     openExternal('https://example.com/', { platform: 'win32', spawn: r.spawn })
-    expect(r.calls[0]).toEqual({ cmd: 'cmd', args: ['/c', 'start', '', 'https://example.com/'] })
+    expect(r.calls[0]).toEqual({
+      cmd: 'rundll32',
+      args: ['url.dll,FileProtocolHandler', 'https://example.com/'],
+    })
   })
 
   test('refuses non-http(s)/mailto URLs without spawning', () => {
@@ -47,4 +50,23 @@ describe('openExternal', () => {
     }
     expect(openExternal('https://example.com/', { platform: 'linux', spawn })).toBe(false)
   })
+})
+
+test('Windows passes shell metacharacters as a single argument without a shell', () => {
+  const url = 'https://example.com/?a=1&b=2|echo'
+  let called = false
+  expect(
+    openExternal(url, {
+      platform: 'win32',
+      spawn: (cmd, args, opts) => {
+        expect(cmd).toBe('rundll32')
+        expect(args).toEqual(['url.dll,FileProtocolHandler', url])
+        expect(opts.shell).toBe(false)
+        called = true
+        return { unref() {} }
+      },
+    }),
+  ).toBe(true)
+  expect(called).toBe(true)
+  expect(openExternal('https://', { spawn: recorder().spawn })).toBe(false)
 })

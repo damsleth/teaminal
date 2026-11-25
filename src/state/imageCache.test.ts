@@ -1,7 +1,7 @@
 import { accountRef } from '../account'
 import { createGraphClient, currentAccountContext } from '../graph/client'
 import { afterEach, describe, expect, it, mock } from 'bun:test'
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { statSync, readdirSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -34,6 +34,9 @@ import {
   userPhotoKey,
   ensureImageFetched,
   fetchAndCacheImage,
+  fetchExternalImage,
+  isPublicImageAddress,
+  __setExternalImageTransportForTests,
   getImageCacheDir,
   getImageData,
   imageCacheKey as cacheKey,
@@ -126,11 +129,10 @@ describe('attachmentGraphPath', () => {
 })
 
 describe('fetchAndCacheImage isExternal branch', () => {
-  const realFetch = globalThis.fetch
   const realXdg = process.env.XDG_CACHE_HOME
   let cacheRoot: string
   afterEach(() => {
-    globalThis.fetch = realFetch
+    __setExternalImageTransportForTests()
     if (realXdg === undefined) delete process.env.XDG_CACHE_HOME
     else process.env.XDG_CACHE_HOME = realXdg
     rmSync(cacheRoot, { recursive: true, force: true })
@@ -145,7 +147,7 @@ describe('fetchAndCacheImage isExternal branch', () => {
       capturedHeaders = new Headers(init?.headers ?? {})
       return new Response(bytes, { status: 200 })
     })
-    globalThis.fetch = fakeFetch as unknown as typeof fetch
+    __setExternalImageTransportForTests(fakeFetch)
 
     const key = `external-test-${Date.now()}`
     const buf = await fetchAndCacheImage(
@@ -156,6 +158,9 @@ describe('fetchAndCacheImage isExternal branch', () => {
     )
 
     expect(buf).not.toBeNull()
+    const dir = getImageCacheDir()
+    expect(statSync(dir).mode & 0o777).toBe(0o700)
+    for (const file of readdirSync(dir)) expect(statSync(join(dir, file)).mode & 0o777).toBe(0o600)
     expect(capturedHeaders).not.toBeNull()
     expect(capturedHeaders!.get('authorization')).toBeNull()
     expect(capturedHeaders!.get('Authorization')).toBeNull()
@@ -165,9 +170,9 @@ describe('fetchAndCacheImage isExternal branch', () => {
   it('sanitizes profile names before using them in cache paths', async () => {
     cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-profile`)
     process.env.XDG_CACHE_HOME = cacheRoot
-    globalThis.fetch = mock(
-      async () => new Response(new Uint8Array([1]), { status: 200 }),
-    ) as unknown as typeof fetch
+    __setExternalImageTransportForTests(
+      mock(async () => new Response(new Uint8Array([1]), { status: 200 })),
+    )
 
     const key = `profile-path-test-${Date.now()}`
     await fetchAndCacheImage(
@@ -590,4 +595,112 @@ describe('profile photos', () => {
     await new Promise((r) => setTimeout(r, 120))
     expect(peak).toBeLessThanOrEqual(4)
   })
+})
+
+describe('external image security', () => {
+  afterEach(() => {
+    __setExternalImageTransportForTests()
+  })
+
+  it('rejects unsafe schemes, IP literals and local hosts before fetching', async () => {
+    const transport = mock(async () => new Response(''))
+    __setExternalImageTransportForTests(transport)
+    for (const url of [
+      'http://example.com/a',
+      'https://127.0.0.1/a',
+      'https://100.64.0.1/a',
+      'https://[::1]/a',
+      'https://localhost/a',
+      'https://localhost./a',
+      'https://example.local/a',
+      'https://2130706433/a',
+    ]) {
+      await expect(fetchExternalImage(url)).rejects.toThrow()
+    }
+    expect(transport).not.toHaveBeenCalled()
+  })
+
+  it('disables redirects and preserves small images', async () => {
+    __setExternalImageTransportForTests(
+      mock(async (_url: string, init?: RequestInit) => {
+        expect(init?.redirect).toBe('error')
+        return new Response(new Uint8Array([1, 2]))
+      }),
+    )
+    expect(await fetchExternalImage('https://example.com/a')).toEqual(Buffer.from([1, 2]))
+  })
+
+  it('cancels oversized bodies from Content-Length before reading', async () => {
+    let cancelled = false
+    __setExternalImageTransportForTests(
+      mock(
+        async () =>
+          new Response(
+            new ReadableStream({
+              cancel() {
+                cancelled = true
+              },
+            }),
+            { headers: { 'content-length': String(4 * 1024 * 1024 + 1) } },
+          ),
+      ),
+    )
+    await expect(fetchExternalImage('https://example.com/a')).rejects.toThrow('too large')
+    expect(cancelled).toBe(true)
+  })
+
+  it('cancels a stream exceeding the cap even with a false Content-Length', async () => {
+    let cancelled = false
+    let reads = 0
+    __setExternalImageTransportForTests(
+      mock(
+        async () =>
+          new Response(
+            new ReadableStream({
+              pull(controller) {
+                reads++
+                controller.enqueue(new Uint8Array(1024 * 1024))
+              },
+              cancel() {
+                cancelled = true
+              },
+            }),
+            { headers: { 'content-length': '1' } },
+          ),
+      ),
+    )
+    await expect(fetchExternalImage('https://example.com/a')).rejects.toThrow('too large')
+    expect(cancelled).toBe(true)
+    expect(reads).toBeLessThanOrEqual(6)
+  })
+})
+
+it('rejects private DNS results including IPv4 mapped IPv6', () => {
+  for (const [address, family] of [
+    ['127.0.0.1', 4],
+    ['100.64.0.1', 4],
+    ['::1', 6],
+    ['::ffff:127.0.0.1', 6],
+    ['fe80::1', 6],
+    ['fc00::1', 6],
+  ] as const) {
+    expect(isPublicImageAddress(address, family)).toBe(false)
+  }
+})
+
+it('rejects redirect responses without making another request', async () => {
+  const transport = mock(
+    async () =>
+      new Response(null, {
+        status: 302,
+        headers: { location: 'https://127.0.0.1/a' },
+      }),
+  )
+  __setExternalImageTransportForTests(transport)
+  try {
+    await expect(fetchExternalImage('https://example.com/a')).rejects.toThrow('302')
+    expect(transport).toHaveBeenCalledTimes(1)
+  } finally {
+    __setExternalImageTransportForTests()
+  }
 })

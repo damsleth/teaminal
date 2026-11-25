@@ -2,7 +2,7 @@
 //
 // macOS:  open <url>
 // Linux:  xdg-open <url>
-// Windows: start "" <url>  (via cmd)
+// Windows: rundll32 url.dll,FileProtocolHandler <url>
 //
 // Best-effort and non-blocking: the child is spawned detached and unref'd so
 // it can't keep the TUI alive, and any spawn failure is logged, never thrown.
@@ -15,12 +15,16 @@ import { warn } from '../log'
 type Spawner = (cmd: string, args: string[], opts: SpawnOptions) => { unref: () => void }
 
 function isSafeUrl(url: string): boolean {
-  return /^(https?:|mailto:)/i.test(url)
+  try {
+    return ['http:', 'https:', 'mailto:'].includes(new URL(url).protocol)
+  } catch {
+    return false
+  }
 }
 
 function openerFor(platform: NodeJS.Platform, url: string): { cmd: string; args: string[] } {
   if (platform === 'darwin') return { cmd: 'open', args: [url] }
-  if (platform === 'win32') return { cmd: 'cmd', args: ['/c', 'start', '', url] }
+  if (platform === 'win32') return { cmd: 'rundll32', args: ['url.dll,FileProtocolHandler', url] }
   return { cmd: 'xdg-open', args: [url] }
 }
 
@@ -40,7 +44,7 @@ export function openExternal(
     opts?.spawn ?? ((cmd, args, o) => nodeSpawn(cmd, args, o) as unknown as { unref: () => void })
   const { cmd, args } = openerFor(platform, url)
   try {
-    const child = spawn(cmd, args, { detached: true, stdio: 'ignore' })
+    const child = spawn(cmd, args, { detached: true, stdio: 'ignore', shell: false })
     child.unref()
     return true
   } catch (err) {

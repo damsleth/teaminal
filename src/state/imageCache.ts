@@ -5,9 +5,21 @@
 // The cache key is messageId::attachmentId - never contains signed URLs or
 // other credentials. Blobs are rejected above MAX_IMAGE_BYTES to bound disk use.
 
+import { lookup } from 'node:dns'
+import { request } from 'node:https'
+import { Readable } from 'node:stream'
+import { BlockList, isIP } from 'node:net'
 import { sendWithBackoff } from '../graph/backoff'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import { teaminalCacheDir } from './cacheFiles'
 import { accountRef, owaProfile, profileSlug, type AccountId } from '../account'
@@ -101,9 +113,12 @@ export function readCachedImage(key: string, profile?: string): CachedImage | nu
 
 function writeCachedImage(key: string, data: Buffer, meta: ImageMeta, profile?: string): void {
   const dir = getCacheDir(profile)
-  mkdirSync(dir, { recursive: true })
-  writeFileSync(blobPath(key, profile), data)
-  writeFileSync(metaPath(key, profile), JSON.stringify(meta))
+  mkdirSync(dir, { recursive: true, mode: 0o700 })
+  chmodSync(dir, 0o700)
+  writeFileSync(blobPath(key, profile), data, { mode: 0o600 })
+  chmodSync(blobPath(key, profile), 0o600)
+  writeFileSync(metaPath(key, profile), JSON.stringify(meta), { mode: 0o600 })
+  chmodSync(metaPath(key, profile), 0o600)
 }
 
 export type FetchImageOpts = {
@@ -111,7 +126,7 @@ export type FetchImageOpts = {
   // that account's on-disk cache directory.
   client: GraphClient
   signal?: AbortSignal
-  // When true, fetch directly with plain fetch() and no Authorization
+  // When true, fetch directly over HTTPS with no Authorization
   // header. Used for giphy/tenor URLs returned by the Teams gif picker;
   // sending a Bearer token to those hosts produces a rejection.
   isExternal?: boolean
@@ -256,13 +271,116 @@ export function getImageData(account: AccountId | undefined, key: string): Buffe
 // size cap as the Graph path. Used by the gif-picker shape, where
 // contentUrl is an external CDN URL (giphy/tenor) that rejects Bearer
 // tokens.
-async function fetchExternalImage(url: string, signal?: AbortSignal): Promise<Uint8Array> {
-  const res = await sendWithBackoff(fetch, url, { signal })
+const privateNetworks = new BlockList()
+for (const [address, prefix] of [
+  ['0.0.0.0', 8],
+  ['10.0.0.0', 8],
+  ['100.64.0.0', 10],
+  ['127.0.0.0', 8],
+  ['169.254.0.0', 16],
+  ['172.16.0.0', 12],
+  ['192.168.0.0', 16],
+  ['224.0.0.0', 4],
+  ['240.0.0.0', 4],
+] as const)
+  privateNetworks.addSubnet(address, prefix, 'ipv4')
+privateNetworks.addSubnet('::', 128, 'ipv6')
+privateNetworks.addSubnet('::1', 128, 'ipv6')
+privateNetworks.addSubnet('fc00::', 7, 'ipv6')
+privateNetworks.addSubnet('fe80::', 10, 'ipv6')
+privateNetworks.addSubnet('ff00::', 8, 'ipv6')
+
+export function isPublicImageAddress(address: string, family: number): boolean {
+  return !privateNetworks.check(address, family === 6 ? 'ipv6' : 'ipv4')
+}
+
+// Validate the address actually used by the socket, avoiding a second DNS
+// resolution between validation and connection. HTTPS still verifies the
+// original hostname. Node's request does not follow redirects.
+const externalImageRequest = (url: string, init: RequestInit): Promise<Response> =>
+  new Promise((resolve, reject) => {
+    const req = request(
+      url,
+      {
+        signal: init.signal ?? undefined,
+        agent: false,
+        lookup(hostname, options, callback) {
+          lookup(hostname, { all: true }, (err, addresses) => {
+            if (err) return callback(err, [], undefined as never)
+            if (
+              !addresses.length ||
+              addresses.some(({ address, family }) => !isPublicImageAddress(address, family))
+            ) {
+              return callback(new Error('private external image host'), [], undefined as never)
+            }
+            if (options.all) callback(null, addresses)
+            else callback(null, addresses[0]!.address, addresses[0]!.family)
+          })
+        },
+      },
+      (res) => {
+        const headers = new Headers()
+        for (const [name, value] of Object.entries(res.headers)) {
+          if (value !== undefined)
+            headers.set(name, Array.isArray(value) ? value.join(', ') : value)
+        }
+        resolve(
+          new Response(Readable.toWeb(res) as ReadableStream<Uint8Array>, {
+            status: res.statusCode ?? 500,
+            headers,
+          }),
+        )
+      },
+    )
+    req.on('error', reject)
+    req.end()
+  })
+
+let externalImageTransport = externalImageRequest
+export function __setExternalImageTransportForTests(transport?: typeof externalImageRequest): void {
+  externalImageTransport = transport ?? externalImageRequest
+}
+
+export async function fetchExternalImage(url: string, signal?: AbortSignal): Promise<Uint8Array> {
+  const parsed = new URL(url)
+  const host = parsed.hostname.replace(/\.$/, '')
+  if (
+    parsed.protocol !== 'https:' ||
+    parsed.username ||
+    parsed.password ||
+    isIP(host) ||
+    host.startsWith('[') ||
+    !host.includes('.') ||
+    /(^|\.)(localhost|local|internal)$/.test(host)
+  ) {
+    throw new Error('unsafe external image URL')
+  }
+  const res = await sendWithBackoff(externalImageTransport, url, { signal, redirect: 'error' })
   if (!res.ok) {
+    await res.body?.cancel()
     throw new Error(`external image fetch ${res.status} ${res.statusText}`)
   }
-  const ab = await res.arrayBuffer()
-  return new Uint8Array(ab)
+  if (Number(res.headers.get('content-length')) > MAX_IMAGE_BYTES) {
+    await res.body?.cancel()
+    throw new Error('external image too large')
+  }
+  const reader = res.body?.getReader()
+  if (!reader) return new Uint8Array()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      size += value.byteLength
+      if (size > MAX_IMAGE_BYTES) throw new Error('external image too large')
+      chunks.push(value)
+    }
+    return Buffer.concat(chunks, size)
+  } finally {
+    await reader.cancel()
+    reader.releaseLock()
+  }
 }
 
 // Trigger an async fetch for a key. Calls onChange when the status
@@ -423,8 +541,10 @@ function ensurePhoto(
       const status = err instanceof GraphError ? err.status : null
       if (status === 404) {
         try {
-          mkdirSync(getCacheDir(profile), { recursive: true })
-          writeFileSync(noPhotoPath(key, profile), '')
+          mkdirSync(getCacheDir(profile), { recursive: true, mode: 0o700 })
+          chmodSync(getCacheDir(profile), 0o700)
+          writeFileSync(noPhotoPath(key, profile), '', { mode: 0o600 })
+          chmodSync(noPhotoPath(key, profile), 0o600)
         } catch {
           // best-effort: without the marker it's just asked again next launch
         }

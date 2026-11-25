@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { dirname } from 'node:path'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { cleanupImageTempFiles, materializeImage, openImageFile } from './openImageFile'
 
@@ -65,4 +66,13 @@ describe('openImageFile', () => {
     cleanupImageTempFiles()
     cleanupImageTempFiles()
   })
+})
+
+test('viewer directories are private and unique across sessions', () => {
+  const a = materializeImage('key', PNG)!
+  expect(statSync(dirname(a)).mode & 0o777).toBe(0o700)
+  cleanupImageTempFiles()
+  const b = materializeImage('key', PNG)!
+  expect(dirname(b)).not.toBe(dirname(a))
+  cleanupImageTempFiles()
 })
