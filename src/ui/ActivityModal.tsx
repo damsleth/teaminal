@@ -9,6 +9,7 @@
 // activity arriving twice — once via initial hydrate, once via trouter
 // push reconcile — renders as one row.
 
+import { fitCells } from './textSizing'
 import { Box, useApp } from 'ink'
 import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
@@ -185,8 +186,8 @@ export function ActivityModal() {
             const absIdx = top + i
             const focused = absIdx === cursor
             const arrow = focused ? '>' : ' '
-            const sender = (it.senderDisplayName ?? '?').slice(0, 18).padEnd(18)
-            const preview = (it.preview ?? '').slice(0, 40).padEnd(40)
+            const sender = fitCells(it.senderDisplayName ?? '?', 18)
+            const preview = fitCells(it.preview ?? '', 40)
             const when = relativeTime(it.createdAt, now).padStart(4)
             const unreadDot = it.isRead ? ' ' : '●'
             return (

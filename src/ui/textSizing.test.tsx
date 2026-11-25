@@ -1,6 +1,8 @@
 import { afterEach, expect, test } from 'bun:test'
 import { Box, Text, renderToString } from 'ink'
 import {
+  fitCells,
+  padCells,
   __setTextSizingSupportedForTests,
   expandTextSizing,
   fs,
@@ -118,4 +120,11 @@ test('tall packer and fractions stay within the spec limits', () => {
     expect(p.cells(p.len) / 2).toBeLessThanOrEqual(7)
     expect(p.cells(p.len)).toBeLessThanOrEqual(Math.ceil((p.len * n) / 10) + 1)
   }
+})
+
+test('padCells and fitCells count wide characters as two cells', () => {
+  expect(padCells('日本', 6)).toBe('日本  ')
+  expect(padCells('toolong', 3)).toBe('toolong')
+  expect(fitCells('日本語', 5)).toBe('日本 ')
+  expect(fitCells('ab', 4)).toBe('ab  ')
 })

@@ -335,3 +335,23 @@ export async function probeTextSizing(timeoutMs = 150): Promise<boolean> {
     }
   })
 }
+
+// Pad `text` with spaces to `width` terminal cells (wide characters count
+// as two). Longer text is returned as is.
+export function padCells(text: string, width: number): string {
+  const w = Bun.stringWidth(text)
+  return w >= width ? text : text + ' '.repeat(width - w)
+}
+
+// Exactly `width` cells: cut at a grapheme boundary, then pad.
+export function fitCells(text: string, width: number): string {
+  let out = ''
+  let w = 0
+  for (const { segment } of new Intl.Segmenter().segment(text)) {
+    const sw = Bun.stringWidth(segment)
+    if (w + sw > width) break
+    out += segment
+    w += sw
+  }
+  return out + ' '.repeat(width - w)
+}

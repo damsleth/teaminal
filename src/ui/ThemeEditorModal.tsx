@@ -47,15 +47,13 @@ import { activeCustomThemeData, useAppState, useAppStore, useTheme } from './Sto
 import { openThemePresets } from './ThemePresetsModal'
 import { activePresetName, saveThemePresetAs } from './themePresets'
 import { bodyFrame } from './MessagePane'
-import { fs } from './textSizing'
+import { fs, padCells } from './textSizing'
 import type { Settings } from '../state/store'
 
 const LABEL_W = 22
 const CONTENT_W = 52
 
-function pad(s: string): string {
-  return s.length >= CONTENT_W ? s : s + ' '.repeat(CONTENT_W - s.length)
-}
+const pad = (s: string): string => padCells(s, CONTENT_W)
 
 export function openThemeEditor(store: ReturnType<typeof useAppStore>): void {
   store.set({ modal: { kind: 'theme-editor', cursor: 0 }, inputZone: 'menu' })

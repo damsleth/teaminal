@@ -16,6 +16,7 @@
 // Menu structure lives in ./menu - this component is the renderer + input
 // dispatcher. Add menu items there, not here.
 
+import { padCells } from './textSizing'
 import { Box, useApp, useStdout } from 'ink'
 import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
@@ -71,11 +72,6 @@ const LOGO = [
 // backgroundColor on each Text and padding so every cell of the row is
 // covered.
 const MENU_MIN_WIDTH = LOGO[0]!.length
-
-function padTo(text: string, width: number): string {
-  if (text.length >= width) return text
-  return text + ' '.repeat(width - text.length)
-}
 
 type AppStoreApi = ReturnType<typeof useAppStore>
 export type MenuItemDeps = {
@@ -350,7 +346,7 @@ export function MenuModal() {
       ),
     ),
   )
-  const pad = (text: string): string => padTo(text, width)
+  const pad = (text: string): string => padCells(text, width)
 
   return (
     <Box alignItems="center" justifyContent="center" flexGrow={1}>

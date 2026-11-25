@@ -11,6 +11,7 @@
 //   d             delete the selected preset (y to confirm)
 //   esc           back to where it was opened from
 
+import { padCells } from './textSizing'
 import { Box } from 'ink'
 import { Text } from './Text'
 import { useInput } from './useInput'
@@ -29,9 +30,7 @@ import {
 
 const CONTENT_W = 52
 
-function pad(s: string): string {
-  return s.length >= CONTENT_W ? s : s + ' '.repeat(CONTENT_W - s.length)
-}
+const pad = (s: string): string => padCells(s, CONTENT_W)
 
 type PresetsModal = Extract<NonNullable<AppState['modal']>, { kind: 'theme-presets' }>
 
