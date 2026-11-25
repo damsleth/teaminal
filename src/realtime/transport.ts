@@ -37,6 +37,6 @@ export type TransportOpts = {
   getToken: () => Promise<string>
   /** Function that returns a fresh IC3 Teams access token for websocket auth. */
   getIc3Token?: () => Promise<string>
-  /** owa-piggy profile alias, if any. */
-  profile?: string
+  /** owa-piggy profile alias; undefined is the default account, written out. */
+  profile: string | undefined
 }

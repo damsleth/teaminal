@@ -13,6 +13,7 @@ function makeDummyTransport() {
   const transport = new TrouterTransport({
     bus,
     getToken: async () => 'fake-token',
+    profile: undefined,
   })
   return { bus, transport }
 }
@@ -431,6 +432,7 @@ describe('TrouterTransport shutdown', () => {
     const transport = new TrouterTransport({
       bus: new RealtimeEventBus(),
       getToken: () => new Promise<string>((r) => (release = r)),
+      profile: undefined,
     })
     ;(transport as unknown as { ensureSkypeToken: () => Promise<void> }).ensureSkypeToken =
       async () => {}

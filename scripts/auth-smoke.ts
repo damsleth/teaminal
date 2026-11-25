@@ -26,9 +26,9 @@ function summarize(token: string): { aud: string; minutes: number } {
 }
 
 const t0 = performance.now()
-const a = await getToken(profile)
+const a = await getToken({ profile })
 const t1 = performance.now()
-const b = await getToken(profile)
+const b = await getToken({ profile })
 const t2 = performance.now()
 
 const sa = summarize(a)

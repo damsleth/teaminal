@@ -48,7 +48,7 @@ describe('getTeamsPresenceByOid', () => {
       calls++
       return new Response('', { status: 200 })
     })
-    const out = await getTeamsPresenceByOid([])
+    const out = await getTeamsPresenceByOid([], { profile: undefined })
     expect(out.size).toBe(0)
     expect(calls).toBe(0)
   })
@@ -79,7 +79,7 @@ describe('getTeamsPresenceByOid', () => {
       )
     })
 
-    const out = await getTeamsPresenceByOid([ME_OID])
+    const out = await getTeamsPresenceByOid([ME_OID], { profile: undefined })
     expect(seenUrl).toBe('https://presence.teams.microsoft.com/v1/presence/getpresence/')
     expect(JSON.parse(seenBody)).toEqual([{ mri: `8:orgid:${ME_OID}` }])
     expect(seenAuth).toMatch(/^Bearer /)
@@ -114,7 +114,7 @@ describe('getTeamsPresenceByOid', () => {
       )
     })
 
-    const out = await getTeamsPresenceByOid([ME_OID, otherOid])
+    const out = await getTeamsPresenceByOid([ME_OID, otherOid], { profile: undefined })
     expect(out.size).toBe(1)
     expect(out.get(ME_OID)?.availability).toBe('Available')
     expect(out.has(otherOid)).toBe(false)
@@ -130,7 +130,7 @@ describe('getTeamsPresenceByOid', () => {
     })
     let caught: unknown = null
     try {
-      await getTeamsPresenceByOid([ME_OID])
+      await getTeamsPresenceByOid([ME_OID], { profile: undefined })
     } catch (err) {
       caught = err
     }
@@ -143,7 +143,7 @@ describe('getTeamsPresenceByOid', () => {
     __setTransportForTests(async () => new Response('upstream is sad', { status: 503 }))
     let caught: unknown = null
     try {
-      await getTeamsPresenceByOid([ME_OID])
+      await getTeamsPresenceByOid([ME_OID], { profile: undefined })
     } catch (err) {
       caught = err
     }
@@ -160,7 +160,9 @@ describe('getTeamsPresenceByOid', () => {
         headers: { 'content-type': 'application/json' },
       })
     })
-    await expect(getTeamsPresenceByOid([ME_OID])).rejects.toBeInstanceOf(TeamsPresenceError)
+    await expect(getTeamsPresenceByOid([ME_OID], { profile: undefined })).rejects.toBeInstanceOf(
+      TeamsPresenceError,
+    )
   })
 
   test('forwards the abort signal to fetch', async () => {
@@ -174,7 +176,7 @@ describe('getTeamsPresenceByOid', () => {
       })
     })
     const ctrl = new AbortController()
-    await getTeamsPresenceByOid([ME_OID], { signal: ctrl.signal })
+    await getTeamsPresenceByOid([ME_OID], { profile: undefined, signal: ctrl.signal })
     expect(seenSignal).toBe(ctrl.signal)
   })
 })
@@ -201,7 +203,7 @@ describe('getMyTeamsPresence', () => {
         { status: 200, headers: { 'content-type': 'application/json' } },
       )
     })
-    const me = await getMyTeamsPresence()
+    const me = await getMyTeamsPresence({ profile: undefined })
     expect(me?.oid).toBe(ME_OID)
     expect(me?.availability).toBe('Available')
   })
@@ -215,7 +217,7 @@ describe('getMyTeamsPresence', () => {
       calls++
       return new Response('[]', { status: 200 })
     })
-    const out = await getMyTeamsPresence()
+    const out = await getMyTeamsPresence({ profile: undefined })
     expect(out).toBeNull()
     expect(calls).toBe(0)
   })
