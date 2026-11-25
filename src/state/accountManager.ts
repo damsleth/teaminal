@@ -234,6 +234,7 @@ export function createAccountManager(
       if (stopped || mine !== transition || !slot.isCurrent()) {
         debug('session: discarding a bootstrap superseded by a newer account transition')
         driver.stop()
+        if (forceDriver === driver) forceDriver = null
         await session.stop().catch(() => {})
         return
       }
@@ -270,11 +271,12 @@ export function createAccountManager(
     },
 
     async switchAccount(nextProfile) {
-      if (stopped || currentSession?.profile === nextProfile) return
+      if (stopped) return
       const mine = ++transition
       const started = await serialize(async () => {
         // A newer switch (or stopAll) was requested while this one waited.
-        if (mine !== transition) return null
+        // Checked here, not before queueing, so the last request wins.
+        if (mine !== transition || currentSession?.profile === nextProfile) return null
         // Tear down the running session first so its loops can't write into
         // the about-to-be-reset store.
         await stopSession()

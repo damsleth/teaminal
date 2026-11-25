@@ -74,8 +74,10 @@ export function setActiveProfile(profile: string | undefined): void {
   activeProfile = profile
 }
 
-// Per-account audience preference for the default (no-explicit-scope)
-// Graph calls. 'graph' is the out-of-the-box behavior. When set to
+// Ambient audience preference for the default (no-explicit-scope) Graph
+// calls, read only through currentAccountContext() (scripts / tests, like
+// activeProfile above); app clients carry their own account's audience in
+// their AccountContext. 'graph' is the out-of-the-box behavior. When set to
 // 'ic3', default calls request the ic3-audience token first; on a
 // persistent 401 the client falls back to the other audience once (when
 // audienceFallback is on). Calls that pass an explicit `scope` are never
@@ -84,8 +86,7 @@ export type TokenAudience = 'graph' | 'ic3'
 let preferredAudience: TokenAudience = 'graph'
 // Off by default: a plain install with no per-account audience preference
 // behaves exactly as before (graph token, single same-audience 401 retry,
-// no cross-audience fallback request). bootstrap turns this on only for
-// accounts that explicitly opted into a non-default audience.
+// no cross-audience fallback request).
 let audienceFallback = false
 
 export function setAudiencePreference(

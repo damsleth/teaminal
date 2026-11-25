@@ -292,6 +292,27 @@ describe('AccountManager', () => {
     expect(sessions.every((s) => s.stopped)).toBe(true)
   })
 
+  test('switching away and straight back keeps the running session (last request wins)', async () => {
+    nonSeeded()
+    const sessions: FakeSession[] = []
+    const store = createAppStore()
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => {
+        const s = fakeSession(opts)
+        sessions.push(s)
+        return s
+      },
+      noDriver,
+    )
+    await m.start(() => {})
+    await Promise.all([m.switchAccount('beta'), m.switchAccount('alpha')])
+    expect(sessions.map((s) => [s.profile, s.stopped])).toEqual([['alpha', false]])
+    expect(m.activeProfile()).toBe('alpha')
+    await m.stopAll()
+  })
+
   test('a bootstrap whose slot was re-opened meanwhile is discarded', async () => {
     nonSeeded()
     let release = () => {}

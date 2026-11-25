@@ -14,6 +14,7 @@ import * as teamsFederation from '../graph/teamsFederation'
 import * as teamsPresence from '../graph/teamsPresence'
 import { __resetForTests as resetRegion, __setRegionForTests } from '../graph/teamsRegion'
 import { accountStore, openAccount } from './accountStore'
+import type { RealtimeTransport, TransportOpts, TransportState } from '../realtime/transport'
 import { runSession, type SessionHandle } from './bootstrap'
 import { createAppStore } from './store'
 
@@ -101,33 +102,75 @@ afterEach(async () => {
   resetAuth()
 })
 
+// A push transport that never touches the network; it keeps the bus its
+// session handed it so the test can emit events on that session only.
+class FakeTransport implements RealtimeTransport {
+  state: TransportState = 'disconnected'
+  disconnected = false
+  constructor(readonly opts: TransportOpts) {}
+  async connect(): Promise<void> {
+    this.state = 'connected'
+  }
+  disconnect(): void {
+    this.disconnected = true
+    this.state = 'disconnected'
+  }
+  onStateChange(): () => void {
+    return () => {}
+  }
+  retry(): void {}
+}
+
+const listPolls = (from: number, who: string) =>
+  requests.slice(from).filter((r) => r.who === who && r.url.includes('/v1.0/chats?')).length
+
 describe('runSession', () => {
-  test('two sessions in one process write their own slots and own their pollers', async () => {
+  test('two sessions in one process: own slots, pollers and transports', async () => {
     install()
     const store = createAppStore(alice)
+    store.set({ settings: { ...store.get().settings, realtimeEnabled: true } })
     const a = accountStore(store)
     const b = openAccount(store, bob, { foreground: false })
-    const sa = await runSession({ account: a, profile: 'alice', onFatal: () => {} })
+    const fakes: FakeTransport[] = []
+    const createTransport = (o: TransportOpts) => {
+      const t = new FakeTransport(o)
+      fakes.push(t)
+      return t
+    }
+    const onFatal = () => {}
+    const sa = await runSession({ account: a, profile: 'alice', onFatal, createTransport })
     sessions.push(sa)
-    const sb = await runSession({ account: b, profile: 'bob', onFatal: () => {} })
+    const sb = await runSession({ account: b, profile: 'bob', onFatal, createTransport })
     sessions.push(sb)
+    const [ta, tb] = fakes
 
     expect(store.get().me?.id).toBe('alice-id')
     expect(store.get().backgroundAccounts[bob.id]?.me?.id).toBe('bob-id')
     expect(sa.poller).not.toBeNull()
-    expect(sb.poller).not.toBeNull()
     expect(sa.poller).not.toBe(sb.poller)
-    // Realtime is off by default: no transport.
-    expect(sa.transport).toBeNull()
+    expect(sa.transport).toBe(ta!)
+    expect(sb.transport).toBe(tb!)
+    expect(ta!.opts.profile).toBe('alice')
+    expect(tb!.opts.profile).toBe('bob')
 
-    // Stopping A leaves B's poller running.
+    // Let both initial list polls finish.
+    await waitFor(() => listPolls(0, 'alice-id') > 0 && listPolls(0, 'bob-id') > 0)
+    await Bun.sleep(50)
+
+    // A push on B's bus wakes B's poller only.
+    let mark = requests.length
+    tb!.opts.bus.emit({ kind: 'new-message', chatId: 'c1' })
+    await waitFor(() => listPolls(mark, 'bob-id') > 0)
+    expect(listPolls(mark, 'alice-id')).toBe(0)
+
+    // Stopping A disconnects A's transport only; B's poller still answers.
     await sa.stop()
     sessions.splice(sessions.indexOf(sa), 1)
-    const mark = requests.length
-    sb.poller!.refresh()
-    await waitFor(() =>
-      requests.slice(mark).some((r) => r.who === 'bob-id' && r.url.includes('/v1.0/chats')),
-    )
+    expect(ta!.disconnected).toBe(true)
+    expect(tb!.disconnected).toBe(false)
+    mark = requests.length
+    tb!.opts.bus.emit({ kind: 'new-message', chatId: 'c1' })
+    await waitFor(() => listPolls(mark, 'bob-id') > 0)
     expect(requests.slice(mark).some((r) => r.who === 'alice-id')).toBe(false)
   })
 

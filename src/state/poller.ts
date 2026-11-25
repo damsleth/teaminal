@@ -82,8 +82,8 @@ export type PollerOpts = {
 }
 
 // Mutable ref to the active poller handle. The handle is not available
-// at first render because bootstrap is async; consumers (the UI tree
-// and bootstrap itself) share a `{ current }` box rather than passing
+// at first render because bootstrap is async; the UI tree reads a
+// `{ current }` box (written by the AccountManager) rather than passing
 // a handle through props/context that does not exist yet.
 export type PollerHandleRef = { current: PollerHandle | null }
 

@@ -20,7 +20,7 @@ import { listActivityFeed } from '../graph/teamsActivity'
 import { recordEvent, warn } from '../log'
 import { notifyMention } from '../notify'
 import { RealtimeEventBus } from '../realtime/events'
-import type { RealtimeTransport } from '../realtime/transport'
+import type { RealtimeTransport, TransportOpts } from '../realtime/transport'
 import { TrouterTransport } from '../realtime/trouter'
 import { htmlToText } from '../text/html'
 import { mergeActivityItems, countUnreadMentions, recordNotification } from './activityFeed'
@@ -54,6 +54,8 @@ export type RunSessionOpts = {
   // slot is closed or re-opened.
   account: AccountStore
   profile: string | null
+  // Test seam: the push transport (realtimeEnabled only).
+  createTransport?: (opts: TransportOpts) => RealtimeTransport
   /**
    * Called when bootstrap fails fatally (e.g. unauthorized /me). The
    * caller decides whether to unmount the UI and exit. Errors thrown
@@ -110,7 +112,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
   let pollerHandle: PollerHandle | null = null
   let bus: RealtimeEventBus | null = null
   let bridge: ReturnType<typeof startRealtimeBridge> | null = null
-  let transport: TrouterTransport | null = null
+  let transport: RealtimeTransport | null = null
   // Flipped by stop(). Detached async work (e.g. the activity-feed
   // hydrate) consults this before writing to the store so a fetch that
   // resolves after a profile switch can't repopulate the next account's
@@ -204,7 +206,8 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
       // rejected with 401 by the authsvc endpoint. owa-piggy already
       // exposes per-resource tokens via --scope, so we route the request
       // through the same scoped path the presence loop uses.
-      transport = new TrouterTransport({
+      const createTransport = opts.createTransport ?? ((o) => new TrouterTransport(o))
+      transport = createTransport({
         bus,
         getToken: () =>
           getToken({
