@@ -4,7 +4,8 @@
  * concurrentAccounts on, two seeded accounts. Removing both from the
  * Accounts modal (background one first, then the foreground) leaves no
  * account at all: the shell still renders and the Accounts modal stays
- * open so an account can be added again.
+ * open so an account can be added again; the chat list says so instead of
+ * loading forever.
  *
  * Its own config dir: the flow rewrites the config's account list.
  *
@@ -72,5 +73,6 @@ test('account-concurrent-remove-all: no accounts left, the shell and Accounts mo
   terminal.keyEscape()
   await pause(400)
   await expect(terminal.getByText('teaminal')).toBeVisible()
+  await expect(terminal.getByText('(no accounts)')).toBeVisible()
   expect(screen(terminal)).not.toContain('No accounts added.')
 })

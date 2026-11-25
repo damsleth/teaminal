@@ -74,7 +74,8 @@ export function ActivityModal() {
   // On open, opportunistically refresh from the server so the user sees
   // any items that arrived between the last reconcile and now.
   useEffect(() => {
-    if (!isOpen) return
+    // No account at all (every account removed): nothing to refresh.
+    if (!isOpen || !store.get().account) return
     void refreshActivityFeed(accountStore(store))
   }, [isOpen, store])
 

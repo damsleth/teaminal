@@ -474,7 +474,13 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
       <Box flexDirection="column" paddingLeft={0} paddingRight={1}>
         {filterBanner}
         <Text color={theme.mutedText}>
-          {filter ? '  no matches' : conn === 'connecting' ? '  loading...' : '  (none)'}
+          {filter
+            ? '  no matches'
+            : !accountId
+              ? '  (no accounts)'
+              : conn === 'connecting'
+                ? '  loading...'
+                : '  (none)'}
         </Text>
       </Box>
     )

@@ -163,3 +163,17 @@ test('the selected row is colored as a whole and can be framed', () => {
     at(flat, 'Design Sync') - at(flat, 'Ada Byron') + 2,
   )
 })
+
+test('no account open (every account removed): an empty state, not loading', () => {
+  const store = createAppStore()
+  const out = renderToString(
+    <StoreProvider store={store}>
+      <SessionProvider api={session}>
+        <ChatList listPaneWidth={60} />
+      </SessionProvider>
+    </StoreProvider>,
+    { columns: 60 },
+  )
+  expect(out).toContain('no account')
+  expect(out).not.toContain('loading')
+})
