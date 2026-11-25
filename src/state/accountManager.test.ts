@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { accountRef } from '../account'
 import { createAccountManager } from './accountManager'
+import type { SessionHandle } from './bootstrap'
 import { getMessageCachePath, loadMessageCache } from './messageCachePersistence'
 import { createAppStore, emptyMessageCache } from './store'
 
@@ -61,5 +62,49 @@ describe('AccountManager', () => {
     expect(existsSync(path)).toBe(true)
     expect(Object.keys(loadMessageCache(path))).toEqual(['chat:c1'])
     expect(existsSync(getMessageCachePath(process.env, null))).toBe(false)
+  })
+
+  test('a bootstrap that resolves after a newer transition is stopped, not installed', async () => {
+    delete process.env.TEAMINAL_SEED
+    cacheRoot = mkdtempSync(join(tmpdir(), 'teaminal-manager-'))
+    process.env.XDG_CACHE_HOME = cacheRoot
+    const stopped: string[] = []
+    const release: Record<string, (s: SessionHandle) => void> = {}
+    const fake = (profile: string | null) =>
+      ({
+        profile,
+        stop: async () => {
+          stopped.push(String(profile))
+        },
+        client: () => ({ profile }),
+      }) as unknown as SessionHandle
+    const store = createAppStore()
+    const m = createAccountManager(store, 'alpha', (opts) => {
+      return new Promise((resolve) => (release[String(opts.profile)] = resolve))
+    })
+    const starting = m.start(() => {})
+    const tick = () => new Promise((r) => setTimeout(r, 0))
+    const toBeta = m.switchAccount('beta')
+    await tick() // beta reaches its bootstrap
+    const toGamma = m.switchAccount('gamma')
+    await tick()
+    release.gamma!(fake('gamma'))
+    await toGamma
+    release.alpha!(fake('alpha'))
+    release.beta!(fake('beta'))
+    await Promise.all([starting, toBeta])
+    expect(stopped.sort()).toEqual(['alpha', 'beta'])
+    expect((m.client() as unknown as { profile: string }).profile).toBe('gamma')
+
+    // Shutdown while a bootstrap is pending: the late session is stopped too.
+    const m2 = createAccountManager(createAppStore(), 'delta', (opts) => {
+      return new Promise((resolve) => (release[String(opts.profile)] = resolve))
+    })
+    const late = m2.start(() => {})
+    await m2.stopAll()
+    release.delta!(fake('delta'))
+    await late
+    expect(stopped).toContain('delta')
+    await m.stopAll()
   })
 })

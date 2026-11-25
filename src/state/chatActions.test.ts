@@ -13,7 +13,17 @@ import {
 } from '../graph/client'
 import { __resetChatMessageFallbackForTests } from '../graph/chats'
 import type { ChatMessage, IdentityUser } from '../types'
-import { createAppStore, resetAccountScopedState } from './store'
+import { createAppStore, emptyMessageCache, focusKey, resetAccountScopedState } from './store'
+import {
+  __resetForTests as resetChatsvc,
+  __setTransportForTests as setChatsvcTransport,
+} from '../graph/teamsChatsvc'
+import {
+  __resetForTests as resetFederation,
+  __setTransportForTests as setFederationTransport,
+} from '../graph/teamsFederation'
+import { __setRegionForTests } from '../graph/teamsRegion'
+import { mergeActivePagePatch } from './poller/pagePatch'
 import {
   deleteChatById,
   deleteChatMessageById,
@@ -288,5 +298,195 @@ describe('sendMessage', () => {
     release()
     await pending
     expect(convMsgs(store)).toEqual([])
+  })
+})
+
+// The poller merges from messageCacheByConvo; these drive an action and then
+// the real head-poll patch, the way a live session interleaves them.
+describe('actions and the next poll', () => {
+  const chat = { kind: 'chat', chatId: 'c1' } as const
+  const json = (body: unknown) =>
+    new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } })
+  const poll = (store: ReturnType<typeof createAppStore>, messages: ChatMessage[]) =>
+    store.set(
+      mergeActivePagePatch(store.get(), 'chat:c1', { messages }, { kind: 'chat', chatId: 'c1' }),
+    )
+  const withCache = (store: ReturnType<typeof createAppStore>) => {
+    store.set(() => ({ messageCacheByConvo: { 'chat:c1': emptyMessageCache(convMsgs(store)) } }))
+    return store
+  }
+  const m1 = convMsgsSeed()
+
+  it('a confirmed send survives a poll that does not carry it yet', async () => {
+    const store = withCache(
+      setup(async () =>
+        json({
+          id: 'server-1',
+          createdDateTime: '2026-05-29T10:01:00Z',
+          body: { contentType: 'text', content: 'hi' },
+        }),
+      ),
+    )
+    await sendMessage(testClient(), accountStore(store), chat, 'hi')
+    poll(store, [m1])
+    expect(convMsgs(store).map((m) => m.id)).toEqual(['m1', 'server-1'])
+  })
+
+  it('an echo that lands before the POST resolves leaves one row', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const server = {
+      id: 'server-1',
+      createdDateTime: '2026-05-29T10:01:00Z',
+      body: { contentType: 'text' as const, content: 'hi' },
+    }
+    const store = withCache(
+      setup(async () => {
+        await gate
+        return json(server)
+      }),
+    )
+    const pending = sendMessage(testClient(), accountStore(store), chat, 'hi')
+    const cmid = convMsgs(store).at(-1)!.clientMessageId
+    expect(cmid).toBeTruthy()
+    // chatsvc echoes carry the client message id.
+    poll(store, [m1, { ...server, clientMessageId: cmid }])
+    expect(convMsgs(store).map((m) => m.id)).toEqual(['m1', 'server-1'])
+    release()
+    expect(await pending).toEqual({ ok: true })
+    expect(convMsgs(store).map((m) => m.id)).toEqual(['m1', 'server-1'])
+  })
+
+  it('a Graph echo (same id, no client id) before the POST resolves leaves one row', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const server = {
+      id: 'server-1',
+      createdDateTime: '2026-05-29T10:01:00Z',
+      body: { contentType: 'text' as const, content: 'hi' },
+    }
+    const store = withCache(
+      setup(async () => {
+        await gate
+        return json(server)
+      }),
+    )
+    const pending = sendMessage(testClient(), accountStore(store), chat, 'hi')
+    poll(store, [m1, server])
+    release()
+    await pending
+    expect(convMsgs(store).map((m) => m.id)).toEqual(['m1', 'server-1'])
+    poll(store, [m1, server])
+    expect(convMsgs(store).map((m) => m.id)).toEqual(['m1', 'server-1'])
+  })
+
+  it('a reaction survives a poll that does not carry it yet', async () => {
+    const store = withCache(setup(ok))
+    await toggleReaction(testClient(), accountStore(store), 'c1', 'm1', 'like', me)
+    poll(store, [m1])
+    expect(convMsgs(store)[0]!.reactions?.map((r) => r.reactionType)).toEqual(['like'])
+  })
+
+  it('a failed edit restores only that message, keeping ones that arrived meanwhile', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const store = withCache(
+      setup(async () => {
+        await gate
+        return fail()
+      }),
+    )
+    const pending = editChatMessageContent(testClient(), accountStore(store), 'c1', 'm1', 'edited')
+    const m2: ChatMessage = { ...m1, id: 'm2', createdDateTime: '2026-05-29T10:02:00Z' }
+    poll(store, [{ ...m1, body: { contentType: 'text', content: 'edited' } }, m2])
+    release()
+    await expect(pending).rejects.toThrow()
+    // The poll already replaced the optimistic copy: it wins, m2 stays.
+    expect(convMsgs(store).map((m) => [m.id, m.body.content])).toEqual([
+      ['m1', 'edited'],
+      ['m2', 'hello'],
+    ])
+  })
+
+  it('a failed edit with no poll in between puts the original back', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const store = withCache(
+      setup(async () => {
+        await gate
+        return fail()
+      }),
+    )
+    const pending = editChatMessageContent(testClient(), accountStore(store), 'c1', 'm1', 'edited')
+    store.set(() => ({
+      messagesByConvo: {
+        'chat:c1': [
+          ...convMsgs(store),
+          { ...m1, id: 'm2', createdDateTime: '2026-05-29T10:02:00Z' },
+        ],
+      },
+    }))
+    release()
+    await expect(pending).rejects.toThrow()
+    expect(convMsgs(store).map((m) => [m.id, m.body.content])).toEqual([
+      ['m1', 'hello'],
+      ['m2', 'hello'],
+    ])
+  })
+})
+
+function convMsgsSeed(): ChatMessage {
+  return {
+    id: 'm1',
+    createdDateTime: '2026-05-29T10:00:00Z',
+    body: { contentType: 'text', content: 'hello' },
+    from: { user: me },
+  }
+}
+
+describe('thread reply send', () => {
+  afterEach(() => {
+    resetChatsvc()
+    resetFederation()
+  })
+
+  it("sends with the optimistic row's client id and lands in the loaded channel stream", async () => {
+    const store = setup(ok)
+    // chatsvc auth: Skype token via the federation transport, fixed region.
+    setFederationTransport(
+      async () =>
+        new Response(JSON.stringify({ tokens: { skypeToken: 'skype', expiresIn: 3600 } }), {
+          headers: { 'content-type': 'application/json' },
+        }),
+    )
+    __setRegionForTests('test', 'emea')
+    let wireCmid: unknown
+    let rowCmid: string | undefined
+    setChatsvcTransport(async (_url, init) => {
+      wireCmid = (JSON.parse(String(init.body)) as Record<string, unknown>).clientmessageid
+      rowCmid = store.get().messagesByConvo['thread:t1:ch1:root1']?.at(-1)?.clientMessageId
+      return new Response(JSON.stringify({ id: 'reply-1', OriginalArrivalTime: Date.now() }), {
+        status: 201,
+        headers: { 'content-type': 'application/json' },
+      })
+    })
+    const root: ChatMessage = {
+      id: 'root1',
+      rootMessageId: 'root1',
+      createdDateTime: '2026-05-29T09:00:00Z',
+      body: { contentType: 'text', content: 'root' },
+    }
+    const channelConv = 'channel:t1:ch1'
+    store.set({ messagesByConvo: { [channelConv]: [root] } })
+    const focus = { kind: 'thread', teamId: 't1', channelId: 'ch1', rootId: 'root1' } as const
+    expect(focusKey(focus)).toBe('thread:t1:ch1:root1')
+    expect(await sendMessage(testClient(), accountStore(store), focus, 'hi')).toEqual({ ok: true })
+    expect(wireCmid).toBeTruthy()
+    expect(wireCmid).toBe(rowCmid)
+    const stream = store.get().messagesByConvo[channelConv] ?? []
+    expect(stream.map((m) => [m.id, m.replyToId])).toEqual([
+      ['root1', undefined],
+      ['reply-1', 'root1'],
+    ])
   })
 })

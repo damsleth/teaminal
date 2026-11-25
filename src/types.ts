@@ -194,6 +194,10 @@ export type ChatMessage = {
   sequenceId?: number
   subject?: string | null
   eventDetail?: SystemEventDetail | null
+  // chatsvc send identity (`clientmessageid`). Generated once per send and
+  // echoed back on the server copy, so an optimistic row can be matched to
+  // its poll echo even when the echo lands before the POST resolves.
+  clientMessageId?: string
   // Local-only fields used by the optimistic-send flow. Underscore prefix
   // marks them as never set by Graph; they're always undefined on
   // server-confirmed messages. Once the server response replaces the
@@ -201,6 +205,9 @@ export type ChatMessage = {
   _tempId?: string
   _sending?: boolean
   _sendError?: string
+  // When a local reaction change was applied (ms epoch). A poll that returns
+  // no reactions keeps the local ones only inside a short window after this.
+  _reactionsPendingAt?: number
 }
 
 // One result from a server-side (Graph /search/query) message search.

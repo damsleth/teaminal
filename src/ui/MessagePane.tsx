@@ -603,7 +603,11 @@ export function MessagePane(props: {
                     theme={theme}
                     threadMeta={
                       channelThreads && row.kind === 'message'
-                        ? replyBadgeFor(channelThreads, row.message.id)
+                        ? replyBadgeFor(
+                            channelThreads,
+                            row.message.id,
+                            convCache?.fullyLoaded === true,
+                          )
                         : undefined
                     }
                   />
@@ -1349,14 +1353,19 @@ function inlineImagePlaceholder(
 }
 
 // Locally-derived reply-count badge for a channel root message. `count` is
-// the number of replies present in the loaded stream; `more` is reserved for
-// a future window-gap signal (see the rootMessageId rebuild plan, step 3) and
-// is false for now — the badge reflects what's loaded.
+// the number of replies present in the loaded stream. `more` ("N+") unless
+// coverage is proven complete: the channel's whole history is loaded.
+// ponytail: whole-history proof only; a per-thread proof (thread door fully
+// loaded, or a gap-free window back to the root) would drop the "+" sooner.
 export type ReplyBadge = { count: number; more: boolean }
 
-function replyBadgeFor(threads: ChannelThreads, rootId: string): ReplyBadge | undefined {
+function replyBadgeFor(
+  threads: ChannelThreads,
+  rootId: string,
+  complete: boolean,
+): ReplyBadge | undefined {
   const count = replyCountForRoot(threads, rootId)
-  return count > 0 ? { count, more: false } : undefined
+  return count > 0 ? { count, more: !complete } : undefined
 }
 
 export function formatReplyCount(meta: ReplyBadge): string {

@@ -28,6 +28,7 @@ import {
 } from '../graph/messageSearch'
 import { searchExternalUsers as searchExternalUsersGraph } from '../graph/teamsExternalSearch'
 import { resolveFederatedEquivalentConversationId } from '../graph/teamsFederation'
+import { newClientMessageId } from '../graph/teamsChatsvc'
 import {
   postChannelReply as postChannelReplyGraph,
   sendChannelMessage as sendChannelMessageGraph,
@@ -42,9 +43,12 @@ import {
   hasReactionType,
   removeReactionType,
 } from './messageMutations'
+import { mergeChronological } from './poller/merge'
 import {
   focusKey,
+  type AccountSlice,
   type AppState,
+  type ConvKey,
   type FocusChannel,
   type FocusChat,
   type FocusThread,
@@ -121,12 +125,33 @@ function makeTempId(): string {
 
 export type SendResult = { ok: true } | { ok: false; error: string }
 
+// Both message maps hold the conversation's list: the UI reads
+// messagesByConvo, the poller merges from messageCacheByConvo. An action
+// writes both, or the next poll undoes it.
+function convPatch(
+  s: AppState,
+  conv: ConvKey,
+  next: ChatMessage[],
+): Pick<AppState, 'messagesByConvo'> & Partial<Pick<AppState, 'messageCacheByConvo'>> {
+  const cache = s.messageCacheByConvo[conv]
+  return {
+    messagesByConvo: { ...s.messagesByConvo, [conv]: next },
+    ...(cache
+      ? { messageCacheByConvo: { ...s.messageCacheByConvo, [conv]: { ...cache, messages: next } } }
+      : {}),
+  }
+}
+
+const convMessages = (s: AppState, conv: ConvKey): ChatMessage[] => s.messagesByConvo[conv] ?? []
+
 /**
  * Send `content` to a chat, channel or thread with an optimistic row: the
  * message appears at once (marked sending) and its draft is cleared, then the
  * server copy replaces it, or on failure it is marked failed and the text goes
- * back into the draft. Writes after the network call are dropped by the
- * AccountStore when the account changed underneath the send.
+ * back into the draft. The row carries the send's client message id, so a
+ * poll echo that lands before the POST resolves replaces it instead of
+ * doubling it. Writes after the network call are dropped by the AccountStore
+ * when the account changed underneath the send.
  */
 export async function sendMessage(
   client: GraphClient,
@@ -136,53 +161,99 @@ export async function sendMessage(
 ): Promise<SendResult> {
   const conv = focusKey(focus)!
   const tempId = makeTempId()
+  const clientMessageId = newClientMessageId()
+  const rootId = focus.kind === 'thread' ? focus.rootId : undefined
   const me = store.get().me
   const optimistic: ChatMessage = {
     id: tempId,
     _tempId: tempId,
     _sending: true,
+    clientMessageId,
     createdDateTime: new Date().toISOString(),
     body: { contentType: 'text', content },
     from: { user: { id: me?.id || 'me', displayName: me?.displayName ?? 'Me' } },
+    ...(rootId ? { replyToId: rootId, rootMessageId: rootId } : {}),
   }
   store.set((s) => {
     const drafts = { ...s.draftsByConvo }
     delete drafts[conv]
     return {
-      messagesByConvo: {
-        ...s.messagesByConvo,
-        [conv]: [...(s.messagesByConvo[conv] ?? []), optimistic],
-      },
+      ...convPatch(s, conv, [...convMessages(s, conv), optimistic]),
       draftsByConvo: drafts,
     }
   })
-  const replaceTemp = (s: AppState, next: (m: ChatMessage) => ChatMessage) => ({
-    ...s.messagesByConvo,
-    [conv]: (s.messagesByConvo[conv] ?? []).map((m) => (m._tempId === tempId ? next(m) : m)),
-  })
+  const opts = { clientMessageId }
   try {
     const sent =
       focus.kind === 'chat'
-        ? await sendMessageGraph(client, focus.chatId, content)
+        ? await sendMessageGraph(client, focus.chatId, content, opts)
         : focus.kind === 'channel'
-          ? await sendChannelMessageGraph(client, focus.teamId, focus.channelId, content)
+          ? await sendChannelMessageGraph(client, focus.teamId, focus.channelId, content, opts)
           : await postChannelReplyGraph(
               client,
               focus.teamId,
               focus.channelId,
               focus.rootId,
               content,
+              opts,
             )
-    store.set((s) => ({ messagesByConvo: replaceTemp(s, () => sent) }))
+    store.set((s) => {
+      const list = convMessages(s, conv)
+      // The poll may already hold the server copy (same id, or same client
+      // id on chatsvc); keep that one and drop the optimistic row.
+      const echoed = list.some(
+        (m) => !m._tempId && (m.id === sent.id || m.clientMessageId === clientMessageId),
+      )
+      const next = echoed
+        ? list.filter((m) => m._tempId !== tempId)
+        : list.map((m) => (m._tempId === tempId ? sent : m))
+      const patch: Partial<AccountSlice> = convPatch(s, conv, next)
+      // A thread reply also belongs to the loaded parent channel stream, where
+      // the root's reply badge counts it.
+      if (focus.kind === 'thread') {
+        const channelConv = focusKey({
+          kind: 'channel',
+          teamId: focus.teamId,
+          channelId: focus.channelId,
+        })!
+        const stream = s.messagesByConvo[channelConv]
+        if (stream) {
+          Object.assign(
+            patch,
+            convPatch(
+              { ...s, ...patch } as AppState,
+              channelConv,
+              mergeChronological(stream, [sent]),
+            ),
+          )
+        }
+      }
+      return patch
+    })
     return { ok: true }
   } catch (err) {
+    // An echo carrying this send's client id already replaced the optimistic
+    // row: the server has the message, whatever the POST reported.
+    if (
+      convMessages(store.get(), conv).some(
+        (m) => !m._tempId && m.clientMessageId === clientMessageId,
+      )
+    ) {
+      return { ok: true }
+    }
     const error = err instanceof Error ? err.message : 'send failed'
     // The text goes back to this conversation's own draft only, above
     // anything typed there since (never replacing it).
     store.set((s) => {
       const since = s.draftsByConvo[conv]
       return {
-        messagesByConvo: replaceTemp(s, (m) => ({ ...m, _sending: false, _sendError: error })),
+        ...convPatch(
+          s,
+          conv,
+          convMessages(s, conv).map((m) =>
+            m._tempId === tempId ? { ...m, _sending: false, _sendError: error } : m,
+          ),
+        ),
         draftsByConvo: {
           ...s.draftsByConvo,
           [conv]: since && since !== content ? `${content}\n${since}` : content,
@@ -195,35 +266,46 @@ export async function sendMessage(
 
 // --- Write path: reactions, edits, deletes (chat messages only) ---
 //
-// Each action optimistically mutates messagesByConvo[`chat:${chatId}`] via
-// the pure reducers in ./messageMutations, fires the Graph call, and rolls
-// the conversation back to its pre-action snapshot on failure (logging the
-// error). Channel write support is a follow-up — the Graph paths differ.
+// Each action optimistically patches one message in `chat:${chatId}` via the
+// pure reducers in ./messageMutations, fires the Graph call, and on failure
+// puts back only that message's pre-action copy (logging the error), so
+// messages that arrived meanwhile survive. Channel write support is a
+// follow-up — the Graph paths differ.
 
 const chatConvKey = (chatId: string): string => `chat:${chatId}`
 
-function setConvMessages(store: AccountStore, convKey: string, next: ChatMessage[]): void {
-  store.set((s) => ({
-    messagesByConvo: { ...s.messagesByConvo, [convKey]: next },
-  }))
-}
-
-// Run an optimistic mutation against a chat conversation, then a Graph call.
-// Restores the snapshot if the call throws so a failed write never sticks.
 async function withOptimisticChatUpdate(
   store: AccountStore,
   chatId: string,
+  messageId: string,
   mutate: (messages: ChatMessage[]) => ChatMessage[],
   commit: () => Promise<void>,
   label: string,
 ): Promise<void> {
-  const convKey = chatConvKey(chatId)
-  const snapshot = store.get().messagesByConvo[convKey] ?? []
-  setConvMessages(store, convKey, mutate(snapshot))
+  const conv = chatConvKey(chatId)
+  const original = convMessages(store.get(), conv).find((m) => m.id === messageId)
+  let optimistic: ChatMessage | undefined
+  store.set((s) => {
+    const next = mutate(convMessages(s, conv))
+    optimistic = next.find((m) => m.id === messageId)
+    return convPatch(s, conv, next)
+  })
   try {
     await commit()
   } catch (err) {
-    setConvMessages(store, convKey, snapshot)
+    // Undo only while this operation still owns the message: a poll or a
+    // later action that replaced it wins.
+    if (original && optimistic && optimistic !== original) {
+      store.set((s) => {
+        const list = convMessages(s, conv)
+        if (!list.some((m) => m === optimistic)) return {}
+        return convPatch(
+          s,
+          conv,
+          list.map((m) => (m === optimistic ? original : m)),
+        )
+      })
+    }
     recordEvent(
       'graph',
       'warn',
@@ -249,16 +331,18 @@ export async function toggleReaction(
   me: IdentityUser,
 ): Promise<void> {
   const convKey = chatConvKey(chatId)
-  const message = (store.get().messagesByConvo[convKey] ?? []).find((m) => m.id === messageId)
+  const message = convMessages(store.get(), convKey).find((m) => m.id === messageId)
   const removing = message ? hasReactionType(message, me.id, reactionType) : false
 
   await withOptimisticChatUpdate(
     store,
     chatId,
+    messageId,
     (messages) =>
-      removing
+      (removing
         ? removeReactionType(messages, messageId, me.id, reactionType)
-        : applyReaction(messages, messageId, reactionType, me),
+        : applyReaction(messages, messageId, reactionType, me)
+      ).map((m) => (m.id === messageId ? { ...m, _reactionsPendingAt: Date.now() } : m)),
     () =>
       removing
         ? unsetReactionGraph(client, chatId, messageId, reactionType)
@@ -280,6 +364,7 @@ export async function editChatMessageContent(
   await withOptimisticChatUpdate(
     store,
     chatId,
+    messageId,
     (messages) => applyEdit(messages, messageId, trimmed, new Date().toISOString()),
     () => editMessageGraph(client, chatId, messageId, trimmed),
     'edit message',
@@ -296,6 +381,7 @@ export async function deleteChatMessageById(
   await withOptimisticChatUpdate(
     store,
     chatId,
+    messageId,
     (messages) => applyDelete(messages, messageId, new Date().toISOString()),
     () => softDeleteMessageGraph(client, chatId, messageId),
     'delete message',

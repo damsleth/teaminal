@@ -63,11 +63,18 @@ export function mergeActivePagePatch(
   const hasCachedOlderMessages = existing.some(
     (m) => !incomingIds.has(m.id) && !m._sending && !m._sendError,
   )
-  const preserveOlderPaging = hasCachedOlderMessages && cache !== undefined
-  const nextLink = preserveOlderPaging ? cache.nextLink : page.nextLink
-  const fullyLoaded = preserveOlderPaging
-    ? (cache?.fullyLoaded ?? false)
-    : page.nextLink === undefined
+  // The cache's older-page cursor is only good when the fresh page reaches
+  // back into the cached messages. With no overlap (a gap after time away)
+  // or a cursor lost to trimming, page from the fresh page instead: older
+  // fetches walk back through the gap and the merge dedupes the overlap.
+  const overlapsCache = page.messages.some((m) => cachedIds.has(m.id))
+  const keepCachePaging =
+    hasCachedOlderMessages &&
+    cache !== undefined &&
+    overlapsCache &&
+    (cache.nextLink !== undefined || cache.fullyLoaded)
+  const nextLink = keepCachePaging ? cache.nextLink : page.nextLink
+  const fullyLoaded = keepCachePaging ? cache.fullyLoaded : page.nextLink === undefined
   const prevCursor = state.messageCursorByConvo[conv]
   const nextCursor =
     prevCursor === undefined
@@ -79,11 +86,13 @@ export function mergeActivePagePatch(
   // reads as a change and notifies every listener even on an identical poll.
   const patch: Partial<AccountSlice> = {}
 
+  // An older-page load in flight owns loadingOlder; a head poll must not
+  // release it, or a second load starts and the two race on the cursor.
+  const loadingOlder = cache?.loadingOlder ?? false
   const cacheUnchanged =
     cache !== undefined &&
     cache.messages === merged &&
     cache.nextLink === nextLink &&
-    cache.loadingOlder === false &&
     cache.fullyLoaded === fullyLoaded &&
     cache.error === undefined
   if (!cacheUnchanged) {
@@ -93,7 +102,7 @@ export function mergeActivePagePatch(
         ...(cache ?? emptyMessageCache()),
         messages: merged,
         nextLink,
-        loadingOlder: false,
+        loadingOlder,
         fullyLoaded,
         error: undefined,
       },

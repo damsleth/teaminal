@@ -142,6 +142,14 @@ describe('skypeToChannelMessage', () => {
     expect(out.replyToId).toBe('1')
   })
 
+  test('keeps the top-level clientmessageid as the send identity', () => {
+    expect(
+      skypeToChannelMessage({ id: '2', clientmessageid: '17000000000001234', content: 'x' })
+        .clientMessageId,
+    ).toBe('17000000000001234')
+    expect(skypeToChannelMessage({ id: '2', content: 'x' }).clientMessageId).toBeUndefined()
+  })
+
   test('derives replyToId + rootMessageId + sequenceId from the top-level wire fields', () => {
     // emea shape: parentmessageid is absent; rootMessageId carries the
     // linkage. A reply points at its root; a root has rootMessageId === id.
@@ -486,10 +494,15 @@ describe('sendChannelMessageViaChatsvc', () => {
     const sent = await sendChannelMessageViaChatsvc('19:abc@thread.tacv2', 'reply text', {
       account: ACCOUNT,
       replyToId: '100',
+      clientMessageId: '4242',
     })
 
     expect(captured.body?.properties).toEqual({ parentmessageid: '100' })
     expect(sent.replyToId).toBe('100')
     expect(sent.id).toBe('200')
+    // The caller's send identity goes on the wire and comes back on the result.
+    expect(captured.body?.clientmessageid).toBe('4242')
+    expect(sent.clientMessageId).toBe('4242')
+    expect(sent.rootMessageId).toBe('100')
   })
 })

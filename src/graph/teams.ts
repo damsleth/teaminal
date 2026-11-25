@@ -151,6 +151,7 @@ export function paginateChannelMessages(
 
 export type SendChannelMessageOpts = {
   signal?: AbortSignal
+  clientMessageId?: string
 }
 
 export async function sendChannelMessage(
@@ -165,6 +166,7 @@ export async function sendChannelMessage(
   return sendChannelMessageViaChatsvc(channelId, content, {
     account: client.ctx.account,
     signal: opts?.signal,
+    clientMessageId: opts?.clientMessageId,
   })
 }
 
@@ -246,5 +248,6 @@ export async function postChannelReply(
     account: client.ctx.account,
     replyToId: rootId,
     signal: opts?.signal,
+    clientMessageId: opts?.clientMessageId,
   })
 }

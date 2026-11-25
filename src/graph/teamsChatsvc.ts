@@ -305,6 +305,9 @@ export function skypeToChannelMessage(raw: SkypeMessage): ChatMessage {
     ...(rootRaw ? { rootMessageId: rootRaw } : {}),
     ...(sequenceId !== undefined ? { sequenceId } : {}),
     ...(raw.properties?.subject ? { subject: String(raw.properties.subject) } : {}),
+    ...(typeof raw.clientmessageid === 'string' && raw.clientmessageid
+      ? { clientMessageId: raw.clientmessageid }
+      : {}),
   }
 }
 
@@ -486,9 +489,11 @@ export type SendChatsvcOpts = ChatsvcOpts & {
   imdisplayname?: string
   /** Author MRI for the optimistic from.user.id (caller passes it; we don't echo). */
   fromUserId?: string
+  /** Send identity; the caller generates it once so its optimistic row can match the echo. */
+  clientMessageId?: string
 }
 
-function clientMessageId(): string {
+export function newClientMessageId(): string {
   // Skype expects a numeric string. 19 digits keeps it well inside the
   // documented signed-64-bit range while still being collision-safe.
   const millis = Date.now().toString()
@@ -511,7 +516,7 @@ export async function sendChannelMessageViaChatsvc(
   // Generate the cmid outside the retry closure so a 401-retry preserves
   // idempotency: Skype dedupes by clientmessageid, so re-sending with the
   // same id is safe.
-  const cmid = clientMessageId()
+  const cmid = opts.clientMessageId ?? newClientMessageId()
   return withSkypeAuth(async () => {
     const r = await region(opts)
     const url = `${TEAMS_ORIGIN}/api/chatsvc/${r}/v1/users/ME/conversations/${encodeURIComponent(
@@ -579,7 +584,8 @@ export async function sendChannelMessageViaChatsvc(
       createdDateTime: created,
       messageType: 'message',
       body: { contentType: 'text', content },
-      ...(opts?.replyToId ? { replyToId: opts.replyToId } : {}),
+      clientMessageId: cmid,
+      ...(opts?.replyToId ? { replyToId: opts.replyToId, rootMessageId: opts.replyToId } : {}),
       ...(opts?.fromUserId
         ? {
             from: {

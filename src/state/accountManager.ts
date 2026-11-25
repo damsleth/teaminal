@@ -59,6 +59,8 @@ export type AccountManager = {
 export function createAccountManager(
   store: Store<AppState>,
   profile: string | null,
+  // Test seam: the session starter.
+  startSessionImpl: typeof runSession = runSession,
 ): AccountManager {
   // Seeded/offline mode (tui-test, demos) must neither read nor write the real
   // per-profile caches: fixture data would overwrite ~/.cache/teaminal, and
@@ -69,6 +71,9 @@ export function createAccountManager(
   let activeProfile = profile
   let currentSession: SessionHandle | null = null
   let stopped = false
+  // Bumped by every start / switch / stopAll. A bootstrap that resolves after
+  // a newer transition began is obsolete: it is stopped, never installed.
+  let transition = 0
 
   store.set({ account: accountRef(activeProfile) })
 
@@ -180,8 +185,21 @@ export function createAccountManager(
     }
   }
 
-  function startSession(onFatal: RunSessionOpts['onFatal']): Promise<SessionHandle> {
-    return runSession({ store, profile: activeProfile, pollerHandleRef, onFatal })
+  // Start a session and install it unless a newer transition superseded it
+  // while it bootstrapped.
+  async function startSession(mine: number, onFatal: RunSessionOpts['onFatal']): Promise<void> {
+    const session = await startSessionImpl({
+      store,
+      profile: activeProfile,
+      pollerHandleRef,
+      onFatal,
+    })
+    if (stopped || mine !== transition) {
+      debug('session: discarding a bootstrap superseded by a newer account transition')
+      await session.stop().catch(() => {})
+      return
+    }
+    currentSession = session
   }
 
   return {
@@ -201,14 +219,16 @@ export function createAccountManager(
         applySeededState(store, activeProfile)
         return
       }
-      currentSession = await startSession(onFatal)
+      await startSession(++transition, onFatal)
     },
 
     async switchAccount(nextProfile) {
-      if (currentSession?.profile === nextProfile) return
+      if (stopped || currentSession?.profile === nextProfile) return
+      const mine = ++transition
       // Tear down the running session first so its loops can't write into
       // the about-to-be-reset store.
       await stopSession()
+      if (mine !== transition) return
       // Flush the previous profile's caches before swapping the paths.
       flushCaches()
       // Swap the persistence paths before the reset: the reset fires the cache
@@ -230,7 +250,7 @@ export function createAccountManager(
       }
       if (persistCaches) hydrate(activeProfile)
       try {
-        currentSession = await startSession((kind, msg) => {
+        await startSession(mine, (kind, msg) => {
           warn(`bootstrap: fatal (${kind}): ${msg}`)
         })
       } catch (err) {
@@ -242,6 +262,7 @@ export function createAccountManager(
     async stopAll() {
       if (stopped) return
       stopped = true
+      transition++
       unsubscribe()
       await stopSession()
       flushCaches()

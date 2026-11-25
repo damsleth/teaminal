@@ -73,6 +73,88 @@ describe('mergeActivePagePatch', () => {
     expect(patch.messageCacheByConvo?.[conv]?.fullyLoaded).toBe(false)
   })
 
+  test('a fresh page with no overlap pages back through the gap, keeping cached messages', () => {
+    // Time away: the cached history is older than the whole fresh page, and
+    // its cursor was dropped by trimming. Paging must follow the fresh
+    // page's link, or the messages in between are never reachable.
+    const state = appStateWith({
+      messageCacheByConvo: {
+        [conv]: {
+          messages: [message('m0', '2026-01-01T00:00:00Z')],
+          loadingOlder: false,
+          fullyLoaded: false,
+        },
+      },
+    })
+    const page: MessagesPage = {
+      messages: [message('m9', '2026-01-02T00:00:00Z')],
+      nextLink: 'https://graph/before-m9',
+    }
+    const cache = mergeActivePagePatch(state, conv, page, focus).messageCacheByConvo?.[conv]
+    expect(cache?.messages.map((m) => m.id)).toEqual(['m0', 'm9'])
+    expect(cache?.nextLink).toBe('https://graph/before-m9')
+    expect(cache?.fullyLoaded).toBe(false)
+  })
+
+  test('an overlapping page with a cursor lost to trimming takes the fresh cursor', () => {
+    const state = appStateWith({
+      messageCacheByConvo: {
+        [conv]: {
+          messages: [message('m0', '2026-01-01T00:00:00Z'), message('m1', '2026-01-01T00:00:01Z')],
+          loadingOlder: false,
+          fullyLoaded: false,
+        },
+      },
+    })
+    const page: MessagesPage = {
+      messages: [message('m1', '2026-01-01T00:00:01Z'), message('m2', '2026-01-01T00:00:02Z')],
+      nextLink: 'https://graph/before-m1',
+    }
+    const cache = mergeActivePagePatch(state, conv, page, focus).messageCacheByConvo?.[conv]
+    expect(cache?.nextLink).toBe('https://graph/before-m1')
+  })
+
+  test('a head poll leaves an in-flight older-page load owning loadingOlder', () => {
+    const state = appStateWith({
+      messageCacheByConvo: {
+        [conv]: {
+          messages: [message('m1', '2026-01-01T00:00:01Z')],
+          nextLink: 'https://graph/older',
+          loadingOlder: true,
+          fullyLoaded: false,
+        },
+      },
+    })
+    const page: MessagesPage = { messages: [message('m2', '2026-01-01T00:00:02Z')] }
+    const patch = mergeActivePagePatch(state, conv, page, focus)
+    expect(patch.messageCacheByConvo?.[conv]?.loadingOlder).toBe(true)
+  })
+
+  test('a chatsvc echo replaces the optimistic row carrying the same client message id', () => {
+    const optimistic = message('temp-1', '2026-01-01T00:00:02Z', {
+      _tempId: 'temp-1',
+      _sending: true,
+      clientMessageId: '123',
+    })
+    const state = appStateWith({
+      messageCacheByConvo: {
+        [conv]: {
+          messages: [message('m1', '2026-01-01T00:00:01Z'), optimistic],
+          loadingOlder: false,
+          fullyLoaded: true,
+        },
+      },
+    })
+    const page: MessagesPage = {
+      messages: [
+        message('m1', '2026-01-01T00:00:01Z'),
+        message('s1', '2026-01-01T00:00:03Z', { clientMessageId: '123' }),
+      ],
+    }
+    const patch = mergeActivePagePatch(state, conv, page, focus)
+    expect(messagesAfter(state, patch, conv).map((m) => m.id)).toEqual(['m1', 's1'])
+  })
+
   test('rescues optimistic _sending messages that live only in messagesByConvo', () => {
     // Simulates the Composer path: optimistic row is written to
     // messagesByConvo but not yet mirrored into messageCacheByConvo.

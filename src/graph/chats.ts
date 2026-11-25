@@ -306,6 +306,8 @@ export async function listMessagesNextPage(
 
 export type SendMessageOpts = {
   signal?: AbortSignal
+  // Used by the chatsvc path only; Graph has no client message id.
+  clientMessageId?: string
 }
 
 function graphSend(
@@ -332,6 +334,7 @@ export async function sendMessage(
     sendChannelMessageViaChatsvc(chatId, content, {
       account: client.ctx.account,
       ...(opts?.signal ? { signal: opts.signal } : {}),
+      ...(opts?.clientMessageId ? { clientMessageId: opts.clientMessageId } : {}),
     })
   const { audience, fallback } = client.ctx
   // ic3-primary modes send via chatsvc; only ic3+graph falls back to graph.

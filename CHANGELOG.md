@@ -13,6 +13,26 @@ adheres to [Semantic Versioning](https://semver.org/).
 - Keep cached images and viewer temporary files private.
 - Limit workflow permissions and safely pass release inputs to the shell.
 
+### Fixed
+
+- A sent message, edit or reaction no longer vanishes or reverts on the next
+  poll: actions now update the same message cache the poller merges from.
+- Sending no longer shows the message twice when the server echo arrives before
+  the send completes. Each send carries one client message id end to end.
+- A reply sent from a thread view appears in the parent channel and its reply
+  count right away.
+- Channel reply counts show `N+` unless the channel's whole history is loaded.
+- A failed edit, delete or reaction restores only that message, not the whole
+  conversation, so messages that arrived meanwhile stay.
+- Reactions removed on another client now clear here; a local reaction is only
+  held against the server copy for 30 seconds.
+- After time away, older history between the cached messages and the newest
+  page is reachable again, and a cache trimmed on save can page back further.
+- A head poll no longer releases an in-flight "load older" request, which could
+  start a second load racing on the paging cursor.
+- Switching accounts quickly, or quitting while an account starts, no longer
+  installs an obsolete session or leaves its pollers running.
+
 ## [0.25.1] - 2026-10-30
 
 ### Added

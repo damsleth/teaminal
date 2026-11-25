@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { ChatMessage } from '../../types'
-import { countNewMessages, mergeChronological, newestMessageId } from './merge'
+import { REACTION_PENDING_MS, countNewMessages, mergeChronological, newestMessageId } from './merge'
 
 function msg(id: string, ts: string, extra?: Partial<ChatMessage>): ChatMessage {
   return {
@@ -67,27 +67,27 @@ describe('mergeChronological', () => {
 
   // --- Reaction-preservation tests ---
 
-  test('incoming-without-reactions does not clobber existing-with-reactions (propagation window)', () => {
-    // Simulates: user reacted (optimistic), server poll returns same message
-    // without reactions (reaction not yet propagated). Existing reactions must
-    // survive the merge.
+  test('a local reaction change survives a reactionless poll inside the propagation window', () => {
     const reaction = { reactionType: 'like', user: { user: { id: 'user-1' } } }
-    const existing = [msg('m1', '2026-01-01T00:00:00Z', { reactions: [reaction] })]
-    // Server copy has no reactions key at all (typical for chatsvc path).
-    const incoming = [msg('m1', '2026-01-01T00:00:00Z')]
-    const merged = mergeChronological(existing, incoming)
-    expect(merged).toHaveLength(1)
-    expect(merged[0]?.reactions).toEqual([reaction])
+    const existing = [
+      msg('m1', '2026-01-01T00:00:00Z', { reactions: [reaction], _reactionsPendingAt: Date.now() }),
+    ]
+    for (const incoming of [
+      [msg('m1', '2026-01-01T00:00:00Z')],
+      [msg('m1', '2026-01-01T00:00:00Z', { reactions: [] })],
+    ]) {
+      expect(mergeChronological(existing, incoming)[0]?.reactions).toEqual([reaction])
+    }
   })
 
-  test('incoming-without-reactions does not clobber when incoming has explicit empty array', () => {
-    // chatsvc sometimes returns reactions: [] explicitly; treated as "no reactions"
-    // from the server — existing optimistic reactions should still be preserved.
+  test('reactions removed elsewhere clear once nothing local is pending', () => {
     const reaction = { reactionType: 'heart', user: { user: { id: 'user-2' } } }
-    const existing = [msg('m1', '2026-01-01T00:00:00Z', { reactions: [reaction] })]
     const incoming = [msg('m1', '2026-01-01T00:00:00Z', { reactions: [] })]
-    const merged = mergeChronological(existing, incoming)
-    expect(merged[0]?.reactions).toEqual([reaction])
+    // Settled server reactions, and a local change older than the window.
+    for (const extra of [{}, { _reactionsPendingAt: Date.now() - REACTION_PENDING_MS - 1 }]) {
+      const existing = [msg('m1', '2026-01-01T00:00:00Z', { reactions: [reaction], ...extra })]
+      expect(mergeChronological(existing, incoming)[0]?.reactions ?? []).toEqual([])
+    }
   })
 
   test('incoming-with-reactions overrides existing reactions (server is authoritative)', () => {
