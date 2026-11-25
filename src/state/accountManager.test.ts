@@ -853,6 +853,11 @@ describe('AccountManager (concurrent)', () => {
     await waitFor(() => m.running().length === 2)
     const session = (p: string) => sessions.filter((s) => s.profile === p).at(-1)!
     expect(session('alpha').opts.labelled?.()).toBe(true)
+    // A background session reads the root store's list filter (its own view
+    // resets it), so a filter that lifts a collapse also lifts presence.
+    store.set({ filter: 'bob' })
+    expect(session('beta').opts.listFilter?.()).toBe('bob')
+    store.set({ filter: '' })
 
     // Every loop reports the same expiry; it is handled once.
     const expired = new Error('AADSTS700082: The refresh token has expired')
@@ -920,6 +925,7 @@ describe('AccountManager (concurrent)', () => {
     await m.start(() => {})
     expect(opts[0]!.onAuthExpired).toBeUndefined()
     expect(opts[0]!.labelled).toBeUndefined()
+    expect(opts[0]!.listFilter).toBeUndefined()
     await m.stopAll()
   })
 

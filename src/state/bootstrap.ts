@@ -68,6 +68,8 @@ export type RunSessionOpts = {
   // Concurrent mode: true while more than one account runs, so
   // notifications name the account.
   labelled?: () => boolean
+  // Concurrent mode: the chat-list filter from the root store.
+  listFilter?: () => string
 }
 
 async function hydrateActivityFeed(store: AccountStore, isStale: () => boolean): Promise<void> {
@@ -154,6 +156,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
     pollerHandle = startPoller({
       store,
       getClient: client,
+      listFilter: opts.listFilter,
       onError: (loop, err) => {
         warn(`poller[${store.ref.label}:${loop}]:`, err.message)
         // Presence runs on its own scoped tokens; a challenge on one of

@@ -849,10 +849,16 @@ describe('collapsedInSidebar (presence fan-out)', () => {
   }
   test('a collapsed account fetches no member presence; the others and single mode do', () => {
     const s = state(2, { 'account:alpha': true })
-    expect(collapsedInSidebar(s, accountRef('alpha'))).toBe(true)
-    expect(collapsedInSidebar(s, accountRef('beta'))).toBe(false)
+    expect(collapsedInSidebar(s, accountRef('alpha'), '')).toBe(true)
+    expect(collapsedInSidebar(s, accountRef('beta'), '')).toBe(false)
     // The persisted key from an earlier concurrent run is ignored with one account.
-    expect(collapsedInSidebar(state(1, { 'account:alpha': true }), accountRef('alpha'))).toBe(false)
+    expect(collapsedInSidebar(state(1, { 'account:alpha': true }), accountRef('alpha'), '')).toBe(
+      false,
+    )
+  })
+  test('a filter lifts the collapse, so the revealed rows get presence', () => {
+    const s = state(2, { 'account:alpha': true })
+    expect(collapsedInSidebar(s, accountRef('alpha'), 'bob')).toBe(false)
   })
 })
 

@@ -34,6 +34,8 @@ export type PresenceLoopDeps = {
   stopSignal: AbortSignal
   isStopped: () => boolean
   reportError: (err: unknown) => void
+  // The chat-list filter (global UI; a background account's view resets it).
+  listFilter: () => string
 }
 
 export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
@@ -109,11 +111,11 @@ export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
 
         // --- Other-user presence for the chat-list dot ---
         const stateAfterSelf = store.get()
-        // A collapsed account in the unified sidebar shows no rows, so it
-        // fetches no member presence.
+        // A collapsed account in the unified sidebar shows no rows (unless a
+        // filter lifts the collapse), so it fetches no member presence.
         const wantsMembers =
           stateAfterSelf.settings.showPresenceInList !== false &&
-          !collapsedInSidebar(stateAfterSelf, store.ref)
+          !collapsedInSidebar(stateAfterSelf, store.ref, deps.listFilter())
         if (wantsMembers && !signal.aborted) {
           const meId = stateAfterSelf.me?.id
           const oids: string[] = []

@@ -402,7 +402,13 @@ export function createAccountManager(
           account: slot.acc,
           profile: slot.profile,
           onFatal,
-          ...(concurrent ? { onAuthExpired, labelled: () => runningSlots().length > 1 } : {}),
+          ...(concurrent
+            ? {
+                onAuthExpired,
+                labelled: () => runningSlots().length > 1,
+                listFilter: () => store.get().filter,
+              }
+            : {}),
         })
       } catch (err) {
         driver.stop()

@@ -517,15 +517,19 @@ export function foregroundLabel(s: AppState): string | null {
   return s.account && unifiedSidebar(s) ? s.account.label : null
 }
 
-// The account's header is collapsed in the unified sidebar. Counted from the
-// open slots, not unifiedListInput: a background account's view of the store
-// has its own slice in the flat fields. The key persists in config, so a
-// later single-mode run must ignore it.
+// The account's header is collapsed in the unified sidebar and hides its rows.
+// Counted from the open slots, not unifiedListInput: a background account's
+// view of the store has its own slice in the flat fields. The key persists in
+// config, so a later single-mode run must ignore it. A filter lifts collapse
+// (see unifiedSidebarItems); `filter` is the root store's, since a background
+// account's view resets it.
 export function collapsedInSidebar(
   s: Pick<AppState, 'generationById' | 'settings'>,
   ref: AccountRef,
+  filter: string,
 ): boolean {
   return (
+    !filter &&
     ref.profile !== DEFAULT_PROFILE &&
     Object.keys(s.generationById).length > 1 &&
     !!s.settings.chatListCollapsedSections[accountCollapseKey(ref.profile)]
