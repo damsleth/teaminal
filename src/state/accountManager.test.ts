@@ -705,6 +705,105 @@ describe('AccountManager (concurrent)', () => {
     await m.stopAll()
   })
 
+  test('a hung background start does not keep the accounts queued behind it down', async () => {
+    nonSeeded()
+    managerTimings.backgroundStartWaitMs = 10
+    const held = heldSessions()
+    const store = concurrentStore(['alpha', 'beta', 'gamma'])
+    const m = createAccountManager(store, 'alpha', held.start, noDriver, true)
+    const starting = m.start(() => {})
+    await tick()
+    held.pending.alpha!.release()
+    await starting
+    // beta hangs and stays configured; gamma starts anyway.
+    await waitFor(() => held.requested.includes('gamma'))
+    held.pending.gamma!.release()
+    await waitFor(() => m.running().length === 2)
+    // beta's start lands late and is installed.
+    held.pending.beta!.release()
+    await waitFor(() => m.running().length === 3)
+    await m.stopAll()
+  })
+
+  test('retry restarts a running account whose loops report authError or offline', async () => {
+    nonSeeded()
+    const sessions: FakeSession[] = []
+    const store = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => {
+        const s = fakeSession(opts)
+        sessions.push(s)
+        return s
+      },
+      noDriver,
+      true,
+    )
+    await m.start(() => {})
+    await waitFor(() => m.running().length === 2)
+    const session = (p: string) => sessions.filter((s) => s.profile === p).at(-1)!
+    const betaBefore = session('beta')
+    // A healthy running account: retry does nothing.
+    await m.retry('beta')
+    expect(session('beta')).toBe(betaBefore)
+    // The list loop saw a Graph 401: the session is up but failed.
+    betaBefore.opts.account.set({ conn: 'authError' })
+    await m.retry('beta')
+    expect(betaBefore.stopped).toBe(true)
+    expect(session('beta')).not.toBe(betaBefore)
+    expect(store.get().backgroundAccounts[accountRef('beta').id]?.conn).toBe('connecting')
+    expect(m.running().map((r) => r.label)).toEqual(['alpha', 'beta'])
+    // Same for offline on the foreground.
+    const alphaBefore = session('alpha')
+    alphaBefore.opts.account.set({ conn: 'offline' })
+    await m.retry('alpha')
+    expect(alphaBefore.stopped).toBe(true)
+    expect(session('alpha')).not.toBe(alphaBefore)
+    expect(m.pollerHandleRef.current).toBe(session('alpha').poller)
+    // A quit while the failed session is stopping starts nothing.
+    const alphaNow = session('alpha')
+    let release = () => {}
+    alphaNow.stop = () => new Promise<void>((r) => (release = r))
+    alphaNow.opts.account.set({ conn: 'offline' })
+    const retrying = m.retry('alpha')
+    await tick()
+    const stopping = m.stopAll()
+    release()
+    await Promise.all([retrying, stopping])
+    expect(session('alpha')).toBe(alphaNow)
+  })
+
+  test('an expiry whose teardown outlasts stopAll writes nothing afterwards', async () => {
+    nonSeeded()
+    const sessions: FakeSession[] = []
+    const store = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => {
+        const s = fakeSession(opts)
+        sessions.push(s)
+        return s
+      },
+      noDriver,
+      true,
+    )
+    await m.start(() => {})
+    await waitFor(() => m.running().length === 2)
+    const alpha = sessions.find((s) => s.profile === 'alpha')!
+    let release = () => {}
+    alpha.stop = () => new Promise<void>((r) => (release = r))
+    alpha.opts.onAuthExpired!(new Error('AADSTS700082: The refresh token has expired'))
+    await tick()
+    await m.stopAll()
+    release()
+    await tick()
+    await tick()
+    expect(store.get().conn).not.toBe('authError')
+    expect(store.get().modal).toBeNull()
+  })
+
   test('a refresh-token expiry mid-session stops only that account; swapping to it shows why', async () => {
     nonSeeded()
     const sessions: FakeSession[] = []

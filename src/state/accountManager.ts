@@ -87,7 +87,8 @@ export type AccountManager = {
   // Concurrent mode: swap an open account to the foreground (throws when
   // it is not open).
   setForeground(profile: string): void
-  // Concurrent mode: start an account again that has no session.
+  // Concurrent mode: start an account again that has no session, or whose
+  // running session reports authError / offline.
   retry(profile: string): Promise<void>
   // Concurrent mode: open and start added accounts, stop and close removed
   // ones. No-op in single mode.
@@ -141,6 +142,10 @@ export const managerTimings = {
   // this long for the foreground's start, then start anyway: a hung
   // foreground bootstrap must not keep them down.
   foregroundHeadStartMs: 1500,
+  // ponytail: BACKGROUND_START_WAIT, 5 s. The background queue waits this
+  // long for one account's start, then moves on: a hung bootstrap must not
+  // keep the accounts behind it down. The slow start may still land later.
+  backgroundStartWaitMs: 5000,
 }
 
 function persisted(s: AccountSlice): Persisted {
@@ -441,7 +446,8 @@ export function createAccountManager(
     // Stop first, then set conn: a loop's own error handling writes conn
     // right after reporting the error.
     await stopSlot(slot)
-    if (!wanted()) return null
+    // stopAll may have run while the stop was pending.
+    if (stopped || !wanted()) return null
     slot.failure = err.message
     slot.acc.set({ conn: auth ? 'authError' : 'offline' })
     if (auth && slot.acc.isForeground()) showAuthExpired(slot, err.message)
@@ -510,8 +516,13 @@ export function createAccountManager(
         const box = await serialize(() =>
           slots.get(slot.ref.id) === slot && slot.attempt === 0 ? beginStart(slot) : null,
         )
-        // A slot removed while its start hangs releases the queue.
-        if (box) await Promise.race([box.done, slot.removed])
+        // A slot removed while its start hangs releases the queue; so does
+        // a start that takes too long.
+        if (box)
+          await bounded(
+            Promise.race([box.done, slot.removed]),
+            managerTimings.backgroundStartWaitMs,
+          )
       }
     } finally {
       draining = false
@@ -680,9 +691,17 @@ export function createAccountManager(
 
     async retry(p) {
       if (stopped || !concurrent) return
-      const box = await serialize(() => {
+      const box = await serialize(async () => {
         const slot = slotForProfile(p)
-        if (!slot || isUp(slot)) return null
+        if (!slot) return null
+        if (isUp(slot)) {
+          // A running session whose loops report a failure (a Graph 401,
+          // offline) is stopped and started again.
+          const { conn } = slot.acc.get()
+          if (conn !== 'authError' && conn !== 'offline') return null
+          await stopSlot(slot)
+          if (stopped) return null
+        }
         return slot.starting ? { done: slot.starting } : beginStart(slot)
       })
       const err = await box?.done
