@@ -30,6 +30,14 @@ describe('computeLayout', () => {
       expect(composerHeight).toBe(6)
     })
 
+    test('reply quote and edit banner rows add on top and are never squeezed out', () => {
+      // The reply quote used to share the single text row and push the
+      // prompt onto the bottom border.
+      expect(computeLayout({ ...base, quoteRows: 1 }).composerHeight).toBe(4)
+      expect(computeLayout({ ...base, draftLines: 10, quoteRows: 2 }).composerHeight).toBe(10)
+      expect(computeLayout({ ...base, quoteRows: 2, composerHeight: 3 }).composerHeight).toBe(5)
+    })
+
     test('auto composer height is capped at 8 by the inner clamp', () => {
       const { composerHeight } = computeLayout({ ...base, draftLines: 10 })
       // auto = clamp(10 + 0 + 2, 3, 8) = 8; upper bound = min(10, 13) = 10

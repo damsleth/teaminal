@@ -6,6 +6,11 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The composer grows to fit the reply quote and edit banner, so the text no
+  longer runs over the bottom border when replying in a thread.
+
 ## [0.25.2] - 2026-11-25
 
 ### Security

@@ -43,7 +43,7 @@ import { useInput } from './useInput'
 import { useEffect, useRef, useState } from 'react'
 import { accountStore } from '../state/accountStore'
 import { editChatMessageContent, sendMessage } from '../state/chatActions'
-import { focusKey, type AppState } from '../state/store'
+import { focusKey, type AppState, type Focus } from '../state/store'
 import type { ChatMessage } from '../types'
 import {
   DISABLE_BRACKETED_PASTE,
@@ -61,8 +61,6 @@ import { elementRect } from './inlineImageLayout'
 import { openCommandPalette } from './CommandPalette'
 import { useSessionApi } from './SessionContext'
 import { kittyKeyboardEnabled } from './kittyKeyboard'
-
-const MAX_VISIBLE_LINES = 5
 
 const QUOTE_PREVIEW_MAX = 80
 
@@ -122,7 +120,21 @@ export function findRootQuote(
   return { sender, preview }
 }
 
-export function Composer({ columns = 80 }: { columns?: number }) {
+// Rows the composer draws above its text: the edit banner and the reply quote.
+// App sizes the pane from this, so the two must agree.
+export function composerHeaderRows(
+  editing: boolean,
+  focus: Focus,
+  messagesByConvo: Record<string, ChatMessage[]>,
+): number {
+  return (
+    (editing ? 1 : 0) + (focus.kind === 'thread' && findRootQuote(focus, messagesByConvo) ? 1 : 0)
+  )
+}
+
+// `rows` is the inner height the pane gives the composer; the text scrolls
+// inside whatever is left after the header rows, so nothing ever overflows.
+export function Composer({ columns = 80, rows = 6 }: { columns?: number; rows?: number }) {
   const store = useAppStore()
   const session = useSessionApi()
   const { isRawModeSupported } = useStdin()
@@ -443,24 +455,27 @@ export function Composer({ columns = 80 }: { columns?: number }) {
   // Long lines soft-wrap to the composer width instead of truncating.
   const lines = wrapComposer(buf.text, columns - COMPOSER_TEXT_CHROME)
   const { row: cursorLine, col: cursorCol } = cursorRowCol(lines, buf.cursor)
-  // Show up to MAX_VISIBLE_LINES around the cursor; bias toward the
-  // last lines so a long buffer stays anchored to the most recent
-  // content while typing.
-  const totalLines = lines.length
-  const overflow = Math.max(0, totalLines - MAX_VISIBLE_LINES)
-  let firstVisible = Math.max(0, totalLines - MAX_VISIBLE_LINES)
-  // If the cursor is inside the hidden head, scroll up so it's visible.
-  if (cursorLine < firstVisible) firstVisible = cursorLine
-  const visible = lines.slice(firstVisible, firstVisible + MAX_VISIBLE_LINES).map((r) => r.text)
-
   const quote = focus.kind === 'thread' ? findRootQuote(focus, messagesByConvo) : null
+  const headerRows = (editingMessageId ? 1 : 0) + (quote ? 1 : 0)
+  // Text gets what's left of the pane; "sending..." and the "earlier lines"
+  // marker only take a row when there's one to spare.
+  const showSending = sending && rows - headerRows >= 2
+  let room = Math.max(1, rows - headerRows - (showSending ? 1 : 0))
+  const totalLines = lines.length
+  const markerRow = totalLines > room && room > 1
+  if (markerRow) room -= 1
+  // Bias toward the last lines so a long buffer stays anchored to the most
+  // recent content while typing; scroll up if the cursor is in the hidden head.
+  let firstVisible = Math.max(0, totalLines - room)
+  if (cursorLine < firstVisible) firstVisible = cursorLine
+  const visible = lines.slice(firstVisible, firstVisible + room).map((r) => r.text)
+  const showMarker = markerRow && firstVisible > 0
 
   // Caret cell: the composer's box from the last layout, plus the rows above
   // the text (edit banner, quote, "earlier lines") and the 2-column prompt.
   if (composerActive && rootRef.current) {
     const rect = elementRect(rootRef.current)
-    const rowsAbove =
-      (editingMessageId ? 1 : 0) + (quote ? 1 : 0) + (overflow > 0 && firstVisible > 0 ? 1 : 0)
+    const rowsAbove = headerRows + (showMarker ? 1 : 0)
     const before = (lines[cursorLine]?.text ?? '').slice(0, cursorCol)
     // +1 row: Ink moves the cursor up from the line after its output, but the
     // app fills the terminal, so the cursor really starts on the last row.
@@ -486,7 +501,7 @@ export function Composer({ columns = 80 }: { columns?: number }) {
           </Text>
         </Box>
       )}
-      {overflow > 0 && firstVisible > 0 && (
+      {showMarker && (
         <Box>
           <Text color={theme.mutedText}>… {firstVisible} earlier line(s)</Text>
         </Box>
@@ -517,7 +532,7 @@ export function Composer({ columns = 80 }: { columns?: number }) {
           </Box>
         )
       })}
-      {sending && (
+      {showSending && (
         <Box>
           <Text muted wrap="truncate-end">
             sending...

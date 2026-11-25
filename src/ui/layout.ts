@@ -19,7 +19,7 @@ export type LayoutInput = {
   rows: number
   /** Number of lines in the composer draft text. */
   draftLines: number
-  /** Extra rows reserved by a quoted reply preview in the composer. */
+  /** Composer header rows above the text (reply quote, edit banner). */
   quoteRows: number
   /** Explicit chatListWidth from settings, or null for auto. */
   chatListWidth: number | null
@@ -55,13 +55,17 @@ export function computeLayout({
     chatListWidthHi,
   )
 
-  // Auto composer height: draft lines + quote rows + borders, clamped.
-  const autoComposerHeight = clamp(draftLines + quoteRows + 2, 3, 8)
-  // Upper bound keeps at least 2/3 of the terminal for the message pane.
-  const composerHeightHi = Math.max(COMPOSER_HARD_FLOOR, Math.min(10, Math.floor(rows / 3)))
+  // Auto composer height: draft lines + borders, clamped, plus the header
+  // rows (quote, edit banner) on top so they never eat into the text.
+  const autoComposerHeight = clamp(draftLines + 2, 3, 8) + quoteRows
+  // Upper bound keeps at least 2/3 of the terminal for the message pane. The
+  // floor always fits the header rows and one text line, even when an
+  // explicit setting or a short terminal asks for less.
+  const floor = COMPOSER_HARD_FLOOR + quoteRows
+  const composerHeightHi = Math.max(floor, Math.min(10 + quoteRows, Math.floor(rows / 3)))
   const resolvedComposerHeight = clamp(
     composerHeight ?? autoComposerHeight,
-    COMPOSER_HARD_FLOOR,
+    floor,
     composerHeightHi,
   )
 

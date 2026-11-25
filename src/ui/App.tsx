@@ -40,7 +40,7 @@ import {
 import { AccountsModal } from './AccountsModal'
 import { AuthExpiredModal } from './AuthExpiredModal'
 import { ChatList } from './ChatList'
-import { Composer } from './Composer'
+import { Composer, composerHeaderRows } from './Composer'
 import { ActivityModal, openActivity } from './ActivityModal'
 import { DiagnosticsModal } from './DiagnosticsModal'
 import { EventsModal } from './EventsModal'
@@ -216,6 +216,7 @@ export function App() {
   // Compute dynamic layout dimensions from terminal size + settings.
   // Only the open draft's wrapped line count: typing re-renders App (and both
   // panes) only when the composer grows or shrinks a line.
+  const editingMessageId = useAppState((s) => s.editingMessageId)
   const draftLines = useAppState((s) => {
     const conv = focusKey(s.focus)
     const draft = conv ? (s.draftsByConvo[conv] ?? '') : ''
@@ -225,7 +226,7 @@ export function App() {
     cols: terminalCols,
     rows: terminalRows,
     draftLines,
-    quoteRows: 0,
+    quoteRows: composerHeaderRows(!!editingMessageId, focus, messagesByConvo),
     chatListWidth: chatListWidthSetting,
     composerHeight: composerHeightSetting,
   })
@@ -685,7 +686,7 @@ export function App() {
       </Box>
       {showTailPanels && <TailPanels />}
       <Box {...paneBorder('composer')} height={resolvedComposerHeight}>
-        <Composer columns={terminalCols} />
+        <Composer columns={terminalCols} rows={resolvedComposerHeight - 2} />
       </Box>
       {statusBarPosition === 'bottom' && <StatusBar />}
     </Box>
