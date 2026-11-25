@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.25.3] - 2026-11-25
+
 ### Fixed
 
 - Replies sent from a thread view went out as new top-level channel posts.
@@ -1794,7 +1796,8 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.25.2...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.25.3...HEAD
+[0.25.3]: https://github.com/damsleth/teaminal/compare/v0.25.2...v0.25.3
 [0.25.2]: https://github.com/damsleth/teaminal/compare/v0.25.1...v0.25.2
 [0.25.1]: https://github.com/damsleth/teaminal/compare/v0.24.0...v0.25.1
 [0.24.0]: https://github.com/damsleth/teaminal/compare/v0.23.0...v0.24.0
