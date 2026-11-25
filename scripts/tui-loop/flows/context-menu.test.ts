@@ -34,7 +34,7 @@ test('context-menu: chat row and message', async ({ terminal }) => {
   const ada = rows.findIndex((r) => r.includes('Ada Byron'))
   const open = rows.findIndex((r) => r.includes('> Open'))
   if (open === -1 || Math.abs(open - ada) > 2)
-    throw new Error(`menu not beside the row: Ada on ${ada}, Open on ${open}`)
+    throw new Error(`menu not beside the row: Ada on ${ada}, Open on ${open}\n${rows.join('\n')}`)
   if (rows[open]!.indexOf('> Open') <= rows[ada]!.indexOf('Ada Byron'))
     throw new Error('menu not to the right of the row')
   terminal.keyEscape()
