@@ -7,8 +7,6 @@ import {
   __resetForTests as resetClient,
   __setTransportForTests,
   createGraphClient,
-  currentAccountContext,
-  setAudiencePreference,
 } from '../../graph/client'
 import { createAppStore, type Focus } from '../../state/store'
 import { SessionProvider, type SessionApi } from '../SessionContext'
@@ -28,7 +26,6 @@ function Probe(props: { focus: Focus; store: ReturnType<typeof createAppStore> }
 }
 
 test('a failed member hydrate is retried after a delay', async () => {
-  setAudiencePreference('graph', { fallback: false })
   __setRunnerForTests(async () => ({
     stdout: jwt({ exp: Math.floor(Date.now() / 1000) + 3600 }),
     stderr: '',
@@ -54,7 +51,8 @@ test('a failed member hydrate is retried after a delay', async () => {
   })
   const api: SessionApi = {
     getActiveProfile: () => 'test',
-    client: () => createGraphClient(currentAccountContext()),
+    client: () =>
+      createGraphClient({ account: accountRef(undefined), audience: 'graph', fallback: false }),
     switchAccount: async () => {},
     retryRealtime: () => {},
     reconcile: async () => {},

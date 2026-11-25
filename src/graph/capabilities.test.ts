@@ -1,22 +1,19 @@
-import { createGraphClient, currentAccountContext } from '../graph/client'
+import { accountRef } from '../account'
+import { createGraphClient, type AccountContext } from '../graph/client'
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
-import {
-  __resetForTests,
-  __setSleepForTests,
-  __setTransportForTests,
-  setAudiencePreference,
-} from './client'
+import { __resetForTests, __setSleepForTests, __setTransportForTests } from './client'
 import {
   __resetForTests as resetTeamsPresence,
   __setTransportForTests as setTeamsPresenceTransport,
 } from './teamsPresence'
 import { probeCapabilities } from './capabilities'
 
-const testClient = () => createGraphClient(currentAccountContext())
+const testClient = (over: Partial<AccountContext> = {}) =>
+  createGraphClient({ account: accountRef(undefined), audience: 'graph', fallback: false, ...over })
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 const TEST_OID = '11111111-1111-1111-1111-111111111111'
@@ -86,7 +83,6 @@ describe('probeCapabilities', () => {
   })
 
   test('ic3 audience reports chats/joinedTeams ok without probing graph', async () => {
-    setAudiencePreference('ic3', { fallback: false })
     primeAuth()
     const seenUrls: string[] = []
     installTransports(
@@ -97,7 +93,7 @@ describe('probeCapabilities', () => {
       },
       seenUrls,
     )
-    const caps = await probeCapabilities(testClient())
+    const caps = await probeCapabilities(testClient({ audience: 'ic3', fallback: false }))
     // me via token claims, chats/joinedTeams assumed-ok (served by CSA).
     expect(caps.me.ok).toBe(true)
     expect(caps.chats.ok).toBe(true)

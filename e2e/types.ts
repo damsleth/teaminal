@@ -16,8 +16,12 @@
 // The CI pipeline runs only `bun test` (unit tests) and
 // `bunx @microsoft/tui-test` against the seeded offline app (no auth).
 
+import type { GraphClient } from '../src/graph/client'
+
 export type E2EContext = {
   profile: string
+  /** Graph client bound to `profile`. */
+  client: GraphClient
   externalUsers: string[]
   log: (msg: string) => void
 }

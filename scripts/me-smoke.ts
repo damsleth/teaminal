@@ -1,4 +1,3 @@
-import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // Live smoke for src/graph/client + src/graph/me.
 //
 // Hits real /me through the graph client, prints displayName + redacted id
@@ -8,13 +7,13 @@ import { createGraphClient, currentAccountContext } from '../src/graph/client'
 //   bun run scripts/me-smoke.ts            # default profile
 //   bun run scripts/me-smoke.ts work       # specific profile
 
-import { setActiveProfile } from '../src/graph/client'
+import { accountRef } from '../src/account'
+import { createGraphClient } from '../src/graph/client'
 import { getMe } from '../src/graph/me'
 
-const testClient = () => createGraphClient(currentAccountContext())
-
 const profile = Bun.argv[2]
-if (profile) setActiveProfile(profile)
+const testClient = () =>
+  createGraphClient({ account: accountRef(profile), audience: 'graph', fallback: false })
 
 const profileLabel = profile ?? '<owa-default>'
 

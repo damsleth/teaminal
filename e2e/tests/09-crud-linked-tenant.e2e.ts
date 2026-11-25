@@ -1,4 +1,3 @@
-import { createGraphClient, currentAccountContext } from '../../src/graph/client'
 import {
   createOneOnOneChat,
   editMessage,
@@ -9,8 +8,6 @@ import {
 } from '../../src/graph/chats'
 import { getMe } from '../../src/graph/me'
 import type { E2ETest } from '../types'
-
-const testClient = () => createGraphClient(currentAccountContext())
 
 // CRUD against a B2B-linked external user. The external email is
 // configurable via --external-users; the test picks the first entry
@@ -26,7 +23,7 @@ const test: E2ETest = {
     if (ctx.externalUsers.length === 0) {
       throw new Error('no external users configured (--external-users)')
     }
-    const me = await getMe(testClient())
+    const me = await getMe(ctx.client)
     if (!me.id) throw new Error('me.id is empty')
 
     // Find the first external user resolvable via Graph search (the
@@ -35,7 +32,7 @@ const test: E2ETest = {
     let peerId: string | null = null
     let peerLabel = ''
     for (const email of ctx.externalUsers) {
-      const matches = await searchChatUsers(testClient(), email)
+      const matches = await searchChatUsers(ctx.client, email)
       const direct = matches.find(
         (m) =>
           m.userPrincipalName?.toLowerCase() === email.toLowerCase() ||
@@ -54,24 +51,24 @@ const test: E2ETest = {
     }
     ctx.log(`peer ${peerLabel} (${peerId})`)
 
-    const chat = await createOneOnOneChat(testClient(), me.id, peerId)
+    const chat = await createOneOnOneChat(ctx.client, me.id, peerId)
     ctx.log(`chat id=${chat.id}`)
 
     const stamp = new Date().toISOString()
     const initial = `[teaminal-e2e crud-linked] ping @ ${stamp}`
-    const sent = await sendMessage(testClient(), chat.id, initial)
+    const sent = await sendMessage(ctx.client, chat.id, initial)
     if (!sent.id) throw new Error('sendMessage returned no id')
     ctx.log(`sent message id=${sent.id}`)
 
-    const messages = await listMessages(testClient(), chat.id, { top: 50 })
+    const messages = await listMessages(ctx.client, chat.id, { top: 50 })
     if (!messages.find((m) => m.id === sent.id)) {
       throw new Error('sent message not present in listMessages')
     }
 
-    await editMessage(testClient(), chat.id, sent.id, `${initial} (edited)`)
+    await editMessage(ctx.client, chat.id, sent.id, `${initial} (edited)`)
     ctx.log('edited OK')
 
-    await softDeleteMessage(testClient(), chat.id, sent.id)
+    await softDeleteMessage(ctx.client, chat.id, sent.id)
     ctx.log('soft-delete OK')
   },
 }

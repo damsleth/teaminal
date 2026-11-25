@@ -1,15 +1,14 @@
-import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // Live smoke for src/graph/capabilities.
 //
 // Hits real Graph and prints a per-probe result table.
 
-import { setActiveProfile } from '../src/graph/client'
+import { accountRef } from '../src/account'
+import { createGraphClient } from '../src/graph/client'
 import { probeCapabilities } from '../src/graph/capabilities'
 
-const testClient = () => createGraphClient(currentAccountContext())
-
 const profile = Bun.argv[2]
-if (profile) setActiveProfile(profile)
+const testClient = () =>
+  createGraphClient({ account: accountRef(profile), audience: 'graph', fallback: false })
 
 const t0 = performance.now()
 const caps = await probeCapabilities(testClient())

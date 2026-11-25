@@ -1,10 +1,11 @@
-import { createGraphClient, currentAccountContext } from '../graph/client'
+import { accountRef } from '../account'
+import { createGraphClient, type AccountContext } from '../graph/client'
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
-import { __resetForTests, __setTransportForTests, setAudiencePreference } from './client'
+import { __resetForTests, __setTransportForTests } from './client'
 import {
   __resetChatMessageFallbackForTests,
   createGroupChat,
@@ -30,7 +31,8 @@ import {
 import { __resetForTests as resetRegion, __setRegionForTests } from './teamsRegion'
 import type { Chat, ChatMessage } from '../types'
 
-const testClient = () => createGraphClient(currentAccountContext())
+const testClient = (over: Partial<AccountContext> = {}) =>
+  createGraphClient({ account: accountRef(undefined), audience: 'graph', fallback: false, ...over })
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -287,7 +289,6 @@ describe('listMessages', () => {
   test('falls back to chatsvc when graph /chats/{id}/messages 401s', async () => {
     primeAuth()
     // graph+ic3 (default routing): graph-primary with cross-transport fallback.
-    setAudiencePreference('graph', { fallback: true })
     __setRegionForTests(undefined, 'emea')
     // graph chat messages → 401 (Conditional Access).
     __setTransportForTests(async () =>
@@ -319,14 +320,20 @@ describe('listMessages', () => {
       })
     })
 
-    const page = await listMessagesPage(testClient(), '19:aaaa_bbbb@unq.gbl.spaces')
+    const page = await listMessagesPage(
+      testClient({ audience: 'graph', fallback: true }),
+      '19:aaaa_bbbb@unq.gbl.spaces',
+    )
     // chronological (oldest first), all messages kept.
     expect(page.messages.map((m) => m.id)).toEqual(['1', '2'])
     expect(chatsvcUrl).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
 
     // Latched: a second call goes straight to chatsvc (graph transport
     // would still 401, but we never hit it).
-    const page2 = await listMessagesPage(testClient(), '19:aaaa_bbbb@unq.gbl.spaces')
+    const page2 = await listMessagesPage(
+      testClient({ audience: 'graph', fallback: true }),
+      '19:aaaa_bbbb@unq.gbl.spaces',
+    )
     expect(page2.messages.map((m) => m.id)).toEqual(['1', '2'])
   })
 })
@@ -534,7 +541,6 @@ describe('sendMessage', () => {
 
   test('falls back to chatsvc send when graph POST 401s', async () => {
     primeAuth()
-    setAudiencePreference('graph', { fallback: true })
     __setRegionForTests(undefined, 'emea')
     __setTransportForTests(async () =>
       jsonResponse({ error: { code: 'Unauthorized', message: 'CA' } }, { status: 401 }),
@@ -553,7 +559,11 @@ describe('sendMessage', () => {
         },
       )
     })
-    const created = await sendMessage(testClient(), '19:aaaa_bbbb@unq.gbl.spaces', 'hello')
+    const created = await sendMessage(
+      testClient({ audience: 'graph', fallback: true }),
+      '19:aaaa_bbbb@unq.gbl.spaces',
+      'hello',
+    )
     expect(chatsvcPost).toContain('POST')
     expect(chatsvcPost).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
     expect(created.body.content).toBe('hello')
@@ -563,7 +573,6 @@ describe('sendMessage', () => {
 describe('chat routing modes', () => {
   test('ic3-only reads messages straight from chatsvc without touching graph', async () => {
     primeAuth()
-    setAudiencePreference('ic3', { fallback: false })
     __setRegionForTests(undefined, 'emea')
     let graphCalled = false
     __setTransportForTests(async () => {
@@ -588,7 +597,10 @@ describe('chat routing modes', () => {
       })
     })
 
-    const page = await listMessagesPage(testClient(), '19:aaaa_bbbb@unq.gbl.spaces')
+    const page = await listMessagesPage(
+      testClient({ audience: 'ic3', fallback: false }),
+      '19:aaaa_bbbb@unq.gbl.spaces',
+    )
     expect(page.messages.map((m) => m.id)).toEqual(['1'])
     expect(chatsvcUrl).toContain('/api/chatsvc/emea/v1/users/ME/conversations/')
     expect(graphCalled).toBe(false)
@@ -596,7 +608,6 @@ describe('chat routing modes', () => {
 
   test('chatsvc chat history pages older through its backward link', async () => {
     primeAuth()
-    setAudiencePreference('ic3', { fallback: false })
     __setRegionForTests(undefined, 'emea')
     let graphCalled = false
     __setTransportForTests(async () => {
@@ -625,9 +636,15 @@ describe('chat routing modes', () => {
       })
     })
 
-    const page = await listMessagesPage(testClient(), '19:aaaa_bbbb@unq.gbl.spaces')
+    const page = await listMessagesPage(
+      testClient({ audience: 'ic3', fallback: false }),
+      '19:aaaa_bbbb@unq.gbl.spaces',
+    )
     expect(page.nextLink).toBe(older)
-    const next = await listMessagesNextPage(testClient(), page.nextLink!)
+    const next = await listMessagesNextPage(
+      testClient({ audience: 'ic3', fallback: false }),
+      page.nextLink!,
+    )
     expect(urls[1]).toBe(older)
     expect(next.messages.map((m) => m.id)).toEqual(['1'])
     expect(next.nextLink).toBeUndefined()
@@ -636,7 +653,6 @@ describe('chat routing modes', () => {
 
   test('graph-only surfaces the 401 instead of falling back to chatsvc', async () => {
     primeAuth()
-    setAudiencePreference('graph', { fallback: false })
     __setRegionForTests(undefined, 'emea')
     __setTransportForTests(async () =>
       jsonResponse({ error: { code: 'Unauthorized', message: 'CA' } }, { status: 401 }),

@@ -1,6 +1,6 @@
 import { accountRef } from '../../account'
 import { accountStore } from '../accountStore'
-import { createGraphClient, currentAccountContext } from '../../graph/client'
+import { createGraphClient, type AccountContext } from '../../graph/client'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { __resetForTests, __setTransportForTests } from '../../graph/client'
 import {
@@ -11,7 +11,8 @@ import type { ChatMessage } from '../../types'
 import { createAppStore, resetAccountScopedState, type ConvKey } from '../store'
 import { loadOlderMessages } from './loadOlder'
 
-const testClient = () => createGraphClient(currentAccountContext())
+const testClient = (over: Partial<AccountContext> = {}) =>
+  createGraphClient({ account: accountRef(undefined), audience: 'graph', fallback: false, ...over })
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 

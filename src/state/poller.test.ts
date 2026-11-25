@@ -1,12 +1,12 @@
 import { accountRef } from '../account'
 import { accountStore } from './accountStore'
-import { createGraphClient, currentAccountContext } from '../graph/client'
+import { createGraphClient, type AccountContext } from '../graph/client'
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
-import { __resetForTests, __setTransportForTests, setAudiencePreference } from '../graph/client'
+import { __resetForTests, __setTransportForTests } from '../graph/client'
 import type { Capabilities } from '../graph/capabilities'
 import {
   __resetForTests as resetTeamsPresence,
@@ -27,7 +27,8 @@ import {
   startPoller,
 } from './poller'
 
-const testClient = () => createGraphClient(currentAccountContext())
+const testClient = (over: Partial<AccountContext> = {}) =>
+  createGraphClient({ account: accountRef(undefined), audience: 'graph', fallback: false, ...over })
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -545,7 +546,6 @@ describe('list loop', () => {
 
   test('falls back to Teams CSA when graph /chats 401s (Conditional Access)', async () => {
     primeAuth()
-    setAudiencePreference('graph', { fallback: true })
     __setRegionForTests(undefined, 'emea')
     // graph /chats + /me/joinedTeams are CA-gated → 401.
     installTransport(
@@ -583,7 +583,7 @@ describe('list loop', () => {
     })
     const store = createAppStore(accountRef('test'))
     activeHandle = startPoller({
-      getClient: testClient,
+      getClient: () => testClient({ audience: 'graph', fallback: true }),
       store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
@@ -595,7 +595,6 @@ describe('list loop', () => {
 
   test('graph-only does not fall back to Teams CSA when graph /chats 401s', async () => {
     primeAuth()
-    setAudiencePreference('graph', { fallback: false })
     installTransport(
       makeHandlers({
         '/chats': () =>
@@ -622,7 +621,6 @@ describe('list loop', () => {
 
   test('list loop observes live routing changes without restart', async () => {
     primeAuth()
-    setAudiencePreference('graph', { fallback: false })
     __setRegionForTests(undefined, 'emea')
     let graphCalls = 0
     installTransport(
@@ -658,16 +656,17 @@ describe('list loop', () => {
       }
       return jsonResponse({ teams: [] })
     })
+    // The app's client reads the account's routing per call; so does this one.
+    let audience: AccountContext['audience'] = 'graph'
     const store = createAppStore(accountRef('test'))
     activeHandle = startPoller({
-      getClient: testClient,
+      getClient: () => testClient({ audience }),
       store: accountStore(store),
       intervals: { activeMs: 99_999, listMs: 30, presenceMs: 99_999 },
     })
     await waitFor(() => store.get().chats[0]?.id === 'graph-chat')
 
-    setAudiencePreference('ic3', { fallback: false })
-
+    audience = 'ic3'
     await waitFor(() => store.get().chats[0]?.id === 'csa-chat')
     expect(graphCalls).toBeGreaterThan(0)
     expect(csaCalls).toBeGreaterThan(0)

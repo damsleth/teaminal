@@ -30,7 +30,8 @@
 
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { setActiveProfile } from '../src/graph/client'
+import { accountRef } from '../src/account'
+import { createGraphClient } from '../src/graph/client'
 import { EVENTS_LOG, NETWORK_LOG, installLogging, logFileSize, tailFromOffset } from './log'
 import type { E2EContext, E2ETest } from './types'
 
@@ -211,7 +212,6 @@ async function main(): Promise<void> {
   }
 
   installLogging()
-  setActiveProfile(args.profile)
 
   const tests = await loadTests()
   const filtered = args.filter
@@ -236,6 +236,11 @@ async function main(): Promise<void> {
 
   const ctx: E2EContext = {
     profile: args.profile,
+    client: createGraphClient({
+      account: accountRef(args.profile),
+      audience: 'graph',
+      fallback: false,
+    }),
     externalUsers: args.externalUsers,
     log: (msg) => console.log(`  ${color(process.stdout, '·', ANSI.dim)} ${msg}`),
   }

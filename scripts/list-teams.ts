@@ -1,16 +1,15 @@
-import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // Live smoke for src/graph/teams.
 //
 // Lists joined teams + their channels (with $select fields) to confirm the
 // teams + channels endpoints work end-to-end against the user's tenant.
 
-import { setActiveProfile } from '../src/graph/client'
+import { accountRef } from '../src/account'
+import { createGraphClient } from '../src/graph/client'
 import { listChannels, listJoinedTeams } from '../src/graph/teams'
 
-const testClient = () => createGraphClient(currentAccountContext())
-
 const profile = Bun.argv[2]
-if (profile) setActiveProfile(profile)
+const testClient = () =>
+  createGraphClient({ account: accountRef(profile), audience: 'graph', fallback: false })
 
 const t0 = performance.now()
 const teams = await listJoinedTeams(testClient())

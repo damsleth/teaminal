@@ -1,6 +1,6 @@
 import { accountRef } from '../account'
 import { accountStore } from './accountStore'
-import { createGraphClient, currentAccountContext } from '../graph/client'
+import { createGraphClient, type AccountContext } from '../graph/client'
 import { afterEach, describe, expect, it } from 'bun:test'
 import {
   __resetForTests as resetAuth,
@@ -9,7 +9,6 @@ import {
 import {
   __resetForTests as resetClient,
   __setTransportForTests as setClientTransport,
-  setAudiencePreference,
 } from '../graph/client'
 import { __resetChatMessageFallbackForTests } from '../graph/chats'
 import type { ChatMessage, IdentityUser } from '../types'
@@ -32,7 +31,8 @@ import {
   toggleReaction,
 } from './chatActions'
 
-const testClient = () => createGraphClient(currentAccountContext())
+const testClient = (over: Partial<AccountContext> = {}) =>
+  createGraphClient({ account: accountRef(undefined), audience: 'graph', fallback: false, ...over })
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 const me: IdentityUser = { id: 'me-1', displayName: 'Me' }
@@ -44,7 +44,6 @@ function makeJwt(payload: Record<string, unknown>): string {
 }
 
 function setup(transport: (url: string, init: RequestInit) => Promise<Response>) {
-  setAudiencePreference('graph', { fallback: false })
   // tid is what hideChat reads off the token for the hideForUser body.
   setAuthRunner(async () => ({
     stdout: makeJwt({ exp: FAR_FUTURE, tid: 'tenant-1' }),
