@@ -15,20 +15,23 @@ export function useClampMessageCursor(
   messagesByConvo: AppState['messagesByConvo'],
   store: Store<AppState>,
 ): void {
-  // Newest navigable message id per conversation, to tell a new arrival
-  // apart from loading older pages (which only prepend).
+  // Newest navigable message id per account + conversation, to tell a new
+  // arrival apart from loading older pages (which only prepend). Keyed by
+  // account so a swap to another account's same-id chat is not an arrival.
   const newestByConv = useRef(new Map<string, string>())
+  const accountId = store.get().account?.id
   useEffect(() => {
     const conv = focusKey(focus)
     if (!conv) return
+    const newestKey = `${accountId ?? ''}\0${conv}`
     // Clamp against the NAVIGABLE list (roots-only for channels), matching
     // the cursor index space the message pane actually renders.
     const nav = messagesForTimelineNavigation(messagesByConvo[conv] ?? [], focus)
     const count = nav.length
     if (count === 0) return
     const newest = nav[count - 1]!.id
-    const prevNewest = newestByConv.current.get(conv)
-    newestByConv.current.set(conv, newest)
+    const prevNewest = newestByConv.current.get(newestKey)
+    newestByConv.current.set(newestKey, newest)
     const arrived = prevNewest !== undefined && prevNewest !== newest
     store.set((s) => {
       const existing = s.messageCursorByConvo[conv]
@@ -44,5 +47,5 @@ export function useClampMessageCursor(
         },
       }
     })
-  }, [focus, messagesByConvo, store])
+  }, [accountId, focus, messagesByConvo, store])
 }

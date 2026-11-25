@@ -149,6 +149,10 @@ export function App() {
   }, [stdoutForCols])
 
   const focus = useAppState((s) => s.focus)
+  // The foreground account. Conversation-keyed state below is keyed by it
+  // too: after a concurrent-mode swap the restored focus can be deep-equal
+  // to the previous account's (colliding ids).
+  const accountId = useAppState((s) => s.account?.id)
   const cursor = useAppState((s) => s.cursor)
   const cursorKey = useAppState((s) => s.cursorKey)
   const chats = useAppState((s) => s.chats)
@@ -186,11 +190,12 @@ export function App() {
   }, [focus])
   useEffect(() => {
     if (focus.kind !== 'chat' || !me?.id) return
-    if (federatedFocusCheckedRef.current.has(focus.chatId)) return
+    const checkedKey = `${accountId ?? ''}\0${focus.chatId}`
+    if (federatedFocusCheckedRef.current.has(checkedKey)) return
     const chat = chats.find((c) => c.id === focus.chatId)
     const otherUserId = otherUserIdForFederatedResolution(focus.chatId, chat, me.id)
     if (!otherUserId) return
-    federatedFocusCheckedRef.current.add(focus.chatId)
+    federatedFocusCheckedRef.current.add(checkedKey)
     let cancelled = false
     void (async () => {
       const federatedChatId = await resolveFederatedChatId(session.client(), me.id, otherUserId)
@@ -211,7 +216,7 @@ export function App() {
     return () => {
       cancelled = true
     }
-  }, [focus, me?.id, chats])
+  }, [accountId, focus, me?.id, chats])
 
   // Compute dynamic layout dimensions from terminal size + settings.
   // Only the open draft's wrapped line count: typing re-renders App (and both
@@ -600,7 +605,7 @@ export function App() {
       <Box flexDirection="row" flexGrow={1} position="relative">
         {showList && (
           <Box width={listWidth} flexShrink={0} {...paneBorder('list')}>
-            <ChatList listPaneWidth={listWidth} />
+            <ChatList key={accountId} listPaneWidth={listWidth} />
           </Box>
         )}
         <Box
@@ -622,6 +627,7 @@ export function App() {
           ) : (
             <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
               <MessagePane
+                key={accountId}
                 focusedMessageId={focusedMessageId}
                 focusIndicatorActive={focus.kind !== 'list' && inputZone === 'list'}
                 loadOlderState={loadOlderState}
@@ -685,7 +691,7 @@ export function App() {
       </Box>
       {showTailPanels && <TailPanels />}
       <Box {...paneBorder('composer')} height={resolvedComposerHeight}>
-        <Composer columns={terminalCols} />
+        <Composer key={accountId} columns={terminalCols} />
       </Box>
       {statusBarPosition === 'bottom' && <StatusBar />}
     </Box>
