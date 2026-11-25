@@ -314,6 +314,9 @@ export class TrouterTransport implements RealtimeTransport {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private keepaliveTimer: ReturnType<typeof setInterval> | null = null
   private disconnecting = false
+  // Bumped by connect() and disconnect(): a connect attempt whose number is
+  // no longer current was superseded and must not open or keep a socket.
+  private attempt = 0
   // The registrar request in flight: aborted on disconnect or a new
   // registration, so a long 429 back-off can't outlive the connection.
   private registrarAbort: AbortController | null = null
@@ -336,18 +339,22 @@ export class TrouterTransport implements RealtimeTransport {
   }
 
   async connect(): Promise<void> {
+    const mine = ++this.attempt
     this.disconnecting = false
     this.setState('connecting')
     try {
       await this.ensureSkypeToken()
-      await this.openWebSocket()
+      if (mine !== this.attempt) return
+      await this.openWebSocket(mine)
     } catch (err) {
+      if (mine !== this.attempt) return
       warn('trouter: connect failed:', err instanceof Error ? err.message : String(err))
       this.scheduleReconnect()
     }
   }
 
   disconnect(): void {
+    this.attempt++
     this.disconnecting = true
     this.registrarAbort?.abort()
     this.registrarAbort = null
@@ -400,9 +407,10 @@ export class TrouterTransport implements RealtimeTransport {
 
   // --- WebSocket ---
 
-  private async openWebSocket(): Promise<void> {
+  private async openWebSocket(mine: number): Promise<void> {
     this.registrationId = crypto.randomUUID()
     const ic3Token = await this.getIc3Token()
+    if (mine !== this.attempt) return
     const tokenSummary = summariseToken(ic3Token)
     if (tokenSummary) recordEvent('trouter', 'debug', `trouter ic3 token ${tokenSummary}`)
     this.wsUrl = buildTrouterConnectUrl(this.trouterUrl, this.registrationId)
@@ -412,6 +420,8 @@ export class TrouterTransport implements RealtimeTransport {
 
     return new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(this.wsUrl!)
+      // Held from creation, so a disconnect() before the upgrade closes it.
+      this.ws = ws
       let settled = false
 
       const timeout = setTimeout(() => {
@@ -424,8 +434,13 @@ export class TrouterTransport implements RealtimeTransport {
       }, 15_000)
 
       ws.onopen = () => {
+        if (mine !== this.attempt) {
+          try {
+            ws.close()
+          } catch {}
+          return
+        }
         debug('trouter: websocket upgrade complete')
-        this.ws = ws
         this.startKeepalive()
       }
 
@@ -470,14 +485,17 @@ export class TrouterTransport implements RealtimeTransport {
           'warn',
           `trouter ws closed code=${code}${reason ? ` reason=${reason.slice(0, 200)}` : ''}`,
         )
-        this.ws = null
-        this.clearKeepalive()
+        if (this.ws === ws) this.ws = null
+        // A superseded socket leaves the newer connection's keepalive and
+        // reconnect alone.
+        const current = mine === this.attempt
+        if (current) this.clearKeepalive()
         if (!settled) {
           settled = true
           reject(new Error(`trouter: websocket closed before registration code=${code}`))
           return
         }
-        if (!this.disconnecting) {
+        if (current && !this.disconnecting) {
           this.scheduleReconnect()
         }
       }

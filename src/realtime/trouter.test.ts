@@ -407,3 +407,70 @@ describe('buildRegistrarRequest', () => {
     expect(headers['x-skypetoken']).toBe('skype-1')
   })
 })
+
+describe('TrouterTransport shutdown', () => {
+  class FakeSocket {
+    static made: FakeSocket[] = []
+    closed = false
+    onopen: (() => void) | null = null
+    onmessage: ((e: { data: string }) => void) | null = null
+    onerror: ((e: unknown) => void) | null = null
+    onclose: ((e: unknown) => void) | null = null
+    constructor(public url: string) {
+      FakeSocket.made.push(this)
+    }
+    send() {}
+    close() {
+      this.closed = true
+    }
+  }
+
+  function setupTransport() {
+    FakeSocket.made = []
+    let release!: (t: string) => void
+    const transport = new TrouterTransport({
+      bus: new RealtimeEventBus(),
+      getToken: () => new Promise<string>((r) => (release = r)),
+    })
+    ;(transport as unknown as { ensureSkypeToken: () => Promise<void> }).ensureSkypeToken =
+      async () => {}
+    return { transport, release: (t: string) => release(t) }
+  }
+
+  test('a disconnect during the token await opens no socket afterwards', async () => {
+    const real = globalThis.WebSocket
+    globalThis.WebSocket = FakeSocket as unknown as typeof WebSocket
+    try {
+      const { transport, release } = setupTransport()
+      const connecting = transport.connect()
+      await Promise.resolve()
+      transport.disconnect()
+      release('tok')
+      await connecting
+      expect(FakeSocket.made).toHaveLength(0)
+      expect(transport.state).toBe('disconnected')
+    } finally {
+      globalThis.WebSocket = real
+    }
+  })
+
+  test('a disconnect while the socket is opening closes it', async () => {
+    const real = globalThis.WebSocket
+    globalThis.WebSocket = FakeSocket as unknown as typeof WebSocket
+    try {
+      const { transport, release } = setupTransport()
+      void transport.connect()
+      await Promise.resolve()
+      release('tok')
+      for (let i = 0; i < 10 && FakeSocket.made.length === 0; i++) await Promise.resolve()
+      expect(FakeSocket.made).toHaveLength(1)
+      transport.disconnect()
+      expect(FakeSocket.made[0]!.closed).toBe(true)
+      // A late open on the stale socket must not revive it.
+      FakeSocket.made[0]!.onopen?.()
+      expect(transport.state).toBe('disconnected')
+    } finally {
+      globalThis.WebSocket = real
+    }
+  })
+})
