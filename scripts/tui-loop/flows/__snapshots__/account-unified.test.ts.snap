@@ -1,0 +1,82 @@
+// TUI Test Snapshot v1
+
+exports[`three accounts › account-unified: three sections; Enter opens gamma’s copy of a shared chat id | 1`] = String.raw`
+╭────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
+││  teaminal · You (example.com) · presence ● · graph ● · 3 chats                                   ││
+│╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
+│╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
+││▾ alpha · example.com     ││Select a chat or channel · Enter to open · q to quit                  ││
+││ ◯ Ada Byron              ││                                                                      ││
+││   The launch notes are…  ││                                                                      ││
+││  Design Sync            ││                                                                      ││
+││   Anna: Anna shared two… ││                                                                      ││
+││  Ops Channel            ││                                                                      ││
+││   Mina: Deploy is green… ││                                                                      ││
+││▾ beta · example.com      ││                                                                      ││
+││ ◯ ADA BYRON              ││                                                                      ││
+││   THE LAUNCH NOTES ARE…  ││                                                                      ││
+││  DESIGN SYNC            ││                                                                      ││
+││   ANNA: ANNA SHARED TWO… ││                                                                      ││
+││  OPS CHANNEL            ││                                                                      ││
+││   MINA: DEPLOY IS GREEN… ││                                                                      ││
+││▾ gamma · example.com     ││                                                                      ││
+││ ◯ Ada Byron (gamma)      ││                                                                      ││
+││   The launch notes are…  ││                                                                      ││
+││  Design Sync (gamma)    ││                                                                      ││
+││   Anna: Anna shared two… ││                                                                      ││
+││  Ops Channel (gamma)    ││                                                                      ││
+││   Mina: Deploy is green… ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+│╰──────────────────────────╯╰──────────────────────────────────────────────────────────────────────╯│
+│╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
+││ open a chat to compose                                                                           ││
+│╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
+│ alpha · j/k move · l/Enter open · / filter · n new chat · ? help · q quit                          │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
+`;
+
+exports[`two accounts: sidebar › account-unified: both sections under their headers | 1`] = String.raw`
+╭────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
+││  teaminal · You (example.com) · presence ● · graph ● · 3 chats                                   ││
+│╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
+│╭──────────────────────────╮╭──────────────────────────────────────────────────────────────────────╮│
+││▾ alpha · example.com     ││Select a chat or channel · Enter to open · q to quit                  ││
+││ ◯ Ada Byron              ││                                                                      ││
+││   The launch notes are…  ││                                                                      ││
+││  Design Sync            ││                                                                      ││
+││   Anna: Anna shared two… ││                                                                      ││
+││  Ops Channel            ││                                                                      ││
+││   Mina: Deploy is green… ││                                                                      ││
+││▾ beta · example.com      ││                                                                      ││
+││ ◯ ADA BYRON              ││                                                                      ││
+││   THE LAUNCH NOTES ARE…  ││                                                                      ││
+││  DESIGN SYNC            ││                                                                      ││
+││   ANNA: ANNA SHARED TWO… ││                                                                      ││
+││  OPS CHANNEL            ││                                                                      ││
+││   MINA: DEPLOY IS GREEN… ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+││                          ││                                                                      ││
+│╰──────────────────────────╯╰──────────────────────────────────────────────────────────────────────╯│
+│╭──────────────────────────────────────────────────────────────────────────────────────────────────╮│
+││ open a chat to compose                                                                           ││
+│╰──────────────────────────────────────────────────────────────────────────────────────────────────╯│
+│ alpha · j/k move · l/Enter open · / filter · n new chat · ? help · q quit                          │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────╯
+`;
+

@@ -4,8 +4,9 @@
  * concurrentAccounts on, two seeded accounts that share every id: `beta`
  * upper-cases names, topics and bodies. Both run at once; picking an account
  * in the Accounts modal swaps it to the foreground instantly, and it comes
- * back on the conversation that was open in it. Any text from the other
- * account on screen after a swap is a cross-account leak.
+ * back on the conversation that was open in it. Both accounts' rows share the
+ * unified sidebar (M2 F.3), so any text from the other account in the
+ * message pane after a swap is a cross-account leak.
  *
  * RUNNER: node node_modules/@microsoft/tui-test/index.js (not bun test).
  */
@@ -37,10 +38,13 @@ test.use({
 // Separate keystrokes so `j` `j` doesn't arrive as one "jj" input.
 const pause = (ms = 180) => new Promise((r) => setTimeout(r, ms))
 
-const screen = (terminal: { getViewableBuffer(): string[][] }) =>
+// The screen right of the chat list (message pane, composer, status bar):
+// the sidebar lists every account, so only this part must be one account's.
+const LIST_PANE_COLS = 28
+const pane = (terminal: { getViewableBuffer(): string[][] }) =>
   terminal
     .getViewableBuffer()
-    .map((row) => row.join(''))
+    .map((row) => row.slice(LIST_PANE_COLS).join(''))
     .join('\n')
 
 // Message-pane-only lines (not in the chat list previews).
@@ -65,7 +69,7 @@ async function switchTo(terminal: Terminal, down: number, inModal?: () => Promis
 }
 
 function expectOnly(terminal: Terminal, account: 'alpha' | 'beta') {
-  const out = screen(terminal)
+  const out = pane(terminal)
   if (account === 'beta') {
     expect(out).not.toContain('Ada Byron')
     expect(out).not.toContain('Design Sync')
@@ -80,8 +84,10 @@ function expectOnly(terminal: Terminal, account: 'alpha' | 'beta') {
 test('account-concurrent: instant switch lands on the conversation that was open', async ({
   terminal,
 }) => {
-  // alpha in front: open Ada's chat.
+  // alpha in front: open Ada's chat (the cursor starts on alpha's header).
   await expect(terminal.getByText('Ada Byron')).toBeVisible()
+  terminal.write('j')
+  await pause()
   terminal.submit()
   await expect(terminal.getByText(ALPHA_ADA)).toBeVisible()
 
@@ -91,9 +97,12 @@ test('account-concurrent: instant switch lands on the conversation that was open
     await expect(terminal.getByText('alpha  foreground')).toBeVisible()
     await expect(terminal.getByText('beta  running')).toBeVisible()
   })
-  await expect(terminal.getByText('ADA BYRON')).toBeVisible()
+  // Both sections are always listed; the status bar names the foreground.
+  await expect(terminal.getByText('beta · j/k move')).toBeVisible()
   expectOnly(terminal, 'beta')
-  // Open DESIGN SYNC in beta.
+  // Open DESIGN SYNC in beta: the cursor starts on beta's header.
+  terminal.write('j')
+  await pause()
   terminal.write('j')
   await pause()
   terminal.submit()
