@@ -230,3 +230,47 @@ test('a paste then a chat switch: the paste stays in the chat it was pasted into
   expect(store.get().draftsByConvo['chat:b']).toBe('x')
   app.unmount()
 })
+
+test("saving an edit keeps the chat's unsent draft, and a failed edit still resumes", async () => {
+  const requests = heldTransport()
+  const message = {
+    id: 'm1',
+    createdDateTime: '2026-01-01T00:00:00Z',
+    messageType: 'message',
+    body: { contentType: 'text' as const, content: 'original' },
+    from: { user: { id: 'me', displayName: 'Me' } },
+  }
+  const { store, stdin, app } = mount({
+    me: { id: 'me', displayName: 'Me' } as never,
+    focus: { kind: 'chat', chatId: 'a' },
+    inputZone: 'composer',
+    messagesByConvo: { 'chat:a': [message] },
+  })
+  await tick()
+  stdin.write('unsent draft')
+  await tick()
+  expect(store.get().draftsByConvo['chat:a']).toBe('unsent draft')
+  store.set({ editingMessageId: 'm1', inputZone: 'composer' })
+  await tick()
+  stdin.write(' revised')
+  await tick()
+  stdin.write('\n')
+  await tick()
+  requests.at(-1)!.settle(204)
+  await tick(80)
+  expect(store.get().draftsByConvo['chat:a']).toBe('unsent draft')
+
+  // A failed edit with the draft back in the box resumes the edit; the draft
+  // stays saved for when the edit is left.
+  store.set({ editingMessageId: 'm1', inputZone: 'composer' })
+  await tick()
+  stdin.write('!')
+  await tick()
+  stdin.write('\n')
+  await tick()
+  requests.at(-1)!.settle(500)
+  await tick(80)
+  expect(store.get().editingMessageId).toBe('m1')
+  expect(store.get().draftsByConvo['chat:a']).toBe('unsent draft')
+  app.unmount()
+})

@@ -388,9 +388,13 @@ export function Composer({ columns = 80 }: { columns?: number }) {
     if (!boxIsCurrent() || focusKey(store.get().focus) !== focusKey(focus)) return
 
     setSending(true)
-    setBuf(emptyBuffer)
-    store.set({ editingMessageId: null, inputZone: 'list' })
+    // Leaving the edit puts the conversation's unsent draft back in the box
+    // (as Esc does). An empty box here would read as "draft cleared" to the
+    // persistence effect and delete it.
     const editConv = focusKey(focus)
+    const draft = editConv ? (store.get().draftsByConvo[editConv] ?? '') : ''
+    setBuf({ text: draft, cursor: draft.length })
+    store.set({ editingMessageId: null, inputZone: 'list' })
     const editOwner = ownedRef.current
     const acc = accountStore(store)
     try {
@@ -399,12 +403,15 @@ export function Composer({ columns = 80 }: { columns?: number }) {
       await editChatMessageContent(session.client(), acc, focus.chatId, id, trimmed)
     } catch {
       // Resume the edit only where it was made, and only if the box is
-      // still free; otherwise the message simply stays as it was.
+      // still free (holding just the saved draft, which stays saved while
+      // editing); otherwise the message simply stays as it was.
+      const boxText = bufRef.current.text
+      const savedDraft = editConv ? (store.get().draftsByConvo[editConv] ?? '') : ''
       const placement = failedSendPlacement({
         sentConv: editConv ?? '',
         currentConv: focusKey(store.get().focus),
         accountCurrent: acc.isCurrent(),
-        boxText: bufRef.current.text,
+        boxText: boxText === savedDraft ? '' : boxText,
       })
       if (placement.kind === 'box' && !placement.prepend && ownedRef.current === editOwner) {
         resumeEditRef.current = true
