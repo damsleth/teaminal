@@ -32,11 +32,12 @@ export function avatarPixels(rows: number): 48 | 96 {
 }
 
 type Pixels = { rgba: Uint8Array; width: number; height: number }
-// Decoded JPEGs by owned image key; null = not decodable.
-const decoded = new Map<string, Pixels | null>()
+// Decoded JPEGs by blob; null = not decodable. Keyed on the bytes, not the
+// image key, so a refetched photo under the same key decodes afresh.
+let decoded = new WeakMap<Buffer, Pixels | null>()
 
-function decodeJpeg(key: string, data: Buffer): Pixels | null {
-  if (decoded.has(key)) return decoded.get(key)!
+function decodeJpeg(data: Buffer): Pixels | null {
+  if (decoded.has(data)) return decoded.get(data)!
   let pixels: Pixels | null = null
   try {
     const img = decode(data, { useTArray: true, formatAsRGBA: true, maxResolutionInMP: 4 })
@@ -44,7 +45,7 @@ function decodeJpeg(key: string, data: Buffer): Pixels | null {
   } catch {
     pixels = null
   }
-  decoded.set(key, pixels)
+  decoded.set(data, pixels)
   return pixels
 }
 
@@ -52,9 +53,9 @@ function decodeJpeg(key: string, data: Buffer): Pixels | null {
 // corner (badge) or a solid strip down the left edge, like old Lync (bar).
 export type PresenceStamp = { rgb: [number, number, number]; style: 'badge' | 'bar' }
 
-// Stamped copies by stamped key, so a repaint doesn't redraw them.
-// ponytail: unbounded, one small entry per (picture, presence color) seen.
-const stampedPixels = new Map<string, Pixels>()
+// Stamped copies per source picture and stamp, so a repaint doesn't redraw
+// them; they go when the source picture does.
+let stampedPixels = new WeakMap<Pixels, Map<string, Pixels>>()
 
 function withStamp(
   key: string,
@@ -62,11 +63,14 @@ function withStamp(
   stamp: PresenceStamp | undefined,
 ): { key: string; pixels: Pixels } {
   if (!stamp) return { key, pixels }
-  const stampedKey = `${key}|${stamp.style}:${stamp.rgb.join(',')}`
-  let out = stampedPixels.get(stampedKey)
+  const stampKey = `${stamp.style}:${stamp.rgb.join(',')}`
+  const stampedKey = `${key}|${stampKey}`
+  let byStamp = stampedPixels.get(pixels)
+  if (!byStamp) stampedPixels.set(pixels, (byStamp = new Map()))
+  let out = byStamp.get(stampKey)
   if (!out) {
     out = stampPresence(pixels, stamp)
-    stampedPixels.set(stampedKey, out)
+    byStamp.set(stampKey, out)
   }
   return { key: stampedKey, pixels: out }
 }
@@ -108,7 +112,7 @@ export function avatarEscape(
   const format = detectImageFormat(data)
   if (format === 'png') return buildKittyImageEscape(ownedKey, data, placement)
   if (format !== 'jpeg') return ''
-  const pixels = decodeJpeg(ownedKey, data)
+  const pixels = decodeJpeg(data)
   if (!pixels) return ''
   const s = withStamp(ownedKey, pixels, stamp)
   return buildKittyRawEscape(s.key, s.pixels, placement)
@@ -299,7 +303,7 @@ export function iconEscape(key: string, rows: number, stamp?: PresenceStamp): st
 }
 
 export function __resetAvatarDecodeCacheForTests(): void {
-  decoded.clear()
+  decoded = new WeakMap()
   icons.clear()
-  stampedPixels.clear()
+  stampedPixels = new WeakMap()
 }

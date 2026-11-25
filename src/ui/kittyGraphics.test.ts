@@ -267,6 +267,13 @@ describe('transmit once, place many', () => {
     expect(second.length * 1000).toBeLessThan(first.length)
   })
 
+  it('a refetched blob under the same key is sent again, not placed stale', () => {
+    const placement = { rows: 6, reservedRows: 6 }
+    buildKittyImageEscape('key-a', png(400, 400, 64), placement)
+    // Same key, new bytes (cache emptied, photo changed): transmit again.
+    expect(buildKittyImageEscape('key-a', png(400, 400, 64), placement)).toContain('a=T')
+  })
+
   it('gives each blob its own stable id', () => {
     expect(kittyImageId('a')).toBe(kittyImageId('a'))
     expect(kittyImageId('a')).not.toBe(kittyImageId('b'))

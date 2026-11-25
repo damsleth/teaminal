@@ -35,13 +35,19 @@ test('sizes map to rows, and columns follow the cell aspect', () => {
 })
 
 test('a JPEG photo is sent as raw RGBA into an exact cell box, then placed by id', () => {
-  const first = avatarEscape('acct\u0000photo:user:u1:48', jpeg(8, 8), 2)
+  const photo = jpeg(8, 8) // the in-memory image cache hands out one Buffer per blob
+  const first = avatarEscape('acct\u0000photo:user:u1:48', photo, 2)
   expect(first.startsWith('\x1b_Ga=T,f=32,s=8,v=8,')).toBe(true)
   expect(first).toContain('c=4,r=2')
-  const again = avatarEscape('acct\u0000photo:user:u1:48', jpeg(8, 8), 2)
+  const again = avatarEscape('acct\u0000photo:user:u1:48', photo, 2)
   expect(again).toBe(
     `\x1b_Ga=p,i=${kittyImageId('acct\u0000photo:user:u1:48')},c=4,r=2,C=1,z=17042,q=2\x1b\\`,
   )
+})
+
+test('a refetched photo under the same key is decoded and sent again', () => {
+  avatarEscape('acct\u0000photo:user:u2:48', jpeg(8, 8), 2)
+  expect(avatarEscape('acct\u0000photo:user:u2:48', jpeg(8, 8), 2)).toContain('a=T')
 })
 
 test('undecodable data paints nothing', () => {

@@ -594,6 +594,46 @@ describe('chat routing modes', () => {
     expect(graphCalled).toBe(false)
   })
 
+  test('chatsvc chat history pages older through its backward link', async () => {
+    primeAuth()
+    setAudiencePreference('ic3', { fallback: false })
+    __setRegionForTests(undefined, 'emea')
+    let graphCalled = false
+    __setTransportForTests(async () => {
+      graphCalled = true
+      return jsonResponse({ value: [] })
+    })
+    setFederationTransport(async () =>
+      jsonResponse({ tokens: { skypeToken: 'skype-test', expiresIn: 3600 } }),
+    )
+    const older =
+      'https://teams.microsoft.com/api/chatsvc/emea/v1/users/ME/conversations/x/messages?syncState=old'
+    const urls: string[] = []
+    setChatsvcTransport(async (url) => {
+      urls.push(url)
+      const first = urls.length === 1
+      return jsonResponse({
+        messages: [
+          {
+            id: first ? '2' : '1',
+            messagetype: 'Text',
+            originalarrivaltime: '2026-04-29T09:00:00Z',
+            content: 'a',
+          },
+        ],
+        _metadata: first ? { backwardLink: older } : {},
+      })
+    })
+
+    const page = await listMessagesPage(testClient(), '19:aaaa_bbbb@unq.gbl.spaces')
+    expect(page.nextLink).toBe(older)
+    const next = await listMessagesNextPage(testClient(), page.nextLink!)
+    expect(urls[1]).toBe(older)
+    expect(next.messages.map((m) => m.id)).toEqual(['1'])
+    expect(next.nextLink).toBeUndefined()
+    expect(graphCalled).toBe(false)
+  })
+
   test('graph-only surfaces the 401 instead of falling back to chatsvc', async () => {
     primeAuth()
     setAudiencePreference('graph', { fallback: false })

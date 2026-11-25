@@ -32,6 +32,12 @@ adheres to [Semantic Versioning](https://semver.org/).
   start a second load racing on the paging cursor.
 - Switching accounts quickly, or quitting while an account starts, no longer
   installs an obsolete session or leaves its pollers running.
+- Chats read through the Teams chat service (Conditional Access fallback or
+  `ic3` routing) can load older history again.
+- A thread whose saved cache was trimmed can page back through older replies
+  instead of stopping at the cached ones.
+- After emptying the cache or a profile photo change, pictures show the new
+  image instead of the terminal's stale copy.
 
 ## [0.25.1] - 2026-10-30
 

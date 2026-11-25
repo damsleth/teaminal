@@ -17,7 +17,11 @@
 import type { AccountStore } from '../accountStore'
 import { listMessagesNextPage, listMessagesPage } from '../../graph/chats'
 import type { GraphClient } from '../../graph/client'
-import { listChannelMessagesNextPage, listChannelMessagesPage } from '../../graph/teams'
+import {
+  listChannelMessagesNextPage,
+  listChannelMessagesPage,
+  listChannelRepliesPage,
+} from '../../graph/teams'
 import {
   cacheMessagesFromLegacy,
   emptyMessageCache,
@@ -111,6 +115,11 @@ export async function loadOlderMessages(deps: LoadOlderDeps): Promise<LoadOlderM
       // to older history. A channel with a single page comes back without a
       // link and is marked fully loaded below.
       page = await listChannelMessagesPage(client, focus.teamId, focus.channelId, { signal })
+    } else if (focus.kind === 'thread') {
+      // Same recovery for a thread: restart from its newest page.
+      page = await listChannelRepliesPage(client, focus.teamId, focus.channelId, focus.rootId, {
+        signal,
+      })
     } else {
       page = { messages: [] }
     }

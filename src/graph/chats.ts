@@ -11,7 +11,11 @@
 import { owaProfile, type AccountId, type AccountRef } from '../account'
 import { decodeJwtClaims, getToken } from '../auth/owaPiggy'
 import { GraphError, type GraphClient } from './client'
-import { listChatMessagesViaChatsvc, sendChannelMessageViaChatsvc } from './teamsChatsvc'
+import {
+  listChannelMessagesViaChatsvcNextPage,
+  listChatMessagesViaChatsvc,
+  sendChannelMessageViaChatsvc,
+} from './teamsChatsvc'
 import { createOneOnOneThreadViaChatsvc } from './teamsFederation'
 import { recordEvent } from '../log'
 import { teamsMessageBody } from '../text/html'
@@ -272,9 +276,8 @@ export async function listMessagesPage(
   }
 }
 
-// chatsvc returns the most-recent page; older-page paging via chatsvc's
-// backwardLink isn't wired through MessagesPage yet (nextLink is a Graph
-// URL). Returning no nextLink simply means "no older page" for now.
+// chatsvc returns the most-recent page; its backwardLink rides in nextLink,
+// and listMessagesNextPage sends a non-Graph link back through chatsvc.
 async function chatsvcMessagesPage(
   client: GraphClient,
   chatId: string,
@@ -285,7 +288,7 @@ async function chatsvcMessagesPage(
     ...(opts?.signal ? { signal: opts.signal } : {}),
     ...(opts?.top ? { pageSize: opts.top } : {}),
   })
-  return { messages: page.messages }
+  return { messages: page.messages, nextLink: page.backwardLink }
 }
 
 export async function listMessagesNextPage(
@@ -293,6 +296,13 @@ export async function listMessagesNextPage(
   nextLink: string,
   opts?: { signal?: AbortSignal },
 ): Promise<MessagesPage> {
+  if (new URL(nextLink, 'https://graph.microsoft.com').hostname !== 'graph.microsoft.com') {
+    const page = await listChannelMessagesViaChatsvcNextPage(nextLink, {
+      account: client.ctx.account,
+      ...(opts?.signal ? { signal: opts.signal } : {}),
+    })
+    return { messages: page.messages, nextLink: page.backwardLink }
+  }
   const res = await client.graph<CollectionResponse<ChatMessage>>({
     method: 'GET',
     path: nextLink,

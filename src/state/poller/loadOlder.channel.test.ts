@@ -14,6 +14,10 @@ mock.module('../../graph/teams', () => ({
     return firstPage
   },
   listChannelMessagesNextPage: async () => ({ messages: [] }),
+  listChannelRepliesPage: async () => {
+    firstPageCalls++
+    return firstPage
+  },
 }))
 const { loadOlderMessages } = await import('./loadOlder')
 
@@ -24,11 +28,13 @@ const msg = (id: string): ChatMessage => ({
   body: { contentType: 'text', content: id },
 })
 
-async function run(): Promise<{ fullyLoaded: boolean; nextLink?: string }> {
+async function run(thread = false): Promise<{ fullyLoaded: boolean; nextLink?: string }> {
   const store = createAppStore(accountRef('test'))
-  const conv: ConvKey = 'channel:t1:ch1'
+  const conv: ConvKey = thread ? 'thread:t1:ch1:r1' : 'channel:t1:ch1'
   store.set({
-    focus: { kind: 'channel', teamId: 't1', channelId: 'ch1' },
+    focus: thread
+      ? { kind: 'thread', teamId: 't1', channelId: 'ch1', rootId: 'r1' }
+      : { kind: 'channel', teamId: 't1', channelId: 'ch1' },
     messageCacheByConvo: {
       [conv]: { messages: [msg('m1')], loadingOlder: false, fullyLoaded: false },
     },
@@ -53,4 +59,11 @@ test('a channel without a cursor refetches its first page to recover one', async
 test('a single-page channel is fully loaded after that fetch', async () => {
   firstPage = { messages: [msg('m1')] }
   expect((await run()).fullyLoaded).toBe(true)
+})
+
+test('a thread without a cursor refetches its newest page instead of ending its history', async () => {
+  firstPageCalls = 0
+  firstPage = { messages: [msg('m1'), msg('m0')], nextLink: 'https://chatsvc/thread-next' }
+  expect(await run(true)).toEqual({ fullyLoaded: false, nextLink: 'https://chatsvc/thread-next' })
+  expect(firstPageCalls).toBe(1)
 })

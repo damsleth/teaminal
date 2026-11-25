@@ -211,7 +211,10 @@ export function fitKittyPlacement(
 const KITTY_ID_BASE = 1_704_200
 let nextKittyId = KITTY_ID_BASE
 const idByCacheKey = new Map<string, number>()
-const transmitted = new Set<number>()
+// The source object each id was last transmitted from. A blob refetched
+// under the same key (cache emptied, photo changed) is a new object, so it is
+// sent again instead of placing the terminal's stale copy.
+const transmitted = new Map<number, object>()
 
 // Stable terminal-side id for a cached blob, assigned on first use.
 export function kittyImageId(cacheKey: string): number {
@@ -238,9 +241,9 @@ export function buildKittyImageEscape(
   placement: KittyPlacement,
 ): string {
   const id = kittyImageId(cacheKey)
-  if (transmitted.has(id)) return buildKittyPlaceById(id, placement)
+  if (transmitted.get(id) === png) return buildKittyPlaceById(id, placement)
   const apc = buildKittyAPC(png, placement, id)
-  if (apc) transmitted.add(id)
+  if (apc) transmitted.set(id, png)
   return apc
 }
 
@@ -294,9 +297,9 @@ export function buildKittyRawEscape(
   placement: KittyPlacement,
 ): string {
   const id = kittyImageId(cacheKey)
-  if (transmitted.has(id)) return buildKittyPlaceById(id, placement)
+  if (transmitted.get(id) === pixels) return buildKittyPlaceById(id, placement)
   const apc = buildKittyRawAPC(pixels.rgba, pixels.width, pixels.height, placement, id)
-  if (apc) transmitted.add(id)
+  if (apc) transmitted.set(id, pixels)
   return apc
 }
 
