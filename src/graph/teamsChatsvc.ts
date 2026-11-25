@@ -266,12 +266,15 @@ export function skypeToChannelMessage(raw: SkypeMessage): ChatMessage {
       ? raw.rootMessageId
       : undefined
   const parentRaw = raw.properties?.parentmessageid
+  // A server-stamped root (rootMessageId === id) is a root whatever
+  // parentmessageid says: Teams shows it top-level (teaminal <=0.25.2 posted
+  // "replies" that way).
   const replyToId =
-    typeof parentRaw === 'string' && parentRaw.length > 0 && parentRaw !== raw.id
-      ? parentRaw
-      : rootRaw && rootRaw !== raw.id
-        ? rootRaw
-        : undefined
+    rootRaw === raw.id
+      ? undefined
+      : typeof parentRaw === 'string' && parentRaw.length > 0 && parentRaw !== raw.id
+        ? parentRaw
+        : rootRaw
   const sequenceId =
     typeof raw.sequenceId === 'number' && Number.isFinite(raw.sequenceId)
       ? raw.sequenceId
@@ -519,9 +522,13 @@ export async function sendChannelMessageViaChatsvc(
   const cmid = opts.clientMessageId ?? newClientMessageId()
   return withSkypeAuth(async () => {
     const r = await region(opts)
-    const url = `${TEAMS_ORIGIN}/api/chatsvc/${r}/v1/users/ME/conversations/${encodeURIComponent(
-      threadId,
-    )}/messages`
+    // A reply goes to the thread's `;messageid=` sub-conversation, like the
+    // Teams web client. `parentmessageid` alone is ignored by the server (live,
+    // 2026-11-25: the post landed as a new root), so it is only a hint.
+    const conv = opts.replyToId
+      ? `${encodeURIComponent(threadId)};messageid=${encodeURIComponent(opts.replyToId)}`
+      : encodeURIComponent(threadId)
+    const url = `${TEAMS_ORIGIN}/api/chatsvc/${r}/v1/users/ME/conversations/${conv}/messages`
     const outgoing = teamsMessageBody(content)
     const body: Record<string, unknown> = {
       content: outgoing.content,

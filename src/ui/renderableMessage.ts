@@ -24,7 +24,9 @@ export function isRenderableMessage(m: ChatMessage): boolean {
   if (m.messageType === 'systemEventMessage') {
     return describeSystemEvent(m) !== null
   }
-  if (effectiveSenderName(m) === null) return false
+  // A known author with no display name (chatsvc rows without imdisplayname)
+  // is still a real message, not a system row.
+  if (effectiveSenderName(m) === null && !m.from?.user?.id) return false
   if (extractInlineImages(m).length > 0) return true
   const hasBody =
     typeof m.body?.content === 'string' && m.body.content.replace(/<[^>]+>/g, '').trim().length > 0

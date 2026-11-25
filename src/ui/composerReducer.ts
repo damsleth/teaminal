@@ -70,7 +70,9 @@ export function reduce(state: ComposerBuffer, action: ComposerAction): ComposerB
   const { text, cursor } = state
   switch (action.kind) {
     case 'insert': {
-      const chars = action.chars
+      // Pastes and keys that arrive in one chunk carry CR line breaks; a CR
+      // in the buffer would draw over the box instead of starting a line.
+      const chars = action.chars.replace(/\r\n?/g, '\n')
       if (!chars) return state
       return {
         text: text.slice(0, cursor) + chars + text.slice(cursor),

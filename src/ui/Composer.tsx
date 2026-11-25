@@ -134,7 +134,17 @@ export function composerHeaderRows(
 
 // `rows` is the inner height the pane gives the composer; the text scrolls
 // inside whatever is left after the header rows, so nothing ever overflows.
-export function Composer({ columns = 80, rows = 6 }: { columns?: number; rows?: number }) {
+export function Composer({
+  columns = 80,
+  rows = 6,
+  onLines,
+}: {
+  columns?: number
+  rows?: number
+  // Reports the wrapped line count of what's in the box (draft or edit), so
+  // the pane can grow and shrink with it.
+  onLines?: (lines: number) => void
+}) {
   const store = useAppStore()
   const session = useSessionApi()
   const { isRawModeSupported } = useStdin()
@@ -440,6 +450,10 @@ export function Composer({ columns = 80, rows = 6 }: { columns?: number; rows?: 
       setSending(false)
     }
   }
+
+  const lineCount =
+    focus.kind === 'list' ? 1 : wrapComposer(buf.text, columns - COMPOSER_TEXT_CHROME).length
+  useEffect(() => onLines?.(lineCount), [lineCount, onLines])
 
   if (focus.kind === 'list') {
     return (

@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import type { ChatMessage } from '../types'
-import { getQuotedReply, messagesForTimelineNavigation } from './renderableMessage'
+import {
+  getQuotedReply,
+  isRenderableMessage,
+  messagesForTimelineNavigation,
+} from './renderableMessage'
 
 function msg(id: string, createdDateTime = '2026-05-05T10:00:00Z'): ChatMessage {
   return {
@@ -148,4 +152,15 @@ describe('getQuotedReply', () => {
     })
     expect(getQuotedReply(m)?.preview).toBe('hi bold stuff')
   })
+})
+
+test('a message with an author id but no display name still renders', () => {
+  expect(
+    isRenderableMessage({
+      id: 'm1',
+      createdDateTime: '2026-01-01T00:00:00Z',
+      body: { contentType: 'text', content: 'hello' },
+      from: { user: { id: 'u1' } },
+    }),
+  ).toBe(true)
 })

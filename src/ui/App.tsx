@@ -70,7 +70,6 @@ import { handleFilterKeys } from './keybinds/filterKeys'
 import { handleListKeys } from './keybinds/listKeys'
 import { handleMessageSearchKeys } from './keybinds/messageSearchKeys'
 import { handleResizeKeys } from './keybinds/resizeKeys'
-import { COMPOSER_TEXT_CHROME, wrapComposer } from './composerWrap'
 import { computeLayout } from './layout'
 import { readMessagePageState, type LoadMoreState } from './messageRows'
 import { messagesForTimelineNavigation } from './renderableMessage'
@@ -214,14 +213,10 @@ export function App() {
   }, [focus, me?.id, chats])
 
   // Compute dynamic layout dimensions from terminal size + settings.
-  // Only the open draft's wrapped line count: typing re-renders App (and both
-  // panes) only when the composer grows or shrinks a line.
+  // The composer reports its wrapped line count (draft or edit text); App
+  // re-renders only when it changes.
+  const [draftLines, setDraftLines] = useState(1)
   const editingMessageId = useAppState((s) => s.editingMessageId)
-  const draftLines = useAppState((s) => {
-    const conv = focusKey(s.focus)
-    const draft = conv ? (s.draftsByConvo[conv] ?? '') : ''
-    return wrapComposer(draft, terminalCols - COMPOSER_TEXT_CHROME).length
-  })
   const layout = computeLayout({
     cols: terminalCols,
     rows: terminalRows,
@@ -686,7 +681,11 @@ export function App() {
       </Box>
       {showTailPanels && <TailPanels />}
       <Box {...paneBorder('composer')} height={resolvedComposerHeight}>
-        <Composer columns={terminalCols} rows={resolvedComposerHeight - 2} />
+        <Composer
+          columns={terminalCols}
+          rows={resolvedComposerHeight - 2}
+          onLines={setDraftLines}
+        />
       </Box>
       {statusBarPosition === 'bottom' && <StatusBar />}
     </Box>

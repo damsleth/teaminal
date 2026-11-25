@@ -136,3 +136,10 @@ describe('composer reducer', () => {
     })
   })
 })
+
+test('CR and CRLF line breaks insert as newlines', () => {
+  expect(reduce({ text: '', cursor: 0 }, { kind: 'insert', chars: 'a\rb\r\nc' })).toEqual({
+    text: 'a\nb\nc',
+    cursor: 5,
+  })
+})

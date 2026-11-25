@@ -8,8 +8,17 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- The composer grows to fit the reply quote and edit banner, so the text no
-  longer runs over the bottom border when replying in a thread.
+- Replies sent from a thread view went out as new top-level channel posts.
+  They now land in the thread.
+- Channel messages sent from teaminal vanished from teaminal's own view once
+  sent. Sends now carry the sender's name, and a message with a known author
+  but no name still shows.
+- A post Teams shows top-level is top-level in teaminal too, even when it
+  carries a reply hint (as the misrouted replies above do).
+- The composer grows to fit the reply quote, the edit banner and multi-line
+  edits, so text no longer runs over the bottom border.
+- Line breaks in pasted or fast-typed text start a new line instead of
+  drawing over the composer box.
 
 ## [0.25.2] - 2026-11-25
 

@@ -461,9 +461,14 @@ describe('thread reply send', () => {
     )
     __setRegionForTests('test', 'emea')
     let wireCmid: unknown
+    let wireName: unknown
+    let wireUrl = ''
     let rowCmid: string | undefined
-    setChatsvcTransport(async (_url, init) => {
-      wireCmid = (JSON.parse(String(init.body)) as Record<string, unknown>).clientmessageid
+    setChatsvcTransport(async (url, init) => {
+      wireUrl = url
+      const body = JSON.parse(String(init.body)) as Record<string, unknown>
+      wireCmid = body.clientmessageid
+      wireName = body.imdisplayname
       rowCmid = store.get().messagesByConvo['thread:t1:ch1:root1']?.at(-1)?.clientMessageId
       return new Response(JSON.stringify({ id: 'reply-1', OriginalArrivalTime: Date.now() }), {
         status: 201,
@@ -477,7 +482,7 @@ describe('thread reply send', () => {
       body: { contentType: 'text', content: 'root' },
     }
     const channelConv = 'channel:t1:ch1'
-    store.set({ messagesByConvo: { [channelConv]: [root] } })
+    store.set({ me: me as never, messagesByConvo: { [channelConv]: [root] } })
     const focus = { kind: 'thread', teamId: 't1', channelId: 'ch1', rootId: 'root1' } as const
     expect(focusKey(focus)).toBe('thread:t1:ch1:root1')
     expect(await sendMessage(testClient(), accountStore(store), focus, 'hi')).toEqual({ ok: true })
@@ -488,6 +493,11 @@ describe('thread reply send', () => {
       ['root1', undefined],
       ['reply-1', 'root1'],
     ])
+    // Live 2026-11-25: posted to the channel itself, the server made it a new
+    // root, and with no author on the row it vanished from the view.
+    expect(wireUrl).toContain(';messageid=root1/messages')
+    expect(wireName).toBe('Me')
+    expect(stream.at(-1)?.from?.user?.id).toBe('me-1')
   })
 })
 

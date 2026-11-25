@@ -189,6 +189,17 @@ describe('skypeToChannelMessage', () => {
     expect(out.replyToId).toBe('2')
     expect(out.rootMessageId).toBe('1')
   })
+
+  test('a server-stamped root stays a root even with a parentmessageid', () => {
+    const out = skypeToChannelMessage({
+      id: '3',
+      rootMessageId: '3',
+      messagetype: 'Text',
+      content: 'posted to the channel with a parent hint',
+      properties: { parentmessageid: '1' },
+    })
+    expect(out.replyToId).toBeUndefined()
+  })
 })
 
 describe('listChannelMessagesViaChatsvc', () => {
@@ -476,10 +487,11 @@ describe('sendChannelMessageViaChatsvc', () => {
     expect(sent.from?.user?.id).toBe('22222222-2222-2222-2222-222222222222')
   })
 
-  test('encodes a reply via properties.parentmessageid and returns replyToId', async () => {
+  test("posts a reply into the root's ;messageid= sub-conversation and returns replyToId", async () => {
     primeAuth()
-    const captured: { body?: Record<string, unknown> } = {}
-    __setTransportForTests(async (_url, init) => {
+    const captured: { url?: string; body?: Record<string, unknown> } = {}
+    __setTransportForTests(async (url, init) => {
+      captured.url = url
       captured.body = JSON.parse(String(init.body)) as Record<string, unknown>
       return new Response('{}', {
         status: 201,
@@ -497,6 +509,7 @@ describe('sendChannelMessageViaChatsvc', () => {
       clientMessageId: '4242',
     })
 
+    expect(captured.url).toContain('/conversations/19%3Aabc%40thread.tacv2;messageid=100/messages')
     expect(captured.body?.properties).toEqual({ parentmessageid: '100' })
     expect(sent.replyToId).toBe('100')
     expect(sent.id).toBe('200')

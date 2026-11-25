@@ -28,7 +28,10 @@ afterEach(() => {
 
 const tick = (ms = 40) => new Promise((r) => setTimeout(r, ms))
 
-function mount(initial: Parameters<ReturnType<typeof createAppStore>['set']>[0]) {
+function mount(
+  initial: Parameters<ReturnType<typeof createAppStore>['set']>[0],
+  props: Parameters<typeof Composer>[0] = {},
+) {
   const exp = Math.floor(Date.now() / 1000) + 3600
   const jwt = `${Buffer.from('{"alg":"none"}').toString('base64url')}.${Buffer.from(
     JSON.stringify({ exp, oid: 'me' }),
@@ -66,7 +69,7 @@ function mount(initial: Parameters<ReturnType<typeof createAppStore>['set']>[0])
             createGraphClient({ account: accountRef(null), audience: 'graph', fallback: false }),
         }}
       >
-        <Composer />
+        <Composer {...props} />
       </SessionProvider>
     </StoreProvider>,
     { stdin, stdout, debug: true, exitOnCtrlC: false, patchConsole: false },
@@ -282,5 +285,37 @@ test('mounting on a conversation with a saved draft keeps the draft', async () =
   })
   await tick()
   expect(store.get().draftsByConvo['chat:c1']).toBe('half-written')
+  app.unmount()
+})
+
+test('an edit reports its own line count, so the pane grows for edit text too', async () => {
+  const counts: number[] = []
+  const { store, stdin, app } = mount(
+    {
+      me: { id: 'me', displayName: 'Me' } as never,
+      focus: { kind: 'chat', chatId: 'a' },
+      inputZone: 'composer',
+      messagesByConvo: {
+        'chat:a': [
+          {
+            id: 'm1',
+            createdDateTime: '2026-01-01T00:00:00Z',
+            messageType: 'message',
+            body: { contentType: 'text', content: 'original' },
+            from: { user: { id: 'me', displayName: 'Me' } },
+          },
+        ],
+      },
+    },
+    { onLines: (n) => counts.push(n) },
+  )
+  await tick()
+  store.set({ editingMessageId: 'm1', inputZone: 'composer' })
+  await tick()
+  // One chunk, as a paste or fast typing arrives: its CRs become newlines.
+  stdin.write(' x\rtwo\rthree')
+  await tick()
+  expect(counts.at(-1)).toBe(3)
+  expect(store.get().draftsByConvo['chat:a']).toBeUndefined()
   app.unmount()
 })

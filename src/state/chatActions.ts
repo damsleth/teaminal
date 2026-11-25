@@ -182,7 +182,13 @@ export async function sendMessage(
       draftsByConvo: drafts,
     }
   })
-  const opts = { clientMessageId }
+  // chatsvc echoes no author: without these the sent row (and every later
+  // read of it) has no sender and isn't rendered.
+  const opts = {
+    clientMessageId,
+    fromUserId: me?.id || undefined,
+    imdisplayname: me?.displayName ?? undefined,
+  }
   try {
     const sent =
       focus.kind === 'chat'

@@ -152,6 +152,9 @@ export function paginateChannelMessages(
 export type SendChannelMessageOpts = {
   signal?: AbortSignal
   clientMessageId?: string
+  // Sender stamped on the wire and on the returned row; chatsvc echoes no author.
+  fromUserId?: string
+  imdisplayname?: string
 }
 
 export async function sendChannelMessage(
@@ -167,6 +170,8 @@ export async function sendChannelMessage(
     account: client.ctx.account,
     signal: opts?.signal,
     clientMessageId: opts?.clientMessageId,
+    fromUserId: opts?.fromUserId,
+    imdisplayname: opts?.imdisplayname,
   })
 }
 
@@ -249,5 +254,7 @@ export async function postChannelReply(
     replyToId: rootId,
     signal: opts?.signal,
     clientMessageId: opts?.clientMessageId,
+    fromUserId: opts?.fromUserId,
+    imdisplayname: opts?.imdisplayname,
   })
 }
