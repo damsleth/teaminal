@@ -21,6 +21,10 @@ export type NotifyMentionInput = {
   preview: string
   // 'chat' or 'channel-name'.
   scope: string
+  // The account the mention belongs to: coalescing is per (account, conv).
+  account?: { id: string; label: string }
+  // More than one account runs: the title names the account.
+  labelled?: boolean
 }
 
 export type NotifyContext = Pick<QuietContext, 'state' | 'now' | 'terminalFocused'>
@@ -57,12 +61,17 @@ export function notifyMention(input: NotifyMentionInput, ctx: NotifyContext): vo
   })
   if (decision !== 'normal') return
 
-  const title = input.scope.startsWith('channel:')
-    ? `teaminal \u00b7 #${input.scope.slice('channel:'.length)}`
-    : `teaminal \u00b7 ${input.scope}`
+  const scope = input.scope.startsWith('channel:')
+    ? `#${input.scope.slice('channel:'.length)}`
+    : input.scope
+  const title =
+    input.labelled && input.account
+      ? `teaminal \u00b7 ${input.account.label} \u00b7 ${scope}`
+      : `teaminal \u00b7 ${scope}`
   getCoalescer().enqueue(
     {
-      conv: input.conv,
+      // Same conv id in two accounts: two coalesce windows.
+      conv: input.account ? `${input.account.id}|${input.conv}` : input.conv,
       title,
       body: `${input.senderName}: ${input.preview}`,
       senderName: input.senderName,

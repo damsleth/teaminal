@@ -343,6 +343,32 @@ describe('concurrent sessions', () => {
     expect(JSON.stringify(s)).not.toContain('alice')
   }, 10_000)
 
+  test("B's refresh token expiring mid-session stops B only; A keeps polling", async () => {
+    const { store, m, wake } = await startConcurrent()
+    const bobSlice = () => store.get().backgroundAccounts[bob.id]!
+    await waitFor(() => store.get().conn === 'online' && bobSlice().conn === 'online')
+    // bob's owa-piggy refresh token hits its hard expiry.
+    resetAuth()
+    setAuthRunner(async (args) => {
+      const i = args.indexOf('--profile')
+      const profile = i >= 0 ? args[i + 1] : 'default'
+      if (profile === 'bob') {
+        return { stdout: '', stderr: 'AADSTS700082: The refresh token has expired', exitCode: 1 }
+      }
+      return { stdout: makeJwt({ exp: FAR_FUTURE, oid: `${profile}-id` }), stderr: '', exitCode: 0 }
+    })
+    wake('bob')
+    await waitFor(() => bobSlice().conn === 'authError')
+    expect(m.running().map((r) => r.label)).toEqual(['alice'])
+    // bob is in the background: no modal over alice.
+    expect(store.get().modal).toBeNull()
+    expect(store.get().conn).toBe('online')
+    const mark = requests.length
+    wake('alice')
+    await waitFor(() => listPolls(mark, 'alice-id') > 0)
+    expect(store.get().conn).toBe('online')
+  })
+
   test("A's 401 leaves B's conn, latch and poller alone", async () => {
     const { store, m, wake } = await startConcurrent()
     const bobSlice = () => store.get().backgroundAccounts[bob.id]!

@@ -664,7 +664,13 @@ describe('AccountManager (concurrent)', () => {
     // gamma starts although beta's bootstrap never settled.
     await waitFor(() => held.requested.includes('gamma'))
     held.pending.gamma!.release()
-    await waitFor(() => m.running().map((r) => r.label).join() === 'alpha,gamma')
+    await waitFor(
+      () =>
+        m
+          .running()
+          .map((r) => r.label)
+          .join() === 'alpha,gamma',
+    )
     // beta's bootstrap lands late with a stop that never returns: the
     // discarded session's teardown is bounded, so the switch settles.
     held.pending.beta!.release()
@@ -685,13 +691,107 @@ describe('AccountManager (concurrent)', () => {
     await m.start(() => {})
     expect(held.requested).toEqual(['alpha', 'beta'])
     held.pending.beta!.release()
-    await waitFor(() => m.running().map((r) => r.label).join() === 'beta')
+    await waitFor(
+      () =>
+        m
+          .running()
+          .map((r) => r.label)
+          .join() === 'beta',
+    )
     // alpha's start keeps running and lands later.
     held.pending.alpha!.release()
     await waitFor(() => m.running().length === 2)
-    expect(m.pollerHandleRef.current).toBe(
-      held.sessions.find((s) => s.profile === 'alpha')!.poller,
+    expect(m.pollerHandleRef.current).toBe(held.sessions.find((s) => s.profile === 'alpha')!.poller)
+    await m.stopAll()
+  })
+
+  test('a refresh-token expiry mid-session stops only that account; swapping to it shows why', async () => {
+    nonSeeded()
+    const sessions: FakeSession[] = []
+    const { drivers, start: startDriver } = driverRecorder()
+    const store = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => {
+        const s = fakeSession(opts)
+        sessions.push(s)
+        return s
+      },
+      startDriver,
+      true,
     )
+    await m.start(() => {})
+    await waitFor(() => m.running().length === 2)
+    const session = (p: string) => sessions.filter((s) => s.profile === p).at(-1)!
+    expect(session('alpha').opts.labelled?.()).toBe(true)
+
+    // Every loop reports the same expiry; it is handled once.
+    const expired = new Error('AADSTS700082: The refresh token has expired')
+    session('beta').opts.onAuthExpired!(expired)
+    session('beta').opts.onAuthExpired!(expired)
+    const beta = () => store.get().backgroundAccounts[accountRef('beta').id]
+    await waitFor(() => beta()?.conn === 'authError')
+    expect(session('beta').stopped).toBe(true)
+    expect(session('alpha').stopped).toBe(false)
+    expect(store.get().conn).not.toBe('authError')
+    expect(store.get().modal).toBeNull() // beta is in the background
+    expect(m.running().map((r) => r.label)).toEqual(['alpha'])
+    expect(session('alpha').opts.labelled?.()).toBe(false)
+    expect(drivers.filter((d) => !d.ops.includes('stop')).map((d) => d.account)).toEqual(['alpha'])
+
+    // Swapping to it surfaces the expiry instead of an empty pane.
+    m.setForeground('beta')
+    expect(store.get().modal).toMatchObject({ kind: 'auth-expired', profile: 'beta' })
+    expect((store.get().modal as { message: string }).message).toContain('AADSTS700082')
+    // A healthy account opens no modal.
+    m.setForeground('alpha')
+    expect(store.get().modal).toBeNull()
+
+    // retry brings it back.
+    await m.retry('beta')
+    expect(m.running().map((r) => r.label)).toEqual(['alpha', 'beta'])
+    await m.stopAll()
+  })
+
+  test('every account in authError: nothing exits, retry recovers one', async () => {
+    nonSeeded()
+    const held = heldSessions()
+    const store = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(store, 'alpha', held.start, noDriver, true)
+    const starting = m.start(() => {})
+    await tick()
+    held.pending.alpha!.fail(new Error('AADSTS700082: expired'))
+    await starting
+    await waitFor(() => held.requested.includes('beta'))
+    held.pending.beta!.fail(new Error('AADSTS700082: expired'))
+    await waitFor(() => store.get().backgroundAccounts[accountRef('beta').id]?.conn === 'authError')
+    expect(store.get().conn).toBe('authError')
+    expect(store.get().modal?.kind).toBe('auth-expired')
+    expect(m.running()).toEqual([])
+    const retrying = m.retry('beta')
+    await tick()
+    held.pending.beta!.release()
+    await retrying
+    expect(m.running().map((r) => r.label)).toEqual(['beta'])
+    await m.stopAll()
+  })
+
+  test('single mode passes no concurrent-only session callbacks', async () => {
+    nonSeeded()
+    const opts: RunSessionOpts[] = []
+    const m = createAccountManager(
+      createAppStore(),
+      'alpha',
+      async (o) => {
+        opts.push(o)
+        return fakeSession(o)
+      },
+      noDriver,
+    )
+    await m.start(() => {})
+    expect(opts[0]!.onAuthExpired).toBeUndefined()
+    expect(opts[0]!.labelled).toBeUndefined()
     await m.stopAll()
   })
 

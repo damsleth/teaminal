@@ -117,6 +117,9 @@ type Slot = {
   attempt: number
   // Concurrent mode: the pending start; resolves to its failure or null.
   starting: Promise<Error | null> | null
+  // Concurrent mode: why the last start (or the running session) failed;
+  // shown again when the account is swapped to the foreground.
+  failure: string | null
   hydrated: boolean
   // Resolved when the slot is removed, so a wait on its start (the
   // background queue) is released even if that start hangs.
@@ -259,6 +262,7 @@ export function createAccountManager(
       driver: null,
       attempt: 0,
       starting: null,
+      failure: null,
       hydrated: false,
       removed,
       remove,
@@ -283,6 +287,8 @@ export function createAccountManager(
     return i < 0 ? Number.MAX_SAFE_INTEGER : i
   }
   const isUp = (slot: Slot): boolean => (seeded ? slot.attempt > 0 : slot.session !== null)
+  const runningSlots = (): Slot[] =>
+    [...slots.values()].filter(isUp).sort((a, b) => order(a) - order(b))
   const syncPollerRef = (): void => {
     pollerHandleRef.current = foregroundSlot()?.session?.poller ?? null
   }
@@ -378,13 +384,19 @@ export function createAccountManager(
     slot: Slot,
     wanted: () => boolean,
     onFatal: RunSessionOpts['onFatal'],
+    onAuthExpired?: RunSessionOpts['onAuthExpired'],
   ): Box<void> {
     const driver = startForceDriverImpl(slot.acc)
     slot.driver = driver
     const done = (async () => {
       let session: SessionHandle
       try {
-        session = await startSessionImpl({ account: slot.acc, profile: slot.profile, onFatal })
+        session = await startSessionImpl({
+          account: slot.acc,
+          profile: slot.profile,
+          onFatal,
+          ...(concurrent ? { onAuthExpired, labelled: () => runningSlots().length > 1 } : {}),
+        })
       } catch (err) {
         driver.stop()
         if (slot.driver === driver) slot.driver = null
@@ -407,9 +419,17 @@ export function createAccountManager(
 
   // ---- concurrent mode --------------------------------------------------
 
-  // A start failure stays in its slot (product contract 6): refresh-token
-  // expiry or an unauthorized /me -> authError (the foreground also gets the
-  // auth-expired modal), anything else -> offline. Nothing exits.
+  function showAuthExpired(slot: Slot, message: string): void {
+    store.set({
+      modal: { kind: 'auth-expired', profile: slot.profile, message, status: 'idle' },
+      inputZone: 'menu',
+    })
+  }
+
+  // A failure stays in its slot (product contract 6): refresh-token expiry
+  // (at start or mid-session) or an unauthorized /me -> authError (the
+  // foreground also gets the auth-expired modal), any other start error ->
+  // offline. The session stops, the slot stays. Nothing exits.
   async function failSlot(
     slot: Slot,
     wanted: () => boolean,
@@ -417,21 +437,14 @@ export function createAccountManager(
     auth: boolean,
   ): Promise<Error | null> {
     if (stopped || !wanted()) return null
-    warn(`session ${slot.ref.label}: start failed:`, err.message)
+    warn(`session ${slot.ref.label}: ${slot.session ? 'stopped' : 'start failed'}:`, err.message)
+    // Stop first, then set conn: a loop's own error handling writes conn
+    // right after reporting the error.
     await stopSlot(slot)
     if (!wanted()) return null
+    slot.failure = err.message
     slot.acc.set({ conn: auth ? 'authError' : 'offline' })
-    if (auth && slot.acc.isForeground()) {
-      store.set({
-        modal: {
-          kind: 'auth-expired',
-          profile: slot.profile,
-          message: err.message,
-          status: 'idle',
-        },
-        inputZone: 'menu',
-      })
-    }
+    if (auth && slot.acc.isForeground()) showAuthExpired(slot, err.message)
     return err
   }
 
@@ -447,12 +460,29 @@ export function createAccountManager(
     if (persistCaches && !slot.hydrated) hydrate(slot.acc, slot.profile)
     slot.hydrated = true
     slot.acc.set({ conn: 'connecting' })
+    slot.failure = null
+    // Set once: by onFatal during bootstrap, or by the first refresh-token
+    // expiry a loop reports. Before the session is installed the settle
+    // below fails the slot; after that the expiry does it directly.
     let fatal: string | null = null
-    const { done } = startSession(slot, wanted, (_kind, msg) => {
-      fatal = msg
-    })
+    let installed = false
+    const { done } = startSession(
+      slot,
+      wanted,
+      (_kind, msg) => {
+        fatal ??= msg
+      },
+      (err) => {
+        if (fatal !== null) return
+        fatal = err.message
+        if (installed) void failSlot(slot, wanted, err, true)
+      },
+    )
     const settled = done.then(
-      () => (fatal === null ? null : failSlot(slot, wanted, new Error(fatal), true)),
+      () => {
+        installed = true
+        return fatal === null ? null : failSlot(slot, wanted, new Error(fatal), true)
+      },
       (err: unknown) => {
         const e = err instanceof Error ? err : new Error(String(err))
         return failSlot(slot, wanted, e, isRefreshExpiredError(e.message))
@@ -492,10 +522,21 @@ export function createAccountManager(
     void drain()
   }
 
+  // An account that failed for auth and is not starting again shows its
+  // auth-expired modal when it comes to the front.
   function toForeground(slot: Slot): void {
     setForeground(store, slot.ref.id)
     activeProfile = slot.profile
     syncPollerRef()
+    if (
+      concurrent &&
+      !isUp(slot) &&
+      !slot.starting &&
+      slot.failure !== null &&
+      slot.acc.get().conn === 'authError'
+    ) {
+      showAuthExpired(slot, slot.failure)
+    }
   }
 
   async function removeSlot(slot: Slot): Promise<void> {
@@ -538,11 +579,7 @@ export function createAccountManager(
       return slot.session?.client() ?? fallbackClient(slot.profile)
     },
     retryRealtime: () => foregroundSlot()?.session?.transport?.retry(),
-    running: () =>
-      [...slots.values()]
-        .filter(isUp)
-        .sort((a, b) => order(a) - order(b))
-        .map((s) => s.ref),
+    running: () => runningSlots().map((s) => s.ref),
 
     async start(onFatal) {
       if (concurrent) {

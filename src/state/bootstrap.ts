@@ -11,7 +11,7 @@
 // the session and decides which session's poller the UI sees.
 
 import { accountRef, type AccountRef } from '../account'
-import { getToken } from '../auth/owaPiggy'
+import { getToken, isRefreshExpiredError } from '../auth/owaPiggy'
 import { probeCapabilities } from '../graph/capabilities'
 import { createGraphClient, type GraphClient } from '../graph/client'
 import { resetChatMessageTransport } from '../graph/chats'
@@ -62,6 +62,12 @@ export type RunSessionOpts = {
    * after this callback are not retried.
    */
   onFatal: (kind: 'unauthorized', message: string) => void
+  // Concurrent mode: a loop reported a refresh-token expiry. The caller
+  // stops the session and keeps the account's slot (conn authError).
+  onAuthExpired?: (err: Error) => void
+  // Concurrent mode: true while more than one account runs, so
+  // notifications name the account.
+  labelled?: () => boolean
 }
 
 async function hydrateActivityFeed(store: AccountStore, isStale: () => boolean): Promise<void> {
@@ -148,7 +154,10 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
     pollerHandle = startPoller({
       store,
       getClient: client,
-      onError: (loop, err) => warn(`poller[${loop}]:`, err.message),
+      onError: (loop, err) => {
+        warn(`poller[${store.ref.label}:${loop}]:`, err.message)
+        if (opts.onAuthExpired && isRefreshExpiredError(err.message)) opts.onAuthExpired(err)
+      },
       onMention: (event) => {
         const sender = event.message.from?.user?.displayName ?? 'someone'
         const raw = event.message.body.content ?? ''
@@ -180,7 +189,14 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
           })
         }
         notifyMention(
-          { conv: event.conv, senderName: sender, preview: preview.slice(0, 120), scope },
+          {
+            conv: event.conv,
+            senderName: sender,
+            preview: preview.slice(0, 120),
+            scope,
+            account: { id: store.ref.id, label: store.ref.label },
+            labelled: opts.labelled?.() ?? false,
+          },
           {
             now: new Date(),
             terminalFocused: s.terminalFocused !== false,
