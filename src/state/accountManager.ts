@@ -427,11 +427,28 @@ export function createAccountManager(
       slot.session = session
       syncPollerRef()
       drainTimer ??= setInterval(() => drainNotifications(), 1000)
+      if (concurrent) warnSameIdentity(slot)
     })()
     return { done }
   }
 
   // ---- concurrent mode --------------------------------------------------
+
+  // Two aliases for one identity stay two accounts, never merged, but every
+  // message then notifies twice: say so once per pair, aliases only.
+  const warnedPairs = new Set<string>()
+  function warnSameIdentity(slot: Slot): void {
+    const me = slot.acc.get().me?.id
+    if (!me) return
+    for (const other of runningSlots()) {
+      if (other === slot || other.acc.get().me?.id !== me) continue
+      const [a, b] = [slot, other].sort((x, y) => order(x) - order(y)).map((x) => x.ref)
+      const key = `${a!.id}\n${b!.id}`
+      if (warnedPairs.has(key)) continue
+      warnedPairs.add(key)
+      warn(`accounts ${a!.label} and ${b!.label} sign in as the same user: both run, each notifies`)
+    }
+  }
 
   function showAuthExpired(slot: Slot, message: string): void {
     store.set({

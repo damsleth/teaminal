@@ -3,8 +3,9 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { accountRef } from '../account'
+import { subscribeEvents } from '../log'
 import { createAccountManager, managerTimings } from './accountManager'
-import type { AccountStore } from './accountStore'
+import { accountStoreFor, type AccountStore } from './accountStore'
 import type { RunSessionOpts, SessionHandle } from './bootstrap'
 import type { ForceAvailabilityHandle } from './forceAvailability'
 import type { PollerHandle } from './poller'
@@ -1018,6 +1019,81 @@ describe('AccountManager (concurrent)', () => {
     expect(store.get().chats.find((c) => c.topic)?.topic).toBe(alphaTopic!.toUpperCase())
     expect(starts).toBe(0)
     await m.stopAll()
+  })
+  test('two aliases of the same user: one warning per pair, naming both', async () => {
+    nonSeeded()
+    const sessions: FakeSession[] = []
+    const store = concurrentStore(['alpha', 'beta', 'gamma'])
+    const users: Record<string, string> = { alpha: 'u-1', beta: 'u-1', gamma: 'u-2' }
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => {
+        opts.account.set({ me: { id: users[opts.profile!]!, displayName: 'Alice' } as never })
+        const s = fakeSession(opts)
+        sessions.push(s)
+        return s
+      },
+      noDriver,
+      true,
+    )
+    const warnings: string[] = []
+    const unsubscribe = subscribeEvents((e) => {
+      if (e.level === 'warn' && e.message.includes('same user')) warnings.push(e.message)
+    })
+    await m.start(() => {})
+    await waitFor(() => m.running().length === 3)
+    expect(warnings).toEqual([
+      'accounts alpha and beta sign in as the same user: both run, each notifies',
+    ])
+    // A restart of one of them does not warn again.
+    accountStoreFor(store, accountRef('beta')).set({ conn: 'offline' })
+    await m.retry('beta')
+    expect(warnings).toHaveLength(1)
+    unsubscribe()
+
+    // r in the diagnostics overview retries the selected account's push.
+    m.retryRealtime(accountRef('gamma').id)
+    expect(sessions.find((x) => x.profile === 'gamma')!.retries).toBe(1)
+    expect(sessions.find((x) => x.profile === 'alpha')!.retries).toBe(0)
+    await m.stopAll()
+  })
+})
+
+describe('mode toggle', () => {
+  test('single mode reads the per-profile cache files concurrent mode wrote (nothing to migrate)', async () => {
+    nonSeeded()
+    const cache = (text: string) =>
+      emptyMessageCache([
+        {
+          id: 'm1',
+          createdDateTime: '2026-01-01T00:00:00Z',
+          body: { contentType: 'text', content: text },
+        },
+      ])
+    const concurrentRun = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(
+      concurrentRun,
+      'alpha',
+      async (o) => fakeSession(o),
+      noDriver,
+      true,
+    )
+    accountStoreFor(concurrentRun, accountRef('alpha')).set({
+      messageCacheByConvo: { 'chat:c1': cache('from alpha') },
+    })
+    accountStoreFor(concurrentRun, accountRef('beta')).set({
+      messageCacheByConvo: { 'chat:c1': cache('from beta') },
+    })
+    await m.stopAll()
+
+    // Flag off (or --profile): one account, hydrated from the same files.
+    for (const p of ['alpha', 'beta']) {
+      const store = createAppStore()
+      const single = createAccountManager(store, p, async (o) => fakeSession(o), noDriver)
+      expect(store.get().messagesByConvo['chat:c1']?.[0]?.body.content).toBe(`from ${p}`)
+      await single.stopAll()
+    }
   })
 })
 
