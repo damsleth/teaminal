@@ -6,49 +6,72 @@
 //
 // The hook fires on focus changes; the poller's list loop also has a
 // background hydration pass for chats currently visible in the list.
+// A failed hydrate is retried after a delay, a bounded number of times.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSessionApi } from '../SessionContext'
 import { GraphError } from '../../graph/client'
 import { warn } from '../../log'
+import { accountStore } from '../../state/accountStore'
 import { hydrateChat } from '../../state/chatActions'
 import type { Focus, Store, AppState } from '../../state/store'
 
-export function useHydrateMembers(focus: Focus, store: Store<AppState>): void {
+const MAX_ATTEMPTS = 3
+
+type Attempt = { ok: boolean; inFlight: boolean; attempts: number; retryAt: number }
+
+export function useHydrateMembers(focus: Focus, store: Store<AppState>, retryMs = 30_000): void {
   const session = useSessionApi()
-  // hydrated tracks chat ids we've already issued a getChat call for, so
-  // a Tab-into-composer-and-back doesn't re-fetch.
-  const [hydrated, setHydrated] = useState<Set<string>>(new Set())
+  // Per account + chat, so another account's chat with the same id is not
+  // skipped, and a ref so recording an attempt does not re-run the effect.
+  const attempts = useRef(new Map<string, Attempt>())
+  // Bumped when a retry is due, to re-run the effect.
+  const [retryTick, setRetryTick] = useState(0)
 
   useEffect(() => {
     if (focus.kind !== 'chat') return
     const chatId = focus.chatId
-    if (hydrated.has(chatId)) return
+    const key = `${store.get().account?.id ?? ''}\0${chatId}`
+    const entry = attempts.current.get(key) ?? {
+      ok: false,
+      inFlight: false,
+      attempts: 0,
+      retryAt: 0,
+    }
+    attempts.current.set(key, entry)
+    if (entry.ok || entry.inFlight || entry.attempts >= MAX_ATTEMPTS) return
     const existing = store.get().chats.find((c) => c.id === chatId)
     if (existing?.members && existing.members.length > 0) {
-      setHydrated((s) => new Set(s).add(chatId))
+      entry.ok = true
       return
     }
-    let cancelled = false
-    ;(async () => {
-      try {
-        const full = await hydrateChat(session.client(), chatId)
-        if (cancelled) return
-        store.set((s) => ({
+    const wait = entry.retryAt - Date.now()
+    if (wait > 0) {
+      const timer = setTimeout(() => setRetryTick((t) => t + 1), wait)
+      return () => clearTimeout(timer)
+    }
+    // Writes are dropped once the store moved to another account.
+    const target = accountStore(store)
+    entry.inFlight = true
+    let retry: ReturnType<typeof setTimeout> | undefined
+    hydrateChat(session.client(), chatId)
+      .then((full) => {
+        entry.ok = true
+        target.set((s) => ({
           chats: s.chats.map((c) => (c.id === chatId ? { ...c, members: full.members } : c)),
         }))
-        setHydrated((s) => new Set(s).add(chatId))
-      } catch (err) {
-        if (cancelled) return
-        if (err instanceof GraphError) {
-          warn(`hydrate members ${chatId}:`, err.message)
-        } else {
-          warn(`hydrate members ${chatId}:`, String(err))
+      })
+      .catch((err) => {
+        warn(`hydrate members ${chatId}:`, err instanceof GraphError ? err.message : String(err))
+        entry.attempts++
+        entry.retryAt = Date.now() + retryMs
+        if (entry.attempts < MAX_ATTEMPTS) {
+          retry = setTimeout(() => setRetryTick((t) => t + 1), retryMs)
         }
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [focus, hydrated, store])
+      })
+      .finally(() => {
+        entry.inFlight = false
+      })
+    return () => clearTimeout(retry)
+  }, [focus, store, retryMs, retryTick, session])
 }
