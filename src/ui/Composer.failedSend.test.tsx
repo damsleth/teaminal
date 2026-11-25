@@ -62,6 +62,7 @@ function mount(initial: Parameters<ReturnType<typeof createAppStore>['set']>[0])
         api={{
           getActiveProfile: () => null,
           switchAccount: async () => {},
+          retryRealtime: () => {},
           client: () =>
             createGraphClient({ account: accountRef(null), audience: 'graph', fallback: false }),
         }}

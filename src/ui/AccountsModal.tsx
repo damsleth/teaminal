@@ -165,10 +165,10 @@ export function AccountsModal() {
         const next = nextChatRouting(routingForAccount(settings, profile))
         const chatRoutingByAccount = { ...settings.chatRoutingByAccount, [profile]: next }
         void persist({ chatRoutingByAccount }).then(() => {
-          // If we just changed the active account's routing, apply the
-          // derived audience/fallback to the graph client immediately.
+          // The session client reads the new mode on its next call; also
+          // clear the active account's chatsvc latch taken under the old one.
           if (profile === session.getActiveProfile()) {
-            applyChatRouting(session.client().ctx.account, next)
+            applyChatRouting(session.client().ctx.account)
           }
         })
         return

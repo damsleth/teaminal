@@ -14,6 +14,7 @@ import { StoreProvider } from './StoreContext'
 const session: SessionApi = {
   getActiveProfile: () => null,
   switchAccount: async () => {},
+  retryRealtime: () => {},
   client: () =>
     createGraphClient({ account: accountRef(null), audience: 'graph', fallback: false }),
 }

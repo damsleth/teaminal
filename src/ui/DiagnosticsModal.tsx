@@ -22,7 +22,6 @@ import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
 import { accessTokenClaims } from '../state/authActions'
 import type { CapabilityResult } from '../graph/capabilities'
-import { getActiveTransport } from '../realtime/transport'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useSessionApi } from './SessionContext'
 
@@ -105,7 +104,7 @@ export function DiagnosticsModal() {
       if (ch === 'r') {
         // Manual realtime push retry — useful when the dot has been red
         // for a while because trouter exhausted its automatic retries.
-        getActiveTransport()?.retry()
+        session.retryRealtime()
       }
     },
     { isActive: isOpen },

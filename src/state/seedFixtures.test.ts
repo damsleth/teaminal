@@ -1,13 +1,15 @@
 import { describe, expect, test } from 'bun:test'
+import { accountRef } from '../account'
+import { accountStore } from './accountStore'
 import { applySeededState, BETA_PROFILE } from './seedFixtures'
 import { createAppStore } from './store'
 
 describe('collision fixtures', () => {
   test('beta reuses every alpha id with different text', () => {
-    const alpha = createAppStore()
-    const beta = createAppStore()
-    applySeededState(alpha, 'alpha')
-    applySeededState(beta, BETA_PROFILE)
+    const alpha = createAppStore(accountRef('alpha'))
+    const beta = createAppStore(accountRef(BETA_PROFILE))
+    applySeededState(accountStore(alpha), 'alpha')
+    applySeededState(accountStore(beta), BETA_PROFILE)
     const a = alpha.get()
     const b = beta.get()
     expect(b.me?.id).toBe(a.me?.id)

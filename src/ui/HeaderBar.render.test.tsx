@@ -10,6 +10,7 @@ import { createGraphClient } from '../graph/client'
 const session: SessionApi = {
   getActiveProfile: () => null,
   switchAccount: async () => {},
+  retryRealtime: () => {},
   client: () =>
     createGraphClient({ account: accountRef(null), audience: 'graph', fallback: false }),
 }

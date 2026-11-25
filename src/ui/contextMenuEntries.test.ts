@@ -1,11 +1,13 @@
 import { expect, test } from 'bun:test'
+import { accountRef } from '../account'
+import { accountStore } from '../state/accountStore'
 import { applySeededState } from '../state/seedFixtures'
 import { createAppStore } from '../state/store'
 import { contextMenuEntries } from './contextMenuEntries'
 
 function seeded() {
-  const store = createAppStore()
-  applySeededState(store)
+  const store = createAppStore(accountRef(null))
+  applySeededState(accountStore(store))
   return store
 }
 

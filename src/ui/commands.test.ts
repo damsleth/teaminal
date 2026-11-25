@@ -1,4 +1,6 @@
 import { expect, test } from 'bun:test'
+import { accountRef } from '../account'
+import { accountStore } from '../state/accountStore'
 import { applySeededState } from '../state/seedFixtures'
 import { createAppStore } from '../state/store'
 import { buildCommands, filterCommands, fuzzyScore, type CommandRunners } from './commands'
@@ -6,8 +8,8 @@ import { fitCells } from './CommandPalette'
 import type { MenuItem } from './menu'
 
 function setup() {
-  const store = createAppStore()
-  applySeededState(store)
+  const store = createAppStore(accountRef(null))
+  applySeededState(accountStore(store))
   const ran: string[] = []
   const runners: CommandRunners = {
     runMenuItem: (item: MenuItem, path: string[]) =>

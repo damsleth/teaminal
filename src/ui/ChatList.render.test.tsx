@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { renderToString } from 'ink'
+import { accountStore } from '../state/accountStore'
 import { applySeededState } from '../state/seedFixtures'
 import { createAppStore } from '../state/store'
 import { ChatList } from './ChatList'
@@ -11,13 +12,14 @@ import { createGraphClient } from '../graph/client'
 const session: SessionApi = {
   getActiveProfile: () => null,
   switchAccount: async () => {},
+  retryRealtime: () => {},
   client: () =>
     createGraphClient({ account: accountRef(null), audience: 'graph', fallback: false }),
 }
 
 function render(theme: 'light' | 'dark', cursor: number): string[] {
-  const store = createAppStore()
-  applySeededState(store)
+  const store = createAppStore(accountRef(null))
+  applySeededState(accountStore(store))
   const s = store.get()
   store.set({
     settings: {
@@ -58,8 +60,8 @@ test('thumbnails: a picture column on chat rows, rows at least as tall as the pi
   process.env.KITTY_WINDOW_ID = '1'
   try {
     const renderList = (chatListThumbnails: string, chatListPresenceStyle = 'dot') => {
-      const store = createAppStore()
-      applySeededState(store)
+      const store = createAppStore(accountRef(null))
+      applySeededState(accountStore(store))
       store.set({
         settings: {
           ...store.get().settings,
@@ -102,8 +104,8 @@ test('thumbnails: a picture column on chat rows, rows at least as tall as the pi
 })
 
 test('chatListPreviewText colors the previews of read chats', () => {
-  const store = createAppStore()
-  applySeededState(store)
+  const store = createAppStore(accountRef(null))
+  applySeededState(accountStore(store))
   store.set({
     settings: { ...store.get().settings, themeOverrides: { chatListPreviewText: '#ff0000' } },
     unreadByChatId: {},
@@ -124,8 +126,8 @@ test('chatListPreviewText colors the previews of read chats', () => {
 
 test('the selected row is colored as a whole and can be framed', () => {
   const renderList = (overrides: object) => {
-    const store = createAppStore()
-    applySeededState(store)
+    const store = createAppStore(accountRef(null))
+    applySeededState(accountStore(store))
     store.set({
       settings: { ...store.get().settings, themeOverrides: overrides } as never,
       cursor: 0,

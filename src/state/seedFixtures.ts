@@ -11,7 +11,8 @@
 import type { Me } from '../graph/me'
 import type { Capabilities } from '../graph/capabilities'
 import type { Chat, ChatMessage } from '../types'
-import { emptyMessageCache, messagesFromCaches, type AppState, type Store } from './store'
+import type { AccountStore } from './accountStore'
+import { emptyMessageCache, messagesFromCaches, type AppState } from './store'
 
 // ---------------------------------------------------------------------------
 // Fixed identity
@@ -228,7 +229,7 @@ function betaVariant<T>(value: T): T {
  * as fully online so the UI renders the full chat chrome. No Graph calls
  * are made; no owa-piggy auth is required.
  */
-export function applySeededState(store: Store<AppState>, profile?: string | null): void {
+export function applySeededState(acc: AccountStore, profile?: string | null): void {
   const beta = profile === BETA_PROFILE
   const pick = <T>(v: T): T => (beta ? betaVariant(v) : v)
   const messageCacheByConvo: AppState['messageCacheByConvo'] = {}
@@ -236,7 +237,7 @@ export function applySeededState(store: Store<AppState>, profile?: string | null
     messageCacheByConvo[key] = emptyMessageCache(pick(msgs))
   }
 
-  store.set({
+  acc.set({
     me: pick(SEED_ME),
     capabilities: SEED_CAPABILITIES,
     chats: pick(SEED_CHATS),

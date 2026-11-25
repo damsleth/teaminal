@@ -31,19 +31,6 @@ export interface RealtimeTransport {
   retry(): void
 }
 
-// Module-level handle to the currently-active transport so UI surfaces
-// (diagnostics modal) can trigger a manual reconnect without threading
-// a ref all the way down from runSession.
-let activeTransport: RealtimeTransport | null = null
-
-export function setActiveTransport(transport: RealtimeTransport | null): void {
-  activeTransport = transport
-}
-
-export function getActiveTransport(): RealtimeTransport | null {
-  return activeTransport
-}
-
 export type TransportOpts = {
   bus: RealtimeEventBus
   /** Function that returns a fresh Skype/Spaces access token. */

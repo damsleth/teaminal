@@ -56,6 +56,7 @@ test('a failed member hydrate is retried after a delay', async () => {
     getActiveProfile: () => 'test',
     client: () => createGraphClient(currentAccountContext()),
     switchAccount: async () => {},
+    retryRealtime: () => {},
   }
   const stdout = Object.assign(new PassThrough(), { columns: 80, rows: 24 })
   const ink = render(
