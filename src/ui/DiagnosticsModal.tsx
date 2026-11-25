@@ -60,6 +60,8 @@ export function DiagnosticsModal() {
   const { exit } = useApp()
   const store = useAppStore()
   const session = useSessionApi()
+  // App mounts this only while Diagnostics is open, so following the whole
+  // state costs nothing on the typing path.
   const state = useAppState((s) => s)
   const theme = useTheme()
   const isOpen = state.modal?.kind === 'diagnostics'

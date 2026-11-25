@@ -611,6 +611,7 @@ describe('bound clients', () => {
         return jsonResponse({}, { status: 429, headers: { 'Retry-After': '0' } })
       return jsonResponse({ ok: path })
     })
+    __setSleepForTests(async () => {})
     // Same audience on purpose: only the profile separates their tokens.
     const a = createGraphClient({ account: accountRef('a'), audience: 'graph', fallback: false })
     const b = createGraphClient({ account: accountRef('b'), audience: 'graph', fallback: false })
