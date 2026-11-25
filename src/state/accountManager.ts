@@ -9,6 +9,7 @@
 import { accountRef } from '../account'
 import { createGraphClient, type GraphClient } from '../graph/client'
 import { debug, warn } from '../log'
+import { openAccount } from './accountStore'
 import { runSession, type RunSessionOpts, type SessionHandle } from './bootstrap'
 import {
   flushListCache,
@@ -75,7 +76,7 @@ export function createAccountManager(
   // a newer transition began is obsolete: it is stopped, never installed.
   let transition = 0
 
-  store.set({ account: accountRef(activeProfile) })
+  openAccount(store, accountRef(activeProfile), { foreground: true })
 
   // Hydrate the per-profile caches so the sidebar and message pane show
   // history before the first poll. Failure is silent: the poller refills.

@@ -6,7 +6,7 @@
 // careful inside listeners not to call `set` again unconditionally
 // (would recurse).
 
-import type { AccountRef } from '../account'
+import type { AccountId, AccountRef } from '../account'
 import type { Capabilities } from '../graph/capabilities'
 import type { Me } from '../graph/me'
 import type { ForceAvailabilityValue as PresenceChoice } from '../graph/teamsPresence'
@@ -865,13 +865,23 @@ export type ReadReceipt = {
   seenAt: number
 }
 
+// List-pane UI an account gets back when it returns to the foreground.
+export type AccountUi = { focus: Focus; cursor: number; cursorKey: string | null }
+
 export type AppState = {
-  // The account whose data the per-account fields below hold, and a counter
-  // bumped by every resetAccountScopedState. One account per store until the
-  // store splits into accountsById (Phase D.2); accountStore() captures both
-  // so a write from a previous incarnation is dropped.
+  // The foreground account: the one whose data the flat per-account fields
+  // below hold. Other open accounts live in backgroundAccounts.
   account: AccountRef | null
+  // Monotonic counter every opened account slot draws its generation from.
   accountGeneration: number
+  // Open account slots (foreground included) -> their generation. An
+  // AccountStore handle is current while its slot keeps the generation it
+  // captured, so a closed or re-opened account drops late writes.
+  generationById: Record<AccountId, number>
+  // Account slices of the open accounts that are not in the foreground.
+  backgroundAccounts: Record<AccountId, AccountState>
+  // Saved focus / list cursor of accounts swapped out of the foreground.
+  uiByAccount: Record<AccountId, AccountUi>
   me?: Me
   capabilities?: Capabilities
   chats: Chat[]
@@ -1022,6 +1032,9 @@ export type AccountKey = (typeof ACCOUNT_KEYS)[number]
 export type GlobalKey =
   | 'account'
   | 'accountGeneration'
+  | 'generationById'
+  | 'backgroundAccounts'
+  | 'uiByAccount'
   // UI
   | 'focus'
   | 'inputZone'
@@ -1058,10 +1071,28 @@ export function initialAccountState(ref: AccountRef): AccountState {
   return out
 }
 
+// Every account key present, undefined included: a swap that spreads this
+// over the flat fields must clear an optional key (me, myPresence, ...) the
+// outgoing account had set.
+export function pickAccountSlice(s: AccountSlice): AccountSlice {
+  const out = {} as AccountSlice
+  for (const k of ACCOUNT_KEYS) (out as Record<string, unknown>)[k] = s[k]
+  return out
+}
+
+// Account `id`'s data: the flat fields when it is in the foreground, its
+// background slice otherwise, undefined when it is not open.
+export function accountSlice(s: AppState, id: AccountId): AccountSlice | undefined {
+  return s.account?.id === id ? s : s.backgroundAccounts[id]
+}
+
 export function initialAppState(): AppState {
   return {
     account: null,
     accountGeneration: 0,
+    generationById: {},
+    backgroundAccounts: {},
+    uiByAccount: {},
     chats: [],
     teams: [],
     channelsByTeam: {},
@@ -1100,7 +1131,9 @@ export function initialAppState(): AppState {
 }
 
 export function createAppStore(account: AccountRef | null = null): Store<AppState> {
-  return new Store<AppState>({ ...initialAppState(), account })
+  const generationById: Record<AccountId, number> = {}
+  if (account) generationById[account.id] = 0
+  return new Store<AppState>({ ...initialAppState(), account, generationById })
 }
 
 /**
@@ -1111,15 +1144,17 @@ export function createAppStore(account: AccountRef | null = null): Store<AppStat
  *
  * Used when switching the active owa-piggy profile: the new account
  * has its own me/chats/teams/messages and re-fetches them from scratch,
- * but the user's UI preferences should persist across the switch. Bumps
- * accountGeneration, so every accountStore() captured before the reset
- * goes stale.
+ * but the user's UI preferences should persist across the switch. Closes
+ * every open account slot and opens `account` as the only (foreground) one
+ * with a fresh generation, so every accountStore() captured before the reset
+ * goes stale. One replace, so subscribers see a single change.
  */
 export function resetAccountScopedState(store: Store<AppState>, account: AccountRef): void {
   const prev = store.get()
   const fresh = initialAppState()
   fresh.account = account
   fresh.accountGeneration = prev.accountGeneration + 1
+  fresh.generationById[account.id] = fresh.accountGeneration
   // Preserve UI preferences and hardware-level state.
   fresh.settings = prev.settings
   fresh.terminalFocused = prev.terminalFocused

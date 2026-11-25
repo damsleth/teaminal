@@ -88,7 +88,7 @@ export function enterKeyAction(
 export function composerOwner(s: AppState): string | null {
   const conv = focusKey(s.focus)
   if (!conv || !s.account) return null
-  return `${s.accountGeneration}\u0000${s.account.id}\u0000${conv}`
+  return `${s.generationById[s.account.id]}\u0000${s.account.id}\u0000${conv}`
 }
 
 // Where a failed send's text goes. Only ever the conversation it was typed
