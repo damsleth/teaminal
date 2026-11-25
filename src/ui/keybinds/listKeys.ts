@@ -211,8 +211,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
   // Directory search never spans tenants: the prompt searches the account
   // whose section the cursor is in, so that account comes to the front.
   if (ch === 'p') {
-    bringToFront(store, cursorAlias(ctx), ctx.toForeground)
-    openNewChatPrompt('')
+    if (bringToFront(store, cursorAlias(ctx), ctx.toForeground)) openNewChatPrompt('')
     return 'handled'
   }
 
@@ -229,8 +228,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
         : null
     const selectableCount = visible.length + (syntheticNewChatQuery ? 1 : 0)
     if (ch === 'n') {
-      bringToFront(store, cursorAlias(ctx), ctx.toForeground)
-      openNewChatPrompt(ctx.filter)
+      if (bringToFront(store, cursorAlias(ctx), ctx.toForeground)) openNewChatPrompt(ctx.filter)
       return 'handled'
     }
     // m toggles unread/read on the focused chat row. Channels and

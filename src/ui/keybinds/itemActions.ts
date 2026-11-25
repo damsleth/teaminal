@@ -97,17 +97,20 @@ export function openFocus(
   alias?: string,
   toForeground?: ToForeground,
 ): void {
-  bringToFront(store, alias, toForeground)
-  store.set({ focus, inputZone: 'list' })
+  if (bringToFront(store, alias, toForeground)) store.set({ focus, inputZone: 'list' })
 }
 
+// False when the swap put up the auth-expired modal (the account's sign-in
+// expired): the action stops there instead of running behind the modal.
 export function bringToFront(
   store: Store<AppState>,
   alias: string | undefined,
   toForeground: ToForeground | undefined,
-): void {
-  if (alias === undefined || !toForeground) return
-  if (store.get().account?.id !== accountRef(alias).id) toForeground(alias)
+): boolean {
+  if (alias === undefined || !toForeground) return true
+  if (store.get().account?.id === accountRef(alias).id) return true
+  toForeground(alias)
+  return store.get().modal?.kind !== 'auth-expired'
 }
 
 export function openChat(

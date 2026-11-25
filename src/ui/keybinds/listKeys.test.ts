@@ -532,6 +532,49 @@ describe('unified sidebar (M2 F.3)', () => {
     expect(more()).toBe(-1)
   })
 
+  test('a swap that shows auth-expired stops there: no focus, no prompt behind it', () => {
+    const u = unified()
+    // Like the manager: an account that failed for auth comes to the front
+    // with its auth-expired modal.
+    const press = (input: string, key: Partial<Key> = {}) => {
+      const s = u.store.get()
+      return handleListKeys(
+        { input, key: makeKey(key) },
+        {
+          store: u.store,
+          chats: s.chats,
+          teams: s.teams,
+          channelsByTeam: s.channelsByTeam,
+          settings: s.settings,
+          filter: s.filter,
+          expandedChatSections: s.expandedChatSections,
+          cursor: s.cursor,
+          cursorKey: s.cursorKey,
+          focus: s.focus,
+          exit: () => {},
+          refresh: () => {},
+          hardRefresh: () => {},
+          openNewChatPrompt: (q) => u.prompts.push(q ?? ''),
+          toForeground: (alias) => {
+            setForeground(u.store, accountRef(alias).id, { restoreUi: false })
+            u.store.set({
+              modal: { kind: 'auth-expired', profile: alias, message: 'expired', status: 'idle' },
+              inputZone: 'menu',
+            })
+          },
+        },
+      )
+    }
+    for (let i = 0; i < 4; i++) u.press('j')
+    press('', { return: true })
+    expect(u.store.get().focus).toEqual({ kind: 'list' })
+    expect(u.store.get()).toMatchObject({ modal: { kind: 'auth-expired' }, inputZone: 'menu' })
+    // Back on alpha, n on a beta row: the prompt does not open behind the modal.
+    setForeground(u.store, alphaId, { restoreUi: false })
+    press('n')
+    expect(u.prompts).toEqual([])
+  })
+
   test('n brings the account under the cursor to the front before the prompt', () => {
     const u = unified()
     for (let i = 0; i < 3; i++) u.press('j')

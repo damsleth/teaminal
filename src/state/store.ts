@@ -141,7 +141,8 @@ export type ModalState =
   | {
       kind: 'context-menu'
       target:
-        | { kind: 'chat'; chatId: string; label: string }
+        // alias: the row's account in the unified sidebar (absent = foreground).
+        | { kind: 'chat'; chatId: string; label: string; alias?: string }
         | { kind: 'message'; focus: FocusChat | FocusChannel; messageId: string }
       cursor: number
     }
