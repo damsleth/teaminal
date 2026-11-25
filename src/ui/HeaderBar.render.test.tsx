@@ -89,16 +89,12 @@ describe('background account badge', () => {
     ).replace(/\x1b\[[0-9;]*m/g, '')
   }
 
-  test('lists background accounts with something to say, in configured order', () => {
+  // Two or more open accounts are the unified sidebar (M2 F.3), whose account
+  // header rows carry these counts: the badge is not shown.
+  test('hidden in the unified sidebar', () => {
     const out = renderAccounts(140, true)
-    expect(out).toContain('beta 3 · gamma !')
-    // delta has nothing to say; the foreground's own unread is not in the badge.
-    expect(out).not.toContain('delta')
-    expect(out).not.toContain('alpha 5')
-  })
-
-  test('truncates to +N when narrow', () => {
-    expect(renderAccounts(60, true)).toContain('beta 3 · +1')
+    expect(out).not.toContain('beta 3')
+    expect(out).not.toContain('gamma !')
   })
 
   test('hidden with one account', () => {

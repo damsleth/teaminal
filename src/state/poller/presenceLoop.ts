@@ -12,6 +12,7 @@
 
 import type { AccountStore } from '../accountStore'
 import { owaProfile } from '../../account'
+import { collapsedInSidebar } from '../selectables'
 import type { GraphClient } from '../../graph/client'
 import { getMyPresence } from '../../graph/presence'
 import { getMyTeamsPresence, TeamsPresenceError } from '../../graph/teamsPresence'
@@ -108,7 +109,11 @@ export function makePresenceLoop(deps: PresenceLoopDeps): () => Promise<void> {
 
         // --- Other-user presence for the chat-list dot ---
         const stateAfterSelf = store.get()
-        const wantsMembers = stateAfterSelf.settings.showPresenceInList !== false
+        // A collapsed account in the unified sidebar shows no rows, so it
+        // fetches no member presence.
+        const wantsMembers =
+          stateAfterSelf.settings.showPresenceInList !== false &&
+          !collapsedInSidebar(stateAfterSelf, store.ref)
         if (wantsMembers && !signal.aborted) {
           const meId = stateAfterSelf.me?.id
           const oids: string[] = []

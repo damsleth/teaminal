@@ -5,7 +5,7 @@
 // open the new-chat prompt when the filter looks like a person name
 // nobody in the chat list matches), Esc to clear and exit.
 
-import { visibleList } from '../../state/selectables'
+import { unifiedListInput, visibleList } from '../../state/selectables'
 import type { AppState, Store } from '../../state/store'
 import type { Channel, Chat, Team } from '../../types'
 import type { Me } from '../../graph/me'
@@ -31,7 +31,12 @@ export function handleFilterKeys({ input, key }: RawKey, ctx: FilterKeysCtx): Ke
   if (key.return) {
     const trimmed = ctx.filter.trim()
     if (isNewChatQueryCandidate(trimmed)) {
-      const visible = visibleList({ ...ctx, filter: trimmed })
+      // Every open account's rows count in the unified sidebar: a name that
+      // matches only in another account is not a new chat.
+      const unified = unifiedListInput(store.get())
+      const visible = visibleList(
+        unified ? { ...unified, filter: trimmed } : { ...ctx, filter: trimmed },
+      )
       if (visible.length === 0) {
         ctx.openNewChatPrompt(trimmed)
         return 'handled'

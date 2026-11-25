@@ -18,6 +18,7 @@ import {
   ensureUserPhoto,
   getImageData,
   ownedImageKey,
+  splitOwnedImageKey,
   teamPhotoKey,
   userPhotoKey,
 } from '../state/imageCache'
@@ -38,13 +39,16 @@ import { requestKittyPaint, setKittyOwner } from './kittyPainter'
 import { initialsOf, PictureSlot } from './PictureSlot'
 import { useSessionApi } from './SessionContext'
 import {
+  cachedUnifiedListInput,
   chatLabel,
   cursorAt,
   resolveCursor,
   shortName,
   visibleList,
+  type AccountListSlice,
   type SelectableItem,
 } from '../state/selectables'
+import type { AccountId } from '../account'
 import type { Presence } from '../types'
 import wrapAnsi from 'wrap-ansi'
 import { htmlToText } from '../text/html'
@@ -134,7 +138,36 @@ function rowLabel(
       ? `${COLLAPSED_GLYPH} ${item.team.displayName}`
       : `${EXPANDED_GLYPH} ${item.team.displayName}`
   if (item.kind === 'more') return `… ${item.hidden} more`
+  if (item.kind === 'account')
+    return `${item.collapsed ? COLLAPSED_GLYPH : EXPANDED_GLYPH} ${item.label}`
   return `# ${item.label}`
+}
+
+// Unified sidebar account header: what follows the label. Counts (chats with
+// unread activity, unread mentions) come first so a narrow pane truncates the
+// tenant hint, not them.
+function accountHeaderParts(
+  item: Extract<SelectableItem, { kind: 'account' }>,
+  slice: AccountListSlice | undefined,
+): { counts: string; status: string; tenant: string } {
+  const counts =
+    (item.unread > 0 ? ` ${item.unread}` : '') + (item.mentions > 0 ? ` @${item.mentions}` : '')
+  const status =
+    item.conn === 'authError'
+      ? ' ! signed out'
+      : item.conn === 'offline'
+        ? ' ! offline'
+        : item.conn === 'rateLimited'
+          ? ' ! rate limited'
+          : item.conn === 'connecting'
+            ? ' …'
+            : slice?.realtimeState === 'error'
+              ? ' ! push'
+              : ''
+  const upn = slice?.me?.userPrincipalName
+  const at = upn ? upn.lastIndexOf('@') : -1
+  const tenant = upn && at >= 0 && at < upn.length - 1 ? ` · ${upn.slice(at + 1)}` : ''
+  return { counts, status, tenant }
 }
 
 export function isNewChatQueryCandidate(filter: string): boolean {
@@ -241,6 +274,11 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const accountId = useAppState((s) => s.account?.id)
   const modalOpen = useAppState((s) => s.modal != null)
   const session = useSessionApi()
+  // Unified sidebar (two or more accounts open): rows come from every
+  // account, each read from its own slice. Cached so the list is rebuilt
+  // only when one of its inputs changed.
+  const unifiedSelector = useMemo(cachedUnifiedListInput, [])
+  const unified = useAppState(unifiedSelector)
   const { stdout } = useStdout()
   const { waitUntilRenderFlush } = useApp()
   const [, setPictureRevision] = useState(0)
@@ -266,6 +304,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   // Build selectables from individual slices, memoized on exactly those
   // slices: a cursor move or an unrelated store change reuses the list.
   const items = useMemo(() => {
+    if (unified) return visibleList(unified)
     return visibleList({
       me,
       chats,
@@ -293,7 +332,27 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     chatListCollapsedSections,
     filter,
     expandedChatSections,
+    unified,
   ])
+  // Per-row data: a tagged row reads its own account's slice; an untagged
+  // one (single mode) the foreground fields.
+  const slicesById = useMemo(
+    () => new Map(unified?.accounts.map((a) => [a.accountId, a.slice]) ?? []),
+    [unified],
+  )
+  const sliceOf = (item: SelectableItem): AccountListSlice | undefined =>
+    item.accountId === undefined ? undefined : slicesById.get(item.accountId)
+  const rowData = (item: SelectableItem) => {
+    const slice = sliceOf(item)
+    return slice
+      ? {
+          meId: slice.me?.id,
+          nameByUserId: slice.nameByUserId,
+          unreadByChatId: slice.unreadByChatId,
+          memberPresence: slice.memberPresence,
+        }
+      : { meId: me?.id, nameByUserId, unreadByChatId, memberPresence }
+  }
   const syntheticNewChatQuery =
     filter && items.length === 0 && isNewChatQueryCandidate(filter) ? filter.trim() : null
 
@@ -339,7 +398,8 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
       return { kind: 'icon', id: icon, key: iconKey(icon, iconRgb) }
     }
     if (item.kind !== 'chat' || item.chat.chatType !== 'oneOnOne') return null
-    const other = (item.chat.members ?? []).find((m) => m.userId && m.userId !== me?.id)
+    const meId = rowData(item).meId
+    const other = (item.chat.members ?? []).find((m) => m.userId && m.userId !== meId)
     return other?.userId
       ? {
           kind: 'user',
@@ -363,16 +423,18 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
           return visualLines(`Create chat with "${row.query}"`, labelWidthFor)
         }
         const cw = labelWidthFor
-        const label = rowLabel(row.item, me?.id, shortNames, nameByUserId)
-        const unread = row.item.kind === 'chat' ? unreadByChatId[row.item.chat.id] : undefined
+        const data = rowData(row.item)
+        const label = rowLabel(row.item, data.meId, shortNames, data.nameByUserId)
+        const unread = row.item.kind === 'chat' ? data.unreadByChatId[row.item.chat.id] : undefined
         const hasMention = !!unread && unread.mentionCount > 0
         const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
         const unreadBadge = hasMention ? ' @' : hasUnread ? ' ●' : ''
-        // Team / section headers render truncated to one row.
-        if (row.item.kind === 'team' || row.item.kind === 'section') return 1
+        // Team / section / account headers render truncated to one row.
+        if (row.item.kind === 'team' || row.item.kind === 'section' || row.item.kind === 'account')
+          return 1
         let h = visualLines(label + unreadBadge, cw)
         if (row.item.kind === 'chat') {
-          const preview = previewLineForChat(row.item.chat, cw, previewLines, me?.id)
+          const preview = previewLineForChat(row.item.chat, cw, previewLines, data.meId)
           if (preview) h += preview.split('\n').length
         }
         if (hasPictureColumn(row.item)) h = Math.max(h, thumbRows)
@@ -391,6 +453,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
       thumbRows,
       rowFrame,
       chatListGap,
+      slicesById,
     ],
   )
 
@@ -415,10 +478,24 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   // Fetch pictures for the visible rows only (idempotent per key).
   useEffect(() => {
     if (thumbRows === 0) return
-    const client = session.client()
     const onChange = () => setPictureRevision((r) => r + 1)
+    // A tagged row's picture is fetched with its own account's client; a
+    // slot that closed meanwhile has none.
+    const clients = new Map<AccountId | undefined, ReturnType<typeof session.client> | null>()
+    const clientOf = (id: AccountId | undefined) => {
+      if (!clients.has(id)) {
+        try {
+          clients.set(id, id === undefined ? session.client() : session.clientFor(id))
+        } catch {
+          clients.set(id, null)
+        }
+      }
+      return clients.get(id)!
+    }
     for (const row of visible) {
       if (row.kind !== 'item') continue
+      const client = clientOf(row.item.accountId)
+      if (!client) continue
       const pic = pictureFor(row.item)
       if (pic?.kind === 'user')
         ensureUserPhoto(pic.id, avatarPixels(thumbRows), { client, onChange })
@@ -438,11 +515,13 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
       slots: pictureSlots.current,
       escape: (cacheKey, rows, fallbackKey, stamp) => {
         if (isGeneratedKey(cacheKey)) return iconEscape(cacheKey, rows, stamp)
-        const data = getImageData(accountId, cacheKey)
+        // Unified sidebar slots carry their owner in the key.
+        const owned = splitOwnedImageKey(cacheKey)
+        const owner = owned ? owned.account : accountId
+        const key = owned ? owned.key : cacheKey
+        const data = getImageData(owner, key)
         const photo =
-          data && accountId
-            ? avatarEscape(ownedImageKey(accountId, cacheKey), data, rows, stamp)
-            : ''
+          data && owner ? avatarEscape(ownedImageKey(owner, key), data, rows, stamp) : ''
         return photo || (fallbackKey ? iconEscape(fallbackKey, rows, stamp) : '')
       },
     })
@@ -521,6 +600,34 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         // Headers are bold at rest too, so the selected color alone can't
         // carry focus (ANSI blue/cyan vanish on some palettes): a focused
         // header also gets the same full-width background bar as chat rows.
+        if (row.item.kind === 'account') {
+          const isSelected = row.index === safeCursor
+          const hdrBg = isSelected ? (theme.selectedRowBackground ?? undefined) : undefined
+          const head = rowLabel(row.item)
+          const { counts, status, tenant } = accountHeaderParts(row.item, sliceOf(row.item))
+          const pad = hdrBg
+            ? ' '.repeat(
+                Math.max(0, previewContentWidth - (head + counts + status + tenant).length),
+              )
+            : ''
+          return (
+            <Box key={`acct-${row.index}`} flexDirection="row" flexShrink={0}>
+              <Text
+                bold={theme.emphasis.sectionHeadingBold}
+                color={isSelected ? theme.selected : undefined}
+                backgroundColor={hdrBg}
+                wrap="truncate-end"
+              >
+                {head}
+                {counts && <Text color={theme.unread}>{counts}</Text>}
+                {status && <Text color={theme.warnText}>{status}</Text>}
+                {tenant && <Text color={theme.mutedText}>{tenant}</Text>}
+                {pad}
+              </Text>
+            </Box>
+          )
+        }
+
         if (row.item.kind === 'team' || row.item.kind === 'section') {
           const isSelected = row.index === safeCursor
           const restColor = row.item.kind === 'team' ? theme.mutedText : undefined
@@ -545,7 +652,8 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         }
 
         const isSelected = row.index === safeCursor
-        const label = rowLabel(row.item, me?.id, shortNames, nameByUserId)
+        const data = rowData(row.item)
+        const label = rowLabel(row.item, data.meId, shortNames, data.nameByUserId)
         // Gutter glyph: 1:1 chats show a presence dot (when presence is
         // enabled), while meeting / group chats show a chat-type glyph so
         // they're distinguishable. Type glyphs need no fetched data, so they
@@ -553,9 +661,10 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         // With thumbnails on, group / meeting chats show their icon there, so
         // the small type glyph would repeat it; presence dots stay.
         const presence =
-          (showPresence ? presenceForChatItem(row.item, me?.id, memberPresence, theme) : null) ??
-          (thumbRows > 0 ? null : chatTypeGlyph(row.item, theme))
-        const unread = row.item.kind === 'chat' ? unreadByChatId[row.item.chat.id] : undefined
+          (showPresence
+            ? presenceForChatItem(row.item, data.meId, data.memberPresence, theme)
+            : null) ?? (thumbRows > 0 ? null : chatTypeGlyph(row.item, theme))
+        const unread = row.item.kind === 'chat' ? data.unreadByChatId[row.item.chat.id] : undefined
         const hasMention = !!unread && unread.mentionCount > 0
         const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
         // Unread badge is a suffix, not a leading dot, so it can't be
@@ -576,7 +685,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         const labelWidth = labelWidthFor
         const preview =
           row.item.kind === 'chat'
-            ? previewLineForChat(row.item.chat, labelWidth, previewLines, me?.id)
+            ? previewLineForChat(row.item.chat, labelWidth, previewLines, data.meId)
             : ''
         // Background highlight for the selected row. Pad the label to fill
         // its column width so the background renders as a continuous bar
@@ -611,7 +720,11 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
               <Box width={thumbColumn} flexShrink={0}>
                 <PictureSlot
                   slots={pictureSlots.current}
-                  cacheKey={picture?.key ?? null}
+                  cacheKey={
+                    picture && picture.kind !== 'icon' && row.item.accountId !== undefined
+                      ? ownedImageKey(row.item.accountId, picture.key)
+                      : (picture?.key ?? null)
+                  }
                   rows={thumbRows}
                   cols={thumbCols}
                   stamp={stamp}

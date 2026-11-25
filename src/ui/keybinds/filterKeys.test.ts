@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import type { Key } from 'ink'
 import { handleFilterKeys, type FilterKeysCtx } from './filterKeys'
+import { accountRef } from '../../account'
+import { openAccount } from '../../state/accountStore'
 import { createAppStore } from '../../state/store'
 
 function makeKey(overrides: Partial<Key> = {}): Key {
@@ -93,5 +95,30 @@ describe('handleFilterKeys', () => {
     const { ctx, store } = makeCtx({ filter: '' })
     handleFilterKeys({ input: 'c', key: makeKey({ ctrl: true }) }, ctx)
     expect(store.get().filter).toBe('')
+  })
+})
+
+describe('unified sidebar', () => {
+  test('Enter on a name that matches only in a background account is not a new chat', () => {
+    const store = createAppStore()
+    openAccount(store, accountRef('alpha'), { foreground: true })
+    openAccount(store, accountRef('beta'), { foreground: false }).set({
+      chats: [{ id: 'c1', chatType: 'group', createdDateTime: '', topic: 'Bob Builder' }],
+    })
+    store.set((s) => ({ settings: { ...s.settings, accounts: ['alpha', 'beta'] } }))
+    const openCalls: string[] = []
+    handleFilterKeys(
+      { input: '', key: makeKey({ return: true }) },
+      {
+        store,
+        filter: 'Bob',
+        chats: [],
+        teams: [],
+        channelsByTeam: {},
+        openNewChatPrompt: (q) => openCalls.push(q),
+      },
+    )
+    expect(openCalls).toEqual([])
+    expect(store.get().inputZone).toBe('list')
   })
 })

@@ -49,6 +49,7 @@ import {
 import { indexNamesFromChats, indexNamesFromMessages } from './nameIndex'
 import type { PollerHandleRef } from './poller'
 import { applySeededState, isSeededMode } from './seedFixtures'
+import { accountRowKey, unifiedSidebar } from './selectables'
 import {
   accountSlice,
   audienceFromRouting,
@@ -85,8 +86,9 @@ export type AccountManager = {
   // that start; throws when it fails (the slot stays, marked failed).
   switchAccount(profile: string | null): Promise<void>
   // Concurrent mode: swap an open account to the foreground (throws when
-  // it is not open).
-  setForeground(profile: string): void
+  // it is not open). restoreUi: false keeps the list cursor and filter
+  // (opening a row of another account's section in the unified sidebar).
+  setForeground(profile: string, opts?: { restoreUi?: boolean }): void
   // Concurrent mode: start an account again that has no session, or whose
   // running session reports authError / offline.
   retry(profile: string): Promise<void>
@@ -535,8 +537,14 @@ export function createAccountManager(
 
   // An account that failed for auth and is not starting again shows its
   // auth-expired modal when it comes to the front.
-  function toForeground(slot: Slot): void {
-    setForeground(store, slot.ref.id)
+  function toForeground(slot: Slot, opts?: { restoreUi?: boolean }): void {
+    setForeground(store, slot.ref.id, opts)
+    // Unified sidebar: an account swapped in with no remembered list cursor
+    // starts on its own header, not at the top of the first account.
+    const s = store.get()
+    if (opts?.restoreUi !== false && s.cursorKey === null && unifiedSidebar(s)) {
+      store.set({ cursorKey: accountRowKey(slot.ref.id) })
+    }
     activeProfile = slot.profile
     syncPollerRef()
     if (
@@ -683,10 +691,10 @@ export function createAccountManager(
       }
     },
 
-    setForeground(p) {
+    setForeground(p, opts) {
       const slot = slotForProfile(p)
       if (!slot) throw new Error(`setForeground: ${p} is not open`)
-      toForeground(slot)
+      toForeground(slot, opts)
     },
 
     async retry(p) {

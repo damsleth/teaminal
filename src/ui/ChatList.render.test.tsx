@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { renderToString } from 'ink'
-import { accountStore } from '../state/accountStore'
+import { accountStore, openAccount } from '../state/accountStore'
 import { applySeededState } from '../state/seedFixtures'
 import { createAppStore } from '../state/store'
 import { ChatList } from './ChatList'
@@ -176,4 +176,32 @@ test('no account open (every account removed): an empty state, not loading', () 
   )
   expect(out).toContain('no account')
   expect(out).not.toContain('loading')
+})
+
+test('unified sidebar: each row reads its own account’s unread mark; headers carry counts', () => {
+  const store = createAppStore()
+  applySeededState(openAccount(store, accountRef('alpha'), { foreground: true }), 'alpha')
+  const beta = openAccount(store, accountRef('beta'), { foreground: false })
+  applySeededState(beta, 'beta')
+  const chatId = store.get().chats[0]!.id
+  // Unread in beta only, on a chat id alpha has too.
+  beta.set({ unreadByChatId: { [chatId]: { unreadCount: 2, mentionCount: 1 } } })
+  store.set((s) => ({ settings: { ...s.settings, accounts: ['alpha', 'beta'] } }))
+  const lines = renderToString(
+    <StoreProvider store={store}>
+      <SessionProvider api={session}>
+        <ChatList listPaneWidth={40} />
+      </SessionProvider>
+    </StoreProvider>,
+    { columns: 40 },
+  )
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b\[[0-9;]*m/g, '')
+    .split('\n')
+  expect(lines[0]).toStartWith('▾ alpha · example.com')
+  const betaHeader = lines.find((l) => l.startsWith('▾ beta'))!
+  // 1 chat with unread activity (mentions count the activity feed's).
+  expect(betaHeader).toStartWith('▾ beta 1 · example.com')
+  expect(lines.find((l) => l.includes('Ada Byron'))).not.toContain('@')
+  expect(lines.find((l) => l.includes('ADA BYRON'))).toContain(' @')
 })

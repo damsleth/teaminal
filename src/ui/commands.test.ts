@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import { accountRef } from '../account'
-import { accountStore } from '../state/accountStore'
+import { accountStore, openAccount } from '../state/accountStore'
+import { unifiedListInput } from '../state/selectables'
 import { applySeededState } from '../state/seedFixtures'
 import { createAppStore } from '../state/store'
 import { buildCommands, filterCommands, fuzzyScore, type CommandRunners } from './commands'
@@ -75,4 +76,29 @@ test('presence commands set the picked presence', () => {
   const { commands, ran } = setup()
   commands.find((c) => c.id === 'presence:Busy')?.run()
   expect(ran).toEqual(['presence:Busy'])
+})
+
+test('with several accounts open, every account’s chats are commands, each naming its account', () => {
+  const store = createAppStore()
+  applySeededState(openAccount(store, accountRef('alpha'), { foreground: true }), 'alpha')
+  applySeededState(openAccount(store, accountRef('beta'), { foreground: false }), 'beta')
+  store.set((s) => ({ settings: { ...s.settings, accounts: ['alpha', 'beta'] } }))
+  const ran: string[] = []
+  const commands = buildCommands(
+    store.get(),
+    {
+      runMenuItem: () => {},
+      setPresence: () => {},
+      focusChat: (id, alias) => ran.push(`${alias}:${id}`),
+      focusChannel: () => {},
+      keyActions: [],
+    },
+    unifiedListInput(store.get()),
+  )
+  const ada = commands.filter((c) => c.title.toLowerCase() === 'go to ada byron')
+  expect(ada.map((c) => c.detail)).toEqual(['alpha', 'beta'])
+  // Same chat id in both: distinct command ids, so the selection can't jump.
+  expect(new Set(ada.map((c) => c.id)).size).toBe(2)
+  ada[1]!.run()
+  expect(ran).toEqual([`beta:${store.get().chats[0]!.id}`])
 })

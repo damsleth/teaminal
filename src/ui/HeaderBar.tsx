@@ -1,7 +1,7 @@
 import { Box } from 'ink'
 import { Text } from './Text'
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
-import { chatLabel } from '../state/selectables'
+import { chatLabel, unifiedSidebar } from '../state/selectables'
 import {
   accountUnreadCount,
   recentUnreadNotifications,
@@ -144,19 +144,23 @@ export function HeaderBar({ columns = 100 }: { columns?: number }) {
     if (!capabilities.me.ok) hints.push('me n/a')
   }
 
-  // Empty with one account (single mode has no background accounts).
-  const badge = formatAccountBadge(
-    Object.values(backgroundAccounts)
-      .sort((a, b) => rank(configured, a.ref.label) - rank(configured, b.ref.label))
-      .flatMap((a) => {
-        const failed = a.conn === 'authError' || a.conn === 'offline'
-        const count = accountUnreadCount(a)
-        return failed || count > 0
-          ? [{ label: a.ref.label, mark: failed ? '!' : String(count) }]
-          : []
-      }),
-    Math.max(4, Math.floor(columns / 4)),
-  )
+  // Empty with one account (single mode has no background accounts), and in
+  // the unified sidebar, whose account header rows carry the same counts.
+  const unified = useAppState(unifiedSidebar)
+  const badge = unified
+    ? ''
+    : formatAccountBadge(
+        Object.values(backgroundAccounts)
+          .sort((a, b) => rank(configured, a.ref.label) - rank(configured, b.ref.label))
+          .flatMap((a) => {
+            const failed = a.conn === 'authError' || a.conn === 'offline'
+            const count = accountUnreadCount(a)
+            return failed || count > 0
+              ? [{ label: a.ref.label, mark: failed ? '!' : String(count) }]
+              : []
+          }),
+        Math.max(4, Math.floor(columns / 4)),
+      )
 
   const updated = formatRelative(lastListPollAt, now)
   const unreadText = formatUnread(unreadByChatId, chats, me?.id, nameByUserId)

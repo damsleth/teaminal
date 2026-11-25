@@ -28,7 +28,7 @@ import { useEffect, useRef, useState } from 'react'
 import { accountStore } from '../state/accountStore'
 import { createOneOnOneChat, materializeChat, resolveFederatedChatId } from '../state/chatActions'
 import { indexNameFromDirectoryUser } from '../state/nameIndex'
-import { clampCursor } from '../state/selectables'
+import { clampCursor, unifiedSidebar } from '../state/selectables'
 import {
   focusKey,
   moveMessageCursor as nextMessageCursor,
@@ -153,6 +153,9 @@ export function App() {
   // too: after a concurrent-mode swap the restored focus can be deep-equal
   // to the previous account's (colliding ids).
   const accountId = useAppState((s) => s.account?.id)
+  // Unified sidebar: one list for every open account, so it is not remounted
+  // on a foreground swap (the cursor stays on its row).
+  const unified = useAppState(unifiedSidebar)
   const cursor = useAppState((s) => s.cursor)
   const cursorKey = useAppState((s) => s.cursorKey)
   const chats = useAppState((s) => s.chats)
@@ -494,6 +497,7 @@ export function App() {
         refresh,
         hardRefresh,
         openNewChatPrompt,
+        toForeground: (alias) => session.setForeground(alias, { restoreUi: false }),
       })
     },
     { isActive: isRawModeSupported && inputZone === 'list' },
@@ -605,7 +609,7 @@ export function App() {
       <Box flexDirection="row" flexGrow={1} position="relative">
         {showList && (
           <Box width={listWidth} flexShrink={0} {...paneBorder('list')}>
-            <ChatList key={accountId} listPaneWidth={listWidth} />
+            <ChatList key={unified ? 'unified' : accountId} listPaneWidth={listWidth} />
           </Box>
         )}
         <Box

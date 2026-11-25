@@ -26,7 +26,10 @@
 //
 // Global UI/environment writes go through the Store itself, explicitly.
 // Focus and modal payloads carry no account id because they always belong to
-// store.account: setForeground saves/restores focus and closes the rest.
+// store.account: setForeground saves/restores focus and closes the rest. The
+// one exception is a chat row of the unified sidebar (context menu target,
+// confirm-delete-chat), which names its account's alias: row actions act on
+// that account without bringing it to the foreground.
 
 import type { AccountId, AccountRef } from '../account'
 import {

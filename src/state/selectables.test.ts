@@ -6,6 +6,7 @@ import {
   buildSelectableList,
   CHAT_SECTION_CAP,
   collapseKeyFor,
+  collapsedInSidebar,
   isSelectable,
   headerIndexForKey,
   parentCollapseKey,
@@ -832,5 +833,23 @@ describe('unified list (M2 F.2)', () => {
     expect(after[i]).toMatchObject({ kind: 'chat', alias: 'beta', chat: { id: 'c1' } })
     // The same id in alpha is never picked up.
     expect(i).not.toBe(after.findIndex((it) => it.alias === 'alpha' && it.kind === 'chat'))
+  })
+})
+
+describe('collapsedInSidebar (presence fan-out)', () => {
+  const state = (open: number, collapsed: Record<string, boolean>) => {
+    const store = createAppStore()
+    ;['alpha', 'beta'].slice(0, open).forEach((alias, i) => {
+      openAccount(store, accountRef(alias), { foreground: i === 0 })
+    })
+    store.set((s) => ({ settings: { ...s.settings, chatListCollapsedSections: collapsed } }))
+    return store.get()
+  }
+  test('a collapsed account fetches no member presence; the others and single mode do', () => {
+    const s = state(2, { 'account:alpha': true })
+    expect(collapsedInSidebar(s, accountRef('alpha'))).toBe(true)
+    expect(collapsedInSidebar(s, accountRef('beta'))).toBe(false)
+    // The persisted key from an earlier concurrent run is ignored with one account.
+    expect(collapsedInSidebar(state(1, { 'account:alpha': true }), accountRef('alpha'))).toBe(false)
   })
 })

@@ -7,9 +7,8 @@
 // Rebuilt on each render that needs it; cheap because the underlying lists
 // are small (typically <100 chats, <30 teams * <20 channels).
 
-import { accountRef, type AccountId } from '../account'
+import { accountRef, DEFAULT_PROFILE, type AccountId, type AccountRef } from '../account'
 import {
-  accountSlice,
   unreadTotals,
   type AccountSlice,
   type AppState,
@@ -336,8 +335,11 @@ export function chatLabel(
 // Tagged rows are prefixed with their AccountId, so the same chat id in two
 // accounts is two rows.
 export const NEW_CHAT_ROW = 'new-chat'
+export function accountRowKey(id: AccountId): string {
+  return `account:${id}`
+}
 export function selectableKey(item: SelectableItem): string {
-  if (item.kind === 'account') return `account:${item.accountId}`
+  if (item.kind === 'account') return accountRowKey(item.accountId)
   const key = rowKey(item)
   return item.accountId === undefined ? key : `${item.accountId}/${key}`
 }
@@ -454,34 +456,97 @@ export function visibleList(input: SelectableInput | UnifiedListInput): Selectab
 
 // ---- unified sidebar (M2 F.2) ---------------------------------------------
 
-type AccountListSlice = Pick<
-  AccountSlice,
-  | 'me'
-  | 'chats'
-  | 'teams'
-  | 'channelsByTeam'
-  | 'nameByUserId'
-  | 'expandedChatSections'
-  | 'unreadByChatId'
-  | 'unreadMentionCount'
-  | 'conn'
->
+// What the sidebar reads from one account: the list's inputs, plus
+// memberPresence for its presence dots and realtimeState for its header.
+const LIST_SLICE_KEYS = [
+  'me',
+  'chats',
+  'teams',
+  'channelsByTeam',
+  'nameByUserId',
+  'expandedChatSections',
+  'unreadByChatId',
+  'unreadMentionCount',
+  'conn',
+  'memberPresence',
+  'realtimeState',
+] as const satisfies readonly (keyof AccountSlice)[]
+export type AccountListSlice = Pick<AccountSlice, (typeof LIST_SLICE_KEYS)[number]>
 
 export type UnifiedListInput = Pick<SelectableInput, 'settings' | 'filter'> & {
   // Open accounts in configured order, keyed by alias.
-  accounts: { alias: string; slice: AccountListSlice }[]
+  accounts: { alias: string; accountId: AccountId; slice: AccountListSlice }[]
+}
+
+// What unifiedListInput reads: the root state, or the parts of it a caller
+// holds (the command palette).
+export type UnifiedSource = Pick<AppState, 'account' | 'backgroundAccounts' | 'filter'> &
+  AccountListSlice & {
+    settings: Pick<Settings, 'accounts'> & NonNullable<SelectableInput['settings']>
+  }
+
+// The open accounts in settings.accounts order, a failed one (no session)
+// included.
+function openAccounts(s: UnifiedSource): UnifiedListInput['accounts'] {
+  return s.settings.accounts.flatMap((alias) => {
+    const accountId = accountRef(alias).id
+    const slice: AccountListSlice | undefined =
+      s.account?.id === accountId ? s : s.backgroundAccounts[accountId]
+    return slice ? [{ alias, accountId, slice }] : []
+  })
 }
 
 // The unified sidebar's input, or null below two open accounts (single mode,
 // or concurrent mode with one account): the caller then builds the
-// foreground's list as before. Every open account is listed, a failed one
-// (no session) included, in settings.accounts order.
-export function unifiedListInput(s: AppState): UnifiedListInput | null {
-  const accounts = s.settings.accounts.flatMap((alias) => {
-    const slice = accountSlice(s, accountRef(alias).id)
-    return slice ? [{ alias, slice }] : []
-  })
+// foreground's list as before.
+export function unifiedListInput(s: UnifiedSource): UnifiedListInput | null {
+  const accounts = openAccounts(s)
   return accounts.length < 2 ? null : { accounts, settings: s.settings, filter: s.filter }
+}
+
+// The unified sidebar is on: two or more accounts open. Unlike
+// SessionApi.running(), an open account whose start failed counts: it still
+// has a section in the sidebar.
+export function unifiedSidebar(s: UnifiedSource): boolean {
+  return openAccounts(s).length > 1
+}
+
+// The account's header is collapsed in the unified sidebar. Counted from the
+// open slots, not unifiedListInput: a background account's view of the store
+// has its own slice in the flat fields. The key persists in config, so a
+// later single-mode run must ignore it.
+export function collapsedInSidebar(
+  s: Pick<AppState, 'generationById' | 'settings'>,
+  ref: AccountRef,
+): boolean {
+  return (
+    ref.profile !== DEFAULT_PROFILE &&
+    Object.keys(s.generationById).length > 1 &&
+    !!s.settings.chatListCollapsedSections[accountCollapseKey(ref.profile)]
+  )
+}
+
+// A selector for unifiedListInput that returns the previous result while
+// none of its inputs changed. The foreground's slice is the root state, a
+// new object on every store change, so a component that memoised on the
+// input object itself would rebuild the list on every keystroke.
+export function cachedUnifiedListInput(): (s: AppState) => UnifiedListInput | null {
+  let prev: UnifiedListInput | null = null
+  return (s) => {
+    const next = unifiedListInput(s)
+    if (next === null || prev === null) return (prev = next)
+    const same =
+      next.settings === prev.settings &&
+      next.filter === prev.filter &&
+      next.accounts.length === prev.accounts.length &&
+      next.accounts.every((a, i) => {
+        const b = prev!.accounts[i]!
+        return (
+          a.accountId === b.accountId && LIST_SLICE_KEYS.every((k) => a.slice[k] === b.slice[k])
+        )
+      })
+    return same ? prev : (prev = next)
+  }
 }
 
 // An account's view of the collapsed map: unprefixed legacy keys apply to

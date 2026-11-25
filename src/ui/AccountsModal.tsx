@@ -73,7 +73,11 @@ export function AccountsModal() {
         }
       : background[id]
   }
-  const [mode, setMode] = useState<Mode>({ kind: 'list', cursor: 0 })
+  // Opened on a given row (Enter on a failed account's sidebar header).
+  const [mode, setMode] = useState<Mode>(() => ({
+    kind: 'list',
+    cursor: modal?.kind === 'accounts' && modal.mode === 'list' ? modal.cursor : 0,
+  }))
   // Close only while this modal is the open one: an async step that ends
   // after the user opened another modal must not close that one.
   const close = () =>

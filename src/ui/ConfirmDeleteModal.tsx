@@ -6,7 +6,8 @@ import { Box, useApp } from 'ink'
 import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
-import { accountStore } from '../state/accountStore'
+import { accountRef } from '../account'
+import { accountStore, accountStoreFor } from '../state/accountStore'
 import { deleteChatById, deleteChatMessageById } from '../state/chatActions'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useSessionApi } from './SessionContext'
@@ -32,9 +33,16 @@ export function ConfirmDeleteModal() {
         return
       }
       if (key.return || ch === 'y') {
-        const focus = store.get().focus
+        // A chat row of another account in the unified sidebar is deleted
+        // in that account; the foreground stays.
+        const owner =
+          modal.kind === 'confirm-delete-chat' && modal.alias !== undefined
+            ? accountRef(modal.alias)
+            : null
+        const { focus, account } = store.get()
         const deletingFocused =
           modal.kind === 'confirm-delete-chat' &&
+          (!owner || owner.id === account?.id) &&
           focus.kind === 'chat' &&
           focus.chatId === modal.chatId
         store.set({
@@ -45,6 +53,16 @@ export function ConfirmDeleteModal() {
         // Both actions log + roll back on failure; swallow the rejection so a
         // Graph error never escapes as an unhandled rejection and tears down
         // the TUI.
+        if (owner) {
+          // The account may have been removed while the modal was open.
+          if (store.get().generationById[owner.id] === undefined) return
+          void deleteChatById(
+            session.clientFor(owner.id),
+            accountStoreFor(store, owner),
+            modal.chatId,
+          ).catch(() => {})
+          return
+        }
         const acc = accountStore(store)
         if (modal.kind === 'confirm-delete-chat') {
           void deleteChatById(session.client(), acc, modal.chatId).catch(() => {})

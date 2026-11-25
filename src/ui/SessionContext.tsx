@@ -37,8 +37,11 @@ export type SessionApi = {
   // Concurrent mode (concurrentAccounts) only; no-ops in single mode.
   /** Start added accounts and stop removed ones after `settings.accounts` changed. */
   reconcile: () => Promise<void>
-  /** Swap an open account to the foreground at once. */
-  setForeground: (profile: string) => void
+  /**
+   * Swap an open account to the foreground at once. restoreUi: false keeps
+   * the list cursor and filter and leaves focus on the list.
+   */
+  setForeground: (profile: string, opts?: { restoreUi?: boolean }) => void
   /** Start an account again that has no session (failed start). */
   retry: (profile: string) => Promise<void>
   /** Accounts with a running session, in configured order. */

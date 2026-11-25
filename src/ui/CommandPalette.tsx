@@ -7,9 +7,11 @@
 import { Box, useApp, useStdout, type DOMElement } from 'ink'
 import { Text } from './Text'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { cachedUnifiedListInput } from '../state/selectables'
 import type { AppState, Store } from '../state/store'
 import { buildCommands, filterCommands, type Command, type CommandRunners } from './commands'
 import { elementRect } from './inlineImageLayout'
+import { openChat, openFocus } from './keybinds/itemActions'
 import { runMenuItem } from './MenuModal'
 import { useSessionApi } from './SessionContext'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
@@ -62,6 +64,8 @@ export function CommandPalette(props: {
   const nameByUserId = useAppState((s) => s.nameByUserId)
   const me = useAppState((s) => s.me)
   const presenceChoice = useAppState((s) => s.presenceChoice)
+  const unifiedSelector = useMemo(cachedUnifiedListInput, [])
+  const unified = useAppState(unifiedSelector)
   const [query, setQuery] = useState('')
   // The selection follows a command, not a position, so a chat moving in
   // the list while the palette is open can't change what Enter runs.
@@ -70,6 +74,7 @@ export function CommandPalette(props: {
   const keyActions = useRef(props.keyActions)
   keyActions.current = props.keyActions
 
+  const toForeground = (alias: string) => session.setForeground(alias, { restoreUi: false })
   const baseCommands = useMemo(
     () =>
       isOpen
@@ -86,12 +91,12 @@ export function CommandPalette(props: {
             {
               runMenuItem: (item, path) => runMenuItem(item, path, { store, session, exit }),
               setPresence: (choice) => store.set({ presenceChoice: choice }),
-              focusChat: (chatId) =>
-                store.set({ focus: { kind: 'chat', chatId }, inputZone: 'list' }),
-              focusChannel: (teamId, channelId) =>
-                store.set({ focus: { kind: 'channel', teamId, channelId }, inputZone: 'list' }),
+              focusChat: (chatId, alias) => openChat(store, chatId, alias, toForeground),
+              focusChannel: (teamId, channelId, alias) =>
+                openFocus(store, { kind: 'channel', teamId, channelId }, alias, toForeground),
               keyActions: [],
             },
+            unified,
           )
         : [],
     [
@@ -103,6 +108,7 @@ export function CommandPalette(props: {
       nameByUserId,
       me,
       presenceChoice,
+      unified,
       store,
       session,
       exit,

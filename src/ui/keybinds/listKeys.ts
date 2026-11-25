@@ -6,6 +6,8 @@
 
 import type { Channel, Chat, Team } from '../../types'
 import type { Me } from '../../graph/me'
+import { accountRef } from '../../account'
+import { accountStoreFor } from '../../state/accountStore'
 import { focusKey, type AppState, type Focus, type Settings, type Store } from '../../state/store'
 import {
   buildSelectableList,
@@ -18,7 +20,10 @@ import {
   nextSelectableIndex,
   parentCollapseKey,
   resolveCursor,
+  selectableKey,
+  unifiedListInput,
   visibleList,
+  type SelectableItem,
 } from '../../state/selectables'
 import { updateSettings } from '../../config/index'
 import { warn } from '../../log'
@@ -27,7 +32,13 @@ import { openKeybinds } from '../KeybindsModal'
 import { openMenu } from '../MenuModal'
 import { openContextMenu } from '../ContextMenu'
 import { openMessageSearch } from '../MessageSearchModal'
-import { confirmDeleteChat, toggleChatRead } from './itemActions'
+import {
+  bringToFront,
+  confirmDeleteChat,
+  openFocus,
+  toggleChatRead,
+  type ToForeground,
+} from './itemActions'
 import type { KeyResult, RawKey } from './types'
 
 const HALF_PAGE = 10
@@ -54,6 +65,16 @@ export type ListKeysCtx = {
   refresh: () => void
   hardRefresh: () => void
   openNewChatPrompt: (initialQuery?: string) => void
+  // Unified sidebar: bring a row's account to the foreground before opening
+  // it. Absent (single mode, tests) = rows are always the foreground's.
+  toForeground?: ToForeground
+}
+
+// The navigable list. In the unified sidebar it comes from every open
+// account in the store; otherwise from the foreground fields in ctx.
+function listFor(ctx: ListKeysCtx): SelectableItem[] {
+  const unified = unifiedListInput(ctx.store.get())
+  return unified ? visibleList(unified) : visibleList(ctx)
 }
 
 // Collapsed sections are a persisted setting: patch the store for the current
@@ -61,11 +82,20 @@ export type ListKeysCtx = {
 // a failed write costs the user a collapsed section across restarts, nothing
 // more, and must not break the keypress — but it is logged, because silence
 // here is how an unwritable config dir went unnoticed.
-function setSectionCollapsed(store: Store<AppState>, key: string, collapsed: boolean): void {
+// An account's own section and team keys (`explicit`) are reopened with an
+// explicit false rather than deleted: an unprefixed legacy key for the same
+// section would otherwise keep it collapsed.
+function setSectionCollapsed(
+  store: Store<AppState>,
+  key: string,
+  collapsed: boolean,
+  explicit = false,
+): void {
   let next: Record<string, boolean> = {}
   store.set((s) => {
     next = { ...s.settings.chatListCollapsedSections }
     if (collapsed) next[key] = true
+    else if (explicit) next[key] = false
     else delete next[key]
     return { settings: { ...s.settings, chatListCollapsedSections: next } }
   })
@@ -79,18 +109,32 @@ function setSectionCollapsed(store: Store<AppState>, key: string, collapsed: boo
 
 // The chat ctrl+d acts on. Channels have no delete, so a focused channel
 // (or a cursor sitting on one) yields nothing.
-function deleteTarget(ctx: ListKeysCtx): { chat: Chat; label: string } | null {
+// A list row's `alias` is its account in the unified sidebar; a focused chat
+// is always the foreground's.
+function deleteTarget(ctx: ListKeysCtx): { chat: Chat; label: string; alias?: string } | null {
   if (ctx.focus.kind === 'chat') {
     const chatId = ctx.focus.chatId
     const chat = ctx.chats.find((c) => c.id === chatId)
     return chat ? { chat, label: labelForChat(ctx, chat) } : null
   }
   if (ctx.focus.kind !== 'list') return null
-  const visible = visibleList(ctx)
+  const visible = listFor(ctx)
   const it = visible[resolveCursor(visible, visible.length, ctx.cursorKey ?? null, ctx.cursor)]
-  return it && it.kind === 'chat' ? { chat: it.chat, label: it.label } : null
+  return it && it.kind === 'chat'
+    ? { chat: it.chat, label: it.label, ...(it.alias === undefined ? {} : { alias: it.alias }) }
+    : null
 }
 
+// The account of the row under the list cursor (unified sidebar), or
+// undefined for the foreground.
+function cursorAlias(ctx: ListKeysCtx): string | undefined {
+  if (ctx.focus.kind !== 'list') return undefined
+  const visible = listFor(ctx)
+  return visible[resolveCursor(visible, visible.length, ctx.cursorKey ?? null, ctx.cursor)]?.alias
+}
+
+// The focused chat is always the foreground's, so its label comes from the
+// foreground fields in ctx.
 function labelForChat(ctx: ListKeysCtx, chat: Chat): string {
   const item = buildSelectableList(ctx).find(
     (it): it is Extract<typeof it, { kind: 'chat' }> =>
@@ -113,7 +157,12 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
   if (input === '.' && ctx.focus.kind === 'list') {
     const target = deleteTarget(ctx)
     if (target)
-      openContextMenu(store, { kind: 'chat', chatId: target.chat.id, label: target.label })
+      openContextMenu(store, {
+        kind: 'chat',
+        chatId: target.chat.id,
+        label: target.label,
+        ...(target.alias === undefined ? {} : { alias: target.alias }),
+      })
     return 'handled'
   }
 
@@ -122,7 +171,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
   if (key.ctrl && ch === 'd') {
     const target = deleteTarget(ctx)
     if (target) {
-      confirmDeleteChat(store, target.chat.id, target.label)
+      confirmDeleteChat(store, target.chat.id, target.label, target.alias)
     }
     return 'handled'
   }
@@ -159,7 +208,10 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
   }
 
   // p opens the people directory search (find a person, start a 1:1).
+  // Directory search never spans tenants: the prompt searches the account
+  // whose section the cursor is in, so that account comes to the front.
   if (ch === 'p') {
+    bringToFront(store, cursorAlias(ctx), ctx.toForeground)
     openNewChatPrompt('')
     return 'handled'
   }
@@ -170,23 +222,23 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       exit()
       return 'handled'
     }
-    const visible = visibleList(ctx)
+    const visible = listFor(ctx)
     const syntheticNewChatQuery =
       ctx.filter && visible.length === 0 && isNewChatQueryCandidate(ctx.filter)
         ? ctx.filter.trim()
         : null
     const selectableCount = visible.length + (syntheticNewChatQuery ? 1 : 0)
     if (ch === 'n') {
+      bringToFront(store, cursorAlias(ctx), ctx.toForeground)
       openNewChatPrompt(ctx.filter)
       return 'handled'
     }
     // m toggles unread/read on the focused chat row. Channels and
     // teams have no unread state to flip.
     if (ch === 'm') {
-      const visible = visibleList(ctx)
       const safe = resolveCursor(visible, selectableCount, ctx.cursorKey ?? null, ctx.cursor)
       const it = visible[safe]
-      if (it && it.kind === 'chat') toggleChatRead(store, it.chat)
+      if (it && it.kind === 'chat') toggleChatRead(store, it.chat, it.alias)
       return 'handled'
     }
     if (selectableCount === 0) {
@@ -249,10 +301,13 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       // A focused header, or a row with no section (ungrouped chat), stays
       // put: the list is the leftmost pane, so h must not fall through to the
       // filter buffer.
+      // An account header collapses itself (it has no parent).
       const focused = visible[safe]
-      const collapseKey = focused
-        ? parentCollapseKey(focused, ctx.settings.chatListGroupByType)
-        : null
+      const collapseKey = !focused
+        ? null
+        : focused.kind === 'account'
+          ? collapseKeyFor(focused)
+          : parentCollapseKey(focused, ctx.settings.chatListGroupByType)
       if (collapseKey) {
         setSectionCollapsed(store, collapseKey, true)
         // The header may be filtered out of the current view; then there is
@@ -269,7 +324,33 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       }
       const it = visible[safe]
       if (!it) return 'handled'
+      if (it.kind === 'account') {
+        // Enter on a failed account opens the Accounts modal on its row,
+        // where it can be retried.
+        if (key.return && (it.conn === 'authError' || it.conn === 'offline')) {
+          const row = store.get().settings.accounts.indexOf(it.alias)
+          store.set({
+            modal: { kind: 'accounts', mode: 'list', cursor: Math.max(0, row), accounts: [] },
+            inputZone: 'menu',
+          })
+          return 'handled'
+        }
+        // Expand (when collapsed), then move to the account's first row; an
+        // empty account keeps the cursor on its header.
+        if (it.collapsed) setSectionCollapsed(store, collapseKeyFor(it)!, false)
+        const now = listFor(ctx)
+        const at = now.findIndex((row) => selectableKey(row) === selectableKey(it))
+        const next = at < 0 ? at : nextSelectableIndex(now, at, +1)
+        store.set(cursorAt(now, next > at && now[next]?.alias === it.alias ? next : at))
+        return 'handled'
+      }
       const headerKey = collapseKeyFor(it)
+      if (headerKey && it.alias !== undefined) {
+        setSectionCollapsed(store, headerKey, false, true)
+        const expanded = listFor(ctx)
+        store.set(cursorAt(expanded, nextSelectableIndex(expanded, safe, +1)))
+        return 'handled'
+      }
       if (headerKey) {
         // Only collapsed headers are focusable, so this always expands. The
         // cursor lands on the first selectable child — for Teams that skips
@@ -285,6 +366,15 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
         store.set(cursorAt(expanded, nextSelectableIndex(expanded, safe, +1)))
         return 'handled'
       }
+      if (it.kind === 'more' && it.alias !== undefined) {
+        // The row's own account expands its section.
+        const section = it.section
+        accountStoreFor(store, accountRef(it.alias)).set((s) => ({
+          expandedChatSections: { ...s.expandedChatSections, [section]: true },
+        }))
+        store.set(cursorAt(listFor(ctx), safe))
+        return 'handled'
+      }
       if (it.kind === 'more') {
         // Expanding replaces the `… N more` row with the first hidden chat,
         // so the cursor stays where it is and lands on real content.
@@ -296,7 +386,16 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
         })
         return 'handled'
       }
-      if (it.kind === 'chat') {
+      if (it.kind === 'chat' && it.alias !== undefined) {
+        openFocus(store, { kind: 'chat', chatId: it.chat.id }, it.alias, ctx.toForeground)
+      } else if (it.kind === 'channel' && it.alias !== undefined) {
+        openFocus(
+          store,
+          { kind: 'channel', teamId: it.team.id, channelId: it.channel.id },
+          it.alias,
+          ctx.toForeground,
+        )
+      } else if (it.kind === 'chat') {
         store.set({ focus: { kind: 'chat', chatId: it.chat.id } })
       } else if (it.kind === 'channel') {
         store.set({

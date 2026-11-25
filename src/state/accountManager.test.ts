@@ -493,6 +493,35 @@ describe('AccountManager (concurrent)', () => {
     await m.stopAll()
   })
 
+  test('setForeground: a fresh account starts on its header; restoreUi false keeps the cursor', async () => {
+    nonSeeded()
+    const sessions: FakeSession[] = []
+    const store = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => {
+        const s = fakeSession(opts)
+        sessions.push(s)
+        return s
+      },
+      noDriver,
+      true,
+    )
+    await m.start(() => {})
+    await waitFor(() => m.running().length === 2)
+    // Unified sidebar: beta has no remembered cursor, so it lands on its header.
+    m.setForeground('beta')
+    expect(store.get().cursorKey).toBe(`account:${accountRef('beta').id}`)
+    // Opening a row of alpha's section: the list cursor and filter stay.
+    store.set({ cursor: 2, cursorKey: 'row', filter: 'x' })
+    m.setForeground('alpha', { restoreUi: false })
+    expect(store.get()).toMatchObject({ cursor: 2, cursorKey: 'row', filter: 'x' })
+    expect(store.get().account?.id).toBe(accountRef('alpha').id)
+    expect(m.pollerHandleRef.current).toBe(sessions[0]!.poller)
+    await m.stopAll()
+  })
+
   test('a failed start stays local to its account and never exits', async () => {
     nonSeeded()
     const held = heldSessions()

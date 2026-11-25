@@ -152,7 +152,8 @@ export type ModalState =
   // Confirm before soft-deleting the user's own chat message. `preview` is a
   // short excerpt of the message body for the prompt.
   | { kind: 'confirm-delete'; chatId: string; messageId: string; preview: string }
-  | { kind: 'confirm-delete-chat'; chatId: string; label: string }
+  // alias: the chat's account in the unified sidebar (absent = foreground).
+  | { kind: 'confirm-delete-chat'; chatId: string; label: string; alias?: string }
   // Full-size view of a focused inline image. Carries the InlineImageRef so
   // the modal can resolve the cached blob (or fetch it on open).
   | { kind: 'image'; ref: InlineImageRef }

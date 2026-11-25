@@ -11,6 +11,7 @@ import { anchorRect } from './contextAnchor'
 import { contextMenuEntries, type ContextMenuTarget } from './contextMenuEntries'
 import { elementRect } from './inlineImageLayout'
 import { openThread } from './keybinds/chatKeys'
+import { useSessionApi } from './SessionContext'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
@@ -21,6 +22,7 @@ export function openContextMenu(store: Store<AppState>, target: ContextMenuTarge
 
 export function ContextMenu() {
   const store = useAppStore()
+  const session = useSessionApi()
   const theme = useTheme()
   const { stdout } = useStdout()
   const state = useAppState((s) => (s.modal?.kind === 'context-menu' ? s : null))
@@ -51,6 +53,7 @@ export function ContextMenu() {
             )
             openThread(store, focus, messageId, msg)
           },
+          toForeground: (alias) => session.setForeground(alias, { restoreUi: false }),
         })
       : []
   const cursor = modal ? Math.min(modal.cursor, Math.max(0, entries.length - 1)) : 0

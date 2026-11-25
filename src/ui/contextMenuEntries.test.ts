@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { accountRef } from '../account'
-import { accountStore } from '../state/accountStore'
+import { accountStore, openAccount, setForeground } from '../state/accountStore'
 import { applySeededState } from '../state/seedFixtures'
 import { createAppStore } from '../state/store'
 import { contextMenuEntries } from './contextMenuEntries'
@@ -68,4 +68,47 @@ test('a channel message offers its thread', () => {
   expect(entries.map((e) => e.id)).toEqual(['thread'])
   entries[0]!.run()
   expect(opened).toEqual(['root'])
+})
+
+test('a chat row of a background account acts on that account’s chat (unified sidebar)', () => {
+  // alpha in front, beta behind; the same chat id in both.
+  const store = createAppStore()
+  applySeededState(openAccount(store, accountRef('alpha'), { foreground: true }), 'alpha')
+  applySeededState(openAccount(store, accountRef('beta'), { foreground: false }), 'beta')
+  const chat = store.get().chats[0]!
+  const betaId = accountRef('beta').id
+  const swaps: string[] = []
+  const entries = () =>
+    contextMenuEntries(
+      { kind: 'chat', chatId: chat.id, label: 'ADA', alias: 'beta' },
+      store.get(),
+      {
+        store,
+        toForeground: (alias) => {
+          swaps.push(alias)
+          setForeground(store, accountRef(alias).id, { restoreUi: false })
+        },
+      },
+    )
+  // Mark read/unread flips beta's mark only, without a swap.
+  const before = store.get().unreadByChatId[chat.id]
+  entries()
+    .find((e) => e.id === 'toggle-read')!
+    .run()
+  expect(store.get().unreadByChatId[chat.id]).toEqual(before)
+  expect(store.get().backgroundAccounts[betaId]!.unreadByChatId[chat.id]).not.toEqual(
+    store.get().unreadByChatId[chat.id],
+  )
+  // Delete names beta; Open brings beta to the front first.
+  entries()
+    .find((e) => e.id === 'delete')!
+    .run()
+  expect(store.get().modal).toMatchObject({ kind: 'confirm-delete-chat', alias: 'beta' })
+  expect(swaps).toEqual([])
+  entries()
+    .find((e) => e.id === 'open')!
+    .run()
+  expect(swaps).toEqual(['beta'])
+  expect(store.get().account?.id).toBe(betaId)
+  expect(store.get().focus).toEqual({ kind: 'chat', chatId: chat.id })
 })

@@ -238,7 +238,7 @@ function makeSessionApi(): SessionApi {
     retryRealtime: () => accounts.retryRealtime(),
     switchAccount: (profile) => accounts.switchAccount(profile),
     reconcile: () => accounts.reconcile(),
-    setForeground: (profile) => accounts.setForeground(profile),
+    setForeground: (profile, opts) => accounts.setForeground(profile, opts),
     retry: (profile) => accounts.retry(profile),
     running: () => accounts.running(),
     clientFor: (id) => accounts.clientFor(id),
