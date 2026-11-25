@@ -6,6 +6,46 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Experimental concurrent accounts: with `"concurrentAccounts": true` every
+  alias in `accounts` runs at once and stays live (polling, presence and, with
+  `realtimeEnabled`, push), instead of one account at a time. Off by default;
+  `--profile` always runs one account alone.
+  - Switching accounts is instant and returns to the conversation you had open
+    there.
+  - With two or more accounts the sidebar lists them all, one section per
+    account under a collapsible account header with its unread count, mentions,
+    tenant and `! signed out` / `! offline` state. Row actions (mark read,
+    delete, context menu) act on the row's account without switching.
+  - A header badge counts unread activity in the background accounts
+    (`beta 3 · gamma 1`), and the pane title, composer, status bar and modals
+    name the account in front.
+  - Notifications come from every account and name it
+    (`teaminal · beta · Alice`).
+  - A picked presence and the status message go to every running account.
+  - An account whose sign-in expires, or that goes offline, stops on its own
+    and stays listed; the others keep running and nothing exits. The Accounts
+    modal shows each account's state, and `r` there starts it again (after
+    `owa-piggy reseed` for an expired sign-in).
+  - Diagnostics lists every open account (connection, push, last list poll,
+    routing, capability probe, cache files); `j` / `k` pick the account the
+    details and `r` (reconnect push) act on.
+  - Two aliases that sign in as the same user log one warning naming both.
+- `scripts/network-log-summary.ts` prints requests per minute per account from
+  a `--network-log` file. The README describes how to measure the cost of each
+  added account.
+
+### Changed
+
+- Teams-service requests in the network log name their account (`@alias`),
+  like Graph requests already did.
+
+### Fixed
+
+- The owa-piggy default profile uses its own chat routing instead of the
+  routing of the `activeAccount` alias.
+
 ## [0.25.2] - 2026-11-25
 
 ### Security
