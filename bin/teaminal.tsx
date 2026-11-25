@@ -232,6 +232,7 @@ const focusTracker = startFocusTracker(store)
 
 function makeSessionApi(): SessionApi {
   return {
+    concurrent,
     getActiveProfile: () => accounts.activeProfile(),
     client: () => accounts.client(),
     retryRealtime: () => accounts.retryRealtime(),

@@ -49,13 +49,14 @@ const BETA_DESIGN = 'THE SECOND ONE SCANS FASTER.'
 
 // Esc → menu, j → Accounts, Enter → modal, `down` rows to the account, Enter.
 type Terminal = Parameters<Parameters<typeof test>[1]>[0]['terminal']
-async function switchTo(terminal: Terminal, down: number) {
+async function switchTo(terminal: Terminal, down: number, inModal?: () => Promise<void>) {
   terminal.keyEscape()
   await expect(terminal.getByText('Accounts')).toBeVisible()
   terminal.write('j')
   await pause()
   terminal.submit()
   await expect(terminal.getByText('Enter switch')).toBeVisible()
+  await inModal?.()
   for (let i = 0; i < down; i++) {
     terminal.write('j')
     await pause()
@@ -84,8 +85,12 @@ test('account-concurrent: instant switch lands on the conversation that was open
   terminal.submit()
   await expect(terminal.getByText(ALPHA_ADA)).toBeVisible()
 
-  // beta: already running, swapped in with its own (list) focus.
-  await switchTo(terminal, 1)
+  // beta: already running, swapped in with its own (list) focus. The
+  // Accounts modal shows each account's own state.
+  await switchTo(terminal, 1, async () => {
+    await expect(terminal.getByText('alpha  foreground')).toBeVisible()
+    await expect(terminal.getByText('beta  running')).toBeVisible()
+  })
   await expect(terminal.getByText('ADA BYRON')).toBeVisible()
   expectOnly(terminal, 'beta')
   // Open DESIGN SYNC in beta.

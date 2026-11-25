@@ -69,18 +69,23 @@ export function AuthExpiredModal() {
       return
     }
     store.set({ modal: { ...modal, status: 'retrying', lastError: undefined } })
+    // Concurrent mode restarts just this account; the others keep running.
+    const concurrent = session.concurrent === true && profile !== null
     try {
-      await session.switchAccount(profile)
-      // Bootstrap succeeded: drop the modal entirely.
-      store.set({ modal: null, inputZone: 'list' })
+      if (concurrent) await session.retry(profile)
+      else await session.switchAccount(profile)
+      // Bootstrap succeeded: drop the modal entirely (unless another one
+      // was opened meanwhile).
+      store.set((s) => (s.modal?.kind === 'auth-expired' ? { modal: null, inputZone: 'list' } : {}))
     } catch (err) {
-      store.set({
-        modal: {
-          ...modal,
-          status: 'idle',
-          lastError: err instanceof Error ? err.message : String(err),
-        },
-      })
+      const lastError = err instanceof Error ? err.message : String(err)
+      // Concurrent mode: a swap to another account meanwhile closed it; keep
+      // it closed.
+      store.set((s) =>
+        !concurrent || s.modal?.kind === 'auth-expired'
+          ? { modal: { ...modal, status: 'idle', lastError } }
+          : {},
+      )
     }
   }
 

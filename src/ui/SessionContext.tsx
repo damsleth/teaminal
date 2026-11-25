@@ -32,6 +32,8 @@ export type SessionApi = {
    * first if it has no session); throws when that start fails.
    */
   switchAccount: (profile: string | null) => Promise<void>
+  /** Concurrent mode is on (latched at startup). Absent = single mode. */
+  concurrent?: boolean
   // Concurrent mode (concurrentAccounts) only; no-ops in single mode.
   /** Start added accounts and stop removed ones after `settings.accounts` changed. */
   reconcile: () => Promise<void>
