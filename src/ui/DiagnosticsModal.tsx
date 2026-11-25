@@ -20,7 +20,7 @@ import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
-import { decodeJwtClaims, getToken } from '../auth/owaPiggy'
+import { accessTokenClaims } from '../state/authActions'
 import type { CapabilityResult } from '../graph/capabilities'
 import { getActiveTransport } from '../realtime/transport'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
@@ -79,8 +79,8 @@ export function DiagnosticsModal() {
     setLoad({ status: 'loading' })
     ;(async () => {
       try {
-        const token = await getToken()
-        const claims = decodeJwtClaims(token)
+        // The open account's token, not the default profile's.
+        const claims = await accessTokenClaims(session.client())
         if (cancelled) return
         setLoad({ status: 'ready', claims })
       } catch (err) {

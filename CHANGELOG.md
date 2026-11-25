@@ -54,6 +54,9 @@ adheres to [Semantic Versioning](https://semver.org/).
 - Chat members that fail to load are retried instead of staying missing until
   the chat is reopened.
 - The macOS appearance check no longer blocks the UI every 15 seconds.
+- Diagnostics shows the open account's token claims, not the default
+  profile's.
+- Names in Activity and menu rows with wide characters (CJK, emoji) line up.
 
 ## [0.25.1] - 2026-10-30
 

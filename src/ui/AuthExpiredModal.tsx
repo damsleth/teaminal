@@ -12,7 +12,7 @@ import { Box, useApp } from 'ink'
 import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
-import { reseed } from '../auth/owaPiggy'
+import { reseed } from '../state/authActions'
 import { useSessionApi } from './SessionContext'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 

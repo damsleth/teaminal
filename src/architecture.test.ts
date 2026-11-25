@@ -67,6 +67,14 @@ describe('architecture: layer boundaries', () => {
     expect(offenders.map((f) => relative(REPO_ROOT, f))).toEqual([])
   })
 
+  test('src/ui reaches src/auth only through state (type imports allowed)', () => {
+    const forbidden = /^\s*import\s+(?!type\b)[^'"]+from\s+['"][^'"]*\/auth\//
+    const offenders = filesUnder('ui')
+      .filter((f) => !/\.test\.tsx?$/.test(f))
+      .filter((f) => importsMatch(f, forbidden))
+    expect(offenders.map((f) => relative(REPO_ROOT, f))).toEqual([])
+  })
+
   test('src/ui does not call src/graph operation modules (use state/* actions instead)', () => {
     // Permitted:
     //   - `import type` (pure shape sharing, no runtime coupling)
