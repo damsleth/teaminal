@@ -208,18 +208,25 @@ export function isSeededMode(): boolean {
   return typeof v === 'string' && v.length > 0
 }
 
-// Collision fixture (M2): the profile named BETA_PROFILE reuses every fixture
-// id (me, chats, members, messages) with different text: names, topics and
-// bodies upper-cased. Any alpha text on screen after switching to beta is a
-// cross-account leak. Other profiles get the normal fixtures.
+// Collision fixtures (M2): the profiles named BETA_PROFILE and GAMMA_PROFILE
+// reuse every fixture id (me, chats, members, messages) with different text:
+// beta upper-cases names, topics and bodies, gamma appends " (gamma)" (not a
+// case change, so a filter tells all three apart). Text of one account on
+// screen under another is a cross-account leak. Other profiles get the normal
+// fixtures.
 export const BETA_PROFILE = 'beta'
-const BETA_TEXT_KEYS = new Set(['displayName', 'topic', 'content'])
-function betaVariant<T>(value: T): T {
-  if (Array.isArray(value)) return value.map(betaVariant) as T
+export const GAMMA_PROFILE = 'gamma'
+const TEXT_VARIANTS = new Map<string, (text: string) => string>([
+  [BETA_PROFILE, (t) => t.toUpperCase()],
+  [GAMMA_PROFILE, (t) => `${t} (gamma)`],
+])
+const VARIANT_TEXT_KEYS = new Set(['displayName', 'topic', 'content'])
+function textVariant<T>(value: T, f: (text: string) => string): T {
+  if (Array.isArray(value)) return value.map((v) => textVariant(v, f)) as T
   if (!value || typeof value !== 'object') return value
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(value)) {
-    out[k] = BETA_TEXT_KEYS.has(k) && typeof v === 'string' ? v.toUpperCase() : betaVariant(v)
+    out[k] = VARIANT_TEXT_KEYS.has(k) && typeof v === 'string' ? f(v) : textVariant(v, f)
   }
   return out as T
 }
@@ -230,8 +237,8 @@ function betaVariant<T>(value: T): T {
  * are made; no owa-piggy auth is required.
  */
 export function applySeededState(acc: AccountStore, profile?: string | null): void {
-  const beta = profile === BETA_PROFILE
-  const pick = <T>(v: T): T => (beta ? betaVariant(v) : v)
+  const variant = profile ? TEXT_VARIANTS.get(profile) : undefined
+  const pick = <T>(v: T): T => (variant ? textVariant(v, variant) : v)
   const messageCacheByConvo: AppState['messageCacheByConvo'] = {}
   for (const [key, msgs] of Object.entries(SEED_MESSAGES)) {
     messageCacheByConvo[key] = emptyMessageCache(pick(msgs))

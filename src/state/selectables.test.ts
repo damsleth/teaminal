@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import type { Chat, Team, Channel } from '../types'
+import { accountRef } from '../account'
+import { openAccount } from './accountStore'
 import {
   buildSelectableList,
   CHAT_SECTION_CAP,
+  collapseKeyFor,
   isSelectable,
   headerIndexForKey,
   parentCollapseKey,
@@ -14,10 +17,13 @@ import {
   nextSelectableIndex,
   NEW_CHAT_ROW,
   resolveCursor,
+  selectableKey,
   shortName,
+  unifiedListInput,
+  visibleList,
   type SelectableItem,
 } from './selectables'
-import { initialAppState } from './store'
+import { createAppStore, initialAppState, type AccountSlice, type Settings } from './store'
 
 const team = (id: string, displayName: string): Team => ({ id, displayName })
 const channel = (id: string, displayName: string, isArchived = false): Channel => ({
@@ -575,5 +581,232 @@ describe('cursor keys', () => {
   test('the synthetic new-chat row has its own key', () => {
     expect(cursorAt([], 0).cursorKey).toBe(NEW_CHAT_ROW)
     expect(resolveCursor([], 1, NEW_CHAT_ROW, 5)).toBe(0)
+  })
+})
+
+describe('unified list (M2 F.2)', () => {
+  type Data = Partial<AccountSlice>
+  // Every alias in `data` opened in order, the first in front; `settings`
+  // patched over the defaults with accounts = the aliases.
+  function unified(data: Record<string, Data>, settings: Partial<Settings> = {}, filter = '') {
+    const store = createAppStore()
+    Object.keys(data).forEach((alias, i) => {
+      openAccount(store, accountRef(alias), { foreground: i === 0 }).set(data[alias]!)
+    })
+    store.set((s) => ({
+      settings: { ...s.settings, accounts: Object.keys(data), ...settings },
+      filter,
+    }))
+    return unifiedListInput(store.get())
+  }
+  const list = (...args: Parameters<typeof unified>) => visibleList(unified(...args)!)
+  const keys = (items: SelectableItem[]) => items.map(selectableKey)
+  const id = (alias: string) => accountRef(alias).id
+  // Same ids in every account, as the collision fixtures have.
+  const shared = (topic: string): Data => ({
+    chats: [chat('c1', { topic: `${topic} one` }), chat('c2', { topic: `${topic} two` })],
+    teams: [team('t1', `${topic} team`)],
+    channelsByTeam: { t1: [channel('g', `${topic} general`)] },
+  })
+
+  test('single mode is untouched: no unified input, no tags, same keys', () => {
+    const store = createAppStore()
+    openAccount(store, accountRef('alpha'), { foreground: true }).set(shared('a'))
+    store.set((s) => ({ settings: { ...s.settings, accounts: ['alpha', 'beta'] } }))
+    // beta is configured but not open: still one account.
+    expect(unifiedListInput(store.get())).toBeNull()
+    const items = visibleList(store.get())
+    expect(items.some((it) => 'accountId' in it || 'alias' in it)).toBe(false)
+    expect(keys(items)).toEqual(['chat:c1', 'chat:c2', 'team:t1', 'channel:t1/g'])
+  })
+
+  test('two and three accounts with identical ids are distinct rows, in configured order', () => {
+    const two = list({ alpha: shared('a'), beta: shared('b') })
+    expect(keys(two)).toEqual([
+      `account:${id('alpha')}`,
+      `${id('alpha')}/chat:c1`,
+      `${id('alpha')}/chat:c2`,
+      `${id('alpha')}/team:t1`,
+      `${id('alpha')}/channel:t1/g`,
+      `account:${id('beta')}`,
+      `${id('beta')}/chat:c1`,
+      `${id('beta')}/chat:c2`,
+      `${id('beta')}/team:t1`,
+      `${id('beta')}/channel:t1/g`,
+    ])
+    const three = list(
+      { gamma: shared('g'), alpha: shared('a'), beta: shared('b') },
+      {
+        accounts: ['alpha', 'beta', 'gamma'],
+      },
+    )
+    expect(new Set(keys(three)).size).toBe(three.length)
+    expect(three.filter((it) => it.kind === 'account').map((it) => it.alias)).toEqual([
+      'alpha',
+      'beta',
+      'gamma',
+    ])
+    const c1 = three.filter((it) => it.kind === 'chat' && it.chat.id === 'c1')
+    expect(c1.map((it) => [it.alias, it.kind === 'chat' && it.label])).toEqual([
+      ['alpha', 'a one'],
+      ['beta', 'b one'],
+      ['gamma', 'g one'],
+    ])
+  })
+
+  test('the account header carries label, unread, mentions and conn', () => {
+    const [header] = list({
+      alpha: {
+        ...shared('a'),
+        conn: 'authError',
+        unreadMentionCount: 2,
+        unreadByChatId: {
+          c1: { unreadCount: 3, mentionCount: 0 },
+          c2: { unreadCount: 0, mentionCount: 0 },
+        },
+      },
+      beta: shared('b'),
+    })
+    expect(header).toEqual({
+      kind: 'account',
+      accountId: id('alpha'),
+      alias: 'alpha',
+      label: 'alpha',
+      collapsed: false,
+      unread: 1,
+      mentions: 2,
+      conn: 'authError',
+    })
+  })
+
+  test('a failed or empty account shows its header only, and the header is a cursor stop', () => {
+    const items = list({ alpha: shared('a'), beta: { conn: 'offline' } })
+    const beta = items.at(-1)!
+    expect(beta).toMatchObject({ kind: 'account', alias: 'beta', conn: 'offline' })
+    expect(isSelectable(beta)).toBe(true)
+    expect(isSelectable(items[0]!)).toBe(true)
+    expect(nextSelectableIndex(items, items.length - 2, +1)).toBe(items.length - 1)
+  })
+
+  test('filter keeps only the headers of accounts with a match; no match is an empty list', () => {
+    const data = { alpha: shared('alpha'), beta: shared('beta'), gamma: shared('gamma') }
+    expect(keys(list(data, {}, 'beta'))).toEqual([
+      `account:${id('beta')}`,
+      `${id('beta')}/chat:c1`,
+      `${id('beta')}/chat:c2`,
+      `${id('beta')}/team:t1`,
+      `${id('beta')}/channel:t1/g`,
+    ])
+    // A hit in two accounts shows both; section and team headers drop as in
+    // single mode (team t1 matches on its own name only).
+    expect(keys(list(data, { chatListGroupByType: true }, 'two'))).toEqual([
+      `account:${id('alpha')}`,
+      `${id('alpha')}/chat:c2`,
+      `account:${id('beta')}`,
+      `${id('beta')}/chat:c2`,
+      `account:${id('gamma')}`,
+      `${id('gamma')}/chat:c2`,
+    ])
+    // The header never matches on its own label.
+    expect(list({ alpha: shared('x'), beta: shared('y') }, {}, 'alpha')).toEqual([])
+  })
+
+  test('collapse keys are per account; legacy keys apply to every account', () => {
+    const data = { alpha: shared('a'), beta: shared('b') }
+    const channels = (items: SelectableItem[]) =>
+      items.filter((it) => it.kind === 'channel').map((it) => it.alias)
+    expect(channels(list(data, { chatListCollapsedSections: { 'alpha/team:t1': true } }))).toEqual([
+      'beta',
+    ])
+    expect(channels(list(data, { chatListCollapsedSections: { 'team:t1': true } }))).toEqual([])
+    // An explicit false under the prefixed key reopens what a legacy key
+    // collapses, for that account only.
+    expect(
+      channels(
+        list(data, { chatListCollapsedSections: { 'team:t1': true, 'beta/team:t1': false } }),
+      ),
+    ).toEqual(['beta'])
+    // Grouped sections too.
+    const grouped = list(data, {
+      chatListGroupByType: true,
+      chatListCollapsedSections: { 'beta/oneOnOne': true },
+    })
+    expect(grouped.filter((it) => it.kind === 'chat').map((it) => it.alias)).toEqual([
+      'alpha',
+      'alpha',
+    ])
+  })
+
+  test('a collapsed account shows its header only; a filter lifts it', () => {
+    const data = { alpha: shared('a'), beta: shared('b') }
+    const collapsed = list(data, { chatListCollapsedSections: { 'account:alpha': true } })
+    expect(collapsed[0]).toMatchObject({ kind: 'account', alias: 'alpha', collapsed: true })
+    expect(collapsed[1]).toMatchObject({ kind: 'account', alias: 'beta', collapsed: false })
+    const filtered = list(data, { chatListCollapsedSections: { 'account:alpha': true } }, 'one')
+    expect(filtered.map((it) => it.alias)).toEqual(['alpha', 'alpha', 'beta', 'beta'])
+    expect(filtered[0]).toMatchObject({ kind: 'account', collapsed: false })
+  })
+
+  test('header and parent keys carry the alias; the chain ends at the account', () => {
+    const items = list(
+      {
+        alpha: { ...shared('a'), chats: [chat('c1'), chat('m1', { chatType: 'meeting' })] },
+        beta: {},
+      },
+      { chatListGroupByType: true, chatListSectionCap: false },
+    )
+    const find = (kind: SelectableItem['kind'], alias = 'alpha') =>
+      items.find((it) => it.kind === kind && it.alias === alias)!
+    expect(collapseKeyFor(find('account'))).toBe('account:alpha')
+    expect(collapseKeyFor(find('section'))).toBe('alpha/oneOnOne')
+    expect(collapseKeyFor(find('team'))).toBe('alpha/team:t1')
+    expect(parentCollapseKey(find('channel'), true)).toBe('alpha/team:t1')
+    expect(parentCollapseKey(find('team'), true)).toBe('alpha/teams')
+    expect(parentCollapseKey(find('chat'), true)).toBe('alpha/oneOnOne')
+    expect(parentCollapseKey(find('section'), true)).toBe('account:alpha')
+    expect(parentCollapseKey(find('account'), true)).toBeNull()
+    expect(headerIndexForKey(items, 'alpha/team:t1')).toBe(items.indexOf(find('team')))
+    expect(headerIndexForKey(items, 'account:beta')).toBe(items.length - 1)
+    // Ungrouped: a chat or team has no section, so its parent is the account.
+    const flat = list({ alpha: shared('a'), beta: {} })
+    const chatRow = flat.find((it) => it.kind === 'chat')!
+    const teamRow = flat.find((it) => it.kind === 'team')!
+    expect(parentCollapseKey(chatRow, false)).toBe('account:alpha')
+    expect(parentCollapseKey(teamRow, false)).toBe('account:alpha')
+  })
+
+  test('… N more expands per account', () => {
+    const many = (n: number): Data => ({
+      chats: Array.from({ length: n }, (_, i) => chat(`c${i}`, { topic: `t${i}` })),
+    })
+    const more = (alphaExpanded: boolean) =>
+      list(
+        {
+          alpha: {
+            ...many(CHAT_SECTION_CAP + 2),
+            expandedChatSections: { oneOnOne: alphaExpanded },
+          },
+          beta: many(CHAT_SECTION_CAP + 2),
+        },
+        { chatListGroupByType: true },
+      )
+        .filter((it) => it.kind === 'more')
+        .map((it) => it.alias)
+    expect(more(false)).toEqual(['alpha', 'beta'])
+    expect(more(true)).toEqual(['beta'])
+  })
+
+  test('the cursor follows its row across a reorder inside its section, never into another', () => {
+    const before = list({ alpha: shared('a'), beta: shared('b') })
+    const at = before.findIndex((it) => it.alias === 'beta' && it.kind === 'chat')
+    const { cursor, cursorKey } = cursorAt(before, at)
+    expect(cursorKey).toBe(`${id('beta')}/chat:c1`)
+    const reordered = (b: Data) => list({ alpha: shared('a'), beta: b })
+    const b = shared('b')
+    const after = reordered({ ...b, chats: [b.chats![1]!, b.chats![0]!] })
+    const i = resolveCursor(after, after.length, cursorKey, cursor)
+    expect(after[i]).toMatchObject({ kind: 'chat', alias: 'beta', chat: { id: 'c1' } })
+    // The same id in alpha is never picked up.
+    expect(i).not.toBe(after.findIndex((it) => it.alias === 'alpha' && it.kind === 'chat'))
   })
 })
