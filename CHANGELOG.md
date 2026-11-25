@@ -45,6 +45,15 @@ adheres to [Semantic Versioning](https://semver.org/).
   instead of stopping at the cached ones.
 - After emptying the cache or a profile photo change, pictures show the new
   image instead of the terminal's stale copy.
+- Saving an edit no longer deletes the conversation's unsent draft, and a
+  composer that (re)mounts on a conversation keeps that conversation's draft.
+- Realtime no longer reconnects after shutdown or after an account switch that
+  lands while it is still connecting.
+- Inline images that fail to load are retried after 30 seconds, and every view
+  waiting on one updates when it lands.
+- Chat members that fail to load are retried instead of staying missing until
+  the chat is reopened.
+- The macOS appearance check no longer blocks the UI every 15 seconds.
 
 ## [0.25.1] - 2026-10-30
 

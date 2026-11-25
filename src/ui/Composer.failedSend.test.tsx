@@ -274,3 +274,13 @@ test("saving an edit keeps the chat's unsent draft, and a failed edit still resu
   expect(store.get().draftsByConvo['chat:a']).toBe('unsent draft')
   app.unmount()
 })
+
+test('mounting on a conversation with a saved draft keeps the draft', async () => {
+  const { store, app } = mount({
+    focus: { kind: 'chat', chatId: 'c1' },
+    draftsByConvo: { 'chat:c1': 'half-written' },
+  })
+  await tick()
+  expect(store.get().draftsByConvo['chat:c1']).toBe('half-written')
+  app.unmount()
+})

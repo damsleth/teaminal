@@ -141,10 +141,14 @@ export function Composer({ columns = 80 }: { columns?: number }) {
   // account switch and the box being refilled, the previous text can't leak
   // into another conversation or out through another account.
   const owner = useAppState(composerOwner)
-  const [owned, setOwned] = useState<{ owner: string | null; buf: ComposerBuffer }>(() => ({
-    owner: composerOwner(store.get()),
-    buf: emptyBuffer,
-  }))
+  // Seeded from the open conversation's draft: an empty box here would read
+  // as "draft cleared" to the persistence effect below and delete it.
+  const [owned, setOwned] = useState<{ owner: string | null; buf: ComposerBuffer }>(() => {
+    const s = store.get()
+    const k = focusKey(s.focus)
+    const draft = k ? (s.draftsByConvo[k] ?? '') : ''
+    return { owner: composerOwner(s), buf: { text: draft, cursor: draft.length } }
+  })
   const buf = owned.buf
   const setBuf = (next: ComposerBuffer | ((b: ComposerBuffer) => ComposerBuffer)): void =>
     setOwned((o) => ({ owner: o.owner, buf: typeof next === 'function' ? next(o.buf) : next }))
