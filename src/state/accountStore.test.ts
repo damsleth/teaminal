@@ -366,6 +366,24 @@ describe('account slots', () => {
     expect(store.get().generationById[bob.id]).toBeDefined()
   })
 
+  test('an updater that re-opens its own slot cannot write into the new slot', () => {
+    const { store, a, b } = twoSlots()
+    expect(
+      a.set(() => {
+        openAccount(store, alice, { foreground: true })
+        return { chats: [chat('leak')] }
+      }),
+    ).toBe(false)
+    expect(store.get().chats).toEqual([])
+    expect(
+      b.set(() => {
+        openAccount(store, bob, { foreground: false })
+        return { chats: [chat('leak')] }
+      }),
+    ).toBe(false)
+    expect(store.get().backgroundAccounts[bob.id]!.chats).toEqual([])
+  })
+
   test('resetAccountScopedState closes every slot and opens the account alone', () => {
     const { store, a, b } = twoSlots()
     let calls = 0

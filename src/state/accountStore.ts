@@ -119,6 +119,8 @@ export function accountStoreFor(store: Store<AppState>, ref: AccountRef): Accoun
     set(input) {
       if (!isCurrent()) return false
       const patch = typeof input === 'function' ? input(get()) : input
+      // The updater may itself have closed or re-opened the slot.
+      if (!isCurrent()) return false
       const scoped: Record<string, unknown> = {}
       for (const k of ACCOUNT_KEYS) {
         if (k in patch) scoped[k] = patch[k]
