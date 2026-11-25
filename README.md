@@ -1,3 +1,5 @@
+<p align="center"><img src="teaminal-logo.png" alt="teaminal" width="600"></p>
+
 # teaminal
 
 [![CI](https://github.com/damsleth/teaminal/actions/workflows/ci.yml/badge.svg)](https://github.com/damsleth/teaminal/actions/workflows/ci.yml)
