@@ -93,6 +93,7 @@ async function chatsvcGet<T>(
     })
   } catch (err) {
     recordRequest({
+      account: opts.account.label,
       ts: startedAt,
       method: 'GET',
       path,
@@ -103,7 +104,14 @@ async function chatsvcGet<T>(
     throw err
   }
   const durationMs = Date.now() - startedAt
-  recordRequest({ ts: startedAt, method: 'GET', path, status: res.status, durationMs })
+  recordRequest({
+    ts: startedAt,
+    account: opts.account.label,
+    method: 'GET',
+    path,
+    status: res.status,
+    durationMs,
+  })
   // Read the FULL body for parsing - chatsvc message responses
   // routinely exceed any reasonable diagnostic clip. Truncate only the
   // copy returned for diagnostics so logs stay bounded.
@@ -544,6 +552,7 @@ export async function sendChannelMessageViaChatsvc(
       })
     } catch (err) {
       recordRequest({
+        account: opts.account.label,
         ts: startedAt,
         method: 'POST',
         path,
@@ -554,7 +563,14 @@ export async function sendChannelMessageViaChatsvc(
       throw err
     }
     const durationMs = Date.now() - startedAt
-    recordRequest({ ts: startedAt, method: 'POST', path, status: res.status, durationMs })
+    recordRequest({
+      ts: startedAt,
+      account: opts.account.label,
+      method: 'POST',
+      path,
+      status: res.status,
+      durationMs,
+    })
     const text = await safeFullText(res)
     if (res.status < 200 || res.status >= 300) {
       throw new TeamsChatsvcError(

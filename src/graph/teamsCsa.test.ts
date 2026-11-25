@@ -1,4 +1,5 @@
 import { accountRef } from '../account'
+import { getRecentRequests } from '../log'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
@@ -203,6 +204,8 @@ describe('fetchChats', () => {
     expect(urls[1]).toContain('continuationToken=c2')
     expect(seenAuth).toBe(`Bearer ${csaToken}`)
     expect(runnerArgs.some((a) => a.includes('--audience') && a.includes('csa'))).toBe(true)
+    // Request records name the account they ran as.
+    expect(getRecentRequests().some((r) => r.account === ACCOUNT.label)).toBe(true)
   })
 
   test('throws TeamsCsaError on non-2xx', async () => {

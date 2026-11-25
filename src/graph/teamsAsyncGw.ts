@@ -150,6 +150,7 @@ async function authViaSkypeToken(host: string, opts: AsyncGwOpts): Promise<strin
     })
   } catch (err) {
     recordRequest({
+      account: opts.account.label,
       ts: startedAt,
       method: 'POST',
       path: '/v1/skypetokenauth',
@@ -160,6 +161,7 @@ async function authViaSkypeToken(host: string, opts: AsyncGwOpts): Promise<strin
     return null
   }
   recordRequest({
+    account: opts.account.label,
     ts: startedAt,
     method: 'POST',
     path: '/v1/skypetokenauth',
@@ -199,6 +201,7 @@ async function authViaAadToken(host: string, oid: string, opts: AsyncGwOpts): Pr
     })
   } catch (err) {
     recordRequest({
+      account: opts.account.label,
       ts: startedAt,
       method: 'POST',
       path: '/v1/.../aadtokenauth',
@@ -209,6 +212,7 @@ async function authViaAadToken(host: string, oid: string, opts: AsyncGwOpts): Pr
     throw err
   }
   recordRequest({
+    account: opts.account.label,
     ts: startedAt,
     method: 'POST',
     path: '/v1/.../aadtokenauth',
@@ -312,6 +316,7 @@ export async function fetchObjectByUrl(
       })
     } catch (err) {
       recordRequest({
+        account: opts.account.label,
         ts: startedAt,
         method: 'GET',
         path: '/v1/objects/.../views/...',
@@ -322,6 +327,7 @@ export async function fetchObjectByUrl(
       throw err
     }
     recordRequest({
+      account: opts.account.label,
       ts: startedAt,
       method: 'GET',
       path: '/v1/objects/.../views/...',

@@ -257,6 +257,7 @@ async function csaGet(path: string, opts: CsaOpts, diagPath: string): Promise<un
     })
   } catch (err) {
     recordRequest({
+      account: opts.account.label,
       ts: startedAt,
       method: 'GET',
       path: diagPath,
@@ -267,6 +268,7 @@ async function csaGet(path: string, opts: CsaOpts, diagPath: string): Promise<un
     throw err
   }
   recordRequest({
+    account: opts.account.label,
     ts: startedAt,
     method: 'GET',
     path: diagPath,
