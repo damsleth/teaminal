@@ -15,10 +15,11 @@
 // historical default) — users there can still pick 'dark'/'light' explicitly.
 //
 // The driver polls on an interval so flipping the OS appearance updates the
-// running app without a restart. Detection is a short subprocess; the poll
-// interval is generous since appearance changes are rare.
+// running app without a restart. Detection is a short subprocess: the startup
+// read is synchronous (the first render needs it), later polls run it
+// asynchronously, one at a time, so the UI thread never waits on it.
 
-import { execFileSync } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
 import type { AppState, Store, SystemAppearance } from './store'
 
 type DetectOpts = {
@@ -47,6 +48,16 @@ export function detectSystemAppearance(opts?: DetectOpts): SystemAppearance {
   }
 }
 
+// Async form of detectSystemAppearance for the poll.
+export function detectSystemAppearanceAsync(): Promise<SystemAppearance> {
+  if (process.platform !== 'darwin') return Promise.resolve('dark')
+  return new Promise((resolve) => {
+    execFile('defaults', ['read', '-g', 'AppleInterfaceStyle'], (err, stdout) => {
+      resolve(!err && String(stdout).trim() === 'Dark' ? 'dark' : 'light')
+    })
+  })
+}
+
 export type SystemAppearanceDriver = { stop: () => void }
 
 export function startSystemAppearanceDriver(
@@ -54,6 +65,8 @@ export function startSystemAppearanceDriver(
   opts?: {
     intervalMs?: number
     detect?: () => SystemAppearance
+    // The interval's probe; defaults to `detect` when that is injected.
+    poll?: () => Promise<SystemAppearance>
     // The terminal background's appearance from the startup probe, if any.
     terminal?: SystemAppearance | null
   },
@@ -65,15 +78,27 @@ export function startSystemAppearanceDriver(
   // Synchronous initial read so the first render uses the right base.
   let os = detect()
   set(opts?.terminal ?? os)
+  const poll = opts?.poll ?? (opts?.detect ? async () => detect() : detectSystemAppearanceAsync)
+  let inFlight = false
+  let stopped = false
   const timer = setInterval(() => {
-    const next = detect()
-    if (next === os) return
-    os = next
-    set(next)
+    if (inFlight) return
+    inFlight = true
+    void poll()
+      .then((next) => {
+        if (stopped || next === os) return
+        os = next
+        set(next)
+      })
+      .catch(() => {})
+      .finally(() => {
+        inFlight = false
+      })
   }, opts?.intervalMs ?? 15_000)
   if (typeof timer.unref === 'function') timer.unref()
   return {
     stop() {
+      stopped = true
       clearInterval(timer)
     },
   }

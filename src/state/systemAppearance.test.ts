@@ -75,4 +75,24 @@ describe('startSystemAppearanceDriver', () => {
     expect(store.get().systemAppearance).toBe('dark')
     driver.stop()
   })
+
+  test('polls without blocking and with at most one probe in flight', async () => {
+    const store = createAppStore()
+    let calls = 0
+    let finish!: (v: 'light') => void
+    const driver = startSystemAppearanceDriver(store, {
+      detect: () => 'dark',
+      poll: () => {
+        calls++
+        return new Promise((r) => (finish = r))
+      },
+      intervalMs: 2,
+    })
+    await new Promise((r) => setTimeout(r, 30))
+    expect(calls).toBe(1)
+    finish('light')
+    await new Promise((r) => setTimeout(r, 0))
+    expect(store.get().systemAppearance).toBe('light')
+    driver.stop()
+  })
 })
