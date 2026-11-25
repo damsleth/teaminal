@@ -737,6 +737,30 @@ describe('unified list (M2 F.2)', () => {
     ])
   })
 
+  test("an alias with / or : cannot collide with another account's keys", () => {
+    // Unencoded, `account:foo`'s Teams section and `foo/teams`'s header were
+    // both `account:foo/teams`.
+    const data = { 'account:foo': shared('a'), 'foo/teams': shared('b') }
+    const items = list(data, { chatListGroupByType: true })
+    const teamsSection = items.find((it) => it.kind === 'section' && it.section === 'teams')!
+    const header = items.find((it) => it.kind === 'account' && it.alias === 'foo/teams')!
+    const keys = [collapseKeyFor(teamsSection), collapseKeyFor(header)]
+    expect(new Set(keys).size).toBe(2)
+    const collapsed = list(data, {
+      chatListGroupByType: true,
+      chatListCollapsedSections: { [collapseKeyFor(teamsSection)!]: true },
+    })
+    expect(collapsed.find((it) => it.kind === 'account' && it.alias === 'foo/teams')).toMatchObject(
+      { collapsed: false },
+    )
+    expect(collapsed.filter((it) => it.kind === 'channel').map((it) => it.alias)).toEqual([
+      'foo/teams',
+    ])
+    expect(headerIndexForKey(collapsed, collapseKeyFor(header)!)).toBe(
+      collapsed.findIndex((it) => it.kind === 'account' && it.alias === 'foo/teams'),
+    )
+  })
+
   test('a collapsed account shows its header only; a filter lifts it', () => {
     const data = { alpha: shared('a'), beta: shared('b') }
     const collapsed = list(data, { chatListCollapsedSections: { 'account:alpha': true } })

@@ -80,14 +80,26 @@ export function teamCollapseKey(teamId: string): string {
   return `team:${teamId}`
 }
 
+// The alias as it appears inside a collapse key: percent-encoded, so a `/` or
+// `:` in an alias never acts as a separator (aliases `account:x` and `x/teams`
+// must not both produce `account:x/teams`). Ordinary aliases are unchanged.
+function aliasKey(alias: string): string {
+  return encodeURIComponent(alias)
+}
+
 export function accountCollapseKey(alias: string): string {
-  return `account:${alias}`
+  return `account:${aliasKey(alias)}`
+}
+
+// The prefix of an account's own section and team keys.
+function accountKeyPrefix(alias: string): string {
+  return `${aliasKey(alias)}/`
 }
 
 // A tagged row's section and team keys live under its account's alias, so
 // collapsing team x in alpha leaves team x in beta open.
 function scopedKey(item: AccountTag, key: string): string {
-  return item.alias === undefined ? key : `${item.alias}/${key}`
+  return item.alias === undefined ? key : `${accountKeyPrefix(item.alias)}${key}`
 }
 
 // The collapsed-state key a header row toggles, or null for a non-header.
@@ -477,7 +489,7 @@ export function unifiedListInput(s: AppState): UnifiedListInput | null {
 // win over them, an explicit false included (that reopens a section a legacy
 // key collapses).
 function collapsedFor(alias: string, all: Record<string, boolean>): Record<string, boolean> {
-  const prefix = `${alias}/`
+  const prefix = accountKeyPrefix(alias)
   const out = { ...all }
   for (const [k, v] of Object.entries(all)) {
     if (k.startsWith(prefix)) out[k.slice(prefix.length)] = v
