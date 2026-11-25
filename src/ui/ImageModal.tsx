@@ -28,6 +28,7 @@ import { detectImageFormat } from './kittyGraphics'
 import { materializeImage, openImageFile } from './openImageFile'
 import { openExternal } from './openExternal'
 import { useSessionApi } from './SessionContext'
+import { foregroundLabel, labelSuffix } from '../state/selectables'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
 function readPngDimensions(buf: Buffer): { width: number; height: number } | null {
@@ -58,6 +59,8 @@ export function ImageModal() {
   const modal = useAppState((s) => s.modal)
   const accountId = useAppState((s) => s.account?.id)
   const theme = useTheme()
+  // Several accounts open: the foreground account's label.
+  const accountLabel = useAppState(foregroundLabel)
   const isOpen = modal?.kind === 'image'
   const ref = isOpen ? modal.ref : null
 
@@ -133,7 +136,10 @@ export function ImageModal() {
       paddingX={theme.layout.modalPaddingX}
       paddingY={theme.layout.modalPaddingY}
     >
-      <Text bold={theme.emphasis.modalTitleBold}>{ref.name || 'image'}</Text>
+      <Text bold={theme.emphasis.modalTitleBold}>
+        {ref.name || 'image'}
+        {labelSuffix(accountLabel)}
+      </Text>
       <Box marginTop={1} flexDirection="column">
         <Text color={theme.mutedText}>
           {format ? `format: ${format}` : data ? 'format: unknown' : 'loading…'}

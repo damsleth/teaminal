@@ -504,11 +504,17 @@ export function unifiedListInput(s: UnifiedSource): UnifiedListInput | null {
   return accounts.length < 2 ? null : { accounts, settings: s.settings, filter: s.filter }
 }
 
-// The unified sidebar is on: two or more accounts open. Unlike
-// SessionApi.running(), an open account whose start failed counts: it still
-// has a section in the sidebar.
+// The unified sidebar is on: two or more accounts open. Also the condition
+// for naming the foreground account in the pane title, composer, status bar
+// and modals (F.4). Unlike SessionApi.running(), an open account whose start
+// failed counts: it still has a section in the sidebar.
 export function unifiedSidebar(s: UnifiedSource): boolean {
   return openAccounts(s).length > 1
+}
+
+// The foreground account's label where several accounts are open, else null.
+export function foregroundLabel(s: AppState): string | null {
+  return s.account && unifiedSidebar(s) ? s.account.label : null
 }
 
 // The account's header is collapsed in the unified sidebar. Counted from the
@@ -524,6 +530,11 @@ export function collapsedInSidebar(
     Object.keys(s.generationById).length > 1 &&
     !!s.settings.chatListCollapsedSections[accountCollapseKey(ref.profile)]
   )
+}
+
+// ` · <label>` after a title, or '' without a label.
+export function labelSuffix(label: string | null | undefined): string {
+  return label ? ` · ${label}` : ''
 }
 
 // A selector for unifiedListInput that returns the previous result while

@@ -55,7 +55,8 @@ import {
 import { emptyBuffer, reduce, type ComposerAction, type ComposerBuffer } from './composerReducer'
 import { htmlToText } from '../text/html'
 import { COMPOSER_TEXT_CHROME, cursorRowCol, wrapComposer } from './composerWrap'
-import { shortName } from '../state/selectables'
+import { foregroundLabel, shortName } from '../state/selectables'
+import { headerForFocus } from './MessagePane'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { elementRect } from './inlineImageLayout'
 import { openCommandPalette } from './CommandPalette'
@@ -164,6 +165,21 @@ export function Composer({ columns = 80 }: { columns?: number }) {
     return ownedRef.current !== null && ownedRef.current === composerOwner(s)
   }
   const [sending, setSending] = useState(false)
+  // Several accounts open: the empty box says which conversation it posts
+  // to and as which account.
+  const placeholder = useAppState((s) => {
+    const label = foregroundLabel(s)
+    if (!label || s.focus.kind === 'list') return null
+    const title = headerForFocus(
+      s.focus,
+      s.chats,
+      s.teams,
+      s.channelsByTeam,
+      s.me?.id,
+      s.nameByUserId,
+    )
+    return `Message ${title} as ${label}`
+  })
   const parserRef = useRef<ParserState>(initialParserState)
 
   const conv = focusKey(focus)
@@ -495,6 +511,16 @@ export function Composer({ columns = 80 }: { columns?: number }) {
         const lineIdx = i + firstVisible
         const isCursorLine = composerActive && lineIdx === cursorLine
         const prefix = lineIdx === 0 ? (composerActive ? '> ' : '  ') : '  '
+        if (placeholder && buf.text === '') {
+          return (
+            <Box key={lineIdx}>
+              <Text wrap="truncate-end">
+                {prefix}
+                <Text color={theme.mutedText}>{placeholder}</Text>
+              </Text>
+            </Box>
+          )
+        }
         if (!isCursorLine) {
           return (
             <Box key={lineIdx}>

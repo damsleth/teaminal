@@ -5,6 +5,7 @@
 import { Box } from 'ink'
 import { Text } from './Text'
 import { focusedReplyCount, selectFocusedAttachment } from './messageFocusables'
+import { foregroundLabel } from '../state/selectables'
 import { useAppState, useTheme } from './StoreContext'
 import { kittyKeyboardEnabled } from './kittyKeyboard'
 
@@ -30,6 +31,8 @@ export function StatusBar() {
   // The focused channel message has a thread: advertise 't'.
   const hasThread = useAppState((s) => focusedReplyCount(s) > 0)
   const theme = useTheme()
+  // Several accounts open: the foreground account's label.
+  const accountLabel = useAppState(foregroundLabel)
   const enterSends = useAppState((s) => s.settings.enterSends) && kittyKeyboardEnabled()
 
   let hint = 'j/k move · l/Enter open · / filter · n new chat · ? help · q quit'
@@ -57,6 +60,7 @@ export function StatusBar() {
   return (
     <Box paddingX={1}>
       <Text color={theme.mutedText} wrap="truncate-end">
+        {accountLabel && hint ? `${accountLabel} · ` : ''}
         {hint}
         {filter && inputZone !== 'filter' ? ` · / ${filter}` : ''}
       </Text>

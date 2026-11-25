@@ -7,7 +7,9 @@ import {
   CHAT_SECTION_CAP,
   collapseKeyFor,
   collapsedInSidebar,
+  foregroundLabel,
   isSelectable,
+  labelSuffix,
   headerIndexForKey,
   parentCollapseKey,
   chatLabel,
@@ -851,5 +853,18 @@ describe('collapsedInSidebar (presence fan-out)', () => {
     expect(collapsedInSidebar(s, accountRef('beta'))).toBe(false)
     // The persisted key from an earlier concurrent run is ignored with one account.
     expect(collapsedInSidebar(state(1, { 'account:alpha': true }), accountRef('alpha'))).toBe(false)
+  })
+})
+
+describe('foregroundLabel (M2 F.4)', () => {
+  test('names the foreground only where several accounts are open', () => {
+    const store = createAppStore()
+    openAccount(store, accountRef('alpha'), { foreground: true })
+    store.set((s) => ({ settings: { ...s.settings, accounts: ['alpha', 'beta'] } }))
+    expect(foregroundLabel(store.get())).toBeNull()
+    openAccount(store, accountRef('beta'), { foreground: false })
+    expect(foregroundLabel(store.get())).toBe('alpha')
+    expect(labelSuffix(foregroundLabel(store.get()))).toBe(' · alpha')
+    expect(labelSuffix(null)).toBe('')
   })
 })

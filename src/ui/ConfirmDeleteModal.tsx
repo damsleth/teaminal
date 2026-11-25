@@ -9,6 +9,7 @@ import { useInput } from './useInput'
 import { accountRef } from '../account'
 import { accountStore, accountStoreFor } from '../state/accountStore'
 import { deleteChatById, deleteChatMessageById } from '../state/chatActions'
+import { foregroundLabel, labelSuffix } from '../state/selectables'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useSessionApi } from './SessionContext'
 
@@ -18,6 +19,7 @@ export function ConfirmDeleteModal() {
   const session = useSessionApi()
   const modal = useAppState((s) => s.modal)
   const theme = useTheme()
+  const label = useAppState(foregroundLabel)
   const isOpen = modal?.kind === 'confirm-delete' || modal?.kind === 'confirm-delete-chat'
 
   useInput(
@@ -90,6 +92,8 @@ export function ConfirmDeleteModal() {
     >
       <Text bold={theme.emphasis.modalTitleBold}>
         {isChat ? 'Delete chat?' : 'Delete message?'}
+        {/* Several accounts open: the account the delete acts on. */}
+        {labelSuffix(modal.kind === 'confirm-delete-chat' ? (modal.alias ?? label) : label)}
       </Text>
       {modal.kind === 'confirm-delete-chat' ? (
         <>
