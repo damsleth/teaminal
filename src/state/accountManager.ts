@@ -72,8 +72,9 @@ export type AccountManager = {
   client(): GraphClient
   // Same, for any open account.
   clientFor(id: AccountId): GraphClient
-  // Manual push reconnect for the foreground session (diagnostics `r`).
-  retryRealtime(): void
+  // Manual push reconnect (diagnostics `r`) for an open account's session,
+  // the foreground's by default.
+  retryRealtime(id?: AccountId): void
   // Accounts with a running session, in configured order.
   running(): AccountRef[]
   // First session(s), or fixture data in seeded mode. Single mode throws
@@ -603,7 +604,8 @@ export function createAccountManager(
       if (!slot) throw new Error(`clientFor: account ${id} is not open`)
       return slot.session?.client() ?? fallbackClient(slot.profile)
     },
-    retryRealtime: () => foregroundSlot()?.session?.transport?.retry(),
+    retryRealtime: (id) =>
+      (id === undefined ? foregroundSlot() : slots.get(id))?.session?.transport?.retry(),
     running: () => runningSlots().map((s) => s.ref),
 
     async start(onFatal) {

@@ -20,8 +20,8 @@ export type SessionApi = {
    * at the moment they run, so an action never borrows another account.
    */
   client: () => GraphClient
-  /** Manual push reconnect for the running session (diagnostics `r`). */
-  retryRealtime: () => void
+  /** Manual push reconnect (diagnostics `r`) for `id`, default the foreground. */
+  retryRealtime: (id?: AccountId) => void
   /**
    * Tear down the running session, reset account-scoped state, hydrate
    * the new profile's message cache, and bring up a new session against
