@@ -152,7 +152,7 @@ export function ContextMenu() {
         <Box position="absolute" top={pos.top} left={pos.left}>
           {menu}
         </Box>
-      ) : (
+      ) : anchor && !origin ? null /* first frame: draw once placed, not centered then moved */ : (
         <Box flexGrow={1} alignItems="center" justifyContent="center">
           {menu}
         </Box>

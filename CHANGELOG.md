@@ -19,6 +19,8 @@ adheres to [Semantic Versioning](https://semver.org/).
   edits, so text no longer runs over the bottom border.
 - Line breaks in pasted or fast-typed text start a new line instead of
   drawing over the composer box.
+- The context menu no longer flashes in the middle of the screen before
+  moving beside its row.
 
 ## [0.25.2] - 2026-11-25
 
