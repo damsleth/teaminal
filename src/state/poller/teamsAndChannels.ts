@@ -27,8 +27,11 @@ export async function fetchTeamsAndChannels(
   const teams = await listJoinedTeams(client, { signal })
   recordEvent('poller', 'info', 'joined teams fetch complete', { teams: teams.length })
   if (teams.length === 0) return { teams, channelsByTeam: {} }
-  const results = await Promise.all(
-    teams.map(async (team): Promise<[string, Channel[]]> => {
+  // A few channel-list requests at a time, not one per team at once.
+  const results = await mapLimit(
+    teams,
+    TEAM_FETCH_CONCURRENCY,
+    async (team): Promise<[string, Channel[]]> => {
       try {
         recordEvent('poller', 'debug', 'team channels fetch started', { team: team.id })
         const channels = await listChannels(client, team.id, { signal })
@@ -42,9 +45,28 @@ export async function fetchTeamsAndChannels(
         reportError(err)
         return [team.id, previous[team.id] ?? []]
       }
-    }),
+    },
   )
   const channelsByTeam: Record<string, Channel[]> = {}
   for (const [teamId, channels] of results) channelsByTeam[teamId] = channels
   return { teams, channelsByTeam }
+}
+
+const TEAM_FETCH_CONCURRENCY = 4
+
+export async function mapLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out: R[] = new Array(items.length)
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++
+      out[i] = await fn(items[i]!)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return out
 }

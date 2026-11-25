@@ -12,7 +12,7 @@
 import { listAnchorRef } from './contextAnchor'
 import { Box, useApp, useStdout, type DOMElement } from 'ink'
 import { Text } from './Text'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ensureTeamPhoto,
   ensureUserPhoto,
@@ -264,26 +264,38 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     terminalRows - chromeRowsForChatList({ hasFilterBanner, anyTailEnabled }),
   )
 
-  // Build selectables from individual slices so the hook only re-runs on
-  // the data we actually depend on. (useAppState's selectors guarantee
-  // referential stability of the store, not derived data, so we recompute
-  // on every render - cheap given the list sizes.)
-  const all = buildSelectableList({
+  // Build selectables from individual slices, memoized on exactly those
+  // slices: a cursor move or an unrelated store change reuses the list.
+  const items = useMemo(() => {
+    const all = buildSelectableList({
+      me,
+      chats,
+      teams,
+      channelsByTeam,
+      nameByUserId,
+      settings: {
+        chatListSort,
+        chatListGroupByType,
+        chatListSectionCap,
+        chatListCollapsedSections,
+      },
+      filter,
+      expandedChatSections,
+    })
+    return filter ? all.filter((i) => itemMatchesFilter(i, filter)) : all
+  }, [
     me,
     chats,
     teams,
     channelsByTeam,
     nameByUserId,
-    settings: {
-      chatListSort,
-      chatListGroupByType,
-      chatListSectionCap,
-      chatListCollapsedSections,
-    },
+    chatListSort,
+    chatListGroupByType,
+    chatListSectionCap,
+    chatListCollapsedSections,
     filter,
     expandedChatSections,
-  })
-  const items = filter ? all.filter((i) => itemMatchesFilter(i, filter)) : all
+  ])
   const syntheticNewChatQuery =
     filter && items.length === 0 && isNewChatQueryCandidate(filter) ? filter.trim() : null
 
@@ -296,7 +308,10 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   useEffect(() => {
     if (safeCursor !== cursor) store.set(cursorAt(items, safeCursor))
   })
-  const rows = buildRows(items, syntheticNewChatQuery)
+  const rows = useMemo(
+    () => buildRows(items, syntheticNewChatQuery),
+    [items, syntheticNewChatQuery],
+  )
   const chatListGap = theme.layout.chatListGap
   const chatListIndent = theme.layout.chatListIndent
   // A selected-row border style frames the selected row; every row reserves
@@ -342,26 +357,44 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   // visual lines, and previews add up to two more;
   // the viewport math below counts visual lines so wrapping never
   // pushes adjacent rows off-screen or into the composer.
-  const heights = rows.map((row) => {
-    if (row.kind === 'synthetic-new-chat') {
-      return visualLines(`Create chat with "${row.query}"`, labelWidthFor)
-    }
-    const cw = labelWidthFor
-    const label = rowLabel(row.item, me?.id, shortNames, nameByUserId)
-    const unread = row.item.kind === 'chat' ? unreadByChatId[row.item.chat.id] : undefined
-    const hasMention = !!unread && unread.mentionCount > 0
-    const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
-    const unreadBadge = hasMention ? ' @' : hasUnread ? ' ●' : ''
-    // Team / section headers render truncated to one row.
-    if (row.item.kind === 'team' || row.item.kind === 'section') return 1
-    let h = visualLines(label + unreadBadge, cw)
-    if (row.item.kind === 'chat') {
-      const preview = previewLineForChat(row.item.chat, cw, previewLines, me?.id)
-      if (preview) h += preview.split('\n').length
-    }
-    if (hasPictureColumn(row.item)) h = Math.max(h, thumbRows)
-    return h + rowFrame + chatListGap
-  })
+  // Memoized: wrapping every label and preview is the costly part of a render.
+  const heights = useMemo(
+    () =>
+      rows.map((row) => {
+        if (row.kind === 'synthetic-new-chat') {
+          return visualLines(`Create chat with "${row.query}"`, labelWidthFor)
+        }
+        const cw = labelWidthFor
+        const label = rowLabel(row.item, me?.id, shortNames, nameByUserId)
+        const unread = row.item.kind === 'chat' ? unreadByChatId[row.item.chat.id] : undefined
+        const hasMention = !!unread && unread.mentionCount > 0
+        const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
+        const unreadBadge = hasMention ? ' @' : hasUnread ? ' ●' : ''
+        // Team / section headers render truncated to one row.
+        if (row.item.kind === 'team' || row.item.kind === 'section') return 1
+        let h = visualLines(label + unreadBadge, cw)
+        if (row.item.kind === 'chat') {
+          const preview = previewLineForChat(row.item.chat, cw, previewLines, me?.id)
+          if (preview) h += preview.split('\n').length
+        }
+        if (hasPictureColumn(row.item)) h = Math.max(h, thumbRows)
+        return h + rowFrame + chatListGap
+      }),
+    // hasPictureColumn reads thumbColumn only.
+    [
+      rows,
+      labelWidthFor,
+      me?.id,
+      shortNames,
+      nameByUserId,
+      unreadByChatId,
+      previewLines,
+      thumbColumn,
+      thumbRows,
+      rowFrame,
+      chatListGap,
+    ],
+  )
 
   // Anchor the viewport on the cursor row, then fill the visual-line
   // budget around it (backward first so j/k feels sticky, forward to

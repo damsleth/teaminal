@@ -29,6 +29,7 @@ import type { MentionEvent } from '../poller'
 
 type ChatsTeams = { chats: Chat[]; teams: Team[]; channelsByTeam: Record<string, Channel[]> }
 
+export const TOPOLOGY_TTL_MS = 5 * 60_000
 export type ListLoopDeps = {
   store: AccountStore
   // Bound Graph client for this session's account.
@@ -80,11 +81,22 @@ export function makeListLoop(deps: ListLoopDeps): () => Promise<void> {
   // inherits an older fallback latch.
   let graphList401 = false
 
+  // Teams and channels change rarely; chats every poll. Topology is refetched
+  // at most every TOPOLOGY_TTL_MS (a hard refresh empties it, forcing one).
+  let topologyAt = 0
+
   async function loadGraphChatsTeams(signal: AbortSignal): Promise<ChatsTeams> {
     const client = deps.getClient()
+    const s = store.get()
+    const topologyFresh = s.teams.length > 0 && Date.now() - topologyAt < TOPOLOGY_TTL_MS
     const [chats, tc] = await Promise.all([
       listChats(client, { signal }),
-      fetchTeamsAndChannels(client, signal, reportError, store.get().channelsByTeam),
+      topologyFresh
+        ? { teams: s.teams, channelsByTeam: s.channelsByTeam }
+        : fetchTeamsAndChannels(client, signal, reportError, s.channelsByTeam).then((r) => {
+            topologyAt = Date.now()
+            return r
+          }),
     ])
     return { chats, teams: tc.teams, channelsByTeam: tc.channelsByTeam }
   }

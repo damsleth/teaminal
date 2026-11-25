@@ -172,7 +172,6 @@ export function App() {
   const chatListCollapsedSections = useAppState((s) => s.settings.chatListCollapsedSections)
   const expandedChatSections = useAppState((s) => s.expandedChatSections)
   const nameByUserId = useAppState((s) => s.nameByUserId)
-  const draftsByConvo = useAppState((s) => s.draftsByConvo)
 
   const [newChatPrompt, setNewChatPrompt] = useState<string | null>(null)
   const federatedFocusCheckedRef = useRef<Set<string>>(new Set())
@@ -215,9 +214,13 @@ export function App() {
   }, [focus, me?.id, chats])
 
   // Compute dynamic layout dimensions from terminal size + settings.
-  const activeConvForDraft = focusKey(focus)
-  const activeDraft = activeConvForDraft ? (draftsByConvo[activeConvForDraft] ?? '') : ''
-  const draftLines = wrapComposer(activeDraft, terminalCols - COMPOSER_TEXT_CHROME).length
+  // Only the open draft's wrapped line count: typing re-renders App (and both
+  // panes) only when the composer grows or shrinks a line.
+  const draftLines = useAppState((s) => {
+    const conv = focusKey(s.focus)
+    const draft = conv ? (s.draftsByConvo[conv] ?? '') : ''
+    return wrapComposer(draft, terminalCols - COMPOSER_TEXT_CHROME).length
+  })
   const layout = computeLayout({
     cols: terminalCols,
     rows: terminalRows,

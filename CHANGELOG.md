@@ -13,6 +13,13 @@ adheres to [Semantic Versioning](https://semver.org/).
 - Keep cached images and viewer temporary files private.
 - Limit workflow permissions and safely pass release inputs to the shell.
 
+### Changed
+
+- Typing re-renders the panes only when the composer gains or loses a line,
+  and the chat list reuses its rows and row heights across cursor moves.
+- Teams and channel lists refresh every 5 minutes instead of on every chat
+  list poll, at most four channel requests at a time.
+
 ### Fixed
 
 - A sent message, edit or reaction no longer vanishes or reverts on the next
