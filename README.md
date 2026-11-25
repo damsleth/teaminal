@@ -331,6 +331,60 @@ colors, and out-of-range values are dropped with a warning at startup.
 
 The in-app Settings menu persists changes back to `config.json`.
 
+## Several accounts
+
+teaminal runs any owa-piggy profiles listed in `accounts`, in one of two
+modes, chosen once at startup:
+
+- **Single mode** (the default). One account runs at a time. Picking another
+  in the Accounts modal stops the running one and starts the new one.
+- **Concurrent mode** (`"concurrentAccounts": true`, experimental). Every
+  alias in `accounts` runs at once and stays live; switching is instant.
+  Active only when the flag is on, `accounts` is not empty and no
+  `--profile` was given.
+- **`--profile <alias>`** always runs that one account alone, whatever the
+  flag says.
+
+Both modes read and write the same per-profile cache files
+(`~/.cache/teaminal/{messages,list,names}.<alias>.json`), so turning the
+flag on or off needs no migration.
+
+**Cost per account.** Every running account polls its chat list (every 30 s),
+re-reads its teams and channels (at most every 5 min), polls its own presence
+(every 60 s) and, with `realtimeEnabled`, keeps its own push connection. Only
+the account in front polls the open conversation (every 10 s). With push
+connected the loops slow to 60 s, and to 5 min while the terminal is
+unfocused. Background traffic therefore grows with each account you add. To
+measure it, run with a network log, leave teaminal idle for a while, then
+summarize requests per minute per account:
+
+```bash
+teaminal --network-log /tmp/teaminal-net.log
+bun run scripts/network-log-summary.ts /tmp/teaminal-net.log --skip-minutes 5
+```
+
+Repeat with one, two, three and five aliases in `accounts` to compare.
+
+**Partial failures.** An account whose sign-in expires, or that goes offline,
+stops on its own and stays listed (`! signed out` / `! offline`); the others
+keep running and nothing exits. `r` in the Accounts modal starts it again
+(after `owa-piggy reseed` for an expired sign-in).
+
+**Notifications** come from every running account. With more than one
+running, the title names the account: `teaminal · beta · Alice`.
+
+**Presence and status message.** A picked presence (forced Available while
+the terminal is focused, with `forceAvailableWhenFocused`) and the status
+message go to every running account.
+
+**Same user twice.** Two aliases that sign in as the same user run as two
+accounts, so every message notifies twice; teaminal logs one warning naming
+both aliases.
+
+**Diagnostics** (Help → Diagnostics) lists every open account: connection,
+push state, last list poll, chat routing, capability probe and cache files.
+`j` / `k` select the account the details below and `r` act on.
+
 ## Keybindings
 
 | Keys                   | When                   | Action                                                                                                                                                                                                                                                                           |
@@ -363,6 +417,8 @@ The in-app Settings menu persists changes back to `config.json`.
 | `d` / Delete           | Accounts               | Remove the focused account from teaminal's list.                                                                                                                                                                                                                                 |
 | `t`                    | Accounts               | Cycle the focused account's chat routing mode.                                                                                                                                                                                                                                   |
 | `r`                    | Accounts               | With `concurrentAccounts`: start the focused account again when it shows `auth expired` (runs `owa-piggy reseed` first) or `offline`.                                                                                                                                            |
+| `j` / `k`              | Diagnostics            | Several accounts open: select the account the details show.                                                                                                                                                                                                                      |
+| `r`                    | Diagnostics            | Reconnect the selected account's push transport.                                                                                                                                                                                                                                 |
 | `h` / Left             | chat / channel         | Return to chat list.                                                                                                                                                                                                                                                             |
 | `j` / Down             | chat / channel         | Focus next message.                                                                                                                                                                                                                                                              |
 | `k` / Up               | chat / channel         | Focus previous message, or load older when focused at the top.                                                                                                                                                                                                                   |
