@@ -214,7 +214,8 @@ const idByCacheKey = new Map<string, number>()
 // The source object each id was last transmitted from. A blob refetched
 // under the same key (cache emptied, photo changed) is a new object, so it is
 // sent again instead of placing the terminal's stale copy.
-const transmitted = new Map<number, object>()
+// Weakly held, so a cleared image cache can free the bytes.
+const transmitted = new Map<number, WeakRef<object>>()
 
 // Stable terminal-side id for a cached blob, assigned on first use.
 export function kittyImageId(cacheKey: string): number {
@@ -241,9 +242,9 @@ export function buildKittyImageEscape(
   placement: KittyPlacement,
 ): string {
   const id = kittyImageId(cacheKey)
-  if (transmitted.get(id) === png) return buildKittyPlaceById(id, placement)
+  if (transmitted.get(id)?.deref() === png) return buildKittyPlaceById(id, placement)
   const apc = buildKittyAPC(png, placement, id)
-  if (apc) transmitted.set(id, png)
+  if (apc) transmitted.set(id, new WeakRef(png))
   return apc
 }
 
@@ -297,9 +298,9 @@ export function buildKittyRawEscape(
   placement: KittyPlacement,
 ): string {
   const id = kittyImageId(cacheKey)
-  if (transmitted.get(id) === pixels) return buildKittyPlaceById(id, placement)
+  if (transmitted.get(id)?.deref() === pixels) return buildKittyPlaceById(id, placement)
   const apc = buildKittyRawAPC(pixels.rgba, pixels.width, pixels.height, placement, id)
-  if (apc) transmitted.set(id, pixels)
+  if (apc) transmitted.set(id, new WeakRef(pixels))
   return apc
 }
 

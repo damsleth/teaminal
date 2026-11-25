@@ -294,16 +294,27 @@ async function withOptimisticChatUpdate(
     await commit()
   } catch (err) {
     // Undo only while this operation still owns the message: a poll or a
-    // later action that replaced it wins.
-    if (original && optimistic && optimistic !== original) {
+    // later action that replaced it wins. A poll that rebuilt the row but kept
+    // this reaction change (same pending stamp) still counts as owned; only
+    // its reactions go back.
+    const mine = optimistic
+    if (original && mine && mine !== original) {
+      const stamp = mine._reactionsPendingAt
       store.set((s) => {
-        const list = convMessages(s, conv)
-        if (!list.some((m) => m === optimistic)) return {}
-        return convPatch(
-          s,
-          conv,
-          list.map((m) => (m === optimistic ? original : m)),
-        )
+        let changed = false
+        const list = convMessages(s, conv).map((m) => {
+          if (m === mine) {
+            changed = true
+            return original
+          }
+          if (stamp !== undefined && m.id === messageId && m._reactionsPendingAt === stamp) {
+            changed = true
+            const { _reactionsPendingAt: _, ...rest } = m
+            return { ...rest, reactions: original.reactions }
+          }
+          return m
+        })
+        return changed ? convPatch(s, conv, list) : {}
       })
     }
     recordEvent(

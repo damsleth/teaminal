@@ -490,3 +490,33 @@ describe('thread reply send', () => {
     ])
   })
 })
+
+it('a failed reaction rolls back even after a poll rebuilt the message', async () => {
+  let release!: () => void
+  const gate = new Promise<void>((r) => (release = r))
+  const store = setup(async () => {
+    await gate
+    return fail()
+  })
+  store.set(() => ({ messageCacheByConvo: { 'chat:c1': emptyMessageCache(convMsgs(store)) } }))
+  const pending = toggleReaction(testClient(), accountStore(store), 'c1', 'm1', 'like', me)
+  const m1 = convMsgs(store)[0]!
+  store.set(
+    mergeActivePagePatch(
+      store.get(),
+      'chat:c1',
+      {
+        // A new message makes the poll rebuild the list (and the reacted row).
+        messages: [
+          { ...m1, reactions: undefined, _reactionsPendingAt: undefined },
+          { ...m1, id: 'm2', createdDateTime: '2026-05-29T10:05:00Z', reactions: undefined },
+        ],
+      },
+      { kind: 'chat', chatId: 'c1' },
+    ),
+  )
+  expect(convMsgs(store)[0]!.reactions?.length).toBe(1)
+  release()
+  await expect(pending).rejects.toThrow()
+  expect(convMsgs(store)[0]!.reactions ?? []).toEqual([])
+})
