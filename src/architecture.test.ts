@@ -67,11 +67,14 @@ describe('architecture: layer boundaries', () => {
     expect(offenders.map((f) => relative(REPO_ROOT, f))).toEqual([])
   })
 
-  test('src/ui reaches src/auth only through state (type imports allowed)', () => {
-    const forbidden = /^\s*import\s+(?!type\b)[^'"]+from\s+['"][^'"]*\/auth\//
+  test('src/ui reaches src/auth and src/realtime only through state (type imports allowed)', () => {
+    // Whole-file scan: a multi-line `import {\n  a,\n} from '../auth/...'`,
+    // a re-export and a dynamic import all count.
+    const forbidden =
+      /^\s*(?:import|export)\s+(?!type\b)[^'"]*?from\s+['"][^'"]*\/(?:auth|realtime)\/|import\(\s*['"][^'"]*\/(?:auth|realtime)\//m
     const offenders = filesUnder('ui')
       .filter((f) => !/\.test\.tsx?$/.test(f))
-      .filter((f) => importsMatch(f, forbidden))
+      .filter((f) => forbidden.test(readFileSync(f, 'utf8')))
     expect(offenders.map((f) => relative(REPO_ROOT, f))).toEqual([])
   })
 
