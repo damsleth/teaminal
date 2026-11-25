@@ -374,6 +374,14 @@ export function shortName(displayName: string | null | undefined): string {
   return tokens.slice(0, -1).join(' ')
 }
 
+// The list the user sees and navigates: built, then narrowed by the filter.
+// Every build-then-filter call site goes through here so one producer can be
+// swapped in later.
+export function visibleList(input: SelectableInput): SelectableItem[] {
+  const items = buildSelectableList(input)
+  return input.filter ? items.filter((it) => itemMatchesFilter(it, input.filter ?? '')) : items
+}
+
 // Case-insensitive substring match against the displayed label (chat
 // label, team displayName, or channel displayName). Used by both the
 // chat-list filter input handler and the ChatList render so navigation

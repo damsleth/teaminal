@@ -38,12 +38,11 @@ import { requestKittyPaint, setKittyOwner } from './kittyPainter'
 import { initialsOf, PictureSlot } from './PictureSlot'
 import { useSessionApi } from './SessionContext'
 import {
-  buildSelectableList,
   chatLabel,
   cursorAt,
   resolveCursor,
-  itemMatchesFilter,
   shortName,
+  visibleList,
   type SelectableItem,
 } from '../state/selectables'
 import type { Presence } from '../types'
@@ -267,7 +266,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   // Build selectables from individual slices, memoized on exactly those
   // slices: a cursor move or an unrelated store change reuses the list.
   const items = useMemo(() => {
-    const all = buildSelectableList({
+    return visibleList({
       me,
       chats,
       teams,
@@ -282,7 +281,6 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
       filter,
       expandedChatSections,
     })
-    return filter ? all.filter((i) => itemMatchesFilter(i, filter)) : all
   }, [
     me,
     chats,

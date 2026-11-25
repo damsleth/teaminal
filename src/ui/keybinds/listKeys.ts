@@ -15,10 +15,10 @@ import {
   firstSelectableIndex,
   headerIndexForKey,
   isSelectable,
-  itemMatchesFilter,
   nextSelectableIndex,
   parentCollapseKey,
   resolveCursor,
+  visibleList,
 } from '../../state/selectables'
 import { updateSettings } from '../../config/index'
 import { warn } from '../../log'
@@ -86,8 +86,7 @@ function deleteTarget(ctx: ListKeysCtx): { chat: Chat; label: string } | null {
     return chat ? { chat, label: labelForChat(ctx, chat) } : null
   }
   if (ctx.focus.kind !== 'list') return null
-  const items = buildSelectableList(ctx)
-  const visible = ctx.filter ? items.filter((it) => itemMatchesFilter(it, ctx.filter)) : items
+  const visible = visibleList(ctx)
   const it = visible[resolveCursor(visible, visible.length, ctx.cursorKey ?? null, ctx.cursor)]
   return it && it.kind === 'chat' ? { chat: it.chat, label: it.label } : null
 }
@@ -171,8 +170,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       exit()
       return 'handled'
     }
-    const items = buildSelectableList(ctx)
-    const visible = ctx.filter ? items.filter((it) => itemMatchesFilter(it, ctx.filter)) : items
+    const visible = visibleList(ctx)
     const syntheticNewChatQuery =
       ctx.filter && visible.length === 0 && isNewChatQueryCandidate(ctx.filter)
         ? ctx.filter.trim()
@@ -185,8 +183,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
     // m toggles unread/read on the focused chat row. Channels and
     // teams have no unread state to flip.
     if (ch === 'm') {
-      const items = buildSelectableList(ctx)
-      const visible = ctx.filter ? items.filter((it) => itemMatchesFilter(it, ctx.filter)) : items
+      const visible = visibleList(ctx)
       const safe = resolveCursor(visible, selectableCount, ctx.cursorKey ?? null, ctx.cursor)
       const it = visible[safe]
       if (it && it.kind === 'chat') toggleChatRead(store, it.chat)

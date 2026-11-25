@@ -5,7 +5,7 @@
 // open the new-chat prompt when the filter looks like a person name
 // nobody in the chat list matches), Esc to clear and exit.
 
-import { buildSelectableList, itemMatchesFilter } from '../../state/selectables'
+import { visibleList } from '../../state/selectables'
 import type { AppState, Store } from '../../state/store'
 import type { Channel, Chat, Team } from '../../types'
 import type { Me } from '../../graph/me'
@@ -31,8 +31,7 @@ export function handleFilterKeys({ input, key }: RawKey, ctx: FilterKeysCtx): Ke
   if (key.return) {
     const trimmed = ctx.filter.trim()
     if (isNewChatQueryCandidate(trimmed)) {
-      const items = buildSelectableList(ctx)
-      const visible = items.filter((it) => itemMatchesFilter(it, trimmed))
+      const visible = visibleList({ ...ctx, filter: trimmed })
       if (visible.length === 0) {
         ctx.openNewChatPrompt(trimmed)
         return 'handled'
