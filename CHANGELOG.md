@@ -6,6 +6,24 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Turn an account off and on from the Accounts modal with Space, instead of
+  removing and adding it again. An account that is off stays listed with its
+  routing, favorites and caches, but does not run: no polling, push,
+  notifications or presence, and no section in the sidebar. Stored as
+  `disabledAccounts`.
+
+### Changed
+
+- `concurrentAccounts` is on by default: every alias in `accounts` runs at
+  once. Set it to `false` for one account at a time. A config file that
+  already contains `"concurrentAccounts": false` (teaminal writes every
+  setting when any is saved in-app) keeps single mode until that line is
+  changed.
+- Removing or turning off the active account no longer leaves `activeAccount`
+  pointing at an account that is off.
+
 ## [0.26.0] - 2026-11-26
 
 ### Added
