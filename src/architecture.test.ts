@@ -265,3 +265,61 @@ describe('architecture: subprocesses', () => {
     expect(spawning.sort()).toEqual([...SPAWNERS].sort())
   })
 })
+
+// Rule 5, second half. Graph requests get their bearer from
+// src/graph/client.ts. The Teams-service clients below still build their own
+// Authorization header (other audiences, skype / asyncgw session tokens);
+// this list only stops new ones from appearing unnoticed. Folding them into
+// one shared authed fetch is open work (code review #7).
+const AUTH_HEADER_SITES = [
+  'src/graph/client.ts',
+  'src/graph/csaAuth.ts',
+  'src/graph/teamsAsyncGw.ts',
+  'src/graph/teamsExternalSearch.ts',
+  'src/graph/teamsFederation.ts',
+  'src/graph/teamsPresence.ts',
+  'src/realtime/trouter.ts',
+]
+
+const isAuthorization = (node: ts.Node): boolean =>
+  (ts.isIdentifier(node) || ts.isStringLiteralLike(node)) &&
+  node.text.toLowerCase() === 'authorization'
+
+function setsAuthorizationHeader(source: string, fileName = 'x.ts'): boolean {
+  let found = false
+  const visit = (node: ts.Node): void => {
+    // { Authorization: ... } / { 'authorization': ... }
+    if (ts.isPropertyAssignment(node) && isAuthorization(node.name)) found = true
+    // headers.set('Authorization', ...) / headers.append(...)
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      ['set', 'append'].includes(node.expression.name.text) &&
+      node.arguments[0] &&
+      isAuthorization(node.arguments[0])
+    )
+      found = true
+    if (!found) ts.forEachChild(node, visit)
+  }
+  visit(parse(fileName, source))
+  return found
+}
+
+describe('architecture: Authorization headers', () => {
+  test('the detector sees literals and set() calls, not comments or comparisons', () => {
+    expect(setsAuthorizationHeader("fetch(u, { headers: { Authorization: 'Bearer x' } })")).toBe(
+      true,
+    )
+    expect(setsAuthorizationHeader("h.set('authorization', t)")).toBe(true)
+    expect(setsAuthorizationHeader("// Authorization: Bearer\nif (k === 'authorization') {}")).toBe(
+      false,
+    )
+  })
+
+  test('only the listed modules build an Authorization header', () => {
+    const sites = [...ALL_FILES, ...BIN_FILES]
+      .filter((f) => !isTest(f) && setsAuthorizationHeader(readFileSync(f, 'utf8'), f))
+      .map((f) => relative(REPO_ROOT, f))
+    expect(sites.sort()).toEqual([...AUTH_HEADER_SITES].sort())
+  })
+})
