@@ -174,7 +174,7 @@ warnings and fall back to defaults.
 | `themeOverrides`               | object               |    `{}` | Override color roles such as `text`, `mutedText`, `unread`, `timestamp`, `presence`, plus `layout` (paddings), `borders` (border styles for `panel`, `modal`, and the `active` pane, which is drawn in `borderActive`), `emphasis` (per-role bold flags), and `fontSize` (per-element text size in percent, kitty text sizing protocol only). Colors under `dark` / `light` apply only to that base theme (the theme editor writes there); top-level colors apply to every theme. |
 | `useTeamsPresence`             | boolean              |  `true` | Use the Teams unified presence endpoint (`presence.teams.microsoft.com`) for own presence. Falls back to Graph `/me/presence` automatically on 401/403/404. Set to `false` to force Graph-only in tenants that block public-client access to that host. |
 | `forceAvailableWhenFocused`    | boolean              |  `true` | While the terminal window has focus (DEC focus reporting; CSI ?1004), register a Desktop endpoint with `presence.teams.microsoft.com` and force your picked presence (default Available) so Teams shows you active, like the desktop client does. Refreshed every 4 min; a picked non-Available presence is also held while blurred, and teaminal resets to Available on quit. Set to `false` to leave presence to Teams' own desktop client / inactivity timer. |
-| `realtimeEnabled`              | boolean              | `false` | Enables the experimental Teams trouter push transport for typing, read-receipt, presence, and immediate refresh signals. Polling remains the source of truth and fallback. |
+| `realtimeEnabled`              | boolean              | `false` | Enables the experimental Teams trouter push transport for typing, read-receipt, presence, and immediate refresh signals. Polling remains the source of truth and fallback. Each running account keeps its own push connection (since 0.26.0). Read at startup (restart to apply). Also in the menu as **Settings → Real-time push**. See [Push troubleshooting](#push-troubleshooting). |
 | `concurrentAccounts`           | boolean              |  `true` | Run every profile in `accounts` at the same time instead of one at a time (`false` runs one at a time): each keeps polling (and pushing, with `realtimeEnabled`) in the background, and picking an account in the Accounts modal swaps to it instantly, back on the conversation you had open there. With two or more accounts the sidebar lists them all, one section per account in `accounts` order under an account header (`▾ beta 3 @1 · example.com`: chats with unread activity, unread mentions, tenant, and `! signed out` / `! offline` when it needs attention). Opening a row brings its account to the front (the list cursor and filter stay); mark read, delete and the context menu act on the row's account without switching. The pane title, composer, status bar and modals name the account in front, and the Accounts modal shows each account's state. Notifications come from every account and name it (`teaminal · beta · Alice`). A picked presence and the status message apply to every running account. An account whose sign-in expires stops on its own; the others keep running. Read at startup (restart to apply); `--profile` forces single-account mode. Also in the menu as **Settings → All accounts at once**. |
 | `notifyMuted`                  | boolean              | `false` | Suppress desktop notification banners while keeping terminal bells.                      |
 | `notifyChatMessages`           | boolean              |  `true` | Notify on every new 1:1 / group chat message, not just @mentions. Meeting chats and channels stay mention-only. |
@@ -432,6 +432,59 @@ header** and **Account header bold** (`accountHeader`, `emphasis.accountHeaderBo
 **Account gap** (`layout.accountGap`, blank rows between accounts), and
 **Cross-account favorites header** / **bold** (`crossFavoritesHeader`,
 `emphasis.crossFavoritesHeaderBold`).
+
+## Push troubleshooting
+
+Push (`realtimeEnabled`, **Settings → Real-time push**, off by default) adds
+the experimental Teams trouter connection: typing indicators, read receipts,
+presence changes, and a refresh as soon as something arrives. Polling stays
+the source of truth: push only makes a poll happen sooner. The setting is read
+when an account starts, so restart teaminal after changing it. Each running
+account keeps its own connection.
+
+- **Header.** `push ●` shows the account in front: green when connected,
+  yellow while connecting or reconnecting, red on `error`. With push off the
+  segment is hidden.
+- **Sidebar.** With several accounts open, an account header shows ` ! push`
+  while that account's push is in `error`.
+- **Retries.** A dropped connection reconnects on its own with back-off, up
+  to 10 times (about four minutes). After that the state stays `error` until
+  you reconnect it.
+- **Polling fallback.** While push is connected and the terminal focused, the
+  polls slow to 60 s. While it is reconnecting or in `error`, the account polls
+  at its normal intervals, so nothing is missed, only seen later.
+- **Diagnostics** (Help → Diagnostics). The `realtime` line shows the selected
+  account's push state and, with push on, its counters, for example
+  `realtime: connected · last event 12s ago · reconnects 1 · dropped 0`:
+  the age of the last push event teaminal mapped (`never` before the first),
+  the reconnects so far, and the frames it received but could not map. These
+  are counters, not a health check: a quiet chat looks the same as a broken
+  subscription. `r` reconnects the selected account's push and resets its
+  retries.
+
+**Reporting a push problem.** Run with capture on and both log mirrors, reproduce
+the problem, quit, then keep only the frame-shape lines and the registrar
+requests:
+
+```bash
+TEAMINAL_TROUTER_CAPTURE=1 teaminal --log-file /tmp/teaminal-events.log --network-log /tmp/teaminal-net.log
+grep '] shape outer=' /tmp/teaminal-events.log > /tmp/push-report.txt
+grep ' /registrar/' /tmp/teaminal-net.log >> /tmp/push-report.txt
+```
+
+`TEAMINAL_TROUTER_CAPTURE=1` writes each distinct frame shape once, at most
+200 lines per account session, for example
+`trouter[beta] shape outer=5 name=other keys=eventType,resource,+1 resource=string:/chats/:other/messages kinds=new-message`:
+the outer frame kind, the event name when it is a known one, the payload key
+names (other keys counted as `+N`), the resource path with every unknown
+segment as `:other`, and the events teaminal mapped it to. A registrar line is
+method, status, duration, path and account, for example
+`POST  200 85ms /registrar/prod/V2/registrations @beta`. The account labels are
+your owa-piggy aliases and can identify you: replace them with placeholders
+before you share the file, for example
+`sed -e 's/trouter\[beta\]/trouter[account-1]/' -e 's/ @beta$/ @account-1/' /tmp/push-report.txt > /tmp/push-report-shared.txt`
+(anchored, because `beta` is also a resource path segment).
+Share only these lines: the rest of the events log is not reviewed for sharing.
 
 ## Keybindings
 
