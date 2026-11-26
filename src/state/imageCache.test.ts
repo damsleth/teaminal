@@ -26,7 +26,9 @@ import {
 } from '../auth/owaPiggy'
 import {
   __forgetImagesInMemoryForTests,
+  __imageMemoryBytesForTests,
   __resetPhotoStateForTests,
+  __setImageMemoryBudgetForTests,
   clearImageCache,
   ensureTeamPhoto,
   ensureUserPhoto,
@@ -38,6 +40,7 @@ import {
   __setExternalImageTransportForTests,
   getImageCacheDir,
   getImageData,
+  getImageStatus,
   imageCacheKey as cacheKey,
   ownedImageKey,
   readCachedImage,
@@ -422,6 +425,92 @@ describe('ensureImageFetched disk-cache notification', () => {
       { client: testClient(), onChange: () => notified++ },
     )
     expect(notified).toBe(1)
+  })
+})
+
+describe('in-memory image budget', () => {
+  const realXdg = process.env.XDG_CACHE_HOME
+  let cacheRoot = ''
+
+  afterEach(() => {
+    __setImageMemoryBudgetForTests()
+    __forgetImagesInMemoryForTests()
+    if (realXdg === undefined) delete process.env.XDG_CACHE_HOME
+    else process.env.XDG_CACHE_HOME = realXdg
+    if (cacheRoot) rmSync(cacheRoot, { recursive: true, force: true })
+  })
+
+  // A 100-byte PNG-looking blob on disk under `key`, filled with `fill`.
+  const seed = (key: string, fill: number): Buffer => {
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(92, fill),
+    ])
+    const dir = getImageCacheDir()
+    mkdirSync(dir, { recursive: true })
+    const hash = createHash('sha1').update(key).digest('hex')
+    writeFileSync(join(dir, `${hash}.bin`), png)
+    writeFileSync(join(dir, `${hash}.meta.json`), JSON.stringify({ contentType: 'image/png' }))
+    return png
+  }
+  const ensure = (key: string, onChange: () => void = () => {}) =>
+    ensureImageFetched(
+      'ignored',
+      key,
+      { contentType: 'image/png', name: 'x.png' },
+      { client: testClient(), onChange },
+    )
+
+  it('evicts the least recently read blob over the budget; it comes back from disk', () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-budget`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    __forgetImagesInMemoryForTests()
+    __setImageMemoryBudgetForTests(250)
+    const me = testClient().ctx.account.id
+    const [a, b, c] = ['img-a', 'img-b', 'img-c']
+    const pngA = seed(a, 1)
+    const pngB = seed(b, 2)
+    seed(c, 3)
+
+    ensure(a)
+    ensure(b)
+    expect(__imageMemoryBytesForTests()).toBe(200)
+    // a is on screen (read by the painter), b is not.
+    expect(getImageData(me, a)).toEqual(pngA)
+    ensure(c)
+
+    expect(__imageMemoryBytesForTests()).toBe(200)
+    expect(getImageData(me, a)).toEqual(pngA)
+    expect(getImageData(me, b)).toBeUndefined()
+    // Not 'ready' with no bytes: the next ensure reloads it.
+    expect(getImageStatus(me, b)).toBe('pending')
+    let notified = 0
+    ensure(b, () => notified++)
+    expect(notified).toBe(1)
+    expect(getImageData(me, b)).toEqual(pngB)
+    expect(__imageMemoryBytesForTests()).toBeLessThanOrEqual(250)
+  })
+
+  it('keeps the newest blob even when it alone is over the budget', () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-budget-one`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    __forgetImagesInMemoryForTests()
+    __setImageMemoryBudgetForTests(50)
+    const png = seed('img-big', 4)
+    ensure('img-big')
+    expect(getImageData(testClient().ctx.account.id, 'img-big')).toEqual(png)
+    expect(__imageMemoryBytesForTests()).toBe(100)
+  })
+
+  it('a cleared account gives its bytes back to the budget', () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-budget-clear`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    __forgetImagesInMemoryForTests()
+    seed('img-a', 1)
+    ensure('img-a')
+    expect(__imageMemoryBytesForTests()).toBe(100)
+    clearImageCache(undefined)
+    expect(__imageMemoryBytesForTests()).toBe(0)
   })
 })
 
