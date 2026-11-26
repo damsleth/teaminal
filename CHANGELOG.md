@@ -24,6 +24,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Images held in memory are capped at about 64 MB. The least recently used
+  are dropped first and reload from the disk cache when shown again.
 - Push log lines name their account, and push registration requests appear in
   the network log, so the per-account cost summary includes them. Push logs no
   longer contain server response bodies, socket URLs or raw error text.
@@ -36,6 +38,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 - A late message from a replaced push connection could register on the new one.
 - A mention in the channel thread you have open rings the bell only, like any
   open conversation, instead of also raising a desktop banner.
+- An oversized image (over 4 MB) from Graph or the Teams attachment service is
+  rejected while downloading instead of after the whole file has arrived.
 - A malformed push frame is dropped and counted instead of raising an error.
 
 ## [0.27.0] - 2026-11-26
