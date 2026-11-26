@@ -164,7 +164,11 @@ export function AccountsModal() {
     await session.reconcile()
     // Single mode: turning off the running account moves to the next
     // enabled one (the default profile when none is left), like removing it.
-    if (!concurrent && turningOff && session.getActiveProfile() === profile) {
+    // "Running one that is off", not "running this one": while a switch away
+    // from the first is still pending, turning its destination off must move
+    // on again instead of letting the switch land on an account that is off.
+    const running = session.getActiveProfile()
+    if (!concurrent && turningOff && running && disabledAccounts.includes(running)) {
       await session.switchAccount(activeAccount)
     }
   }

@@ -321,3 +321,21 @@ test('single mode: a turned-off activeAccount never becomes the switch target', 
   })
   app.unmount()
 })
+
+test('single mode: turning off the destination of a pending switch moves on to the next enabled one', async () => {
+  // The fake keeps reporting alpha as running, like a switch whose stop has
+  // not finished yet.
+  const { calls, app, press } = mount({ concurrent: false })
+  await tick()
+  await press(' ')
+  await tick(80)
+  await press('j')
+  await press(' ')
+  await tick(80)
+  expect(calls).toEqual(['reconcile', 'switch:beta', 'reconcile', 'switch:gamma'])
+  expect(configFile()).toMatchObject({
+    activeAccount: 'gamma',
+    disabledAccounts: ['alpha', 'beta'],
+  })
+  app.unmount()
+})
