@@ -27,7 +27,7 @@ import {
   type ThemeFontSizeKey,
   type ThemeOverrides,
   type ThemePresenceKey,
-} from '../state/store'
+} from '../settings'
 
 export type ConfigSource = 'file' | 'defaults'
 export type TeaminalConfig = Partial<Settings>

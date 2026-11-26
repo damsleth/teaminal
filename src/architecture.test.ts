@@ -167,6 +167,21 @@ describe('architecture: layer boundaries', () => {
     expect(out).toEqual([])
   })
 
+  test('src/settings imports nothing from the rest of src', () => {
+    const out = offenders(
+      filesUnder('settings'),
+      (_ref, target) => target !== null && target !== 'settings',
+    )
+    expect(out).toEqual([])
+  })
+
+  test('src/config reads settings from src/settings, not from state or the layers above', () => {
+    const out = offenders(filesUnder('config'), (_ref, target) =>
+      ['state', 'ui', 'graph', 'auth', 'realtime'].includes(target ?? ''),
+    )
+    expect(out).toEqual([])
+  })
+
   test('src/auth does not import from graph, state, or ui', () => {
     const out = offenders(filesUnder('auth'), (_ref, target) =>
       ['graph', 'state', 'ui'].includes(target ?? ''),
