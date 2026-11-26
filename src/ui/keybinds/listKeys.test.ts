@@ -3,7 +3,14 @@ import type { Key } from 'ink'
 import { handleListKeys, type ListKeysCtx } from './listKeys'
 import { accountRef } from '../../account'
 import { openAccount, setForeground } from '../../state/accountStore'
-import { CHAT_SECTION_CAP, cursorAt, unifiedListInput, visibleList } from '../../state/selectables'
+import {
+  CHAT_SECTION_CAP,
+  cursorAt,
+  favoritesFor,
+  resolveCursor,
+  unifiedListInput,
+  visibleList,
+} from '../../state/selectables'
 import { createAppStore, type AccountSlice, type Settings } from '../../state/store'
 import type { Chat } from '../../types'
 
@@ -445,6 +452,24 @@ describe('unified sidebar (M2 F.3)', () => {
     expect(u.store.get().focus).toEqual({ kind: 'chat', chatId: 'b' })
   })
 
+  test('f favorites the row in its own account, without a swap; the cursor follows it', () => {
+    const u = unified()
+    // account:alpha, alpha a, alpha b, account:beta, beta a, beta b
+    for (let i = 0; i < 5; i++) u.press('j')
+    expect(u.store.get().cursorKey).toBe(`${betaId}/chat:b`)
+    u.press('f')
+    expect(u.swaps).toEqual([])
+    expect(u.store.get().account?.id).toBe(alphaId)
+    expect(u.store.get().settings.favoritesByAccount).toEqual({ beta: ['chat:b'] })
+    const now = visibleList(unifiedListInput(u.store.get())!)
+    const at = now.findIndex((it) => it.kind === 'section' && it.alias === 'beta')
+    expect(at).toBe(4)
+    expect(now[at + 1]).toMatchObject({ kind: 'chat', alias: 'beta', favorite: 'favorites' })
+    expect(resolveCursor(now, now.length, u.store.get().cursorKey, u.store.get().cursor)).toBe(
+      at + 1,
+    )
+  })
+
   test('m flips the row’s own account’s unread mark, not the foreground’s', () => {
     const u = unified()
     for (let i = 0; i < 4; i++) u.press('j')
@@ -582,5 +607,62 @@ describe('unified sidebar (M2 F.3)', () => {
     expect(u.swaps).toEqual(['beta'])
     expect(u.prompts).toEqual([''])
     expect(u.store.get().account?.id).toBe(betaId)
+  })
+})
+
+describe('f: favorites', () => {
+  test('single mode: f moves the cursor row into Favorites and the cursor goes with it', () => {
+    const store = createAppStore(accountRef(null))
+    const press = (input: string, key: Partial<Key> = {}) => {
+      const s = store.get()
+      const favorites = favoritesFor(s.settings, s.account)
+      handleListKeys(
+        { input, key: makeKey(key) },
+        {
+          ...makeCtx().ctx,
+          store,
+          chats: [chat('a'), chat('b'), chat('c')],
+          settings: s.settings,
+          favorites,
+          cursor: s.cursor,
+          cursorKey: s.cursorKey,
+        },
+      )
+    }
+    const list = () => {
+      const s = store.get()
+      return visibleList({
+        chats: [chat('a'), chat('b'), chat('c')],
+        teams: [],
+        channelsByTeam: {},
+        settings: s.settings,
+        favorites: favoritesFor(s.settings, s.account),
+      })
+    }
+    press('j') // cursor on b
+    press('f')
+    expect(store.get().settings.favoritesByAccount).toEqual({ '': ['chat:b'] })
+    const now = list()
+    expect(now.map((it) => it.kind)).toEqual(['section', 'chat', 'chat', 'chat'])
+    expect(store.get().cursorKey).toBe('chat:b')
+    expect(resolveCursor(now, now.length, store.get().cursorKey, store.get().cursor)).toBe(1)
+    // f again: back to its normal place, Favorites gone.
+    press('f')
+    expect(store.get().settings.favoritesByAccount).toEqual({})
+    expect(list().some((it) => it.kind === 'section')).toBe(false)
+  })
+
+  test('f on a header or a more row does nothing; F is not f', () => {
+    const store = createAppStore(accountRef(null))
+    const { ctx } = makeCtx({
+      store,
+      settings: { chatListSort: 'recent', chatListGroupByType: true },
+    })
+    // Cursor on the Direct header (expanded headers are skipped by j/k,
+    // but the stored index can sit on one).
+    expect(handleListKeys({ input: 'f', key: makeKey() }, { ...ctx, cursor: 0 })).toBe('handled')
+    expect(store.get().settings.favoritesByAccount).toEqual({})
+    handleListKeys({ input: 'F', key: makeKey({ shift: true }) }, { ...ctx, cursor: 1 })
+    expect(store.get().settings.favoritesByAccount).toEqual({})
   })
 })

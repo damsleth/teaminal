@@ -306,6 +306,8 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     messagePaneShortNames: settings.messagePaneShortNames,
     showChatNameHeader: settings.showChatNameHeader,
     showPresenceInList: settings.showPresenceInList,
+    showFavorites: settings.showFavorites,
+    favoritesByAccount: cloneIdLists(settings.favoritesByAccount),
     showTimestampsInPane: settings.showTimestampsInPane,
     centerDateMarkers: settings.centerDateMarkers,
     messageAvatars: settings.messageAvatars,
@@ -481,7 +483,12 @@ function cloneSettings(settings: Settings): Settings {
     headerElements: { ...settings.headerElements },
     chatRoutingByAccount: { ...settings.chatRoutingByAccount },
     chatListCollapsedSections: { ...settings.chatListCollapsedSections },
+    favoritesByAccount: cloneIdLists(settings.favoritesByAccount),
   }
+}
+
+function cloneIdLists(lists: Record<string, string[]>): Record<string, string[]> {
+  return Object.fromEntries(Object.entries(lists).map(([k, ids]) => [k, [...ids]]))
 }
 
 function cloneThemeOverrides(overrides: ThemeOverrides): ThemeOverrides {
@@ -627,6 +634,7 @@ function validateAndAssign(
     case 'messagePaneShortNames':
     case 'showChatNameHeader':
     case 'showPresenceInList':
+    case 'showFavorites':
     case 'centerDateMarkers':
     case 'showSenderNamesInPane':
     case 'showOwnNameInPane':
@@ -795,6 +803,12 @@ function validateAndAssign(
       out.chatListCollapsedSections = out2
       return true
     }
+    case 'favoritesByAccount': {
+      const parsed = validateIdLists(key, value, warnings)
+      if (!parsed) return false
+      out[key] = parsed
+      return true
+    }
     case 'chatListWidth':
       if (value === null) {
         out.chatListWidth = null
@@ -850,6 +864,27 @@ function validateHeaderElements(
       continue
     }
     out[key as keyof HeaderElementVisibility] = val
+  }
+  return out
+}
+
+// { <account>: [<id>, ...] }: string ids per account, duplicates dropped.
+function validateIdLists(
+  key: string,
+  value: unknown,
+  warnings: string[],
+): Record<string, string[]> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    warnings.push(`config: "${key}" must be a JSON object`)
+    return null
+  }
+  const out: Record<string, string[]> = {}
+  for (const [account, ids] of Object.entries(value)) {
+    if (!Array.isArray(ids) || !ids.every((id) => typeof id === 'string')) {
+      warnings.push(`config: ${key}["${account}"] must be an array of strings — ignored`)
+      continue
+    }
+    out[account] = [...new Set(ids)]
   }
   return out
 }

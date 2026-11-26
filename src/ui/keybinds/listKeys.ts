@@ -35,8 +35,10 @@ import { openMessageSearch } from '../MessageSearchModal'
 import {
   bringToFront,
   confirmDeleteChat,
+  favoriteTarget,
   openFocus,
   toggleChatRead,
+  toggleFavorite,
   type ToForeground,
 } from './itemActions'
 import type { KeyResult, RawKey } from './types'
@@ -58,6 +60,8 @@ export type ListKeysCtx = {
   }
   filter: string
   expandedChatSections: Record<string, boolean>
+  // Single mode: the foreground's Favorites ids (favoritesFor).
+  favorites?: readonly string[]
   cursor: number
   cursorKey?: string | null
   focus: Focus
@@ -75,6 +79,12 @@ export type ListKeysCtx = {
 function listFor(ctx: ListKeysCtx): SelectableItem[] {
   const unified = unifiedListInput(ctx.store.get())
   return unified ? visibleList(unified) : visibleList(ctx)
+}
+
+// The row under the list cursor (also while a conversation is open), if any.
+export function listCursorRow(ctx: ListKeysCtx): SelectableItem | undefined {
+  const visible = listFor(ctx)
+  return visible[resolveCursor(visible, visible.length, ctx.cursorKey ?? null, ctx.cursor)]
 }
 
 // Collapsed sections are a persisted setting: patch the store for the current
@@ -153,16 +163,29 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
   }
 
   // '.' (Ctrl+. where the terminal reports it) opens the context menu for
-  // the chat row under the cursor.
+  // the chat or channel row under the cursor.
   if (input === '.' && ctx.focus.kind === 'list') {
     const target = deleteTarget(ctx)
+    const alias = (a: string | undefined) => (a === undefined ? {} : { alias: a })
     if (target)
       openContextMenu(store, {
         kind: 'chat',
         chatId: target.chat.id,
         label: target.label,
-        ...(target.alias === undefined ? {} : { alias: target.alias }),
+        ...alias(target.alias),
       })
+    else {
+      const visible = listFor(ctx)
+      const it = visible[resolveCursor(visible, visible.length, ctx.cursorKey ?? null, ctx.cursor)]
+      if (it?.kind === 'channel')
+        openContextMenu(store, {
+          kind: 'channel',
+          teamId: it.team.id,
+          channelId: it.channel.id,
+          label: it.label,
+          ...alias(it.alias),
+        })
+    }
     return 'handled'
   }
 
@@ -229,6 +252,18 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
     const selectableCount = visible.length + (syntheticNewChatQuery ? 1 : 0)
     if (ch === 'n') {
       if (bringToFront(store, cursorAlias(ctx), ctx.toForeground)) openNewChatPrompt(ctx.filter)
+      return 'handled'
+    }
+    // f toggles the chat or channel row in its own account's favorites
+    // (no account switch). The row keeps its key as it moves between
+    // sections, so the cursor goes with it. Other rows: nothing.
+    if (input === 'f' && !key.ctrl) {
+      const safe = resolveCursor(visible, selectableCount, ctx.cursorKey ?? null, ctx.cursor)
+      const target = favoriteTarget(store, visible[safe])
+      if (target) {
+        store.set(cursorAt(visible, safe))
+        toggleFavorite(store, 'favoritesByAccount', target)
+      }
       return 'handled'
     }
     // m toggles unread/read on the focused chat row. Channels and

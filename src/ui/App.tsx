@@ -28,7 +28,7 @@ import { useEffect, useRef, useState } from 'react'
 import { accountStore } from '../state/accountStore'
 import { createOneOnOneChat, materializeChat, resolveFederatedChatId } from '../state/chatActions'
 import { indexNameFromDirectoryUser } from '../state/nameIndex'
-import { clampCursor, unifiedSidebar } from '../state/selectables'
+import { clampCursor, favoritesFor, unifiedSidebar } from '../state/selectables'
 import {
   focusKey,
   moveMessageCursor as nextMessageCursor,
@@ -67,7 +67,13 @@ import { useHydrateMembers } from './hooks/useHydrateMembers'
 import { useTerminalRows } from './hooks/useTerminalRows'
 import { handleChatKeys } from './keybinds/chatKeys'
 import { handleFilterKeys } from './keybinds/filterKeys'
-import { handleListKeys } from './keybinds/listKeys'
+import {
+  favoriteTarget,
+  isFavorite,
+  toggleFavorite,
+  type FavoriteTarget,
+} from './keybinds/itemActions'
+import { handleListKeys, listCursorRow, type ListKeysCtx } from './keybinds/listKeys'
 import { handleMessageSearchKeys } from './keybinds/messageSearchKeys'
 import { handleResizeKeys } from './keybinds/resizeKeys'
 import { computeLayout } from './layout'
@@ -178,6 +184,9 @@ export function App() {
   const chatListCollapsedSections = useAppState((s) => s.settings.chatListCollapsedSections)
   const expandedChatSections = useAppState((s) => s.expandedChatSections)
   const nameByUserId = useAppState((s) => s.nameByUserId)
+  const showFavorites = useAppState((s) => s.settings.showFavorites)
+  const favoritesByAccount = useAppState((s) => s.settings.favoritesByAccount)
+  const account = useAppState((s) => s.account)
 
   const [newChatPrompt, setNewChatPrompt] = useState<string | null>(null)
   const federatedFocusCheckedRef = useRef<Set<string>>(new Set())
@@ -379,7 +388,7 @@ export function App() {
   }
 
   // Key actions the command palette offers besides menu items and chats.
-  const paletteKeyActions = [
+  const paletteKeyActions: { id: string; title: string; keys: string; run: () => void }[] = [
     {
       id: 'new-chat',
       title: 'New chat / find a person',
@@ -414,9 +423,55 @@ export function App() {
     },
   ]
 
+  // The palette's favorite toggles for the row under the list cursor, built
+  // only while the palette is open.
+  function favoriteKeyActions(): typeof paletteKeyActions {
+    // Reads listCtx: called below, once it is set.
+    if (modal?.kind !== 'command-palette') return []
+    const t: FavoriteTarget | null = favoriteTarget(store, listCursorRow(listCtx))
+    if (!t) return []
+    return [
+      {
+        id: 'favorite',
+        title: isFavorite(store.get().settings, 'favoritesByAccount', t)
+          ? 'Remove from favorites'
+          : 'Add to favorites',
+        keys: 'f',
+        run: () => toggleFavorite(store, 'favoritesByAccount', t),
+      },
+    ]
+  }
+
   const hardRefresh = (): void => {
     pollerRef.current?.hardRefresh?.()
   }
+
+  const listCtx: ListKeysCtx = {
+    store,
+    me,
+    chats,
+    teams,
+    channelsByTeam,
+    nameByUserId,
+    settings: {
+      chatListSort,
+      chatListGroupByType,
+      chatListSectionCap,
+      chatListCollapsedSections,
+    },
+    filter,
+    expandedChatSections,
+    favorites: favoritesFor({ showFavorites, favoritesByAccount }, account),
+    cursor,
+    cursorKey,
+    focus,
+    exit,
+    refresh,
+    hardRefresh,
+    openNewChatPrompt,
+    toForeground: (alias) => session.setForeground(alias, { restoreUi: false }),
+  }
+  paletteKeyActions.push(...favoriteKeyActions())
 
   // List / chat dispatcher. Tab is shared across both zones (move to
   // composer) so it lives here rather than being duplicated. The
@@ -471,30 +526,7 @@ export function App() {
         })
         if (result === 'handled') return
       }
-      handleListKeys(raw, {
-        store,
-        me,
-        chats,
-        teams,
-        channelsByTeam,
-        nameByUserId,
-        settings: {
-          chatListSort,
-          chatListGroupByType,
-          chatListSectionCap,
-          chatListCollapsedSections,
-        },
-        filter,
-        expandedChatSections,
-        cursor,
-        cursorKey,
-        focus,
-        exit,
-        refresh,
-        hardRefresh,
-        openNewChatPrompt,
-        toForeground: (alias) => session.setForeground(alias, { restoreUi: false }),
-      })
+      handleListKeys(raw, listCtx)
     },
     { isActive: isRawModeSupported && inputZone === 'list' },
   )

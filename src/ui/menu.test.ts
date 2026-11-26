@@ -233,6 +233,7 @@ describe('ROOT_MENU shape', () => {
       'chatListShortNames',
       'chatListPreviewLines',
       'showPresenceInList',
+      'showFavorites',
       'chatListThumbnails',
       'chatListPresenceStyle',
       // Messages

@@ -15,6 +15,9 @@ import {
   chatLabel,
   clampCursor,
   cursorAt,
+  favoriteId,
+  favoritesFor,
+  favoritesKey,
   firstSelectableIndex,
   itemMatchesFilter,
   nextSelectableIndex,
@@ -872,5 +875,148 @@ describe('foregroundLabel (M2 F.4)', () => {
     expect(foregroundLabel(store.get())).toBe('alpha')
     expect(labelSuffix(foregroundLabel(store.get()))).toBe(' · alpha')
     expect(labelSuffix(null)).toBe('')
+  })
+})
+
+describe('favorites', () => {
+  const base = () => ({
+    ...initialAppState(),
+    chats: [
+      chat('c1', { topic: 'Ada' }),
+      chat('c2', { topic: 'Design', chatType: 'group' }),
+      chat('c3', { topic: 'Ops', chatType: 'group' }),
+    ],
+    teams: [team('t1', 'Contoso')],
+    channelsByTeam: { t1: [channel('g', 'General'), channel('r', 'Random')] },
+  })
+  const keys = (items: SelectableItem[]) => items.map(selectableKey)
+
+  test('a favorite moves to a Favorites section at the top; keys stay unique and unchanged', () => {
+    const items = buildSelectableList({ ...base(), favorites: ['chat:c2', 'channel:t1/r'] })
+    expect(keys(items)).toEqual([
+      'section:favorites',
+      'chat:c2',
+      'channel:t1/r',
+      'chat:c1',
+      'chat:c3',
+      'team:t1',
+      'channel:t1/g',
+    ])
+    expect(items[0]).toMatchObject({ kind: 'section', label: 'Favorites', count: 2 })
+    // A favorite channel names its team, since its team header is elsewhere.
+    expect(items[2]).toMatchObject({ kind: 'channel', label: 'Contoso › Random' })
+  })
+
+  test('grouped: no double counting, and section caps do not apply to Favorites', () => {
+    const many = Array.from({ length: CHAT_SECTION_CAP + 2 }, (_, i) => chat(`d${i}`))
+    const items = buildSelectableList({
+      ...base(),
+      chats: [...many, chat('g1', { chatType: 'group' })],
+      favorites: many.map((c) => `chat:${c.id}`).concat('chat:g1'),
+      settings: { chatListGroupByType: true },
+    })
+    const header = (section: string) =>
+      items.find((it) => it.kind === 'section' && it.section === section)
+    expect(header('favorites')).toMatchObject({ count: CHAT_SECTION_CAP + 3 })
+    // Every favorite moved: Direct and Groups are empty, so they have no header.
+    expect(header('oneOnOne')).toBeUndefined()
+    expect(header('group')).toBeUndefined()
+    expect(items.some((it) => it.kind === 'more')).toBe(false)
+    expect(items.filter((it) => it.kind === 'chat')).toHaveLength(CHAT_SECTION_CAP + 3)
+  })
+
+  test('hidden when empty, and favorites of items that are gone are skipped', () => {
+    expect(keys(buildSelectableList({ ...base(), favorites: [] }))[0]).toBe('chat:c1')
+    const items = buildSelectableList({ ...base(), favorites: ['chat:gone', 'channel:t9/x'] })
+    expect(items.some((it) => it.kind === 'section')).toBe(false)
+  })
+
+  test('collapsible on its own key; rows belong to it for h', () => {
+    const fav = buildSelectableList({ ...base(), favorites: ['chat:c1', 'channel:t1/g'] })
+    const header = fav[0]!
+    expect(collapseKeyFor(header)).toBe('favorites')
+    expect(parentCollapseKey(fav[1]!, false)).toBe('favorites')
+    expect(parentCollapseKey(fav[2]!, true)).toBe('favorites')
+    const collapsed = buildSelectableList({
+      ...base(),
+      favorites: ['chat:c1', 'channel:t1/g'],
+      settings: { chatListCollapsedSections: { favorites: true } },
+    })
+    expect(keys(collapsed).slice(0, 2)).toEqual(['section:favorites', 'chat:c2'])
+    expect(collapsed[0]).toMatchObject({ collapsed: true, count: 2 })
+  })
+
+  test('a filter lists favorites in place', () => {
+    const items = visibleList({ ...base(), favorites: ['chat:c3'], filter: 'o' })
+    expect(keys(items)).toEqual(['chat:c3', 'team:t1', 'channel:t1/r'])
+    expect(items[0]).not.toHaveProperty('favorite')
+  })
+
+  test('favoritesFor: per account key, empty while showFavorites is off', () => {
+    const settings = {
+      showFavorites: true,
+      favoritesByAccount: { alpha: ['chat:c1'], '': ['chat:c2'] },
+    }
+    expect(favoritesKey(accountRef(null))).toBe('')
+    expect(favoritesKey(accountRef('alpha'))).toBe('alpha')
+    expect(favoritesFor(settings, accountRef('alpha'))).toEqual(['chat:c1'])
+    expect(favoritesFor(settings, accountRef(null))).toEqual(['chat:c2'])
+    expect(favoritesFor(settings, null)).toEqual([])
+    expect(favoritesFor({ ...settings, showFavorites: false }, accountRef('alpha'))).toEqual([])
+  })
+
+  test('favoriteId is the row key for chats and channels, null otherwise', () => {
+    const items = buildSelectableList(base())
+    expect(items.map(favoriteId)).toEqual([
+      'chat:c1',
+      'chat:c2',
+      'chat:c3',
+      null,
+      'channel:t1/g',
+      'channel:t1/r',
+    ])
+  })
+
+  test('unified: each account has its own Favorites inside its block; setting off keeps them in place', () => {
+    const data = (topic: string) => ({
+      chats: [chat('c1', { topic: `${topic} one` }), chat('c2', { topic: `${topic} two` })],
+      teams: [],
+      channelsByTeam: {},
+      unreadByChatId: { c2: { unreadCount: 1, mentionCount: 0 } },
+    })
+    const build = (settings: Partial<Settings>) => {
+      const store = createAppStore()
+      openAccount(store, accountRef('alpha'), { foreground: true }).set(data('a'))
+      openAccount(store, accountRef('beta'), { foreground: false }).set(data('b'))
+      store.set((s) => ({ settings: { ...s.settings, accounts: ['alpha', 'beta'], ...settings } }))
+      return visibleList(unifiedListInput(store.get())!)
+    }
+    const a = accountRef('alpha').id
+    const b = accountRef('beta').id
+    const on = build({ favoritesByAccount: { beta: ['chat:c2'] } })
+    expect(keys(on)).toEqual([
+      `account:${a}`,
+      `${a}/chat:c1`,
+      `${a}/chat:c2`,
+      `account:${b}`,
+      `${b}/section:favorites`,
+      `${b}/chat:c2`,
+      `${b}/chat:c1`,
+    ])
+    // The account header still counts the moved chat once.
+    expect(on.find((it) => it.kind === 'account' && it.alias === 'beta')).toMatchObject({
+      unread: 1,
+    })
+    expect(collapseKeyFor(on[4]!)).toBe('beta/favorites')
+    expect(parentCollapseKey(on[5]!, false)).toBe('beta/favorites')
+    const off = build({ favoritesByAccount: { beta: ['chat:c2'] }, showFavorites: false })
+    expect(keys(off)).toEqual([
+      `account:${a}`,
+      `${a}/chat:c1`,
+      `${a}/chat:c2`,
+      `account:${b}`,
+      `${b}/chat:c1`,
+      `${b}/chat:c2`,
+    ])
   })
 })

@@ -2,8 +2,17 @@
 // (listKeys / chatKeys) and the context menu, so both always do the same.
 
 import { accountRef } from '../../account'
+import { updateSettings } from '../../config/index'
+import { warn } from '../../log'
 import { accountStoreFor } from '../../state/accountStore'
-import { toggleChatUnread, type AppState, type Focus, type Store } from '../../state/store'
+import { favoriteId, favoritesKey, type SelectableItem } from '../../state/selectables'
+import {
+  toggleChatUnread,
+  type AppState,
+  type Focus,
+  type Settings,
+  type Store,
+} from '../../state/store'
 import { htmlToText } from '../../text/html'
 import type { Chat, ChatMessage } from '../../types'
 
@@ -120,4 +129,56 @@ export function openChat(
   toForeground?: ToForeground,
 ): void {
   openFocus(store, { kind: 'chat', chatId }, alias, toForeground)
+}
+
+// The favorites list `f` toggles.
+export type FavoriteList = 'favoritesByAccount'
+
+// What a favorite toggle acts on: an account's key (favoritesKey) and an
+// item id (favoriteId).
+export type FavoriteTarget = { account: string; id: string }
+
+// The account a row or menu target belongs to: its alias in the unified
+// sidebar, else the foreground. Null with no account open.
+export function favoriteAccount(store: Store<AppState>, alias?: string): string | null {
+  if (alias !== undefined) return alias
+  const ref = store.get().account
+  return ref ? favoritesKey(ref) : null
+}
+
+// The favorite toggle a list row offers, or null for a row that can't be a
+// favorite (headers, `… N more`).
+export function favoriteTarget(
+  store: Store<AppState>,
+  item: SelectableItem | undefined,
+): FavoriteTarget | null {
+  const id = item ? favoriteId(item) : null
+  const account = id ? favoriteAccount(store, item!.alias) : null
+  return id && account !== null ? { account, id } : null
+}
+
+export function isFavorite(settings: Settings, list: FavoriteList, t: FavoriteTarget): boolean {
+  return settings[list][t.account]?.includes(t.id) ?? false
+}
+
+// Adds or removes the item in that account's list, in the store and in
+// config.json. Local only: nothing is written to Teams. Persistence is
+// fire-and-forget, as for collapsed sections.
+export function toggleFavorite(
+  store: Store<AppState>,
+  list: FavoriteList,
+  t: FavoriteTarget,
+): void {
+  let next: Record<string, string[]> = {}
+  store.set((s) => {
+    const ids = s.settings[list][t.account] ?? []
+    next = { ...s.settings[list] }
+    const kept = ids.filter((id) => id !== t.id)
+    if (kept.length < ids.length && kept.length === 0) delete next[t.account]
+    else next[t.account] = kept.length < ids.length ? kept : [...ids, t.id]
+    return { settings: { ...s.settings, [list]: next } }
+  })
+  void updateSettings({ [list]: next }).catch((err) => {
+    warn('config: failed to persist favorites:', err instanceof Error ? err.message : String(err))
+  })
 }

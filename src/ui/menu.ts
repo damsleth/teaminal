@@ -44,6 +44,7 @@ export type ToggleKey =
   | 'messagePaneShortNames'
   | 'showChatNameHeader'
   | 'showPresenceInList'
+  | 'showFavorites'
   | 'showTimestampsInPane'
   | 'centerDateMarkers'
   | 'messageAvatars'
@@ -270,6 +271,12 @@ export const ROOT_MENU: MenuItem[] = [
         id: 'showPresenceInList',
         label: 'Presence dots',
         action: { kind: 'toggle-setting', key: 'showPresenceInList' },
+      },
+      {
+        id: 'showFavorites',
+        label: 'Show favorites',
+        action: { kind: 'toggle-setting', key: 'showFavorites' },
+        hint: 'f marks a chat or channel',
       },
       {
         id: 'chatListThumbnails',
@@ -601,6 +608,7 @@ export function cycleSetting<K extends ToggleKey>(
     case 'messagePaneShortNames':
     case 'showChatNameHeader':
     case 'showPresenceInList':
+    case 'showFavorites':
     case 'centerDateMarkers':
     case 'showSenderNamesInPane':
     case 'showOwnNameInPane':
@@ -668,6 +676,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'messagePaneShortNames':
     case 'showChatNameHeader':
     case 'showPresenceInList':
+    case 'showFavorites':
     case 'centerDateMarkers':
     case 'showSenderNamesInPane':
     case 'showOwnNameInPane':

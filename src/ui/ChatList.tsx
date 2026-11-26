@@ -42,6 +42,7 @@ import {
   cachedUnifiedListInput,
   chatLabel,
   cursorAt,
+  favoritesFor,
   resolveCursor,
   shortName,
   visibleList,
@@ -256,6 +257,9 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const chatListGroupByType = useAppState((s) => s.settings.chatListGroupByType)
   const chatListSectionCap = useAppState((s) => s.settings.chatListSectionCap)
   const chatListCollapsedSections = useAppState((s) => s.settings.chatListCollapsedSections)
+  const showFavorites = useAppState((s) => s.settings.showFavorites)
+  const favoritesByAccount = useAppState((s) => s.settings.favoritesByAccount)
+  const account = useAppState((s) => s.account)
   const shortNames = useAppState((s) => s.settings.chatListShortNames)
   const previewLines = useAppState((s) => s.settings.chatListPreviewLines)
   const showPresence = useAppState((s) => s.settings.showPresenceInList)
@@ -319,6 +323,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
       },
       filter,
       expandedChatSections,
+      favorites: favoritesFor({ showFavorites, favoritesByAccount }, account),
     })
   }, [
     me,
@@ -332,6 +337,9 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     chatListCollapsedSections,
     filter,
     expandedChatSections,
+    showFavorites,
+    favoritesByAccount,
+    account,
     unified,
   ])
   // Per-row data: a tagged row reads its own account's slice; an untagged

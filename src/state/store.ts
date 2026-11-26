@@ -143,6 +143,7 @@ export type ModalState =
       target:
         // alias: the row's account in the unified sidebar (absent = foreground).
         | { kind: 'chat'; chatId: string; label: string; alias?: string }
+        | { kind: 'channel'; teamId: string; channelId: string; label: string; alias?: string }
         | { kind: 'message'; focus: FocusChat | FocusChannel; messageId: string }
       cursor: number
     }
@@ -393,6 +394,13 @@ export type Settings = {
   // team · # channel) above the messages. Default false.
   showChatNameHeader: boolean
   showPresenceInList: boolean
+  // Sidebar Favorites section. Off lists favorited items in their normal
+  // sections; the stored favorites are kept.
+  showFavorites: boolean
+  // Favorited sidebar items per account, keyed by profile alias ('' for the
+  // owa-piggy default profile). Each id is `chat:<chatId>` or
+  // `channel:<teamId>/<channelId>`. Local only: never written to Teams.
+  favoritesByAccount: Record<string, string[]>
   // 'transient': only on a message sent a while after the previous one
   // (TRANSIENT_TIMESTAMP_GAP_MS in MessagePane).
   showTimestampsInPane: 'off' | 'on' | 'transient'
@@ -584,6 +592,8 @@ export const defaultSettings: Settings = {
   messagePaneShortNames: true,
   showChatNameHeader: false,
   showPresenceInList: true,
+  showFavorites: true,
+  favoritesByAccount: {},
   showTimestampsInPane: 'on',
   centerDateMarkers: false,
   messageAvatars: 'off',

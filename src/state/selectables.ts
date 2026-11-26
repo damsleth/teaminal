@@ -22,9 +22,12 @@ import type { Channel, Chat, Team } from '../types'
 // alias (the config identity collapse keys use). Absent in single mode, so
 // single-mode lists and keys are unchanged.
 type AccountTag = { accountId?: AccountId; alias?: string }
+// A favorited chat or channel: the section it is listed under instead of its
+// normal one.
+type FavoriteTag = { favorite?: 'favorites' }
 
 export type SelectableItem =
-  | ({ kind: 'chat'; chat: Chat; label: string } & AccountTag)
+  | ({ kind: 'chat'; chat: Chat; label: string } & AccountTag & FavoriteTag)
   // Chat-type header. Selectable only while collapsed — see isSelectable.
   | ({
       kind: 'section'
@@ -34,7 +37,7 @@ export type SelectableItem =
       count: number
     } & AccountTag)
   | ({ kind: 'team'; team: Team; collapsed: boolean } & AccountTag)
-  | ({ kind: 'channel'; team: Team; channel: Channel; label: string } & AccountTag)
+  | ({ kind: 'channel'; team: Team; channel: Channel; label: string } & AccountTag & FavoriteTag)
   // Overflow row shown when a grouped chat section exceeds CHAT_SECTION_CAP.
   // Selectable: Enter/l expands the section it belongs to.
   | ({ kind: 'more'; section: ChatSection; hidden: number } & AccountTag)
@@ -63,7 +66,12 @@ export type SelectableInput = Pick<AppState, 'chats' | 'teams' | 'channelsByTeam
   settings?: Partial<
     Pick<
       Settings,
-      'chatListSort' | 'chatListGroupByType' | 'chatListSectionCap' | 'chatListCollapsedSections'
+      | 'chatListSort'
+      | 'chatListGroupByType'
+      | 'chatListSectionCap'
+      | 'chatListCollapsedSections'
+      | 'showFavorites'
+      | 'favoritesByAccount'
     >
   >
   // A non-empty filter must be able to reach chats hidden behind a section
@@ -71,6 +79,9 @@ export type SelectableInput = Pick<AppState, 'chats' | 'teams' | 'channelsByTeam
   filter?: string
   // Sections the user expanded past the cap via the `… N more` row.
   expandedChatSections?: Record<string, boolean>
+  // Ids (see favoriteId) listed under a Favorites section at the top instead
+  // of their normal section. Single-mode callers get them from favoritesFor.
+  favorites?: readonly string[]
 }
 
 // Collapsed-state key for a team. Chat sections key on their ChatSection name,
@@ -132,6 +143,8 @@ export function isSelectable(item: SelectableItem): boolean {
 export function parentCollapseKey(item: SelectableItem, groupByType: boolean): string | null {
   if (item.kind === 'account') return null
   const account = item.alias === undefined ? null : accountCollapseKey(item.alias)
+  if ((item.kind === 'chat' || item.kind === 'channel') && item.favorite)
+    return scopedKey(item, item.favorite)
   if (item.kind === 'channel') return scopedKey(item, teamCollapseKey(item.team.id))
   // Ungrouped lists have no chat-type headers, so there is nothing to collapse.
   if (item.kind === 'chat')
@@ -153,8 +166,9 @@ export function headerIndexForKey(items: SelectableItem[], key: string): number 
 // Section identity when grouping by chat type. Anything unrecognised lands
 // in 'other', which sorts last. One source of truth for the sort rank, the
 // rendered header label, and the per-section cap. 'teams' is the header over
-// the team list; it is never a chat type, so it stays out of CHAT_SECTIONS.
-export type ChatSection = 'oneOnOne' | 'group' | 'meeting' | 'other' | 'teams'
+// the team list and 'favorites' the one over favorited chats and channels;
+// neither is a chat type, so they stay out of CHAT_SECTIONS.
+export type ChatSection = 'oneOnOne' | 'group' | 'meeting' | 'other' | 'teams' | 'favorites'
 
 const CHAT_SECTIONS: ChatSection[] = ['oneOnOne', 'group', 'meeting', 'other']
 
@@ -177,6 +191,8 @@ export function chatSectionLabel(section: ChatSection): string {
       return 'Meetings'
     case 'teams':
       return 'Teams'
+    case 'favorites':
+      return 'Favorites'
     default:
       return 'Other'
   }
@@ -194,18 +210,19 @@ export function buildSelectableList(state: SelectableInput): SelectableItem[] {
   // header, so both are lifted (and headers dropped) while filtering.
   const filtering = !!state.filter
   const collapsed = filtering ? {} : (state.settings?.chatListCollapsedSections ?? {})
+  // Favorites move out of their sections. A filter lists them in place, as
+  // it does every row of a collapsed or capped section.
+  const favorites = new Set(filtering ? [] : (state.favorites ?? []))
 
-  let chatItems: ChatItem[] = state.chats.map((chat) => ({
-    kind: 'chat',
-    chat,
-    label: chatLabel(chat, state.me?.id, { nameByUserId: state.nameByUserId }),
-  }))
+  let chatItems: ChatItem[] = state.chats
+    .filter((chat) => !favorites.has(chatFavoriteId(chat.id)))
+    .map((chat) => chatItem(state, chat))
   chatItems = orderChats(chatItems, sort, groupByType)
 
-  const items: SelectableItem[] =
-    groupByType && !filtering
-      ? sectionedChats(chatItems, collapsed, state.expandedChatSections ?? {}, cap)
-      : [...chatItems]
+  const items = favoritesSection(favoriteRows(state, favorites, 'favorites'), collapsed)
+  if (groupByType && !filtering)
+    items.push(...sectionedChats(chatItems, collapsed, state.expandedChatSections ?? {}, cap))
+  else items.push(...chatItems)
   if (groupByType && !filtering && state.teams.length > 0) {
     const teamsCollapsed = !!collapsed.teams
     items.push({
@@ -223,11 +240,94 @@ export function buildSelectableList(state: SelectableInput): SelectableItem[] {
     if (teamCollapsed) continue
     const channels = state.channelsByTeam[team.id] ?? []
     for (const channel of channels) {
-      if (channel.isArchived) continue
+      if (channel.isArchived || favorites.has(channelFavoriteId(team.id, channel.id))) continue
       items.push({ kind: 'channel', team, channel, label: channel.displayName })
     }
   }
   return items
+}
+
+function chatItem(state: SelectableInput, chat: Chat): ChatItem {
+  return {
+    kind: 'chat',
+    chat,
+    label: chatLabel(chat, state.me?.id, { nameByUserId: state.nameByUserId }),
+  }
+}
+
+// A favorite's stored id: the row key of its chat or channel row, so it
+// stays the same whichever section lists the row.
+function chatFavoriteId(chatId: string): string {
+  return `chat:${chatId}`
+}
+function channelFavoriteId(teamId: string, channelId: string): string {
+  return `channel:${teamId}/${channelId}`
+}
+
+// The id `f` stores for a row, or null for a row that can't be a favorite.
+export function favoriteId(item: SelectableItem): string | null {
+  if (item.kind === 'chat') return chatFavoriteId(item.chat.id)
+  if (item.kind === 'channel') return channelFavoriteId(item.team.id, item.channel.id)
+  return null
+}
+
+// The key an account's favorites are stored under: its alias, '' for the
+// owa-piggy default profile (aliases are never empty).
+export function favoritesKey(ref: AccountRef): string {
+  return ref.profile === DEFAULT_PROFILE ? '' : ref.profile
+}
+
+// The ids an account's list shows under Favorites, or none while the
+// Favorites section is off.
+export function favoritesFor(
+  settings: SelectableInput['settings'],
+  ref: AccountRef | null | undefined,
+): string[] {
+  if (!ref || settings?.showFavorites === false) return []
+  return settings?.favoritesByAccount?.[favoritesKey(ref)] ?? []
+}
+
+// The favorited `ids` that exist, in list order: chats as sorted, then
+// channels team by team. A favorite whose chat or channel is gone is skipped
+// (and kept in config). No cap: every favorite shows.
+function favoriteRows(
+  state: SelectableInput,
+  ids: ReadonlySet<string>,
+  favorite: 'favorites',
+): SelectableItem[] {
+  if (ids.size === 0) return []
+  const chats = orderChats(
+    state.chats.filter((chat) => ids.has(chatFavoriteId(chat.id))).map((c) => chatItem(state, c)),
+    state.settings?.chatListSort ?? 'recent',
+    false,
+  )
+  const out: SelectableItem[] = chats.map((it) => ({ ...it, favorite }))
+  for (const team of state.teams) {
+    for (const channel of state.channelsByTeam[team.id] ?? []) {
+      if (channel.isArchived || !ids.has(channelFavoriteId(team.id, channel.id))) continue
+      // Without its team header above it, the row names the team.
+      const label = `${team.displayName} › ${channel.displayName}`
+      out.push({ kind: 'channel', team, channel, label, favorite })
+    }
+  }
+  return out
+}
+
+// The Favorites header and its rows; nothing when there are no rows.
+function favoritesSection(
+  rows: SelectableItem[],
+  collapsed: Record<string, boolean>,
+): SelectableItem[] {
+  if (rows.length === 0) return []
+  const isCollapsed = !!collapsed.favorites
+  const header: SelectableItem = {
+    kind: 'section',
+    section: 'favorites',
+    label: chatSectionLabel('favorites'),
+    collapsed: isCollapsed,
+    count: rows.length,
+  }
+  return isCollapsed ? [header] : [header, ...rows]
 }
 
 // Apply the chat-list sort, then (optionally) a stable group-by-type pass.
@@ -607,6 +707,7 @@ function unifiedList(input: UnifiedListInput): SelectableItem[] {
       ...slice,
       settings: { ...input.settings, chatListCollapsedSections: collapsedFor(alias, all) },
       filter,
+      favorites: favoritesFor(input.settings, ref),
     })
     if (filter && rows.length === 0) continue
     out.push(header)

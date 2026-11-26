@@ -1,9 +1,26 @@
-import { expect, test } from 'bun:test'
+import { afterAll, beforeAll, expect, test } from 'bun:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { accountRef } from '../account'
 import { accountStore, openAccount, setForeground } from '../state/accountStore'
 import { applySeededState } from '../state/seedFixtures'
 import { createAppStore } from '../state/store'
 import { contextMenuEntries } from './contextMenuEntries'
+
+// Favorite toggles persist to config.json: point that write at a temp dir
+// (the path is resolved when the toggle runs).
+let configHome: string
+const prevConfigHome = process.env.XDG_CONFIG_HOME
+beforeAll(() => {
+  configHome = mkdtempSync(join(tmpdir(), 'teaminal-ctx-menu-'))
+  process.env.XDG_CONFIG_HOME = configHome
+})
+afterAll(() => {
+  if (prevConfigHome === undefined) delete process.env.XDG_CONFIG_HOME
+  else process.env.XDG_CONFIG_HOME = prevConfigHome
+  rmSync(configHome, { recursive: true, force: true })
+})
 
 function seeded() {
   const store = createAppStore(accountRef(null))
@@ -11,7 +28,7 @@ function seeded() {
   return store
 }
 
-test('a chat row offers open, read toggle and delete, each with its key', () => {
+test('a chat row offers open, read toggle, favorite and delete, each with its key', () => {
   const store = seeded()
   const chat = store.get().chats[0]!
   const entries = contextMenuEntries({ kind: 'chat', chatId: chat.id, label: 'Ada' }, store.get(), {
@@ -20,12 +37,46 @@ test('a chat row offers open, read toggle and delete, each with its key', () => 
   expect(entries.map((e) => [e.id, e.key])).toEqual([
     ['open', 'Enter'],
     ['toggle-read', 'm'],
+    ['favorite', 'f'],
     ['delete', 'Ctrl+D'],
   ])
   entries[0]!.run()
   expect(store.get().focus).toEqual({ kind: 'chat', chatId: chat.id })
-  entries[2]!.run()
+  entries[3]!.run()
   expect(store.get().modal?.kind).toBe('confirm-delete-chat')
+})
+
+test('the favorite entry toggles the row in its own account and names the next action', () => {
+  const store = createAppStore()
+  applySeededState(openAccount(store, accountRef('alpha'), { foreground: true }), 'alpha')
+  applySeededState(openAccount(store, accountRef('beta'), { foreground: false }), 'beta')
+  const chat = store.get().chats[0]!
+  const target = { kind: 'chat' as const, chatId: chat.id, label: 'Ada', alias: 'beta' }
+  const favorite = () =>
+    contextMenuEntries(target, store.get(), { store }).find((e) => e.id === 'favorite')!
+  expect(favorite().label).toBe('Add to favorites')
+  favorite().run()
+  expect(store.get().settings.favoritesByAccount).toEqual({ beta: [`chat:${chat.id}`] })
+  // No account switch.
+  expect(store.get().account?.id).toBe(accountRef('alpha').id)
+  expect(favorite().label).toBe('Remove from favorites')
+  favorite().run()
+  expect(store.get().settings.favoritesByAccount).toEqual({})
+})
+
+test('a channel row offers open and favorite', () => {
+  const store = seeded()
+  const target = { kind: 'channel' as const, teamId: 't1', channelId: 'c1', label: 'General' }
+  const entries = contextMenuEntries(target, store.get(), { store })
+  expect(entries.map((e) => [e.id, e.key])).toEqual([
+    ['open', 'Enter'],
+    ['favorite', 'f'],
+  ])
+  entries[1]!.run()
+  // The default profile's favorites are stored under ''.
+  expect(store.get().settings.favoritesByAccount).toEqual({ '': ['channel:t1/c1'] })
+  entries[0]!.run()
+  expect(store.get().focus).toEqual({ kind: 'channel', teamId: 't1', channelId: 'c1' })
 })
 
 test("someone else's message can be reacted to; your own can also be edited and deleted", () => {

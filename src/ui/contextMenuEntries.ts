@@ -13,19 +13,24 @@ import {
 import {
   confirmDeleteChat,
   confirmDeleteMessage,
+  favoriteAccount,
+  isFavorite,
   isOwnEditableMessage,
   openChat,
   openEditReactions,
+  openFocus,
   openReactionPicker,
   startEditMessage,
   toggleChatRead,
+  toggleFavorite,
   type ToForeground,
 } from './keybinds/itemActions'
 
-// A chat row's `alias` is its account in the unified sidebar (absent = the
-// foreground): the entries act on that account's chat.
+// A chat or channel row's `alias` is its account in the unified sidebar
+// (absent = the foreground): the entries act on that account's item.
 export type ContextMenuTarget =
   | { kind: 'chat'; chatId: string; label: string; alias?: string }
+  | { kind: 'channel'; teamId: string; channelId: string; label: string; alias?: string }
   | { kind: 'message'; focus: FocusChat | FocusChannel; messageId: string }
 
 export type ContextMenuEntry = {
@@ -45,6 +50,35 @@ export function contextMenuEntries(
   },
 ): ContextMenuEntry[] {
   const { store } = deps
+  // The favorite toggles of a chat or channel row, in its own account.
+  const favoriteEntries = (alias: string | undefined, id: string): ContextMenuEntry[] => {
+    const account = favoriteAccount(store, alias)
+    if (account === null) return []
+    const t = { account, id }
+    return [
+      {
+        id: 'favorite',
+        label: isFavorite(state.settings, 'favoritesByAccount', t)
+          ? 'Remove from favorites'
+          : 'Add to favorites',
+        key: 'f',
+        run: () => toggleFavorite(store, 'favoritesByAccount', t),
+      },
+    ]
+  }
+  if (target.kind === 'channel') {
+    const { alias, teamId, channelId } = target
+    return [
+      {
+        id: 'open',
+        label: 'Open',
+        key: 'Enter',
+        run: () =>
+          openFocus(store, { kind: 'channel', teamId, channelId }, alias, deps.toForeground),
+      },
+      ...favoriteEntries(alias, `channel:${teamId}/${channelId}`),
+    ]
+  }
   if (target.kind === 'chat') {
     const { alias } = target
     const slice = alias === undefined ? state : accountSlice(state, accountRef(alias).id)
@@ -65,6 +99,7 @@ export function contextMenuEntries(
         key: 'm',
         run: () => toggleChatRead(store, chat, alias),
       },
+      ...favoriteEntries(alias, `chat:${chat.id}`),
       {
         id: 'delete',
         label: 'Delete chat…',

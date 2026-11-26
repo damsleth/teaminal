@@ -98,17 +98,14 @@ export function ContextMenu() {
   const boxH = Math.max(1, entries.length) + 2
 
   // Beside the chat row / under the message, kept inside the overlay.
-  const anchor = anchorRect(modal.target.kind === 'chat' ? 'list' : 'message')
+  const onList = modal.target.kind !== 'message'
+  const anchor = anchorRect(onList ? 'list' : 'message')
   let pos: { top: number; left: number } | null = null
   if (origin && anchor) {
-    const wantTop =
-      modal.target.kind === 'chat'
-        ? anchor.top - origin.top
-        : anchor.top + anchor.height - origin.top
-    const wantLeft =
-      modal.target.kind === 'chat'
-        ? anchor.left + anchor.width - origin.left
-        : anchor.left + 2 - origin.left
+    const wantTop = onList ? anchor.top - origin.top : anchor.top + anchor.height - origin.top
+    const wantLeft = onList
+      ? anchor.left + anchor.width - origin.left
+      : anchor.left + 2 - origin.left
     const maxTop = Math.max(0, origin.height - boxH)
     const maxLeft = Math.max(0, (stdout?.columns ?? origin.width) - origin.left - boxW)
     pos = {

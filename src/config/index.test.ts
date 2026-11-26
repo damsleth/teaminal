@@ -428,6 +428,8 @@ describe('Settings ↔ config.json parity', () => {
     messagePaneShortNames: !defaultSettings.messagePaneShortNames,
     showChatNameHeader: !defaultSettings.showChatNameHeader,
     showPresenceInList: !defaultSettings.showPresenceInList,
+    showFavorites: !defaultSettings.showFavorites,
+    favoritesByAccount: { 'profile-a': ['chat:c1', 'channel:t1/ch1'], '': ['chat:c2'] },
     showTimestampsInPane: 'transient',
     centerDateMarkers: !defaultSettings.centerDateMarkers,
     messageAvatars: 'large',
