@@ -31,12 +31,28 @@ adheres to [Semantic Versioning](https://semver.org/).
     routing, capability probe, cache files); `j` / `k` pick the account the
     details and `r` (reconnect push) act on.
   - Two aliases that sign in as the same user log one warning naming both.
+- Favorites. `f` on a chat or channel moves it into a Favorites section at the
+  top of the list (per account when several are open) and `f` again puts it
+  back. Ctrl+F does the same for a second, cross-account list shown above all
+  accounts, where each row names its account. Both are in the context menu and
+  the command palette. Favorites are stored in teaminal's config and never
+  written to Teams. `showFavorites` (**Chat list → Show favorites**, default
+  on) hides the sections without forgetting them.
+- Notifications (Ctrl+A) lists every open account's notifications, grouped by
+  account. Enter switches to the item's account; `a` marks all accounts read.
+- Theme editor, Chat list group: account header color and bold, a gap between
+  accounts, and color and bold for the cross-account Favorites header.
+- The context menu (`.`) opens on channel rows too.
 - `scripts/network-log-summary.ts` prints requests per minute per account from
   a `--network-log` file. The README describes how to measure the cost of each
   added account.
 
 ### Changed
 
+- In a grouped chat list the cursor starts on the first chat instead of on the
+  expanded section header above it.
+- Account headers have their own bold setting (default on) and no longer
+  follow `sectionHeadingBold`.
 - Teams-service requests in the network log name their account (`@alias`),
   like Graph requests already did.
 

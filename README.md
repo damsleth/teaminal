@@ -154,6 +154,9 @@ warnings and fall back to defaults.
 | `messagePaneShortNames`        | boolean              |  `true` | Show first names in the message-pane sender column.                                      |
 | `showChatNameHeader`           | boolean              | `false` | Show the conversation name (1:1 partner, group chat, or team · # channel) above the messages. |
 | `showPresenceInList`           | boolean              |  `true` | Show presence dots in the chat list when available.                                      |
+| `showFavorites` | boolean | `true` | Show the Favorites sections in the chat list. Off lists favorites in their normal sections and keeps them stored. Also in the menu as **Chat list → Show favorites**. |
+| `favoritesByAccount` | object | `{}` | Favorites per account, written by `f`: profile alias (`""` for the owa-piggy default profile) → list of `chat:<chatId>` / `channel:<teamId>/<channelId>`. Stored locally only; nothing is written to Teams. |
+| `crossAccountFavorites` | object | `{}` | Same shape, written by Ctrl+F: the favorites shown above all accounts when several are open. |
 | `showTimestampsInPane` | `off`, `on`, `transient` | `on` | Message timestamps in the message pane. `transient` shows one only when a message comes 15 minutes or more after the previous one. `true` / `false` still read as `on` / `off`. |
 | `centerDateMarkers` | boolean | `false` | Center the day separators ("Today", "Fri, May 15") in the message pane. Also in the menu as **Messages → Center dates**. |
 | `messageAvatars` | `off`, `small`, `medium`, `large` | `off` | Profile pictures beside other people's messages, 1 / 2 / 3 rows tall, on the first message of each run from the same sender. Needs a terminal with the kitty graphics protocol (kitty, Ghostty, WezTerm) and a Graph account. Also in the menu as **Messages → Profile pictures**. |
@@ -274,6 +277,7 @@ subset of these keys is accepted:
     "paneHeaderMarginBottom": 1, // message gap; 0.5 steps give half-row gaps in kitty
     "chatListIndent": 1, // columns between the presence dot and the chat name
     "chatListGap": 0, // blank rows between chats in the list
+    "accountGap": 0, // blank rows between accounts (and the cross-account Favorites) in the list
     "textBackgroundPaddingX": 0, // bg-colored columns around focused / own message bodies
     "textBackgroundPaddingY": 0, // bg-colored rows above / below them
     "textBackgroundRadius": 0, // 1 = rounded "speech bubble" corners on message backgrounds
@@ -392,6 +396,29 @@ both aliases.
 push state, last list poll, chat routing, capability probe and cache files.
 `j` / `k` select the account the details below and `r` act on.
 
+### Favorites
+
+`f` on a chat or channel moves it into a **Favorites** section at the top of
+the list (at the top of its account's block when several accounts are open);
+`f` again puts it back. Favorites are never capped behind a "more" row.
+
+Ctrl+F does the same for a second list, the **cross-account Favorites**: one
+block above all accounts, with each row naming its account. A row in that
+block is shown there only, and Enter opens it in its own account. With one
+account open the two lists share a single Favorites section.
+
+Both are also in the context menu (`.`) and the command palette. Favorites
+live in teaminal's config (`favoritesByAccount`, `crossAccountFavorites`) and
+are never written to Teams. `"showFavorites": false` (**Chat list → Show
+favorites**) hides the sections without forgetting them. While a filter is
+active, favorites are listed in their normal place.
+
+The theme editor's **Chat list** group styles the account list: **Account
+header** and **Account header bold** (`accountHeader`, `emphasis.accountHeaderBold`),
+**Account gap** (`layout.accountGap`, blank rows between accounts), and
+**Cross-account favorites header** / **bold** (`crossFavoritesHeader`,
+`emphasis.crossFavoritesHeaderBold`).
+
 ## Keybindings
 
 | Keys                   | When                   | Action                                                                                                                                                                                                                                                                           |
@@ -416,6 +443,8 @@ push state, last list poll, chat routing, capability probe and cache files.
 | `/`                    | list                   | Filter chats.                                                                                                                                                                                                                                                                    |
 | `n`                    | list                   | Open the new-chat prompt.                                                                                                                                                                                                                                                        |
 | `m`                    | list                   | Toggle the focused chat read/unread.                                                                                                                                                                                                                                             |
+| `f`                    | list                   | Add the focused chat or channel to Favorites, or remove it. Acts on the row's own account.                                                                                                                                                                                       |
+| Ctrl+F                 | list                   | Same, for the cross-account Favorites shown above all accounts.                                                                                                                                                                                                                  |
 | `h` / Left             | list                   | Collapse the focused row's section (chat type, team, or all Teams).                                                                                                                                                                                                              |
 | `l` / Right            | list                   | Expand the focused collapsed section, or show a section's hidden chats.                                                                                                                                                                                                          |
 | Enter                  | list, account header   | Several accounts open: move into the account (expanding it when collapsed); on an account that failed (`! signed out`, `! offline`), open the Accounts modal on it.                                                                                                              |
@@ -442,7 +471,7 @@ push state, last list poll, chat routing, capability probe and cache files.
 | Ctrl+D                 | list, chat             | Delete the chat (asks for confirmation).                                                                                                                                                                                                                                         |
 | `r` / `t`              | chat                   | React to the focused message / edit your reactions on it.                                                                                                                                                                                                                        |
 | `e` / `x`              | chat                   | Edit / delete your own focused message.                                                                                                                                                                                                                                          |
-| Ctrl+A                 | any                    | Open notifications (also in the Esc menu).                                                                                                                                                                                                                                       |
+| Ctrl+A                 | any                    | Open notifications (also in the Esc menu). With several accounts open it lists every account's, grouped by account; Enter switches to the item's account.                                                                                                                        |
 | Ctrl+X                 | list                   | Enter resize mode (h/l chat list, j/k composer, 0 reset, Esc done).                                                                                                                                                                                                              |
 | Ctrl+B                 | list / chat            | Hide/show the chat list; list and chat then share one pane (h / l).                                                                                                                                                                                                              |
 | `?`                    | list                   | Show keybindings.                                                                                                                                                                                                                                                                |
