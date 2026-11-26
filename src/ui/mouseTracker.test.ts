@@ -39,7 +39,7 @@ function setup(mouse: boolean, tty = true) {
   handles.push(handle)
   const setMouse = (on: boolean) => store.set((s) => ({ settings: { ...s.settings, mouse: on } }))
   const send = (chunk: string | Buffer) => (stdin as unknown as EventEmitter).emit('data', chunk)
-  return { store, out, events, handle, setMouse, send }
+  return { store, stdin, out, events, handle, setMouse, send }
 }
 
 const click = '\x1b[<0;10;5M'
@@ -130,8 +130,21 @@ describe('startMouseTracker', () => {
     expect(count()).toEqual(before)
     t.setMouse(true)
     expect(count()).toEqual(before.map((n) => n + 1))
+    t.setMouse(false)
+    expect(count()).toEqual(before)
+    t.setMouse(true)
     t.handle.stop()
     expect(count()).toEqual(before)
+  })
+
+  test('the stdin listener exists only while reporting is on', () => {
+    const t = setup(false)
+    const n = () => (t.stdin as unknown as EventEmitter).listenerCount('data')
+    expect(n()).toBe(0)
+    t.setMouse(true)
+    expect(n()).toBe(1)
+    t.setMouse(false)
+    expect(n()).toBe(0)
   })
 })
 

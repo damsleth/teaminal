@@ -79,6 +79,7 @@ export function startMouseTracker(
     if (on || suspended || stopped) return
     hook()
     parser.reset()
+    io.stdin.on('data', onData)
     write(ENABLE_MOUSE)
     on = true
   }
@@ -86,6 +87,7 @@ export function startMouseTracker(
     parser.reset()
     if (!on) return
     on = false
+    io.stdin.off('data', onData)
     write(DISABLE_MOUSE, now)
   }
 
@@ -121,7 +123,11 @@ export function startMouseTracker(
     if (s.settings.mouse === want) return
     want = s.settings.mouse
     if (want) enable()
-    else disable()
+    else {
+      // Off means nothing of ours is left installed.
+      disable()
+      unhook()
+    }
   })
   const onData = (chunk: string | Buffer) => {
     if (!on) return
@@ -135,7 +141,6 @@ export function startMouseTracker(
       }
     }
   }
-  io.stdin.on('data', onData)
 
   const tracker: Tracker = {
     active: () => on,
@@ -158,7 +163,6 @@ export function startMouseTracker(
       if (stopped) return
       stopped = true
       unsubscribe()
-      io.stdin.off('data', onData)
       disable(true)
       unhook()
       if (current === tracker) current = null
