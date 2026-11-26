@@ -123,6 +123,9 @@ test.describe('mouse off', () => {
     await pause()
     terminal.write('\x1b[<65;60;10M\x1b[<64;60;10M')
     await pause()
+    // A row click and the wheel over the sidebar, where they would act if on.
+    await click(terminal, 'Design Sync')
+    await wheel(terminal, 'down', 5, 10)
     expect(screen(terminal)).not.toContain('[<')
     expect(screen(terminal)).not.toContain(';10M')
     // The composer is still empty: its prompt line holds nothing but `>`.
@@ -130,5 +133,154 @@ test.describe('mouse off', () => {
     expect(prompt?.slice(3).replace('│', '').trim()).toBe('')
     // Nothing opened from the list either: the click was not a click.
     expect(screen(terminal)).not.toContain(DESIGN_SYNC_LAST)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Wheel: tui-test has no helper; 64 is up, 65 down, cells 1-based.
+// ---------------------------------------------------------------------------
+
+async function wheel(terminal: Terminal, dir: 'up' | 'down', x: number, y: number, times = 1) {
+  for (let i = 0; i < times; i++) {
+    terminal.write(`\x1b[<${dir === 'up' ? 64 : 65};${x + 1};${y + 1}M`)
+    await pause()
+  }
+}
+
+// Screen row of the focused message's marker (`>`) in the conversation pane,
+// or -1. The pane starts right of the sidebar; the composer prompt is lower.
+function markerRow(terminal: Terminal): number {
+  return lines(terminal).findIndex((l, y) => y < 25 && /^│ ?>/.test(l.slice(28)))
+}
+
+const LIST = { x: 5, y: 10 }
+const PANE = { x: 60, y: 10 }
+
+test.describe('wheel', () => {
+  useConfig({ mouse: true })
+
+  test('mouse wheel-list: one report moves the cursor one row; Enter opens it', async ({
+    terminal,
+  }) => {
+    await expect(terminal.getByText('Design Sync')).toBeVisible()
+    await wheel(terminal, 'down', LIST.x, LIST.y)
+    terminal.submit()
+    await expect(terminal.getByText(DESIGN_SYNC_LAST)).toBeVisible()
+  })
+
+  test('mouse wheel-list boundaries: up at the top and down at the bottom stay put', async ({
+    terminal,
+  }) => {
+    await expect(terminal.getByText('Design Sync')).toBeVisible()
+    await wheel(terminal, 'up', LIST.x, LIST.y, 2)
+    terminal.submit()
+    await expect(
+      terminal.getByText('The launch notes are ready for review.', { strict: false }),
+    ).toBeVisible()
+    expect(screen(terminal)).toContain('I will read them now.')
+    terminal.write('h')
+    await pause()
+    await wheel(terminal, 'down', LIST.x, LIST.y, 5)
+    terminal.submit()
+    await expect(terminal.getByText('Good, leave the monitor open.')).toBeVisible()
+  })
+
+  test('mouse wheel-pane: the marker moves one message; the top and bottom hold', async ({
+    terminal,
+  }) => {
+    await expect(terminal.getByText('Ada Byron')).toBeVisible()
+    terminal.submit()
+    await expect(terminal.getByText('I will read them now.')).toBeVisible()
+    await pause()
+    const last = markerRow(terminal)
+    expect(last).toBeGreaterThan(0)
+    await wheel(terminal, 'up', PANE.x, PANE.y)
+    const first = markerRow(terminal)
+    expect(first).toBeGreaterThan(0)
+    expect(first).toBeLessThan(last)
+    // At the top: older history is unavailable in the seed, so nothing moves.
+    await wheel(terminal, 'up', PANE.x, PANE.y)
+    expect(markerRow(terminal)).toBe(first)
+    await wheel(terminal, 'down', PANE.x, PANE.y, 3)
+    expect(markerRow(terminal)).toBe(last)
+  })
+
+  test('mouse wheel-composer: the wheel leaves the composer and keeps the draft', async ({
+    terminal,
+  }) => {
+    await expect(terminal.getByText('Ada Byron')).toBeVisible()
+    terminal.submit()
+    await expect(terminal.getByText('I will read them now.')).toBeVisible()
+    terminal.write('\t')
+    await pause()
+    terminal.write('draft text')
+    await pause()
+    await expect(terminal.getByText('draft text')).toBeVisible()
+    const last = markerRow(terminal)
+    await wheel(terminal, 'up', PANE.x, PANE.y)
+    // Back in the list zone: the marker shows and moved up.
+    const now = markerRow(terminal)
+    expect(now).toBeGreaterThan(0)
+    if (last > 0) expect(now).toBeLessThan(last)
+    terminal.write('\t')
+    await pause()
+    await expect(terminal.getByText('draft text')).toBeVisible()
+  })
+
+  test('mouse wheel-suppressed: a modal, the new-chat prompt and resize mode ignore the wheel', async ({
+    terminal,
+  }) => {
+    await expect(terminal.getByText('Design Sync')).toBeVisible()
+    // Menu open (Esc), wheel, close.
+    terminal.write('\x1b')
+    await pause()
+    await wheel(terminal, 'down', LIST.x, LIST.y)
+    terminal.write('\x1b')
+    await pause()
+    // New-chat prompt (p), wheel, close.
+    terminal.write('p')
+    await pause()
+    await wheel(terminal, 'down', LIST.x, LIST.y)
+    terminal.write('\x1b')
+    await pause()
+    // Resize mode (Ctrl+X), wheel, leave.
+    terminal.write('\x18')
+    await pause()
+    await wheel(terminal, 'down', LIST.x, LIST.y)
+    terminal.write('\x1b')
+    await pause()
+    // The cursor never moved: Enter opens the first chat.
+    terminal.submit()
+    await expect(terminal.getByText('I will read them now.')).toBeVisible()
+    expect(screen(terminal)).not.toContain(DESIGN_SYNC_LAST)
+  })
+
+  // The synthetic row is not clicked here: the new-chat prompt would search
+  // the directory with a real client. activateListRow's tests cover it.
+  test('mouse filter-rows: no matches and the synthetic row: the wheel opens nothing', async ({
+    terminal,
+  }) => {
+    await expect(terminal.getByText('Design Sync')).toBeVisible()
+    terminal.write('/')
+    await pause()
+    terminal.write('zz9')
+    await pause()
+    await expect(terminal.getByText('no matches')).toBeVisible()
+    await wheel(terminal, 'down', LIST.x, LIST.y)
+    await wheel(terminal, 'up', LIST.x, LIST.y)
+    for (let i = 0; i < 3; i++) {
+      terminal.write('\x7f')
+      await pause()
+    }
+    terminal.write('Kari')
+    await pause()
+    // Wrapped in the narrow sidebar: `Create chat with` / `"Kari"`.
+    await expect(terminal.getByText('Create chat with')).toBeVisible()
+    await expect(terminal.getByText('"Kari"')).toBeVisible()
+    await wheel(terminal, 'down', LIST.x, LIST.y)
+    await wheel(terminal, 'up', LIST.x, LIST.y)
+    expect(screen(terminal)).not.toContain('New chat')
+    expect(screen(terminal)).not.toContain('[<')
+    await expect(terminal.getByText('/ Kari')).toBeVisible()
   })
 })

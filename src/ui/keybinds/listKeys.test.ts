@@ -4,6 +4,7 @@ import {
   activateListRow,
   handleListKeys,
   listCtxNow,
+  stepListCursor,
   toggleListHeader,
   type ListKeysCtx,
 } from './listKeys'
@@ -952,5 +953,65 @@ describe('mouse actions: activateListRow / toggleListHeader', () => {
       expect(toggleListHeader(u.ctx(), accountRowKey(betaId))).toBe(true)
       expect(u.store.get().settings.chatListCollapsedSections).toEqual({})
     })
+  })
+})
+
+describe('stepListCursor (wheel, j / k)', () => {
+  const at = (ctx: ListKeysCtx) => ctx.store.get().cursorKey
+
+  test('one stop per step, skipping expanded headers; holds at both ends', () => {
+    const a = makeCtx()
+    a.store.set((s) => ({
+      chats: [chat('a'), chat('b')],
+      teams: [{ id: 't1', displayName: 'Contoso' }],
+      channelsByTeam: { t1: [{ id: 'ch', displayName: 'General' }] },
+      settings: { ...s.settings },
+    }))
+    const now = () => listCtxNow(a.ctx)
+    // [a, b, Contoso (expanded), # General]
+    stepListCursor(now(), -1)
+    expect(at(now())).toBe('chat:a')
+    stepListCursor(now(), 1)
+    expect(at(now())).toBe('chat:b')
+    stepListCursor(now(), 1)
+    expect(at(now())).toBe('channel:t1/ch')
+    stepListCursor(now(), 1)
+    expect(at(now())).toBe('channel:t1/ch')
+    stepListCursor(now(), -1)
+    expect(at(now())).toBe('chat:b')
+  })
+
+  test('the same as j / k, also with a conversation open', () => {
+    const keyed = makeCtx()
+    const stepped = makeCtx()
+    for (const a of [keyed, stepped]) a.store.set({ chats: [chat('a'), chat('b'), chat('c')] })
+    stepped.store.set({ focus: { kind: 'chat', chatId: 'a' } })
+    for (const [input, dir] of [
+      ['j', 1],
+      ['j', 1],
+      ['k', -1],
+    ] as const) {
+      handleListKeys({ input, key: makeKey() }, listCtxNow(keyed.ctx))
+      stepListCursor(listCtxNow(stepped.ctx), dir)
+      expect(stepped.store.get().cursorKey).toBe(keyed.store.get().cursorKey)
+    }
+    expect(stepped.store.get().cursorKey).toBe('chat:b')
+    expect(stepped.store.get().focus).toEqual({ kind: 'chat', chatId: 'a' })
+  })
+
+  test('an empty list does nothing; the synthetic new-chat row is one stop', () => {
+    const empty = makeCtx()
+    empty.store.set({ chats: [], filter: 'zz9' })
+    const before = empty.store.get()
+    stepListCursor(listCtxNow(empty.ctx), 1)
+    expect(empty.store.get()).toBe(before)
+
+    const synthetic = makeCtx()
+    synthetic.store.set({ chats: [], filter: 'Kari' })
+    stepListCursor(listCtxNow(synthetic.ctx), 1)
+    expect(synthetic.store.get().cursorKey).toBe(NEW_CHAT_ROW)
+    stepListCursor(listCtxNow(synthetic.ctx), -1)
+    expect(synthetic.store.get().cursorKey).toBe(NEW_CHAT_ROW)
+    expect(synthetic.newChats).toEqual([])
   })
 })

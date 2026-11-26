@@ -155,6 +155,41 @@ function labelForChat(ctx: ListKeysCtx, chat: Chat): string {
   return item?.label ?? chat.topic ?? chat.id
 }
 
+// The filter as a "Create chat with" query: offered as a synthetic row after
+// the list when nothing matches and it looks like a name or an address.
+function newChatQuery(ctx: ListKeysCtx, visible: SelectableItem[]): string | null {
+  return ctx.filter && visible.length === 0 && isNewChatQueryCandidate(ctx.filter)
+    ? ctx.filter.trim()
+    : null
+}
+
+// The cursor's row index. Teams render as non-selectable headers; cursor
+// must skip them. If the stored cursor happens to land on a team (e.g. just
+// after a filter change reordered the list), advance forward to the next
+// selectable item first.
+function safeCursor(ctx: ListKeysCtx, visible: SelectableItem[], selectableCount: number): number {
+  let safe = resolveCursor(visible, selectableCount, ctx.cursorKey ?? null, ctx.cursor)
+  if (safe < visible.length && !isSelectable(visible[safe]!)) {
+    safe = nextSelectableIndex(visible, safe, +1)
+    if (safe < visible.length && !isSelectable(visible[safe]!)) {
+      safe = firstSelectableIndex(visible)
+    }
+  }
+  return safe
+}
+
+// One cursor stop down (1) or up (-1): j / k, and the mouse wheel over the
+// list. Moves the list cursor also while a conversation is open; opens
+// nothing.
+export function stepListCursor(ctx: ListKeysCtx, dir: 1 | -1): void {
+  const visible = listFor(ctx)
+  const selectableCount = visible.length + (newChatQuery(ctx, visible) ? 1 : 0)
+  if (selectableCount === 0) return
+  const next = nextSelectableIndex(visible, safeCursor(ctx, visible, selectableCount), dir)
+  const at = dir > 0 ? Math.min(next, selectableCount - 1) : next
+  ctx.store.set(cursorAt(visible, clampCursor(at, selectableCount)))
+}
+
 export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyResult {
   const { store, exit, refresh, hardRefresh, openNewChatPrompt } = ctx
   const ch = input.toLowerCase()
@@ -246,10 +281,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       return 'handled'
     }
     const visible = listFor(ctx)
-    const syntheticNewChatQuery =
-      ctx.filter && visible.length === 0 && isNewChatQueryCandidate(ctx.filter)
-        ? ctx.filter.trim()
-        : null
+    const syntheticNewChatQuery = newChatQuery(ctx, visible)
     const selectableCount = visible.length + (syntheticNewChatQuery ? 1 : 0)
     if (ch === 'n') {
       if (bringToFront(store, cursorAlias(ctx), ctx.toForeground)) openNewChatPrompt(ctx.filter)
@@ -284,26 +316,13 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       }
       return 'pass'
     }
-    // Teams render as non-selectable headers; cursor must skip them.
-    // If the stored cursor happens to land on a team (e.g. just after a
-    // filter change reordered the list), advance forward to the next
-    // selectable item first.
-    let safe = resolveCursor(visible, selectableCount, ctx.cursorKey ?? null, ctx.cursor)
-    if (safe < visible.length && !isSelectable(visible[safe]!)) {
-      safe = nextSelectableIndex(visible, safe, +1)
-      if (safe < visible.length && !isSelectable(visible[safe]!)) {
-        safe = firstSelectableIndex(visible)
-      }
-    }
+    const safe = safeCursor(ctx, visible, selectableCount)
     if (ch === 'j' || key.downArrow) {
-      const next = nextSelectableIndex(visible, safe, +1)
-      const max = selectableCount - 1
-      store.set(cursorAt(visible, clampCursor(Math.min(next, max), selectableCount)))
+      stepListCursor(ctx, 1)
       return 'handled'
     }
     if (ch === 'k' || key.upArrow) {
-      const next = nextSelectableIndex(visible, safe, -1)
-      store.set(cursorAt(visible, clampCursor(next, selectableCount)))
+      stepListCursor(ctx, -1)
       return 'handled'
     }
     if (ch === 'u' || (key as typeof key & { pageUp?: boolean }).pageUp) {
@@ -404,9 +423,10 @@ export function activateListRow(ctx: ListKeysCtx, key: string, opts: { enter: bo
   const { store, openNewChatPrompt } = ctx
   const visible = listFor(ctx)
   if (key === NEW_CHAT_ROW) {
-    if (ctx.filter && visible.length === 0 && isNewChatQueryCandidate(ctx.filter)) {
+    const query = newChatQuery(ctx, visible)
+    if (query) {
       store.set(cursorAt(visible, visible.length))
-      openNewChatPrompt(ctx.filter.trim())
+      openNewChatPrompt(query)
     }
     return
   }

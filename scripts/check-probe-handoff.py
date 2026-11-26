@@ -15,7 +15,8 @@ kitty mode also answers that with a color, plain with DA1 only.
 None of the three may switch mouse reporting on (the `mouse` setting is off by
 default). Then, in the kitty terminal with `"mouse": true`, the app must
 switch reporting on and back off however it ends: q, Ctrl+C, and the SIGINT /
-SIGTERM / SIGHUP signals (which must still end it).
+SIGTERM / SIGHUP signals (which must still end it); and switch it off while
+$EDITOR runs (menu, Ctrl+O), back on after.
 
 Usage: python3 -I scripts/check-probe-handoff.py   (from the repo root)
 """
@@ -44,8 +45,10 @@ BG_ANSWERS = {
 
 MOUSE_ON = b'\x1b[?1000h'
 MOUSE_OFF = b'\x1b[?1000l'
-ENDINGS = {'q': b'q', 'ctrl-c': b'\x03', 'SIGINT': signal.SIGINT, 'SIGTERM': signal.SIGTERM,
-           'SIGHUP': signal.SIGHUP}
+EDITOR_MARK = b'EDITOR-RAN'
+# Keys (sent one by one, apart), or a signal.
+ENDINGS = {'q': [b'q'], 'ctrl-c': [b'\x03'], 'editor': [b'\x1b', b'\x0f', b'q'],
+           'SIGINT': signal.SIGINT, 'SIGTERM': signal.SIGTERM, 'SIGHUP': signal.SIGHUP}
 
 
 def run(mode: str, mouse: bool = False, end: str = 'q') -> dict:
@@ -57,11 +60,16 @@ def run(mode: str, mouse: bool = False, end: str = 'q') -> dict:
     pid, fd = pty.fork()
     if pid == 0:
         os.chdir(REPO)
-        os.environ.update({'TEAMINAL_SEED': 'fixtures', 'TZ': 'UTC', 'XDG_CONFIG_HOME': xdg})
+        os.environ.update({'TEAMINAL_SEED': 'fixtures', 'TZ': 'UTC', 'XDG_CONFIG_HOME': xdg,
+                           'VISUAL': 'printf ' + EDITOR_MARK.decode()})
         os.execvp('bun', ['bun', 'run', 'bin/teaminal.tsx'])
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack('HHHH', 30, 100, 0, 0))
 
     out, answered, bg_answered, q_at, exited, status = b'', False, False, None, False, None
+    # Keys still to send, and when the next one is due. Output keeps being read
+    # in between: a blocked write to a full pty would make the app read them
+    # all as one chunk.
+    keys, key_at = [], 0.0
     deadline = time.time() + 30
     while time.time() < deadline:
         if select.select([fd], [], [], 0.05)[0]:
@@ -84,10 +92,14 @@ def run(mode: str, mouse: bool = False, end: str = 'q') -> dict:
         if q_at is None and b'Ada Byron' in out:
             time.sleep(0.5)
             how = ENDINGS[end]
-            if isinstance(how, bytes):
-                os.write(fd, how)
+            if isinstance(how, list):
+                keys, key_at = list(how), time.time()
             else:
                 os.kill(pid, how)
+            q_at = time.time()
+        if keys and time.time() >= key_at:
+            os.write(fd, keys.pop(0))
+            key_at = time.time() + 0.6
             q_at = time.time()
         if q_at is not None and time.time() - q_at > 5:
             break
@@ -103,7 +115,13 @@ def run(mode: str, mouse: bool = False, end: str = 'q') -> dict:
         os.kill(pid, 9)
         os.waitpid(pid, 0)
     on, off = out.rfind(MOUSE_ON), out.rfind(MOUSE_OFF)
+    mark = out.find(EDITOR_MARK)
     return {
+        # Off before the editor printed, on again after it.
+        'editor_between': mark >= 0
+        and out.rfind(MOUSE_OFF, 0, mark) > out.rfind(MOUSE_ON, 0, mark) >= 0
+        and out.find(MOUSE_ON, mark) >= 0,
+        'any_mouse_mode': b'\x1b[?1000' in out or b'\x1b[?1006' in out,
         'signal': signal.Signals(os.WTERMSIG(status)).name
         if status is not None and os.WIFSIGNALED(status) else None,
         'mouse_on': on >= 0,
@@ -127,7 +145,7 @@ def main() -> int:
             and r['quit_on_q']
             and r['pushed'] == want_mode
             and r['popped'] == want_mode
-            and not r['mouse_on']
+            and not r['any_mouse_mode']
         )
         ok = ok and good
         print(f"{'ok  ' if good else 'FAIL'} {mode:6} {r}")
@@ -139,6 +157,7 @@ def main() -> int:
             and r['mouse_off_last']
             and r['popped']
             and r['signal'] == (end if end.startswith('SIG') else None)
+            and r['editor_between'] == (end == 'editor')
         )
         ok = ok and good
         print(f"{'ok  ' if good else 'FAIL'} mouse {end:7} {r}")
