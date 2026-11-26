@@ -5,8 +5,8 @@
 //     parameter returns HTTP 400 ("Query option ... is not allowed")
 //   - Channel message listing supports $top but no useful $orderby or
 //     $filter - older pages MUST be fetched via @odata.nextLink
-//   - Replies/threads are out of scope for v1; the listChannelMessages
-//     return value contains root messages only
+//   - Channel reads return the full stream (roots and replies
+//     interleaved); src/state/channelThreads.ts groups it into threads
 //   - /me/joinedTeams does NOT include host teams for shared channels
 //     where the user is only a shared-channel member; shared-channel
 //     discovery is parked for after v1
@@ -32,12 +32,6 @@ const CHANNEL_MESSAGES_TOP_DEFAULT = 50
 // service. The constants below are kept for documentation only.
 export const CHANNEL_MESSAGE_READ_SCOPE = 'https://graph.microsoft.com/ChannelMessage.Read.All'
 export const CHANNEL_MESSAGE_SEND_SCOPE = 'https://graph.microsoft.com/ChannelMessage.Send'
-
-// Test compatibility shim - the previous Graph fallback flag is no
-// longer needed but tests still call the reset helper.
-export function __resetChannelReadFallbackForTests(): void {
-  /* nothing to reset - chatsvc is the only path */
-}
 
 export type ListJoinedTeamsOpts = {
   signal?: AbortSignal
@@ -85,12 +79,10 @@ export type ChannelMessagesPage = {
   nextLink?: string
 }
 
-// Returns root channel messages in chronological order (oldest first), so
-// the UI can append in render order without re-sorting. Graph returns
-// descending by lastModifiedDateTime; this helper reverses before returning.
-//
-// Replies/threads are NOT included - that's the documented v1 limit; load
-// older pages with `paginateChannelMessages`.
+// Returns the channel's message stream (roots and replies interleaved) in
+// chronological order (oldest first), so the UI can append in render order
+// without re-sorting. Older pages follow `nextLink` via
+// `listChannelMessagesNextPage`.
 export async function listChannelMessages(
   client: GraphClient,
   teamId: string,
@@ -128,25 +120,6 @@ export async function listChannelMessagesNextPage(
     signal: opts?.signal,
   })
   return { messages: fallback.messages, nextLink: fallback.backwardLink }
-}
-
-// AsyncGenerator of channel-message pages following @odata.nextLink. Each
-// yielded page is in API (descending) order; reverse per page if rendering
-// chronologically. Use sparingly - paging an active channel from the top
-// repeatedly is wasteful; v1 only pages on explicit "load older" intents.
-export function paginateChannelMessages(
-  client: GraphClient,
-  teamId: string,
-  channelId: string,
-  opts?: ListChannelMessagesOpts,
-): AsyncGenerator<ChannelMessage[], void, unknown> {
-  return client.paginate<ChannelMessage>({
-    method: 'GET',
-    path: `/teams/${encodeURIComponent(teamId)}/channels/${encodeURIComponent(channelId)}/messages`,
-    query: { $top: opts?.top ?? CHANNEL_MESSAGES_TOP_DEFAULT },
-    scope: CHANNEL_MESSAGE_READ_SCOPE,
-    signal: opts?.signal,
-  })
 }
 
 export type SendChannelMessageOpts = {
@@ -194,16 +167,6 @@ export type ChannelRepliesPage = {
 }
 
 const CHANNEL_REPLIES_TOP_DEFAULT = 50
-
-export async function listChannelReplies(
-  client: GraphClient,
-  teamId: string,
-  channelId: string,
-  rootId: string,
-  opts?: ListChannelRepliesOpts,
-): Promise<ChannelMessage[]> {
-  return (await listChannelRepliesPage(client, teamId, channelId, rootId, opts)).messages
-}
 
 export async function listChannelRepliesPage(
   client: GraphClient,

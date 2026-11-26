@@ -3,9 +3,10 @@
 // Behavior:
 //   - Refuses when nothing is focused, when the cache is mid-load, or
 //     when the cache is already fullyLoaded.
-//   - For channel focus without a cached @odata.nextLink, marks the
-//     cache fullyLoaded and returns. (Channel paging is nextLink-only;
-//     once we exhaust the cursor there's nothing more to fetch.)
+//   - For channel and thread focus without a cached nextLink, refetches
+//     the newest page (paging is nextLink-only): its link walks back
+//     through what is cached and on to older history. A page without a
+//     link marks the cache fullyLoaded.
 //   - For chat focus, falls back to a `beforeCreatedDateTime` filter
 //     when there is no nextLink but at least one cached message.
 //   - Persists a `lastOlderLoad` snapshot so the UI can show "+N older
