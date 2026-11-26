@@ -20,6 +20,7 @@ import { isRefreshExpiredError } from '../auth/owaPiggy'
 import { createGraphClient, type GraphClient } from '../graph/client'
 import { debug, warn } from '../log'
 import { drainNotifications } from '../notify'
+import type { TransportStats } from '../realtime/transport'
 import {
   accountStore,
   closeAccount,
@@ -77,6 +78,9 @@ export type AccountManager = {
   // Manual push reconnect (diagnostics `r`) for an open account's session,
   // the foreground's by default.
   retryRealtime(id?: AccountId): void
+  // Push counters for the same session; null without a transport (push off,
+  // no session, seeded mode).
+  realtimeStats(id?: AccountId): TransportStats | null
   // Accounts with a running session, in configured order.
   running(): AccountRef[]
   // First session(s), or fixture data in seeded mode. Single mode throws
@@ -649,6 +653,8 @@ export function createAccountManager(
     },
     retryRealtime: (id) =>
       (id === undefined ? foregroundSlot() : slots.get(id))?.session?.transport?.retry(),
+    realtimeStats: (id) =>
+      (id === undefined ? foregroundSlot() : slots.get(id))?.session?.transport?.stats?.() ?? null,
     running: () => runningSlots().map((s) => s.ref),
 
     async start(onFatal) {

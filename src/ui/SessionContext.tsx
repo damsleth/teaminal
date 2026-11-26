@@ -11,6 +11,7 @@ import { createContext, useContext } from 'react'
 import type { ReactNode } from 'react'
 import type { AccountId, AccountRef } from '../account'
 import type { GraphClient } from '../graph/client'
+import type { TransportStats } from '../realtime/transport'
 
 export type SessionApi = {
   /** Current owa-piggy profile alias, or null for the default. */
@@ -22,6 +23,8 @@ export type SessionApi = {
   client: () => GraphClient
   /** Manual push reconnect (diagnostics `r`) for `id`, default the foreground. */
   retryRealtime: (id?: AccountId) => void
+  /** Push counters for `id`, default the foreground; null without push. */
+  realtimeStats?: (id?: AccountId) => TransportStats | null
   /**
    * Tear down the running session, reset account-scoped state, hydrate
    * the new profile's message cache, and bring up a new session against
