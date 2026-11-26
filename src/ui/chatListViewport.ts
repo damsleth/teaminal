@@ -122,6 +122,15 @@ export function computeChatListViewport(
   return { viewStart: start, visibleEnd: end }
 }
 
+// Blank rows drawn above row `index` (the theme's accountGap): above every
+// account header except one at the top of the list, so the gap separates an
+// account from whatever block precedes it, collapsed or not. ChatList adds
+// it to the header's height and renders it as the header's marginTop, so the
+// viewport counts exactly the rows that are drawn.
+export function gapAbove(kind: string, index: number, accountGap: number): number {
+  return kind === 'account' && index > 0 ? accountGap : 0
+}
+
 // Rows of "chrome" outside the chat list content area. Used to convert
 // terminal height into the chat list's visible-row budget.
 //

@@ -282,6 +282,7 @@ export type ThemeColorOverrides = {
   selfMessageBorder?: string | null
   senderMessageBorder?: string | null
   chatListPreviewText?: string | null
+  accountHeader?: string | null
   systemEvent?: string | null
   dateMarker?: string | null
   errorText?: string | null
@@ -305,6 +306,7 @@ export type ThemeOverrides = ThemeColorOverrides & {
     paneHeaderMarginBottom: number
     chatListIndent: number
     chatListGap: number
+    accountGap: number
     textBackgroundPaddingX: number
     textBackgroundPaddingY: number
     dateMarkerIndent: number
@@ -326,6 +328,7 @@ export type ThemeOverrides = ThemeColorOverrides & {
   emphasis?: Partial<{
     modalTitleBold: boolean
     sectionHeadingBold: boolean
+    accountHeaderBold: boolean
     selectedBold: boolean
     focusedBold: boolean
     dateMarkerBold: boolean

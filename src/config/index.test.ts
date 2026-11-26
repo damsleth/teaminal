@@ -488,6 +488,21 @@ describe('Settings ↔ config.json parity', () => {
     expect(unchanged).toEqual([])
   })
 
+  test('account header theme tokens round-trip through themeOverrides', () => {
+    const themeOverrides = {
+      dark: { accountHeader: 'magenta' },
+      layout: { accountGap: 2 },
+      emphasis: { accountHeaderBold: false },
+    }
+    const warnings: string[] = []
+    const settings = configToSettings({ themeOverrides } as Record<string, unknown>, warnings)
+    expect(warnings).toEqual([])
+    expect(settings.themeOverrides).toEqual(themeOverrides)
+    expect(configToSettings(settingsToConfig(settings) as Record<string, unknown>)).toEqual(
+      settings,
+    )
+  })
+
   test('every setting round-trips through config without loss', () => {
     const config = settingsToConfig(MUTATED)
     const roundtripped = configToSettings(config as Record<string, unknown>, [])

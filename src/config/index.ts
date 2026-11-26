@@ -64,6 +64,7 @@ const THEME_KEYS = new Set<keyof ThemeOverrides>([
   'selfMessageBorder',
   'senderMessageBorder',
   'chatListPreviewText',
+  'accountHeader',
   'appBackground',
   'systemEvent',
   'dateMarker',
@@ -102,6 +103,7 @@ const LAYOUT_KEYS = new Set<keyof NonNullable<ThemeOverrides['layout']>>([
   'paneHeaderMarginBottom',
   'chatListIndent',
   'chatListGap',
+  'accountGap',
   'textBackgroundPaddingX',
   'textBackgroundPaddingY',
   'dateMarkerIndent',
@@ -125,6 +127,7 @@ const BORDERS_KEYS = new Set<keyof NonNullable<ThemeOverrides['borders']>>([
 const EMPHASIS_KEYS = new Set<keyof NonNullable<ThemeOverrides['emphasis']>>([
   'modalTitleBold',
   'sectionHeadingBold',
+  'accountHeaderBold',
   'selectedBold',
   'focusedBold',
   'dateMarkerBold',

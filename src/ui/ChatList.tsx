@@ -52,7 +52,7 @@ import type { AccountId } from '../account'
 import type { Presence } from '../types'
 import wrapAnsi from 'wrap-ansi'
 import { htmlToText } from '../text/html'
-import { chromeRowsForChatList, computeChatListViewport } from './chatListViewport'
+import { chromeRowsForChatList, computeChatListViewport, gapAbove } from './chatListViewport'
 import { useTerminalRows } from './hooks/useTerminalRows'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import type { PresenceColorKey, Theme } from './theme'
@@ -371,6 +371,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   )
   const chatListGap = theme.layout.chatListGap
   const chatListIndent = theme.layout.chatListIndent
+  const accountGap = theme.layout.accountGap
   // A selected-row border style frames the selected row; every row reserves
   // the frame's columns / rows so moving the cursor doesn't shift the list.
   const rowFrame = theme.borders.selectedRow !== 'none' ? 2 : 0
@@ -430,8 +431,8 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         const hasUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
         const unreadBadge = hasMention ? ' @' : hasUnread ? ' ●' : ''
         // Team / section / account headers render truncated to one row.
-        if (row.item.kind === 'team' || row.item.kind === 'section' || row.item.kind === 'account')
-          return 1
+        if (row.item.kind === 'account') return 1 + gapAbove(row.item.kind, row.index, accountGap)
+        if (row.item.kind === 'team' || row.item.kind === 'section') return 1
         let h = visualLines(label + unreadBadge, cw)
         if (row.item.kind === 'chat') {
           const preview = previewLineForChat(row.item.chat, cw, previewLines, data.meId)
@@ -453,6 +454,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
       thumbRows,
       rowFrame,
       chatListGap,
+      accountGap,
       slicesById,
     ],
   )
@@ -611,10 +613,15 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
               )
             : ''
           return (
-            <Box key={`acct-${row.index}`} flexDirection="row" flexShrink={0}>
+            <Box
+              key={`acct-${row.index}`}
+              flexDirection="row"
+              flexShrink={0}
+              marginTop={gapAbove(row.item.kind, row.index, accountGap)}
+            >
               <Text
-                bold={theme.emphasis.sectionHeadingBold}
-                color={isSelected ? theme.selected : undefined}
+                bold={theme.emphasis.accountHeaderBold}
+                color={isSelected ? theme.selected : (theme.accountHeader ?? undefined)}
                 backgroundColor={hdrBg}
                 wrap="truncate-end"
               >

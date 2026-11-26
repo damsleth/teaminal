@@ -81,6 +81,9 @@ export type ThemeLayout = {
   chatListIndent: number
   // ChatList: blank rows after each chat/channel row.
   chatListGap: number
+  // ChatList, several accounts open: blank rows above each account header
+  // (after the previous account's block, or the cross-account favorites).
+  accountGap: number
   // MessagePane: columns of background color on each side of a message body
   // (focus / self-message background). Reserved on every body so focusing
   // one doesn't shift its text.
@@ -128,6 +131,8 @@ export type ThemeEmphasis = {
   // DiagnosticsModal subsection labels, ChatList "Chats" header,
   // MessagePane cozy chat-name header.
   sectionHeadingBold: boolean
+  // ChatList account header (several accounts open).
+  accountHeaderBold: boolean
   // ChatList / MenuModal / AccountsModal / NewChatPrompt selected rows.
   selectedBold: boolean
   // MessagePane focused message body.
@@ -179,6 +184,9 @@ export type Theme = {
   senderMessageBorder: string | null
   // Chat list last-message previews of read chats; null = muted text.
   chatListPreviewText: string | null
+  // Chat list account header (several accounts open); null = the
+  // terminal's text color.
+  accountHeader: string | null
   systemEvent: string
   // MessagePane day separator.
   dateMarker: string
@@ -224,6 +232,7 @@ const LAYOUT_DEFAULT: ThemeLayout = {
   paneHeaderMarginBottom: 1,
   chatListIndent: 1,
   chatListGap: 0,
+  accountGap: 0,
   textBackgroundPaddingX: 0,
   textBackgroundPaddingY: 0,
   dateMarkerIndent: 0,
@@ -247,6 +256,7 @@ const BORDERS_DEFAULT: ThemeBorders = {
 const EMPHASIS_DEFAULT: ThemeEmphasis = {
   modalTitleBold: true,
   sectionHeadingBold: true,
+  accountHeaderBold: true,
   selectedBold: true,
   focusedBold: true,
   dateMarkerBold: true,
@@ -301,6 +311,7 @@ const DARK: Theme = {
   selfMessageBorder: null,
   senderMessageBorder: null,
   chatListPreviewText: null,
+  accountHeader: null,
   systemEvent: 'gray',
   dateMarker: 'gray',
   errorText: 'red',
@@ -348,6 +359,7 @@ const LIGHT: Theme = {
   selfMessageBorder: null,
   senderMessageBorder: null,
   chatListPreviewText: null,
+  accountHeader: null,
   systemEvent: 'gray',
   dateMarker: 'gray',
   errorText: 'red',
@@ -401,6 +413,7 @@ export type PartialTheme = {
   selfMessageBorder?: string | null
   senderMessageBorder?: string | null
   chatListPreviewText?: string | null
+  accountHeader?: string | null
   systemEvent?: string | null
   dateMarker?: string | null
   errorText?: string | null

@@ -205,3 +205,46 @@ test('unified sidebar: each row reads its own account’s unread mark; headers c
   expect(lines.find((l) => l.includes('Ada Byron'))).not.toContain('@')
   expect(lines.find((l) => l.includes('ADA BYRON'))).toContain(' @')
 })
+
+test('unified sidebar: accountGap puts blank rows above the next account header; cursor row stays on screen', () => {
+  const renderGap = (accountGap: number, cursor: number) => {
+    const store = createAppStore()
+    applySeededState(openAccount(store, accountRef('alpha'), { foreground: true }), 'alpha')
+    applySeededState(openAccount(store, accountRef('beta'), { foreground: false }), 'beta')
+    store.set((s) => ({
+      settings: {
+        ...s.settings,
+        accounts: ['alpha', 'beta'],
+        themeOverrides: { layout: { accountGap } },
+      },
+      cursor,
+      cursorKey: null,
+    }))
+    return (
+      renderToString(
+        <StoreProvider store={store}>
+          <SessionProvider api={session}>
+            <ChatList listPaneWidth={40} />
+          </SessionProvider>
+        </StoreProvider>,
+        { columns: 40 },
+      )
+        // eslint-disable-next-line no-control-regex
+        .replace(/\x1b\[[0-9;]*m/g, '')
+        .split('\n')
+    )
+  }
+  const flat = renderGap(0, 0)
+  const gapped = renderGap(2, 0)
+  const beta = (ls: string[]) => ls.findIndex((l) => l.startsWith('▾ beta'))
+  expect(beta(gapped) - beta(flat)).toBe(2)
+  expect(gapped[beta(gapped) - 1]!.trim()).toBe('')
+  expect(gapped[beta(gapped) - 2]!.trim()).toBe('')
+  // Default (0): no blank row above beta's header.
+  expect(flat[beta(flat) - 1]!.trim()).not.toBe('')
+  // 24-row fallback terminal: a 15-row budget, 16 rows of content with the
+  // gap. The cursor on beta's last chat is drawn, and nothing overflows.
+  const bottom = renderGap(2, 7)
+  expect(bottom.some((l) => l.includes('OPS CHANNEL'))).toBe(true)
+  expect(bottom.length).toBeLessThanOrEqual(15)
+})

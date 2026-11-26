@@ -90,6 +90,7 @@ const NULLABLE_COLOR_KEYS = new Set([
   'selfMessageBorder',
   'senderMessageBorder',
   'chatListPreviewText',
+  'accountHeader',
   'selfMessage',
   'modalBackground',
   'appBackground',

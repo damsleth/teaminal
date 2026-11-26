@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { chromeRowsForChatList, computeChatListViewport } from './chatListViewport'
+import { chromeRowsForChatList, computeChatListViewport, gapAbove } from './chatListViewport'
 
 function uniformHeights(n: number, h = 1): number[] {
   return Array.from({ length: n }, () => h)
@@ -240,5 +240,25 @@ describe('chromeRowsForChatList', () => {
     const baseline = chromeRowsForChatList({ hasFilterBanner: false, anyTailEnabled: false })
     const withTails = chromeRowsForChatList({ hasFilterBanner: false, anyTailEnabled: true })
     expect(withTails - baseline).toBeGreaterThanOrEqual(9)
+  })
+})
+
+describe('gapAbove (accountGap)', () => {
+  test('only account headers below the first row get the gap', () => {
+    expect(gapAbove('account', 0, 2)).toBe(0)
+    expect(gapAbove('account', 4, 2)).toBe(2)
+    expect(gapAbove('chat', 4, 2)).toBe(0)
+    expect(gapAbove('section', 4, 2)).toBe(0)
+    expect(gapAbove('account', 4, 0)).toBe(0)
+  })
+
+  test('with the gap in the heights, the cursor on the last row stays in the window', () => {
+    // header, 3 rows of 2, header (+2 gap), 3 rows of 2: 16 rows in a 15-row budget.
+    const kinds = ['account', 'chat', 'chat', 'chat', 'account', 'chat', 'chat', 'chat']
+    const heights = kinds.map((k, i) => (k === 'account' ? 1 + gapAbove(k, i, 2) : 2))
+    const v = computeChatListViewport(heights, 7, 15, 0, 2)
+    expect(v.visibleEnd).toBe(8)
+    const used = heights.slice(v.viewStart, v.visibleEnd).reduce((a, b) => a + b, 0)
+    expect(used).toBeLessThanOrEqual(15)
   })
 })
