@@ -28,7 +28,7 @@ teaminal is a lightweight terminal Microsoft Teams client written in TypeScript.
    - **Slots:** the store holds one slot per open account. The flat account fields are the foreground's; the others live in `backgroundAccounts`, read with `accountSlice(s, id)`. `openAccount` / `closeAccount` / `setForeground` in `src/state/accountStore.ts` are the only slot operations.
    - **Writes:** session code and state actions write through an `AccountStore` bound when the work starts (`accountStore(store)` for the foreground, `accountStoreFor(store, ref)` for any open slot). It accepts only account-owned fields, follows its account across a foreground swap, and drops writes once that slot is closed or re-opened. Global UI writes (focus, modal, inputZone) go through the raw `Store` in the caller.
    - There is no ambient account: scripts, e2e and tests build `createGraphClient({ account: accountRef(profile), audience, fallback })` themselves. `getToken` and the Teams-presence / push-transport option types take `profile: string | undefined` explicitly, so a forgotten profile is a compile error.
-5. **Auth boundary:** Only `src/auth/owaPiggy.ts` spawns subprocesses. Only `src/graph/client.ts` injects `Authorization` headers.
+5. **Auth boundary:** Only `src/auth/owaPiggy.ts` runs owa-piggy. The other subprocesses are OS helpers (notifications, appearance, opening links / images / the editor, the emoji picker), each listed in `SPAWNERS` in `src/architecture.test.ts`; a new one goes on that list. Only `src/graph/client.ts` injects `Authorization` headers.
 6. **HTML utilities are layer-neutral:** Teams-HTML → plain text lives in `src/text/html.ts` (pure, no Ink dependency). Both UI and `src/notify` consume it.
 
 ## Release Hygiene
