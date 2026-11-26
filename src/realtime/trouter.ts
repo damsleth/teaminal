@@ -445,6 +445,9 @@ export class TrouterTransport implements RealtimeTransport {
       }
 
       ws.onmessage = (event) => {
+        // A frame dispatched on a superseded socket must not send on, or
+        // register, the current one.
+        if (mine !== this.attempt) return
         void this.handleSocketMessage(String(event.data), ic3Token)
           .then((connected) => {
             if (!connected || settled) return
@@ -799,7 +802,10 @@ export class TrouterTransport implements RealtimeTransport {
   }
 
   private scheduleReconnect(): void {
-    if (this.disconnecting) return
+    // A failure before registration settles reaches here twice: from
+    // connect()'s catch and from the socket's onclose. One failure is one
+    // attempt, so a pending timer (or exhaustion already reported) wins.
+    if (this.disconnecting || this.reconnectTimer || this._state === 'error') return
     if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
       warn('trouter: max reconnect attempts reached, giving up')
       recordEvent(

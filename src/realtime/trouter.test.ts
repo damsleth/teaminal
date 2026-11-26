@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, jest, test } from 'bun:test'
 import {
   buildRegistrarRequest,
   buildTrouterConnectUrl,
@@ -7,6 +7,7 @@ import {
   TrouterTransport,
 } from './trouter'
 import { RealtimeEventBus } from './events'
+import { subscribeEvents } from '../log'
 
 function makeDummyTransport() {
   const bus = new RealtimeEventBus()
@@ -409,23 +410,124 @@ describe('buildRegistrarRequest', () => {
   })
 })
 
-describe('TrouterTransport shutdown', () => {
-  class FakeSocket {
-    static made: FakeSocket[] = []
-    closed = false
-    onopen: (() => void) | null = null
-    onmessage: ((e: { data: string }) => void) | null = null
-    onerror: ((e: unknown) => void) | null = null
-    onclose: ((e: unknown) => void) | null = null
-    constructor(public url: string) {
-      FakeSocket.made.push(this)
-    }
-    send() {}
-    close() {
-      this.closed = true
-    }
+// A WebSocket stand-in. close() fires onclose on a microtask, like a real
+// socket, or only on fireClose() ('manual'), so a test can put the close
+// before or after the failed connect's rejection is handled.
+class FakeSocket {
+  static OPEN = 1
+  static made: FakeSocket[] = []
+  static closeMode: 'microtask' | 'manual' = 'microtask'
+  readyState = 0
+  closed = false
+  sent: string[] = []
+  onopen: (() => void) | null = null
+  onmessage: ((e: { data: string }) => void) | null = null
+  onerror: ((e: unknown) => void) | null = null
+  onclose: ((e: unknown) => void) | null = null
+  constructor(public url: string) {
+    FakeSocket.made.push(this)
   }
+  send(data: string) {
+    this.sent.push(data)
+  }
+  close() {
+    if (this.closed) return
+    this.closed = true
+    this.readyState = 3
+    if (FakeSocket.closeMode === 'microtask') queueMicrotask(() => this.fireClose())
+  }
+  fireClose(code = 1006) {
+    this.onclose?.({ code, reason: '' })
+  }
+  open() {
+    this.readyState = FakeSocket.OPEN
+    this.onopen?.()
+  }
+  receive(data: string) {
+    this.onmessage?.({ data })
+  }
+}
 
+const flush = async (n = 50) => {
+  for (let i = 0; i < n; i++) await Promise.resolve()
+}
+
+const fakeResponse = (status: number, body = '') =>
+  ({
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: '',
+    headers: new Headers(),
+    body: null,
+    text: async () => body,
+  }) as unknown as Response
+
+const CONNECTED_FRAME = `5:1::${JSON.stringify({
+  name: 'trouter.connected',
+  args: [{ surl: 'https://trouter.example.com/v4/f/sr-1/', connectparams: { st: 'fake' } }],
+})}`
+
+type FetchStub = (url: string, init: RequestInit) => Promise<Response>
+
+// Fake sockets, fake timers, a fixed jitter and a fetch that refuses
+// anything a test did not stub: nothing here reaches the network.
+async function withHarness(
+  fn: (h: { setFetch: (f: FetchStub) => void; fetchCalls: () => number }) => Promise<void>,
+): Promise<void> {
+  const real = { ws: globalThis.WebSocket, fetch: globalThis.fetch, random: Math.random }
+  FakeSocket.made = []
+  FakeSocket.closeMode = 'microtask'
+  let impl: FetchStub = async () => {
+    throw new Error('test: unexpected network call')
+  }
+  let calls = 0
+  globalThis.WebSocket = FakeSocket as unknown as typeof WebSocket
+  globalThis.fetch = ((url: string, init?: RequestInit) => {
+    calls++
+    return impl(String(url), init ?? {})
+  }) as unknown as typeof fetch
+  Math.random = () => 0.5
+  jest.useFakeTimers()
+  try {
+    await fn({ setFetch: (f) => (impl = f), fetchCalls: () => calls })
+  } finally {
+    jest.useRealTimers()
+    globalThis.WebSocket = real.ws
+    globalThis.fetch = real.fetch
+    Math.random = real.random
+  }
+}
+
+function makeTransport(profile = 'alpha', token = 'ic3-tok') {
+  const transport = new TrouterTransport({
+    bus: new RealtimeEventBus(),
+    getToken: async () => token,
+    profile,
+  })
+  ;(transport as unknown as { ensureSkypeToken: () => Promise<void> }).ensureSkypeToken =
+    async () => {}
+  return transport
+}
+
+// Start a connect and return its socket (not yet open).
+async function startConnect(transport: TrouterTransport): Promise<FakeSocket> {
+  const before = FakeSocket.made.length
+  void transport.connect()
+  await flush()
+  expect(FakeSocket.made).toHaveLength(before + 1)
+  return FakeSocket.made[before]!
+}
+
+// Upgrade, authenticate and deliver trouter.connected (the registrar POST).
+async function handshake(sock: FakeSocket): Promise<void> {
+  sock.open()
+  sock.receive('1::')
+  await flush()
+  sock.receive(CONNECTED_FRAME)
+  await flush()
+}
+
+describe('TrouterTransport shutdown', () => {
   function setupTransport() {
     FakeSocket.made = []
     let release!: (t: string) => void
@@ -475,4 +577,219 @@ describe('TrouterTransport shutdown', () => {
       globalThis.WebSocket = real
     }
   })
+})
+
+describe('TrouterTransport lifecycle', () => {
+  for (const mode of ['microtask', 'manual'] as const) {
+    const order = mode === 'microtask' ? 'close before catch' : 'catch before close'
+    test(`a registrar 500 leaves one pending reconnect, and none after disconnect (${order})`, () =>
+      withHarness(async (h) => {
+        FakeSocket.closeMode = mode
+        h.setFetch(async () => fakeResponse(500))
+        const t = makeTransport()
+        const sock = await startConnect(t)
+        await handshake(sock)
+        if (mode === 'manual') {
+          sock.fireClose()
+          await flush()
+        }
+        expect(sock.closed).toBe(true)
+        expect(t.state).toBe('reconnecting')
+        expect(jest.getTimerCount()).toBe(1)
+        t.disconnect()
+        expect(jest.getTimerCount()).toBe(0)
+        jest.advanceTimersByTime(10 * 60_000)
+        await flush()
+        expect(FakeSocket.made).toHaveLength(1)
+        expect(t.state).toBe('disconnected')
+      }))
+
+    test(`no trouter.connected within 15 s gives one reconnect (${order})`, () =>
+      withHarness(async () => {
+        FakeSocket.closeMode = mode
+        const t = makeTransport()
+        const sock = await startConnect(t)
+        sock.open()
+        sock.receive('1::')
+        await flush()
+        jest.advanceTimersByTime(15_000)
+        await flush()
+        if (mode === 'manual') {
+          sock.fireClose()
+          await flush()
+        }
+        expect(sock.closed).toBe(true)
+        expect(t.state).toBe('reconnecting')
+        expect(jest.getTimerCount()).toBe(1)
+        t.disconnect()
+        jest.advanceTimersByTime(10 * 60_000)
+        await flush()
+        expect(FakeSocket.made).toHaveLength(1)
+      }))
+  }
+
+  test('11 consecutive failures end in error with no timer; retry() starts over', () =>
+    withHarness(async (h) => {
+      h.setFetch(async () => fakeResponse(500))
+      const giveUps: string[] = []
+      const unsubscribe = subscribeEvents((e) => {
+        if (e.message.includes('max reconnect attempts')) giveUps.push(e.message)
+      })
+      try {
+        const t = makeTransport()
+        await handshake(await startConnect(t))
+        for (let i = 0; i < 10; i++) {
+          expect(t.state).toBe('reconnecting')
+          expect(jest.getTimerCount()).toBe(1)
+          // Fire only the reconnect: a longer advance would also run the
+          // next socket's 15 s timeout (bun drains microtasks in between).
+          jest.advanceTimersToNextTimer()
+          await flush()
+          await handshake(FakeSocket.made.at(-1)!)
+        }
+        expect(FakeSocket.made).toHaveLength(11)
+        expect(t.state).toBe('error')
+        expect(jest.getTimerCount()).toBe(0)
+        expect(giveUps).toHaveLength(1)
+
+        t.retry()
+        expect(t.state).toBe('connecting')
+        await flush()
+        expect(FakeSocket.made).toHaveLength(12)
+        await handshake(FakeSocket.made.at(-1)!)
+        expect(t.state).toBe('reconnecting')
+        // The attempt count was reset: the next delay is the 2 s base again.
+        jest.advanceTimersByTime(1_999)
+        await flush()
+        expect(FakeSocket.made).toHaveLength(12)
+        jest.advanceTimersByTime(1)
+        await flush()
+        expect(FakeSocket.made).toHaveLength(13)
+        t.disconnect()
+      } finally {
+        unsubscribe()
+      }
+    }))
+
+  test('a disconnect while the registrar POST is pending aborts it', () =>
+    withHarness(async (h) => {
+      let signal: AbortSignal | undefined
+      h.setFetch(
+        (_url, init) =>
+          new Promise((_, reject) => {
+            signal = init.signal!
+            signal.addEventListener('abort', () =>
+              reject(new DOMException('Aborted', 'AbortError')),
+            )
+          }),
+      )
+      const t = makeTransport()
+      await handshake(await startConnect(t))
+      expect(signal?.aborted).toBe(false)
+      t.disconnect()
+      await flush()
+      expect(signal?.aborted).toBe(true)
+      expect(jest.getTimerCount()).toBe(0)
+      jest.advanceTimersByTime(10 * 60_000)
+      await flush()
+      expect(FakeSocket.made).toHaveLength(1)
+      expect(t.state).toBe('disconnected')
+    }))
+
+  test('trouter.message_loss is acknowledged with its packet id', () =>
+    withHarness(async () => {
+      const t = makeTransport()
+      const sock = await startConnect(t)
+      sock.open()
+      sock.receive('5:7+::{"name":"trouter.message_loss","args":[{"tag":"messaging"}]}')
+      await flush()
+      expect(sock.sent).toEqual([
+        '5:7+::{"name":"trouter.processed_message_loss","args":[{"tag":"messaging"}]}',
+      ])
+      t.disconnect()
+    }))
+
+  test('1:: sends user.authenticate; 2:: is echoed', () =>
+    withHarness(async () => {
+      const t = makeTransport()
+      const sock = await startConnect(t)
+      sock.open()
+      sock.receive('1::')
+      await flush()
+      expect(sock.sent).toHaveLength(1)
+      const auth = JSON.parse(sock.sent[0]!.replace(/^5:::/, ''))
+      expect(auth.name).toBe('user.authenticate')
+      expect(auth.args[0].headers.Authorization).toBe('Bearer ic3-tok')
+      sock.receive('2::')
+      await flush()
+      expect(sock.sent[1]).toBe('2::')
+      t.disconnect()
+    }))
+
+  test('after registration a malformed frame only logs, and disconnect stops the keepalive', () =>
+    withHarness(async (h) => {
+      h.setFetch(async () => fakeResponse(200))
+      const t = makeTransport()
+      const sock = await startConnect(t)
+      await handshake(sock)
+      expect(t.state).toBe('connected')
+      sock.receive('5:::{"name":"x","args":[{"eventType":"NewMessage","resource":42}]}')
+      await flush()
+      expect(t.state).toBe('connected')
+      expect(sock.closed).toBe(false)
+      expect(jest.getTimerCount()).toBe(1) // the keepalive only
+      t.disconnect()
+      const sent = sock.sent.length
+      jest.advanceTimersByTime(60_000)
+      await flush()
+      expect(sock.sent).toHaveLength(sent)
+      expect(jest.getTimerCount()).toBe(0)
+    }))
+
+  test("a registrar failure and disconnect on A leave B's socket and timers alone", () =>
+    withHarness(async (h) => {
+      h.setFetch(async (_url, init) =>
+        fakeResponse(
+          (init.headers as Record<string, string>).authorization === 'Bearer tok-a' ? 500 : 200,
+        ),
+      )
+      const a = makeTransport('alpha', 'tok-a')
+      const b = makeTransport('beta', 'tok-b')
+      const sockA = await startConnect(a)
+      const sockB = await startConnect(b)
+      await handshake(sockB)
+      expect(b.state).toBe('connected')
+      await handshake(sockA)
+      expect(a.state).toBe('reconnecting')
+      a.disconnect()
+      jest.advanceTimersByTime(10 * 60_000)
+      await flush()
+      expect(FakeSocket.made).toHaveLength(2)
+      expect(a.state).toBe('disconnected')
+      expect(sockB.closed).toBe(false)
+      expect(b.state).toBe('connected')
+      expect(jest.getTimerCount()).toBe(1) // B's keepalive
+      expect(sockB.sent.filter((s) => s === '2::').length).toBe(20)
+      b.disconnect()
+    }))
+
+  test('a frame on a superseded socket sends nothing on the current one and does not register', () =>
+    withHarness(async (h) => {
+      h.setFetch(async () => fakeResponse(200))
+      const t = makeTransport()
+      const s1 = await startConnect(t)
+      s1.open()
+      const stale = s1.onmessage!
+      t.retry()
+      await flush()
+      const s2 = FakeSocket.made[1]!
+      s2.open()
+      stale({ data: '1::' })
+      stale({ data: CONNECTED_FRAME })
+      await flush()
+      expect(s2.sent).toEqual([])
+      expect(h.fetchCalls()).toBe(0)
+      expect(t.state).toBe('connecting')
+      t.disconnect()
+    }))
 })
