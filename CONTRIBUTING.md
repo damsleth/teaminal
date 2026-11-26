@@ -48,8 +48,10 @@ seed-on-startup, etc.). The short version:
 2. **Polling, not pushing.** All data freshness comes from
    `src/state/poller.ts`. UI components read from the store, never from
    `src/graph/*` directly.
-3. **Auth boundary.** Only `src/auth/owaPiggy.ts` spawns subprocesses.
-   Only `src/graph/client.ts` injects `Authorization` headers.
+3. **Auth boundary.** Only `src/auth/owaPiggy.ts` runs owa-piggy; other
+   subprocesses and every module that builds an `Authorization` header are
+   listed in `src/architecture.test.ts`, which fails on a new one. Graph
+   requests get their token only from `src/graph/client.ts`.
 
 Patches that break those rules will get bounced back even if the feature
 itself is good.
