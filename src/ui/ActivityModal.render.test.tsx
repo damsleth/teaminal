@@ -168,17 +168,34 @@ test('several accounts, none with notifications: the empty line', () => {
   expect(out).not.toContain('beta ·')
 })
 
-test('one account: no header, the title names no account', () => {
+test('sidebar order, not foreground first', () => {
+  const store = threeAccounts()
+  setForeground(store, accountRef('gamma').id)
+  store.set({ modal: { kind: 'activity', cursor: 0 } })
+  const out = renderOnce(store)
+  expect(out.indexOf('alpha ·')).toBeGreaterThan(-1)
+  expect(out.indexOf('alpha ·')).toBeLessThan(out.indexOf('gamma ·'))
+})
+
+test('one open account (--profile): no header, the title names no account; refreshes it', async () => {
   const store = createAppStore(accountRef('alpha'))
-  store.set({
+  store.set((s) => ({
+    settings: { ...s.settings, accounts: ['alpha', 'beta'] },
     me: me('alice@contoso.onmicrosoft.com'),
     activityFeed: [item('n1', { senderDisplayName: 'Kari Nordmann' })],
     modal: { kind: 'activity', cursor: 0 },
-  })
-  const lines = renderOnce(store, session(store, { concurrent: undefined })).split('\n')
-  expect(lines.some((l) => l.includes('Notifications (1 unread)'))).toBe(true)
-  expect(lines.some((l) => l.includes('alpha'))).toBe(false)
-  expect(lines.some((l) => /> ● @ Kari Nordmann/.test(l))).toBe(true)
+  }))
+  const ui = mount(store, session(store, { concurrent: undefined }))
+  try {
+    await tick(100)
+    const lines = ui.out.frame.split('\n')
+    expect(lines.some((l) => l.includes('Notifications (1 unread)'))).toBe(true)
+    expect(lines.some((l) => l.includes('alpha'))).toBe(false)
+    expect(lines.some((l) => /> ● @ Kari Nordmann/.test(l))).toBe(true)
+    expect([...new Set(tokenProfiles)]).toEqual(['alpha'])
+  } finally {
+    ui.unmount()
+  }
 })
 
 test('opening refreshes every running account with its own token', async () => {

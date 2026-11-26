@@ -164,6 +164,22 @@ test.describe('two accounts: filter', () => {
   })
 })
 
+// The seed fixtures carry no activity items: this only checks the modal
+// opens through the real session in unified mode and names no account.
+// Grouping itself is covered by src/ui/ActivityModal.render.test.tsx.
+test.describe('two accounts: notifications', () => {
+  useAccounts(['alpha', 'beta'])
+  test('account-unified: Ctrl-A opens Notifications for all accounts', async ({ terminal }) => {
+    await ready(terminal, 'beta')
+    terminal.keyPress('a', { ctrl: true })
+    await expect(terminal.getByText('mark all read')).toBeVisible()
+    await expect(terminal.getByText('(no notifications)')).toBeVisible()
+    expect(screen(terminal)).not.toContain('Notifications · ')
+    terminal.keyEscape()
+    await expect(terminal.getByText('mark all read')).not.toBeVisible()
+  })
+})
+
 test.describe('two accounts: narrow terminal', () => {
   useAccounts(['alpha', 'beta'], { rows: 22, columns: 56 })
   test('account-unified: narrow terminal keeps the cursor row on screen', async ({ terminal }) => {
