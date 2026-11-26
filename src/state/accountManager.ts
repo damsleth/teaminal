@@ -6,11 +6,12 @@
 // the one persistence subscription (one comparison per slot) and the one
 // notification drain timer.
 //
-// Single mode (the default, or --profile): one slot at a time. A switch is
-// stop -> flush -> reset -> hydrate -> start; the last request wins.
+// Single mode (concurrentAccounts false, no accounts, or --profile): one
+// slot at a time. A switch is stop -> flush -> reset -> hydrate -> start;
+// the last request wins.
 //
-// Concurrent mode (concurrentAccounts, M2 E.4): one slot per configured
-// account. The foreground starts first, the others one at a time after it;
+// Concurrent mode (concurrentAccounts, the default, M2 E.4): one slot per
+// configured account. The foreground starts first, the others one at a time after it;
 // a switch is an instant foreground swap. An account that fails to start
 // keeps its slot with conn authError / offline and never exits the process.
 

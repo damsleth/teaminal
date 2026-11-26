@@ -118,7 +118,7 @@ warnings and fall back to defaults.
   "useTeamsPresence": true,
   "forceAvailableWhenFocused": true,
   "realtimeEnabled": false,
-  "concurrentAccounts": false,
+  "concurrentAccounts": true,
   "notifyMuted": false,
   "notifyChatMessages": true,
   "notifyActiveBanner": false,
@@ -173,7 +173,7 @@ warnings and fall back to defaults.
 | `useTeamsPresence`             | boolean              |  `true` | Use the Teams unified presence endpoint (`presence.teams.microsoft.com`) for own presence. Falls back to Graph `/me/presence` automatically on 401/403/404. Set to `false` to force Graph-only in tenants that block public-client access to that host. |
 | `forceAvailableWhenFocused`    | boolean              |  `true` | While the terminal window has focus (DEC focus reporting; CSI ?1004), register a Desktop endpoint with `presence.teams.microsoft.com` and force your picked presence (default Available) so Teams shows you active, like the desktop client does. Refreshed every 4 min; a picked non-Available presence is also held while blurred, and teaminal resets to Available on quit. Set to `false` to leave presence to Teams' own desktop client / inactivity timer. |
 | `realtimeEnabled`              | boolean              | `false` | Enables the experimental Teams trouter push transport for typing, read-receipt, presence, and immediate refresh signals. Polling remains the source of truth and fallback. |
-| `concurrentAccounts`           | boolean              | `false` | **Experimental.** Run every profile in `accounts` at the same time instead of one at a time: each keeps polling (and pushing, with `realtimeEnabled`) in the background, and picking an account in the Accounts modal swaps to it instantly, back on the conversation you had open there. With two or more accounts the sidebar lists them all, one section per account in `accounts` order under an account header (`▾ beta 3 @1 · example.com`: chats with unread activity, unread mentions, tenant, and `! signed out` / `! offline` when it needs attention). Opening a row brings its account to the front (the list cursor and filter stay); mark read, delete and the context menu act on the row's account without switching. The pane title, composer, status bar and modals name the account in front, and the Accounts modal shows each account's state. Notifications come from every account and name it (`teaminal · beta · Alice`). A picked presence and the status message apply to every running account. An account whose sign-in expires stops on its own; the others keep running. Read at startup (restart to apply); `--profile` forces single-account mode. Also in the menu as **Settings → All accounts at once (experimental)**. |
+| `concurrentAccounts`           | boolean              |  `true` | Run every profile in `accounts` at the same time instead of one at a time (`false` runs one at a time): each keeps polling (and pushing, with `realtimeEnabled`) in the background, and picking an account in the Accounts modal swaps to it instantly, back on the conversation you had open there. With two or more accounts the sidebar lists them all, one section per account in `accounts` order under an account header (`▾ beta 3 @1 · example.com`: chats with unread activity, unread mentions, tenant, and `! signed out` / `! offline` when it needs attention). Opening a row brings its account to the front (the list cursor and filter stay); mark read, delete and the context menu act on the row's account without switching. The pane title, composer, status bar and modals name the account in front, and the Accounts modal shows each account's state. Notifications come from every account and name it (`teaminal · beta · Alice`). A picked presence and the status message apply to every running account. An account whose sign-in expires stops on its own; the others keep running. Read at startup (restart to apply); `--profile` forces single-account mode. Also in the menu as **Settings → All accounts at once**. |
 | `notifyMuted`                  | boolean              | `false` | Suppress desktop notification banners while keeping terminal bells.                      |
 | `notifyChatMessages`           | boolean              |  `true` | Notify on every new 1:1 / group chat message, not just @mentions. Meeting chats and channels stay mention-only. |
 | `notifyActiveBanner`           | boolean              | `false` | Show banners even for the conversation currently open in a focused terminal.             |
@@ -344,12 +344,13 @@ The in-app Settings menu persists changes back to `config.json`.
 teaminal runs any owa-piggy profiles listed in `accounts`, in one of two
 modes, chosen once at startup:
 
-- **Single mode** (the default). One account runs at a time. Picking another
-  in the Accounts modal stops the running one and starts the new one.
-- **Concurrent mode** (`"concurrentAccounts": true`, experimental). Every
-  alias in `accounts` runs at once and stays live; switching is instant.
-  Active only when the flag is on, `accounts` is not empty and no
+- **Concurrent mode** (the default). Every alias in `accounts` runs at once
+  and stays live; switching is instant. Active when `concurrentAccounts` is
+  on (it is unless you set it to `false`), `accounts` is not empty and no
   `--profile` was given.
+- **Single mode** (`"concurrentAccounts": false`, or no `accounts`). One
+  account runs at a time. Picking another in the Accounts modal stops the
+  running one and starts the new one.
 - **`--profile <alias>`** always runs that one account alone, whatever the
   flag says.
 

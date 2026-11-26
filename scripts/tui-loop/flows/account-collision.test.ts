@@ -19,7 +19,14 @@ const CFG_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'teaminal-tui-accounts-'))
 fs.mkdirSync(path.join(CFG_DIR, 'teaminal'), { recursive: true })
 fs.writeFileSync(
   path.join(CFG_DIR, 'teaminal', 'config.json'),
-  JSON.stringify({ theme: 'dark', accounts: ['alpha', 'beta'], activeAccount: 'alpha' }),
+  // Single mode on purpose: concurrent mode (the default) never resets the
+  // store on a switch, which is what this flow guards.
+  JSON.stringify({
+    theme: 'dark',
+    accounts: ['alpha', 'beta'],
+    activeAccount: 'alpha',
+    concurrentAccounts: false,
+  }),
 )
 
 test.use({

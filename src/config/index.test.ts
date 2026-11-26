@@ -218,6 +218,15 @@ describe('mergeSettings', () => {
     expect(w).toEqual([])
   })
 
+  test('concurrentAccounts defaults to true; an explicit false wins', () => {
+    expect(mergeSettings({ accounts: ['alpha'] }, []).concurrentAccounts).toBe(true)
+    expect(
+      mergeSettings({ accounts: ['alpha'], concurrentAccounts: false }, []).concurrentAccounts,
+    ).toBe(false)
+    writeFileSync(cfgPath, JSON.stringify({ concurrentAccounts: false }))
+    expect(loadSettings(cfgPath).settings.concurrentAccounts).toBe(false)
+  })
+
   test('rejects invalid message focus indicator fields', () => {
     const w: string[] = []
     const out = mergeSettings(

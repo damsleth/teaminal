@@ -425,7 +425,7 @@ export const ROOT_MENU: MenuItem[] = [
       },
       {
         id: 'concurrentAccounts',
-        label: 'All accounts at once (experimental)',
+        label: 'All accounts at once',
         action: { kind: 'toggle-setting', key: 'concurrentAccounts' },
         hint: 'restart to apply',
       },
