@@ -27,11 +27,13 @@ export function useHydrateMembers(focus: Focus, store: Store<AppState>, retryMs 
   const attempts = useRef(new Map<string, Attempt>())
   // Bumped when a retry is due, to re-run the effect.
   const [retryTick, setRetryTick] = useState(0)
+  // Re-run on a foreground swap even when the focus is deep-equal.
+  const accountId = store.get().account?.id
 
   useEffect(() => {
     if (focus.kind !== 'chat') return
     const chatId = focus.chatId
-    const key = `${store.get().account?.id ?? ''}\0${chatId}`
+    const key = `${accountId ?? ''}\0${chatId}`
     const entry = attempts.current.get(key) ?? {
       ok: false,
       inFlight: false,
@@ -73,5 +75,5 @@ export function useHydrateMembers(focus: Focus, store: Store<AppState>, retryMs 
         entry.inFlight = false
       })
     return () => clearTimeout(retry)
-  }, [focus, store, retryMs, retryTick, session])
+  }, [accountId, focus, store, retryMs, retryTick, session])
 }

@@ -4,8 +4,7 @@ import { render } from 'ink'
 import { isRefreshExpiredError } from '../src/auth/owaPiggy'
 import { loadSettings } from '../src/config'
 import { loadThemeFile } from '../src/config/themes'
-import { createAccountManager } from '../src/state/accountManager'
-import { startForceAvailabilityDriver } from '../src/state/forceAvailability'
+import { concurrentMode, createAccountManager } from '../src/state/accountManager'
 import { startSystemAppearanceDriver } from '../src/state/systemAppearance'
 import { probeTerminalBackground } from '../src/ui/terminalBackground'
 import { createAppStore } from '../src/state/store'
@@ -23,7 +22,6 @@ import { installTextSizing, probeTextSizing } from '../src/ui/textSizing'
 import { cleanupImageTempFiles } from '../src/ui/openImageFile'
 import { renderCleanExit } from '../src/ui/shutdown'
 import { PollerProvider } from '../src/ui/PollerContext'
-import { accountRef } from '../src/account'
 import { SessionProvider, type SessionApi } from '../src/ui/SessionContext'
 import { StoreProvider } from '../src/ui/StoreContext'
 import { debug, setLogFile, setNetworkLog, warn } from '../src/log'
@@ -184,9 +182,13 @@ if (configResult.source === 'file') {
 }
 for (const w of configResult.warnings) warn(w)
 
-// Binds the store to the initial account and hydrates its caches before
-// mounting, so the sidebar and message pane show history immediately.
-const accounts = createAccountManager(store, initialProfile)
+// Latched once: the Settings toggle only applies after a restart.
+const concurrent = concurrentMode(settings, cliProfile)
+
+// Binds the store to the initial account(s) and hydrates the foreground's
+// caches before mounting, so the sidebar and message pane show history
+// immediately.
+const accounts = createAccountManager(store, initialProfile, undefined, undefined, concurrent)
 
 // Pick the appearance 'auto' follows before the first render (terminal
 // background, else the OS), then keep it updated on an interval.
@@ -227,17 +229,19 @@ process.on('unhandledRejection', (reason) => {
 })
 
 const focusTracker = startFocusTracker(store)
-// Seeded/offline mode must not touch the network: the forceAvailability driver
-// PUTs to presence.teams.microsoft.com, so stub it out when seeded.
-const forceAvailability = isSeededMode()
-  ? { stop() {}, async reset() {} }
-  : startForceAvailabilityDriver(store, () => accountRef(accounts.activeProfile()))
 
 function makeSessionApi(): SessionApi {
   return {
+    concurrent,
     getActiveProfile: () => accounts.activeProfile(),
     client: () => accounts.client(),
+    retryRealtime: (id) => accounts.retryRealtime(id),
     switchAccount: (profile) => accounts.switchAccount(profile),
+    reconcile: () => accounts.reconcile(),
+    setForeground: (profile, opts) => accounts.setForeground(profile, opts),
+    retry: (profile) => accounts.retry(profile),
+    running: () => accounts.running(),
+    clientFor: (id) => accounts.clientFor(id),
   }
 }
 
@@ -255,6 +259,8 @@ let cleanExit = false
 ;(async () => {
   try {
     try {
+      // Concurrent mode never calls this and never throws: a failed account
+      // keeps its slot (authError / offline) and the others run on.
       await accounts.start((kind, msg) => {
         ink.unmount()
         process.stderr.write(`teaminal: auth failed (${kind}): ${msg}\n`)
@@ -286,17 +292,11 @@ let cleanExit = false
     }
     process.exit(1)
   } finally {
-    // Best-effort shutdown. Stop the session (push + poll), then the
-    // hardware-level helpers (focus tracker / force-availability), then
-    // flush the cache one last time.
+    // Best-effort shutdown. Stop the session (push + poll), flush the
+    // caches and reset a picked presence (all in stopAll), then the
+    // hardware-level helpers.
     try {
       await accounts.stopAll()
-    } catch {}
-    try {
-      await forceAvailability.reset()
-    } catch {}
-    try {
-      forceAvailability.stop()
     } catch {}
     try {
       systemAppearance.stop()

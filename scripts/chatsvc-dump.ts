@@ -1,4 +1,3 @@
-import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // Live raw-payload dump for the Teams chat service channel-message stream.
 //
 // Step 1 de-risk for .plans/channel-threading-rootmessageid-rebuild.md: the
@@ -22,12 +21,10 @@ import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // .plans/chatsvc-sample.json for offline field inspection.
 
 import { accountRef } from '../src/account'
-import { setActiveProfile } from '../src/graph/client'
+import { createGraphClient } from '../src/graph/client'
 import { listChannels, listJoinedTeams } from '../src/graph/teams'
 import { getSkypeToken } from '../src/graph/teamsFederation'
 import { resolveRegion } from '../src/graph/teamsRegion'
-
-const testClient = () => createGraphClient(currentAccountContext())
 
 const TEAMS_ORIGIN = 'https://teams.microsoft.com'
 
@@ -51,7 +48,8 @@ const view = flags.get('view') ?? 'msnp24'
 const maxChannels = Number(flags.get('max-channels') ?? '20')
 const pageSize = Number(flags.get('page-size') ?? '50')
 
-if (profile) setActiveProfile(profile)
+const testClient = () =>
+  createGraphClient({ account: accountRef(profile), audience: 'graph', fallback: false })
 
 // --- raw chatsvc fetch (mirrors chatsvcGet + chatsvcHeaders) ---------------
 function headers(skypeToken: string): Record<string, string> {

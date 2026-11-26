@@ -7,19 +7,50 @@
 // Rebuilt on each render that needs it; cheap because the underlying lists
 // are small (typically <100 chats, <30 teams * <20 channels).
 
-import type { AppState, Settings } from './store'
+import { accountRef, DEFAULT_PROFILE, type AccountId, type AccountRef } from '../account'
+import {
+  unreadTotals,
+  type AccountSlice,
+  type AppState,
+  type ConnectionState,
+  type Settings,
+} from './store'
 import { resolveMemberName } from './nameIndex'
 import type { Channel, Chat, Team } from '../types'
 
+// Unified sidebar (M2 F.2): the account a row belongs to, and that account's
+// alias (the config identity collapse keys use). Absent in single mode, so
+// single-mode lists and keys are unchanged.
+type AccountTag = { accountId?: AccountId; alias?: string }
+
 export type SelectableItem =
-  | { kind: 'chat'; chat: Chat; label: string }
+  | ({ kind: 'chat'; chat: Chat; label: string } & AccountTag)
   // Chat-type header. Selectable only while collapsed — see isSelectable.
-  | { kind: 'section'; section: ChatSection; label: string; collapsed: boolean; count: number }
-  | { kind: 'team'; team: Team; collapsed: boolean }
-  | { kind: 'channel'; team: Team; channel: Channel; label: string }
+  | ({
+      kind: 'section'
+      section: ChatSection
+      label: string
+      collapsed: boolean
+      count: number
+    } & AccountTag)
+  | ({ kind: 'team'; team: Team; collapsed: boolean } & AccountTag)
+  | ({ kind: 'channel'; team: Team; channel: Channel; label: string } & AccountTag)
   // Overflow row shown when a grouped chat section exceeds CHAT_SECTION_CAP.
   // Selectable: Enter/l expands the section it belongs to.
-  | { kind: 'more'; section: ChatSection; hidden: number }
+  | ({ kind: 'more'; section: ChatSection; hidden: number } & AccountTag)
+  // Unified sidebar: one header per open account, always a cursor stop.
+  // `unread` (chats with unread activity) + `mentions` (unread activity-feed
+  // mentions) = accountUnreadCount, what the E.5 header badge shows.
+  | {
+      kind: 'account'
+      accountId: AccountId
+      alias: string
+      label: string
+      collapsed: boolean
+      unread: number
+      mentions: number
+      conn: ConnectionState
+    }
 
 type ChatItem = Extract<SelectableItem, { kind: 'chat' }>
 
@@ -48,17 +79,41 @@ export function teamCollapseKey(teamId: string): string {
   return `team:${teamId}`
 }
 
+// The alias as it appears inside a collapse key: percent-encoded, so a `/` or
+// `:` in an alias never acts as a separator (aliases `account:x` and `x/teams`
+// must not both produce `account:x/teams`). Ordinary aliases are unchanged.
+function aliasKey(alias: string): string {
+  return encodeURIComponent(alias)
+}
+
+export function accountCollapseKey(alias: string): string {
+  return `account:${aliasKey(alias)}`
+}
+
+// The prefix of an account's own section and team keys.
+function accountKeyPrefix(alias: string): string {
+  return `${aliasKey(alias)}/`
+}
+
+// A tagged row's section and team keys live under its account's alias, so
+// collapsing team x in alpha leaves team x in beta open.
+function scopedKey(item: AccountTag, key: string): string {
+  return item.alias === undefined ? key : `${accountKeyPrefix(item.alias)}${key}`
+}
+
 // The collapsed-state key a header row toggles, or null for a non-header.
 export function collapseKeyFor(item: SelectableItem): string | null {
-  if (item.kind === 'section') return item.section
-  if (item.kind === 'team') return teamCollapseKey(item.team.id)
+  if (item.kind === 'account') return accountCollapseKey(item.alias)
+  if (item.kind === 'section') return scopedKey(item, item.section)
+  if (item.kind === 'team') return scopedKey(item, teamCollapseKey(item.team.id))
   return null
 }
 
 // Header rows are cursor stops only while collapsed. An expanded header's
 // children are reachable on their own, so j/k glides past it the way team
 // headers always have; a collapsed header must be focusable or its section
-// could never be restored from the keyboard.
+// could never be restored from the keyboard. An account header always is:
+// it is the only way to reach a failed or empty account.
 export function isSelectable(item: SelectableItem): boolean {
   if (item.kind === 'section' || item.kind === 'team') return item.collapsed
   return true
@@ -66,19 +121,24 @@ export function isSelectable(item: SelectableItem): boolean {
 
 // The collapsed-state key of the section a row belongs to, or null when it has
 // none (an ungrouped chat) or is itself a top-level header. A team header
-// belongs to the Teams section when grouped: channel -> team -> Teams.
+// belongs to the Teams section when grouped: channel -> team -> Teams. In the
+// unified sidebar the chain ends at the row's account header, so a row
+// without a section belongs to its account.
 //
 // Derived from the row itself, never by scanning backwards for the nearest
 // header: under a filter the preceding header can belong to an unrelated
 // section (team A's name matches, a channel of team B matches), and scanning
 // would collapse the wrong one.
 export function parentCollapseKey(item: SelectableItem, groupByType: boolean): string | null {
-  if (item.kind === 'channel') return teamCollapseKey(item.team.id)
+  if (item.kind === 'account') return null
+  const account = item.alias === undefined ? null : accountCollapseKey(item.alias)
+  if (item.kind === 'channel') return scopedKey(item, teamCollapseKey(item.team.id))
   // Ungrouped lists have no chat-type headers, so there is nothing to collapse.
-  if (item.kind === 'chat') return groupByType ? chatSection(item.chat.chatType) : null
-  if (item.kind === 'more') return item.section
-  if (item.kind === 'team') return groupByType ? 'teams' : null
-  return null
+  if (item.kind === 'chat')
+    return groupByType ? scopedKey(item, chatSection(item.chat.chatType)) : account
+  if (item.kind === 'more') return scopedKey(item, item.section)
+  if (item.kind === 'team') return groupByType ? scopedKey(item, 'teams') : account
+  return account
 }
 
 // Index of the header row owning `key`, or null when that header isn't in
@@ -272,8 +332,19 @@ export function chatLabel(
 // Stable identity of a list row, so the cursor stays on the same chat when a
 // poll reorders the list. The synthetic "new chat" row (shown after a filter
 // that matches nothing) sits at index visible.length and has key NEW_CHAT_ROW.
+// Tagged rows are prefixed with their AccountId, so the same chat id in two
+// accounts is two rows.
 export const NEW_CHAT_ROW = 'new-chat'
+export function accountRowKey(id: AccountId): string {
+  return `account:${id}`
+}
 export function selectableKey(item: SelectableItem): string {
+  if (item.kind === 'account') return accountRowKey(item.accountId)
+  const key = rowKey(item)
+  return item.accountId === undefined ? key : `${item.accountId}/${key}`
+}
+
+function rowKey(item: Exclude<SelectableItem, { kind: 'account' }>): string {
   switch (item.kind) {
     case 'chat':
       return `chat:${item.chat.id}`
@@ -374,6 +445,176 @@ export function shortName(displayName: string | null | undefined): string {
   return tokens.slice(0, -1).join(' ')
 }
 
+// The list the user sees and navigates: built, then narrowed by the filter.
+// Every build-then-filter call site goes through here so one producer can be
+// swapped in later.
+export function visibleList(input: SelectableInput | UnifiedListInput): SelectableItem[] {
+  if ('accounts' in input) return unifiedList(input)
+  const items = buildSelectableList(input)
+  return input.filter ? items.filter((it) => itemMatchesFilter(it, input.filter ?? '')) : items
+}
+
+// ---- unified sidebar (M2 F.2) ---------------------------------------------
+
+// What the sidebar reads from one account: the list's inputs, plus
+// memberPresence for its presence dots and realtimeState for its header.
+const LIST_SLICE_KEYS = [
+  'me',
+  'chats',
+  'teams',
+  'channelsByTeam',
+  'nameByUserId',
+  'expandedChatSections',
+  'unreadByChatId',
+  'unreadMentionCount',
+  'conn',
+  'memberPresence',
+  'realtimeState',
+] as const satisfies readonly (keyof AccountSlice)[]
+export type AccountListSlice = Pick<AccountSlice, (typeof LIST_SLICE_KEYS)[number]>
+
+export type UnifiedListInput = Pick<SelectableInput, 'settings' | 'filter'> & {
+  // Open accounts in configured order, keyed by alias.
+  accounts: { alias: string; accountId: AccountId; slice: AccountListSlice }[]
+}
+
+// What unifiedListInput reads: the root state, or the parts of it a caller
+// holds (the command palette).
+export type UnifiedSource = Pick<AppState, 'account' | 'backgroundAccounts' | 'filter'> &
+  AccountListSlice & {
+    settings: Pick<Settings, 'accounts'> & NonNullable<SelectableInput['settings']>
+  }
+
+// The open accounts in settings.accounts order, a failed one (no session)
+// included.
+function openAccounts(s: UnifiedSource): UnifiedListInput['accounts'] {
+  return s.settings.accounts.flatMap((alias) => {
+    const accountId = accountRef(alias).id
+    const slice: AccountListSlice | undefined =
+      s.account?.id === accountId ? s : s.backgroundAccounts[accountId]
+    return slice ? [{ alias, accountId, slice }] : []
+  })
+}
+
+// The unified sidebar's input, or null below two open accounts (single mode,
+// or concurrent mode with one account): the caller then builds the
+// foreground's list as before.
+export function unifiedListInput(s: UnifiedSource): UnifiedListInput | null {
+  const accounts = openAccounts(s)
+  return accounts.length < 2 ? null : { accounts, settings: s.settings, filter: s.filter }
+}
+
+// The unified sidebar is on: two or more accounts open. Also the condition
+// for naming the foreground account in the pane title, composer, status bar
+// and modals (F.4). Unlike SessionApi.running(), an open account whose start
+// failed counts: it still has a section in the sidebar.
+export function unifiedSidebar(s: UnifiedSource): boolean {
+  return openAccounts(s).length > 1
+}
+
+// The foreground account's label where several accounts are open, else null.
+export function foregroundLabel(s: AppState): string | null {
+  return s.account && unifiedSidebar(s) ? s.account.label : null
+}
+
+// The account's header is collapsed in the unified sidebar and hides its rows.
+// Counted from the open slots, not unifiedListInput: a background account's
+// view of the store has its own slice in the flat fields. The key persists in
+// config, so a later single-mode run must ignore it. A filter lifts collapse
+// (see unifiedSidebarItems); `filter` is the root store's, since a background
+// account's view resets it.
+export function collapsedInSidebar(
+  s: Pick<AppState, 'generationById' | 'settings'>,
+  ref: AccountRef,
+  filter: string,
+): boolean {
+  return (
+    !filter &&
+    ref.profile !== DEFAULT_PROFILE &&
+    Object.keys(s.generationById).length > 1 &&
+    !!s.settings.chatListCollapsedSections[accountCollapseKey(ref.profile)]
+  )
+}
+
+// ` · <label>` after a title, or '' without a label.
+export function labelSuffix(label: string | null | undefined): string {
+  return label ? ` · ${label}` : ''
+}
+
+// A selector for unifiedListInput that returns the previous result while
+// none of its inputs changed. The foreground's slice is the root state, a
+// new object on every store change, so a component that memoised on the
+// input object itself would rebuild the list on every keystroke.
+export function cachedUnifiedListInput(): (s: AppState) => UnifiedListInput | null {
+  let prev: UnifiedListInput | null = null
+  return (s) => {
+    const next = unifiedListInput(s)
+    if (next === null || prev === null) return (prev = next)
+    const same =
+      next.settings === prev.settings &&
+      next.filter === prev.filter &&
+      next.accounts.length === prev.accounts.length &&
+      next.accounts.every((a, i) => {
+        const b = prev!.accounts[i]!
+        return (
+          a.accountId === b.accountId && LIST_SLICE_KEYS.every((k) => a.slice[k] === b.slice[k])
+        )
+      })
+    return same ? prev : (prev = next)
+  }
+}
+
+// An account's view of the collapsed map: unprefixed legacy keys apply to
+// every account and are never rewritten; the account's own `<alias>/` keys
+// win over them, an explicit false included (that reopens a section a legacy
+// key collapses).
+function collapsedFor(alias: string, all: Record<string, boolean>): Record<string, boolean> {
+  const prefix = accountKeyPrefix(alias)
+  const out = { ...all }
+  for (const [k, v] of Object.entries(all)) {
+    if (k.startsWith(prefix)) out[k.slice(prefix.length)] = v
+  }
+  return out
+}
+
+// One section per account: its header, then its own list (own collapse keys
+// and `… N more` expansions) with every row tagged. A collapsed account shows
+// its header only. Under a filter collapse is lifted, each account's rows are
+// filtered as in single mode, and an account header stays only when one of
+// its rows matched; nothing matching anywhere is an empty list.
+function unifiedList(input: UnifiedListInput): SelectableItem[] {
+  const filter = input.filter ?? ''
+  const all = input.settings?.chatListCollapsedSections ?? {}
+  const out: SelectableItem[] = []
+  for (const { alias, slice } of input.accounts) {
+    const ref = accountRef(alias)
+    const collapsed = !filter && !!all[accountCollapseKey(alias)]
+    const header: SelectableItem = {
+      kind: 'account',
+      accountId: ref.id,
+      alias,
+      label: ref.label,
+      collapsed,
+      unread: unreadTotals(slice.unreadByChatId).chats,
+      mentions: slice.unreadMentionCount,
+      conn: slice.conn,
+    }
+    if (collapsed) {
+      out.push(header)
+      continue
+    }
+    const rows = visibleList({
+      ...slice,
+      settings: { ...input.settings, chatListCollapsedSections: collapsedFor(alias, all) },
+      filter,
+    })
+    if (filter && rows.length === 0) continue
+    out.push(header)
+    for (const row of rows) out.push({ ...row, accountId: ref.id, alias })
+  }
+  return out
+}
+
 // Case-insensitive substring match against the displayed label (chat
 // label, team displayName, or channel displayName). Used by both the
 // chat-list filter input handler and the ChatList render so navigation
@@ -384,7 +625,8 @@ export function itemMatchesFilter(item: SelectableItem, filter: string): boolean
   if (item.kind === 'chat') return item.label.toLowerCase().includes(needle)
   if (item.kind === 'team') return item.team.displayName.toLowerCase().includes(needle)
   // Caps and headers are both dropped while filtering, so neither a
-  // `… N more` row nor a section header ever coexists with a filter.
-  if (item.kind === 'more' || item.kind === 'section') return false
+  // `… N more` row nor a section header ever coexists with a filter. An
+  // account header is kept by unifiedList when one of its rows matched.
+  if (item.kind === 'more' || item.kind === 'section' || item.kind === 'account') return false
   return item.channel.displayName.toLowerCase().includes(needle)
 }

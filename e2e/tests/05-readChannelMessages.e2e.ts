@@ -1,8 +1,5 @@
-import { createGraphClient, currentAccountContext } from '../../src/graph/client'
 import { listChannelMessagesPage, listChannels, listJoinedTeams } from '../../src/graph/teams'
 import type { E2ETest } from '../types'
-
-const testClient = () => createGraphClient(currentAccountContext())
 
 // The chatsvc-only channel-message read path is the most fragile thing
 // in the stack right now (FOCI can't issue ChannelMessage.Read.All, so
@@ -15,7 +12,7 @@ const test: E2ETest = {
   description: 'Read channel messages via Teams chatsvc fallback',
   authGated: true,
   async run(ctx) {
-    const teams = await listJoinedTeams(testClient())
+    const teams = await listJoinedTeams(ctx.client)
     if (teams.length === 0) throw new Error('no joined teams to probe')
     // Iterate teams until we find one with a non-empty channel. Channel
     // permissioning varies, and a freshly-joined team can return 0
@@ -24,12 +21,12 @@ const test: E2ETest = {
     let probed = 0
     let lastError: Error | null = null
     for (const team of teams.slice(0, 5)) {
-      const channels = await listChannels(testClient(), team.id)
+      const channels = await listChannels(ctx.client, team.id)
       const general = channels.find((c) => c.displayName === 'General') ?? channels[0]
       if (!general) continue
       probed++
       try {
-        const page = await listChannelMessagesPage(testClient(), team.id, general.id, { top: 20 })
+        const page = await listChannelMessagesPage(ctx.client, team.id, general.id, { top: 20 })
         ctx.log(
           `team="${team.displayName}" channel="${general.displayName}" messages=${page.messages.length}`,
         )

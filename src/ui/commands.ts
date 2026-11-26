@@ -3,7 +3,12 @@
 // menu runs it), every chat and channel, and the global key actions.
 // A future context menu can draw from the same list.
 
-import { buildSelectableList } from '../state/selectables'
+import {
+  buildSelectableList,
+  selectableKey,
+  visibleList,
+  type UnifiedListInput,
+} from '../state/selectables'
 import type { AppState } from '../state/store'
 import {
   PRESENCE_CHOICES,
@@ -27,12 +32,20 @@ export type Command = {
 export type CommandRunners = {
   runMenuItem: (item: MenuItem, path: string[]) => void
   setPresence: (choice: (typeof PRESENCE_CHOICES)[number]) => void
-  focusChat: (chatId: string) => void
-  focusChannel: (teamId: string, channelId: string) => void
+  // alias: the row's account in the unified sidebar (absent = foreground).
+  focusChat: (chatId: string, alias?: string) => void
+  focusChannel: (teamId: string, channelId: string, alias?: string) => void
   keyActions: { id: string; title: string; keys: string; run: () => void }[]
 }
 
-export function buildCommands(state: AppState, runners: CommandRunners): Command[] {
+// `unified`: the unified sidebar's input when several accounts are open; the
+// palette then lists every account's chats and channels, each naming its
+// account.
+export function buildCommands(
+  state: AppState,
+  runners: CommandRunners,
+  unified: UnifiedListInput | null = null,
+): Command[] {
   const commands: Command[] = []
 
   // Menu items, depth-first, titled by their path ("Settings › Theme").
@@ -76,34 +89,42 @@ export function buildCommands(state: AppState, runners: CommandRunners): Command
   }
 
   // Every chat and channel, ignoring collapsed sections and the section cap.
-  const items = buildSelectableList({
-    me: state.me,
-    chats: state.chats,
-    teams: state.teams,
-    channelsByTeam: state.channelsByTeam,
-    nameByUserId: state.nameByUserId,
-    settings: {
-      chatListGroupByType: false,
-      chatListSectionCap: false,
-      chatListCollapsedSections: {},
-    },
-  })
+  const settings = {
+    chatListGroupByType: false,
+    chatListSectionCap: false,
+    chatListCollapsedSections: {},
+  }
+  const items = unified
+    ? visibleList({ ...unified, settings, filter: '' })
+    : buildSelectableList({
+        me: state.me,
+        chats: state.chats,
+        teams: state.teams,
+        channelsByTeam: state.channelsByTeam,
+        nameByUserId: state.nameByUserId,
+        settings,
+      })
   for (const item of items) {
+    // Ids collide across accounts (same chat id in two tenants), so a
+    // tagged row's command id is its account-prefixed row key.
+    const { alias } = item
     if (item.kind === 'chat') {
       const chatId = item.chat.id
       commands.push({
-        id: `chat:${chatId}`,
+        id: alias === undefined ? `chat:${chatId}` : selectableKey(item),
         title: `Go to ${item.label}`,
         group: 'Chats',
-        run: () => runners.focusChat(chatId),
+        detail: alias,
+        run: () => runners.focusChat(chatId, alias),
       })
     } else if (item.kind === 'channel') {
       const { team, channel } = item
       commands.push({
-        id: `channel:${team.id}:${channel.id}`,
+        id: alias === undefined ? `channel:${team.id}:${channel.id}` : selectableKey(item),
         title: `Go to ${team.displayName} › ${channel.displayName}`,
         group: 'Channels',
-        run: () => runners.focusChannel(team.id, channel.id),
+        detail: alias,
+        run: () => runners.focusChannel(team.id, channel.id, alias),
       })
     }
   }

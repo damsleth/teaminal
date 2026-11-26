@@ -120,6 +120,7 @@ async function requestTeams<T>(
     })
   } catch (err) {
     recordRequest({
+      account: opts.account.label,
       ts: startedAt,
       method,
       path,
@@ -130,7 +131,14 @@ async function requestTeams<T>(
     throw err
   }
   const durationMs = Date.now() - startedAt
-  recordRequest({ ts: startedAt, method, path, status: res.status, durationMs })
+  recordRequest({
+    ts: startedAt,
+    account: opts.account.label,
+    method,
+    path,
+    status: res.status,
+    durationMs,
+  })
   const fullText = await safeText(res)
   let parsed: T | null = null
   if (fullText) {
@@ -177,7 +185,11 @@ function skypeCacheKey(opts: TeamsFederationOpts): string {
   return opts.account.id
 }
 
-async function postAuthz(bearerToken: string, signal?: AbortSignal): Promise<Response> {
+async function postAuthz(
+  bearerToken: string,
+  account: AccountRef,
+  signal?: AbortSignal,
+): Promise<Response> {
   const startedAt = Date.now()
   let res: Response
   try {
@@ -193,6 +205,7 @@ async function postAuthz(bearerToken: string, signal?: AbortSignal): Promise<Res
     })
   } catch (err) {
     recordRequest({
+      account: account.label,
       ts: startedAt,
       method: 'POST',
       path: '/api/authsvc/v1.0/authz',
@@ -203,6 +216,7 @@ async function postAuthz(bearerToken: string, signal?: AbortSignal): Promise<Res
     throw err
   }
   recordRequest({
+    account: account.label,
     ts: startedAt,
     method: 'POST',
     path: '/api/authsvc/v1.0/authz',
@@ -261,7 +275,7 @@ export async function getSkypeToken(opts: TeamsFederationOpts): Promise<string> 
       profile: profile(opts),
       scope: 'https://teams.microsoft.com/.default',
     })
-    let res = await postAuthz(teamsAudienceToken, opts?.signal)
+    let res = await postAuthz(teamsAudienceToken, opts.account, opts?.signal)
     if (res.status === 401) {
       // Some tenants accept the spaces-scoped token at authsvc instead.
       // Try that before giving up.
@@ -270,7 +284,7 @@ export async function getSkypeToken(opts: TeamsFederationOpts): Promise<string> 
         scope: TEAMS_SPACES_SCOPE,
       })
       if (spacesToken !== teamsAudienceToken) {
-        res = await postAuthz(spacesToken, opts?.signal)
+        res = await postAuthz(spacesToken, opts.account, opts?.signal)
       }
     }
     if (!res.ok) {
@@ -354,6 +368,7 @@ export async function requestChatsvcMe<T>(
     })
   } catch (err) {
     recordRequest({
+      account: opts.account.label,
       ts: startedAt,
       method,
       path,
@@ -364,7 +379,14 @@ export async function requestChatsvcMe<T>(
     throw err
   }
   const durationMs = Date.now() - startedAt
-  recordRequest({ ts: startedAt, method, path, status: res.status, durationMs })
+  recordRequest({
+    ts: startedAt,
+    account: opts.account.label,
+    method,
+    path,
+    status: res.status,
+    durationMs,
+  })
   const fullText = await safeText(res)
   let parsed: T | null = null
   if (fullText) {

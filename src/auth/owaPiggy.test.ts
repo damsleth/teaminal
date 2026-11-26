@@ -84,8 +84,8 @@ describe('getToken caching', () => {
       return { stdout: token, stderr: '', exitCode: 0 }
     })
 
-    const a = await getToken()
-    const b = await getToken()
+    const a = await getToken({ profile: undefined })
+    const b = await getToken({ profile: undefined })
     expect(a).toBe(token)
     expect(b).toBe(token)
     expect(calls).toBe(1)
@@ -122,8 +122,8 @@ describe('getToken caching', () => {
       return { stdout: out ?? fresh, stderr: '', exitCode: 0 }
     })
 
-    expect(await getToken()).toBe(stale)
-    expect(await getToken()).toBe(fresh)
+    expect(await getToken({ profile: undefined })).toBe(stale)
+    expect(await getToken({ profile: undefined })).toBe(fresh)
     expect(calls).toBe(2)
   })
 
@@ -147,7 +147,7 @@ describe('getToken caching', () => {
       return { stdout: token, stderr: '', exitCode: 0 }
     })
 
-    await getToken()
+    await getToken({ profile: undefined })
     expect(seenArgs).toEqual(['token', '--audience', 'graph'])
   })
 
@@ -159,7 +159,7 @@ describe('getToken caching', () => {
       return { stdout: token, stderr: '', exitCode: 0 }
     })
 
-    await getToken({ scope: 'https://presence.teams.microsoft.com/.default' })
+    await getToken({ profile: undefined, scope: 'https://presence.teams.microsoft.com/.default' })
     expect(seenArgs).toEqual(['token', '--scope', 'https://presence.teams.microsoft.com/.default'])
     expect(seenArgs).not.toContain('--audience')
   })
@@ -201,7 +201,10 @@ describe('getToken caching', () => {
       return { stdout: token, stderr: '', exitCode: 0 }
     })
 
-    const a = await getToken({ scope: 'https://graph.microsoft.com/ChannelMessage.Read.All' })
+    const a = await getToken({
+      profile: undefined,
+      scope: 'https://graph.microsoft.com/ChannelMessage.Read.All',
+    })
     expect(a).toBe(token)
     // First spawn tried --scope; second spawn fell back to --audience.
     expect(runs[0]).toContain('--scope')
@@ -210,8 +213,11 @@ describe('getToken caching', () => {
     // Invalidate the cached token so the next call re-spawns. The
     // failed-scope set persists, so it should skip --scope and hit
     // --audience graph directly.
-    invalidate({ scope: 'https://graph.microsoft.com/ChannelMessage.Read.All' })
-    const b = await getToken({ scope: 'https://graph.microsoft.com/ChannelMessage.Read.All' })
+    invalidate({ profile: undefined, scope: 'https://graph.microsoft.com/ChannelMessage.Read.All' })
+    const b = await getToken({
+      profile: undefined,
+      scope: 'https://graph.microsoft.com/ChannelMessage.Read.All',
+    })
     expect(b).toBe(token)
     expect(runs.length).toBe(3)
     expect(runs[2]).toEqual(['token', '--audience', 'graph'])
@@ -234,10 +240,16 @@ describe('getToken caching', () => {
       }
     })
 
-    const a = await getToken()
-    const b = await getToken({ scope: 'https://presence.teams.microsoft.com/.default' })
-    const aAgain = await getToken()
-    const bAgain = await getToken({ scope: 'https://presence.teams.microsoft.com/.default' })
+    const a = await getToken({ profile: undefined })
+    const b = await getToken({
+      profile: undefined,
+      scope: 'https://presence.teams.microsoft.com/.default',
+    })
+    const aAgain = await getToken({ profile: undefined })
+    const bAgain = await getToken({
+      profile: undefined,
+      scope: 'https://presence.teams.microsoft.com/.default',
+    })
     expect(a).toBe(tokenGraph)
     expect(b).toBe(tokenPresence)
     expect(aAgain).toBe(tokenGraph)
@@ -274,7 +286,11 @@ describe('getToken single-flight', () => {
       return { stdout: token, stderr: '', exitCode: 0 }
     })
 
-    const pending = Promise.all([getToken(), getToken(), getToken()])
+    const pending = Promise.all([
+      getToken({ profile: undefined }),
+      getToken({ profile: undefined }),
+      getToken({ profile: undefined }),
+    ])
     expect(calls).toBe(1)
     release!()
     const results = await pending
@@ -318,8 +334,8 @@ describe('getToken single-flight', () => {
     })
 
     const [a, b] = await Promise.all([
-      getToken(),
-      getToken({ scope: 'https://presence.teams.microsoft.com/.default' }),
+      getToken({ profile: undefined }),
+      getToken({ profile: undefined, scope: 'https://presence.teams.microsoft.com/.default' }),
     ])
     expect(a).toBe(tokenGraph)
     expect(b).toBe(tokenPresence)
@@ -339,12 +355,12 @@ describe('getToken errors', () => {
 
   test('throws when stdout is empty even on exit code 0', async () => {
     __setRunnerForTests(async () => ({ stdout: '', stderr: '', exitCode: 0 }))
-    await expect(getToken()).rejects.toThrow(/empty stdout/)
+    await expect(getToken({ profile: undefined })).rejects.toThrow(/empty stdout/)
   })
 
   test('falls back to a generic message when stderr is empty on failure', async () => {
     __setRunnerForTests(async () => ({ stdout: '', stderr: '', exitCode: 42 }))
-    await expect(getToken()).rejects.toThrow(/exited with code 42/)
+    await expect(getToken({ profile: undefined })).rejects.toThrow(/exited with code 42/)
   })
 
   test('errors do not poison the cache', async () => {
@@ -356,8 +372,8 @@ describe('getToken errors', () => {
       return { stdout: token, stderr: '', exitCode: 0 }
     })
 
-    await expect(getToken()).rejects.toThrow('transient')
-    expect(await getToken()).toBe(token)
+    await expect(getToken({ profile: undefined })).rejects.toThrow('transient')
+    expect(await getToken({ profile: undefined })).toBe(token)
     expect(calls).toBe(2)
   })
 })
@@ -373,14 +389,14 @@ describe('invalidate', () => {
       return { stdout: out ?? tokenB, stderr: '', exitCode: 0 }
     })
 
-    expect(await getToken()).toBe(tokenA)
-    expect(await getToken()).toBe(tokenA) // still cached
-    invalidate()
-    expect(await getToken()).toBe(tokenB)
+    expect(await getToken({ profile: undefined })).toBe(tokenA)
+    expect(await getToken({ profile: undefined })).toBe(tokenA) // still cached
+    invalidate({ profile: undefined })
+    expect(await getToken({ profile: undefined })).toBe(tokenB)
     expect(calls).toBe(2)
   })
 
-  test('invalidate({ scope }) clears only that scope, not the default-graph entry', async () => {
+  test('invalidate({ profile: undefined, scope }) clears only that scope, not the default-graph entry', async () => {
     const tokenGraph = makeJwt({ exp: FAR_FUTURE, sub: 'g' })
     const tokenPresence1 = makeJwt({ exp: FAR_FUTURE, sub: 'p1' })
     const tokenPresence2 = makeJwt({ exp: FAR_FUTURE, sub: 'p2' })
@@ -401,11 +417,11 @@ describe('invalidate', () => {
     })
 
     const scope = 'https://presence.teams.microsoft.com/.default'
-    expect(await getToken()).toBe(tokenGraph)
-    expect(await getToken({ scope })).toBe(tokenPresence1)
-    invalidate({ scope })
-    expect(await getToken()).toBe(tokenGraph) // graph still cached
-    expect(await getToken({ scope })).toBe(tokenPresence2) // presence respawned
+    expect(await getToken({ profile: undefined })).toBe(tokenGraph)
+    expect(await getToken({ profile: undefined, scope })).toBe(tokenPresence1)
+    invalidate({ profile: undefined, scope })
+    expect(await getToken({ profile: undefined })).toBe(tokenGraph) // graph still cached
+    expect(await getToken({ profile: undefined, scope })).toBe(tokenPresence2) // presence respawned
     expect(graphCalls).toBe(1)
     expect(presenceCalls).toBe(2)
   })
@@ -622,19 +638,19 @@ describe('reseed', () => {
     })
     await getToken({ profile: 'a' })
     await getToken({ profile: 'ab' })
-    await getToken()
+    await getToken({ profile: undefined })
     expect(tokenCalls).toBe(3)
 
     await reseed({ profile: 'a' })
     await getToken({ profile: 'ab' })
-    await getToken()
+    await getToken({ profile: undefined })
     expect(tokenCalls).toBe(3)
 
     // A default-profile reseed must not purge named profiles either.
     await reseed()
     await getToken({ profile: 'ab' })
     expect(tokenCalls).toBe(3)
-    await getToken()
+    await getToken({ profile: undefined })
     expect(tokenCalls).toBe(4)
   })
 

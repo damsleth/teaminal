@@ -13,6 +13,7 @@ import { useState } from 'react'
 import { accountStore } from '../state/accountStore'
 import { toggleReaction } from '../state/chatActions'
 import { ownReactionTypes } from '../state/messageMutations'
+import { foregroundLabel, labelSuffix } from '../state/selectables'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useSessionApi } from './SessionContext'
 import { reactionGlyph } from './reactions'
@@ -25,6 +26,8 @@ export function EditReactionsModal() {
   const me = useAppState((s) => s.me)
   const messagesByConvo = useAppState((s) => s.messagesByConvo)
   const theme = useTheme()
+  // Several accounts open: the foreground account's label.
+  const accountLabel = useAppState(foregroundLabel)
   const isOpen = modal?.kind === 'edit-reactions'
 
   const [cursor, setCursor] = useState(0)
@@ -96,7 +99,7 @@ export function EditReactionsModal() {
       paddingX={theme.layout.modalPaddingX}
       paddingY={theme.layout.modalPaddingY}
     >
-      <Text bold={theme.emphasis.modalTitleBold}>Your reactions</Text>
+      <Text bold={theme.emphasis.modalTitleBold}>Your reactions{labelSuffix(accountLabel)}</Text>
       {myReactionTypes.length === 0 ? (
         <Box marginTop={1}>
           <Text color={theme.mutedText}>no reactions to edit</Text>

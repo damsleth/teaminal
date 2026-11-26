@@ -3,10 +3,17 @@ import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { useState } from 'react'
-import { listProfilesFromStatus, type OwaPiggyProfileStatus } from '../state/authActions'
+import { accountRef } from '../account'
+import { listProfilesFromStatus, reseed, type OwaPiggyProfileStatus } from '../state/authActions'
 import { updateSettings } from '../config'
 import { applyChatRouting } from '../state/bootstrap'
-import { nextChatRouting, routingForAccount, type Settings } from '../state/store'
+import {
+  accountUnreadCount,
+  nextChatRouting,
+  routingForAccount,
+  type AccountSlice,
+  type Settings,
+} from '../state/store'
 import { useSessionApi } from './SessionContext'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
@@ -20,6 +27,24 @@ type Mode =
       invalid: OwaPiggyProfileStatus[]
     }
   | { kind: 'confirm-remove'; profile: string }
+  | { kind: 'retrying'; profile: string; reseeding: boolean }
+
+type RowState = Pick<AccountSlice, 'conn' | 'unreadByChatId' | 'unreadMentionCount'>
+
+// Concurrent mode: what a row says about its account, from its slot.
+function rowStatus(slice: RowState | undefined, foreground: boolean): string {
+  const conn = slice?.conn
+  const state =
+    conn === 'authError'
+      ? 'auth expired'
+      : conn === 'offline'
+        ? 'offline'
+        : conn === 'connecting' || !slice
+          ? 'starting'
+          : null
+  if (foreground) return state ? `foreground, ${state}` : 'foreground'
+  return state ?? 'running'
+}
 
 export function AccountsModal() {
   const { exit } = useApp()
@@ -30,7 +55,33 @@ export function AccountsModal() {
   const isOpen = modal?.kind === 'accounts'
   const session = useSessionApi()
   const activeProfile = session.getActiveProfile()
-  const [mode, setMode] = useState<Mode>({ kind: 'list', cursor: 0 })
+  const concurrent = session.concurrent === true
+  // Per-account state for the concurrent rows: the foreground's flat fields
+  // and the background slots.
+  const foregroundId = useAppState((s) => s.account?.id)
+  const foregroundConn = useAppState((s) => s.conn)
+  const foregroundUnread = useAppState((s) => s.unreadByChatId)
+  const foregroundMentions = useAppState((s) => s.unreadMentionCount)
+  const background = useAppState((s) => s.backgroundAccounts)
+  const slice = (profile: string): RowState | undefined => {
+    const id = accountRef(profile).id
+    return id === foregroundId
+      ? {
+          conn: foregroundConn,
+          unreadByChatId: foregroundUnread,
+          unreadMentionCount: foregroundMentions,
+        }
+      : background[id]
+  }
+  // Opened on a given row (Enter on a failed account's sidebar header).
+  const [mode, setMode] = useState<Mode>(() => ({
+    kind: 'list',
+    cursor: modal?.kind === 'accounts' && modal.mode === 'list' ? modal.cursor : 0,
+  }))
+  // Close only while this modal is the open one: an async step that ends
+  // after the user opened another modal must not close that one.
+  const close = () =>
+    store.set((s) => (s.modal?.kind === 'accounts' ? { modal: null, inputZone: 'list' } : {}))
 
   async function persist(patch: Partial<Settings>): Promise<void> {
     const next = await updateSettings(patch)
@@ -71,6 +122,8 @@ export function AccountsModal() {
       accounts,
       activeAccount: settings.activeAccount ?? profile,
     })
+    // Concurrent mode starts it in the background (no-op otherwise).
+    await session.reconcile()
     setMode({ kind: 'list', cursor: accounts.indexOf(profile) })
   }
 
@@ -79,6 +132,9 @@ export function AccountsModal() {
     const activeAccount =
       settings.activeAccount === profile ? (accounts[0] ?? null) : settings.activeAccount
     await persist({ accounts, activeAccount })
+    // Concurrent mode stops and closes it, moving the foreground on first
+    // when it was in front (no-op otherwise).
+    await session.reconcile()
     // Removing the account that is running must stop showing it: move to the
     // new active account (the default profile when none are left).
     if (session.getActiveProfile() === profile) await session.switchAccount(activeAccount)
@@ -101,7 +157,7 @@ export function AccountsModal() {
         else setMode({ kind: 'list', cursor: 0 })
         return
       }
-      if (mode.kind === 'loading') return
+      if (mode.kind === 'loading' || mode.kind === 'retrying') return
       if (mode.kind === 'confirm-remove') {
         if (ch === 'y' || key.return) {
           void removeProfile(mode.profile).catch((err) => {
@@ -165,12 +221,34 @@ export function AccountsModal() {
         const next = nextChatRouting(routingForAccount(settings, profile))
         const chatRoutingByAccount = { ...settings.chatRoutingByAccount, [profile]: next }
         void persist({ chatRoutingByAccount }).then(() => {
-          // If we just changed the active account's routing, apply the
-          // derived audience/fallback to the graph client immediately.
-          if (profile === session.getActiveProfile()) {
-            applyChatRouting(session.client().ctx.account, next)
-          }
+          // The session client reads the new mode on its next call; also
+          // clear this account's chatsvc latch taken under the old one.
+          applyChatRouting(accountRef(profile))
         })
+        return
+      }
+      // Concurrent mode: start a failed account again; auth expiry reseeds
+      // the owa-piggy profile first.
+      if (ch === 'r' && concurrent && settings.accounts.length > 0) {
+        const cursor = clamp(mode.cursor, settings.accounts.length)
+        const profile = settings.accounts[cursor]
+        const conn = profile ? slice(profile)?.conn : undefined
+        if (!profile || (conn !== 'authError' && conn !== 'offline')) return
+        const reseeding = conn === 'authError'
+        setMode({ kind: 'retrying', profile, reseeding })
+        void (async () => {
+          try {
+            if (reseeding) await reseed({ profile })
+            await session.retry(profile)
+            setMode({ kind: 'list', cursor })
+          } catch (err) {
+            setMode({
+              kind: 'list',
+              cursor,
+              error: `${profile}: ${err instanceof Error ? err.message : String(err)}`,
+            })
+          }
+        })()
         return
       }
       // Enter switches to the selected account.
@@ -184,9 +262,17 @@ export function AccountsModal() {
         }
         void (async () => {
           try {
+            if (concurrent) {
+              // Instant: the account already runs (or shows why it does
+              // not). The swap closes this modal, or opens auth-expired.
+              session.setForeground(profile)
+              close()
+              await persist({ activeAccount: profile })
+              return
+            }
             await persist({ activeAccount: profile })
             await session.switchAccount(profile)
-            store.set({ modal: null, inputZone: 'list' })
+            close()
           } catch (err) {
             setMode({
               kind: 'list',
@@ -218,6 +304,12 @@ export function AccountsModal() {
         <Box height={1} />
         {mode.kind === 'loading' ? (
           <Text color={theme.mutedText}>Checking owa-piggy profiles...</Text>
+        ) : mode.kind === 'retrying' ? (
+          <Text color={theme.mutedText}>
+            {mode.reseeding
+              ? `Reseeding ${mode.profile} (owa-piggy reseed), then restarting...`
+              : `Restarting ${mode.profile}...`}
+          </Text>
         ) : mode.kind === 'pick' ? (
           <>
             <Text color={theme.mutedText}>Select an account to add</Text>
@@ -253,10 +345,18 @@ export function AccountsModal() {
                 >
                   {i === mode.cursor ? '> ' : '  '}
                   {profile}
-                  <Text color={theme.mutedText}>
-                    {activeProfile === profile ? '  active' : ''}
-                    {`  [${routingForAccount(settings, profile)}]`}
-                  </Text>
+                  {concurrent ? (
+                    <Text color={theme.mutedText}>
+                      {`  ${rowStatus(slice(profile), accountRef(profile).id === foregroundId)}`}
+                      {`  [${routingForAccount(settings, profile)}]`}
+                      {unreadSuffix(slice(profile))}
+                    </Text>
+                  ) : (
+                    <Text color={theme.mutedText}>
+                      {activeProfile === profile ? '  active' : ''}
+                      {`  [${routingForAccount(settings, profile)}]`}
+                    </Text>
+                  )}
                 </Text>
               ))
             )}
@@ -264,13 +364,18 @@ export function AccountsModal() {
             <Box height={1} />
             <Text color={theme.mutedText}>
               Enter switch · a add · d remove · t routing (graph+ic3/ic3+graph/ic3-only/graph-only)
-              · Esc close
+              {concurrent ? ' · r retry failed' : ''} · Esc close
             </Text>
           </>
         )}
       </Box>
     </Box>
   )
+}
+
+function unreadSuffix(slice: RowState | undefined): string {
+  const n = slice ? accountUnreadCount(slice) : 0
+  return n > 0 ? `  ${n} unread` : ''
 }
 
 function clamp(index: number, length: number): number {

@@ -1,4 +1,3 @@
-import { createGraphClient, currentAccountContext } from '../../src/graph/client'
 import {
   createOneOnOneChat,
   editMessage,
@@ -10,8 +9,6 @@ import {
 import { getMe } from '../../src/graph/me'
 import { searchExternalUsers } from '../../src/graph/teamsExternalSearch'
 import type { E2ETest } from '../types'
-
-const testClient = () => createGraphClient(currentAccountContext())
 
 // CRUD against a fully external (no B2B link) user. Differs from the
 // linked-tenant flow in two places:
@@ -30,7 +27,7 @@ const test: E2ETest = {
     if (ctx.externalUsers.length === 0) {
       throw new Error('no external users configured')
     }
-    const me = await getMe(testClient())
+    const me = await getMe(ctx.client)
     if (!me.id) throw new Error('me.id is empty')
 
     // Pick the first external user that is NOT Graph-resolvable -
@@ -38,7 +35,7 @@ const test: E2ETest = {
     // resolves through Graph, this test has nothing to exercise.
     let unlinkedEmail: string | null = null
     for (const email of ctx.externalUsers) {
-      const matches = await searchChatUsers(testClient(), email)
+      const matches = await searchChatUsers(ctx.client, email)
       const direct = matches.find(
         (m) =>
           m.userPrincipalName?.toLowerCase() === email.toLowerCase() ||
@@ -57,7 +54,7 @@ const test: E2ETest = {
     ctx.log(`unlinked-tenant peer: ${unlinkedEmail}`)
 
     const externalHits = await searchExternalUsers(unlinkedEmail, {
-      account: currentAccountContext().account,
+      account: ctx.client.ctx.account,
     })
     if (externalHits.length === 0) {
       throw new Error(`Teams external search returned 0 hits for ${unlinkedEmail}`)
@@ -67,7 +64,7 @@ const test: E2ETest = {
 
     let chatId: string
     try {
-      const chat = await createOneOnOneChat(testClient(), me.id, peer.id)
+      const chat = await createOneOnOneChat(ctx.client, me.id, peer.id)
       chatId = chat.id
       ctx.log(`chat id=${chatId} (Graph create accepted)`)
     } catch (err) {
@@ -80,19 +77,19 @@ const test: E2ETest = {
 
     const stamp = new Date().toISOString()
     const initial = `[teaminal-e2e crud-unlinked] ping @ ${stamp}`
-    const sent = await sendMessage(testClient(), chatId, initial)
+    const sent = await sendMessage(ctx.client, chatId, initial)
     if (!sent.id) throw new Error('sendMessage returned no id')
     ctx.log(`sent message id=${sent.id}`)
 
-    const messages = await listMessages(testClient(), chatId, { top: 50 })
+    const messages = await listMessages(ctx.client, chatId, { top: 50 })
     if (!messages.find((m) => m.id === sent.id)) {
       throw new Error('sent message not present in listMessages')
     }
 
-    await editMessage(testClient(), chatId, sent.id, `${initial} (edited)`)
+    await editMessage(ctx.client, chatId, sent.id, `${initial} (edited)`)
     ctx.log('edited OK')
 
-    await softDeleteMessage(testClient(), chatId, sent.id)
+    await softDeleteMessage(ctx.client, chatId, sent.id)
     ctx.log('soft-delete OK')
   },
 }

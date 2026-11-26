@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'bun:test'
 import { accountRef } from '../../account'
-import { createGraphClient, currentAccountContext } from '../../graph/client'
+import { createGraphClient } from '../../graph/client'
 import type { ChatMessage } from '../../types'
 import { accountStore } from '../accountStore'
 import { createAppStore, type ConvKey } from '../store'
@@ -40,7 +40,8 @@ async function run(thread = false): Promise<{ fullyLoaded: boolean; nextLink?: s
     },
   })
   await loadOlderMessages({
-    getClient: () => createGraphClient(currentAccountContext()),
+    getClient: () =>
+      createGraphClient({ account: accountRef(undefined), audience: 'graph', fallback: false }),
     store: accountStore(store),
     focus: store.get().focus,
     reportError: () => {},

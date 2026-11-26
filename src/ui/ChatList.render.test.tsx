@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { renderToString } from 'ink'
+import { accountStore, openAccount } from '../state/accountStore'
 import { applySeededState } from '../state/seedFixtures'
 import { createAppStore } from '../state/store'
 import { ChatList } from './ChatList'
@@ -11,13 +12,21 @@ import { createGraphClient } from '../graph/client'
 const session: SessionApi = {
   getActiveProfile: () => null,
   switchAccount: async () => {},
+  retryRealtime: () => {},
+  reconcile: async () => {},
+  setForeground: () => {},
+  retry: async () => {},
+  running: () => [],
+  clientFor: () => {
+    throw new Error('unused')
+  },
   client: () =>
     createGraphClient({ account: accountRef(null), audience: 'graph', fallback: false }),
 }
 
 function render(theme: 'light' | 'dark', cursor: number): string[] {
-  const store = createAppStore()
-  applySeededState(store)
+  const store = createAppStore(accountRef(null))
+  applySeededState(accountStore(store))
   const s = store.get()
   store.set({
     settings: {
@@ -58,8 +67,8 @@ test('thumbnails: a picture column on chat rows, rows at least as tall as the pi
   process.env.KITTY_WINDOW_ID = '1'
   try {
     const renderList = (chatListThumbnails: string, chatListPresenceStyle = 'dot') => {
-      const store = createAppStore()
-      applySeededState(store)
+      const store = createAppStore(accountRef(null))
+      applySeededState(accountStore(store))
       store.set({
         settings: {
           ...store.get().settings,
@@ -102,8 +111,8 @@ test('thumbnails: a picture column on chat rows, rows at least as tall as the pi
 })
 
 test('chatListPreviewText colors the previews of read chats', () => {
-  const store = createAppStore()
-  applySeededState(store)
+  const store = createAppStore(accountRef(null))
+  applySeededState(accountStore(store))
   store.set({
     settings: { ...store.get().settings, themeOverrides: { chatListPreviewText: '#ff0000' } },
     unreadByChatId: {},
@@ -124,8 +133,8 @@ test('chatListPreviewText colors the previews of read chats', () => {
 
 test('the selected row is colored as a whole and can be framed', () => {
   const renderList = (overrides: object) => {
-    const store = createAppStore()
-    applySeededState(store)
+    const store = createAppStore(accountRef(null))
+    applySeededState(accountStore(store))
     store.set({
       settings: { ...store.get().settings, themeOverrides: overrides } as never,
       cursor: 0,
@@ -153,4 +162,46 @@ test('the selected row is colored as a whole and can be framed', () => {
   expect(at(framed, 'Design Sync') - at(framed, 'Ada Byron')).toBe(
     at(flat, 'Design Sync') - at(flat, 'Ada Byron') + 2,
   )
+})
+
+test('no account open (every account removed): an empty state, not loading', () => {
+  const store = createAppStore()
+  const out = renderToString(
+    <StoreProvider store={store}>
+      <SessionProvider api={session}>
+        <ChatList listPaneWidth={60} />
+      </SessionProvider>
+    </StoreProvider>,
+    { columns: 60 },
+  )
+  expect(out).toContain('no account')
+  expect(out).not.toContain('loading')
+})
+
+test('unified sidebar: each row reads its own account’s unread mark; headers carry counts', () => {
+  const store = createAppStore()
+  applySeededState(openAccount(store, accountRef('alpha'), { foreground: true }), 'alpha')
+  const beta = openAccount(store, accountRef('beta'), { foreground: false })
+  applySeededState(beta, 'beta')
+  const chatId = store.get().chats[0]!.id
+  // Unread in beta only, on a chat id alpha has too.
+  beta.set({ unreadByChatId: { [chatId]: { unreadCount: 2, mentionCount: 1 } } })
+  store.set((s) => ({ settings: { ...s.settings, accounts: ['alpha', 'beta'] } }))
+  const lines = renderToString(
+    <StoreProvider store={store}>
+      <SessionProvider api={session}>
+        <ChatList listPaneWidth={40} />
+      </SessionProvider>
+    </StoreProvider>,
+    { columns: 40 },
+  )
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b\[[0-9;]*m/g, '')
+    .split('\n')
+  expect(lines[0]).toStartWith('▾ alpha · example.com')
+  const betaHeader = lines.find((l) => l.startsWith('▾ beta'))!
+  // 1 chat with unread activity (mentions count the activity feed's).
+  expect(betaHeader).toStartWith('▾ beta 1 · example.com')
+  expect(lines.find((l) => l.includes('Ada Byron'))).not.toContain('@')
+  expect(lines.find((l) => l.includes('ADA BYRON'))).toContain(' @')
 })

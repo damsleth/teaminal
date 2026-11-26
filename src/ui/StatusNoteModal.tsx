@@ -9,8 +9,9 @@ import { useState } from 'react'
 import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
-import { accountStore } from '../state/accountStore'
-import { parseStatusEnd, setStatusNote } from '../state/presenceActions'
+import { accountStore, accountStoreFor } from '../state/accountStore'
+import { parseStatusEnd, setStatusNote, setStatusNoteOnAll } from '../state/presenceActions'
+import { useSessionApi } from './SessionContext'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 
 const WIDTH = 56
@@ -18,6 +19,7 @@ const WIDTH = 56
 export function StatusNoteModal() {
   const { exit } = useApp()
   const store = useAppStore()
+  const session = useSessionApi()
   const modal = useAppState((s) => s.modal)
   const theme = useTheme()
   const isOpen = modal?.kind === 'status-note'
@@ -32,7 +34,18 @@ export function StatusNoteModal() {
   const submit = (text: string, expiry: Date | null) => {
     setBusy(true)
     setError(null)
-    setStatusNote(accountStore(store), text, expiry)
+    // Concurrent mode: every running account; single mode: the one account.
+    const running = session.concurrent ? session.running() : []
+    Promise.resolve()
+      .then(() =>
+        running.length > 0
+          ? setStatusNoteOnAll(
+              running.map((ref) => accountStoreFor(store, ref)),
+              text,
+              expiry,
+            )
+          : setStatusNote(accountStore(store), text, expiry),
+      )
       .then(close)
       .catch((err) => {
         setBusy(false)

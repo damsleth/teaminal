@@ -260,6 +260,7 @@ describe('ROOT_MENU shape', () => {
       'useTeamsPresence',
       // Advanced / debug
       'realtimeEnabled',
+      'concurrentAccounts',
       'tailEvents',
       'tailNetwork',
       'tailDiagnostics',

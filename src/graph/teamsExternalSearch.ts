@@ -171,6 +171,7 @@ async function searchFederated(
     })
   } catch (err) {
     recordRequest({
+      account: opts.account.label,
       ts: startedAt,
       method: 'GET',
       path: '/api/mt/part/.../beta/users/.../externalsearchv3',
@@ -181,6 +182,7 @@ async function searchFederated(
     throw err
   }
   recordRequest({
+    account: opts.account.label,
     ts: startedAt,
     method: 'GET',
     path: '/api/mt/part/.../beta/users/.../externalsearchv3',
@@ -270,6 +272,7 @@ export async function searchExternalUsers(
     })
   } catch (err) {
     recordRequest({
+      account: opts.account.label,
       ts: startedAt,
       method: 'POST',
       path: '/api/mt/part/.../beta/users/searchV2',
@@ -280,6 +283,7 @@ export async function searchExternalUsers(
     throw err
   }
   recordRequest({
+    account: opts.account.label,
     ts: startedAt,
     method: 'POST',
     path: '/api/mt/part/.../beta/users/searchV2',

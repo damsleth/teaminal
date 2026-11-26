@@ -52,6 +52,12 @@ export function ownedImageKey(account: AccountId, cacheKey: string): string {
   return `${account}\u0000${cacheKey}`
 }
 
+// The parts of an ownedImageKey, or null for a bare key.
+export function splitOwnedImageKey(owned: string): { account: AccountId; key: string } | null {
+  const at = owned.indexOf('\u0000')
+  return at < 0 ? null : { account: owned.slice(0, at) as AccountId, key: owned.slice(at + 1) }
+}
+
 function getCacheDir(profile?: string): string {
   const slug = profileSlug(accountRef(profile)) ?? 'default'
   return join(teaminalCacheDir(), slug, 'images')

@@ -1,4 +1,5 @@
-import { createGraphClient, currentAccountContext } from '../graph/client'
+import { accountRef } from '../account'
+import { createGraphClient, type AccountContext } from '../graph/client'
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
   __resetForTests as resetAuth,
@@ -7,7 +8,8 @@ import {
 import { __resetForTests, __setTransportForTests } from './client'
 import { getChatsBatch } from './chats'
 
-const testClient = () => createGraphClient(currentAccountContext())
+const testClient = (over: Partial<AccountContext> = {}) =>
+  createGraphClient({ account: accountRef(undefined), audience: 'graph', fallback: false, ...over })
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 

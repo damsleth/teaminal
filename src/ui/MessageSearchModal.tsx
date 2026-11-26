@@ -12,7 +12,7 @@ import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useState } from 'react'
 import { searchAllMessages } from '../state/chatActions'
-import { clampCursor } from '../state/selectables'
+import { clampCursor, foregroundLabel, labelSuffix } from '../state/selectables'
 import type { AppState, Store } from '../state/store'
 import type { ChatMessageSearchHit } from '../types'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
@@ -33,6 +33,8 @@ export function MessageSearchModal() {
   const session = useSessionApi()
   const modal = useAppState((s) => s.modal)
   const theme = useTheme()
+  // Several accounts open: the foreground account's label.
+  const accountLabel = useAppState(foregroundLabel)
   const isOpen = modal?.kind === 'message-search-global'
 
   const [query, setQuery] = useState('')
@@ -132,7 +134,9 @@ export function MessageSearchModal() {
         width={70}
         maxWidth="100%"
       >
-        <Text bold={theme.emphasis.modalTitleBold}>Search all messages</Text>
+        <Text bold={theme.emphasis.modalTitleBold}>
+          Search all messages{labelSuffix(accountLabel)}
+        </Text>
         <Box height={1} />
         <Text>
           <Text muted>/ </Text>

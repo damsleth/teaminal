@@ -65,6 +65,14 @@ function mount(
         api={{
           getActiveProfile: () => null,
           switchAccount: async () => {},
+          retryRealtime: () => {},
+          reconcile: async () => {},
+          setForeground: () => {},
+          retry: async () => {},
+          running: () => [],
+          clientFor: () => {
+            throw new Error('unused')
+          },
           client: () =>
             createGraphClient({ account: accountRef(null), audience: 'graph', fallback: false }),
         }}

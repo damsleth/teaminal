@@ -28,7 +28,7 @@ import { useEffect, useRef, useState } from 'react'
 import { accountStore } from '../state/accountStore'
 import { createOneOnOneChat, materializeChat, resolveFederatedChatId } from '../state/chatActions'
 import { indexNameFromDirectoryUser } from '../state/nameIndex'
-import { clampCursor } from '../state/selectables'
+import { clampCursor, unifiedSidebar } from '../state/selectables'
 import {
   focusKey,
   moveMessageCursor as nextMessageCursor,
@@ -148,6 +148,13 @@ export function App() {
   }, [stdoutForCols])
 
   const focus = useAppState((s) => s.focus)
+  // The foreground account. Conversation-keyed state below is keyed by it
+  // too: after a concurrent-mode swap the restored focus can be deep-equal
+  // to the previous account's (colliding ids).
+  const accountId = useAppState((s) => s.account?.id)
+  // Unified sidebar: one list for every open account, so it is not remounted
+  // on a foreground swap (the cursor stays on its row).
+  const unified = useAppState(unifiedSidebar)
   const cursor = useAppState((s) => s.cursor)
   const cursorKey = useAppState((s) => s.cursorKey)
   const chats = useAppState((s) => s.chats)
@@ -185,11 +192,12 @@ export function App() {
   }, [focus])
   useEffect(() => {
     if (focus.kind !== 'chat' || !me?.id) return
-    if (federatedFocusCheckedRef.current.has(focus.chatId)) return
+    const checkedKey = `${accountId ?? ''}\0${focus.chatId}`
+    if (federatedFocusCheckedRef.current.has(checkedKey)) return
     const chat = chats.find((c) => c.id === focus.chatId)
     const otherUserId = otherUserIdForFederatedResolution(focus.chatId, chat, me.id)
     if (!otherUserId) return
-    federatedFocusCheckedRef.current.add(focus.chatId)
+    federatedFocusCheckedRef.current.add(checkedKey)
     let cancelled = false
     void (async () => {
       const federatedChatId = await resolveFederatedChatId(session.client(), me.id, otherUserId)
@@ -210,7 +218,7 @@ export function App() {
     return () => {
       cancelled = true
     }
-  }, [focus, me?.id, chats])
+  }, [accountId, focus, me?.id, chats])
 
   // Compute dynamic layout dimensions from terminal size + settings.
   // The composer reports its wrapped line count (draft or edit text); App
@@ -485,6 +493,7 @@ export function App() {
         refresh,
         hardRefresh,
         openNewChatPrompt,
+        toForeground: (alias) => session.setForeground(alias, { restoreUi: false }),
       })
     },
     { isActive: isRawModeSupported && inputZone === 'list' },
@@ -591,12 +600,12 @@ export function App() {
     >
       {statusBarPosition === 'top' && <StatusBar />}
       <Box borderStyle={inkBorder(theme.borders.panel)} borderColor={theme.border} paddingX={1}>
-        <HeaderBar />
+        <HeaderBar columns={terminalCols} />
       </Box>
       <Box flexDirection="row" flexGrow={1} position="relative">
         {showList && (
           <Box width={listWidth} flexShrink={0} {...paneBorder('list')}>
-            <ChatList listPaneWidth={listWidth} />
+            <ChatList key={unified ? 'unified' : accountId} listPaneWidth={listWidth} />
           </Box>
         )}
         <Box
@@ -618,6 +627,7 @@ export function App() {
           ) : (
             <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
               <MessagePane
+                key={accountId}
                 focusedMessageId={focusedMessageId}
                 focusIndicatorActive={focus.kind !== 'list' && inputZone === 'list'}
                 loadOlderState={loadOlderState}
@@ -682,6 +692,7 @@ export function App() {
       {showTailPanels && <TailPanels />}
       <Box {...paneBorder('composer')} height={resolvedComposerHeight}>
         <Composer
+          key={accountId}
           columns={terminalCols}
           rows={resolvedComposerHeight - 2}
           onLines={setDraftLines}

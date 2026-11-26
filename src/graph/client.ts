@@ -22,7 +22,7 @@ import {
   sleepUnlessAborted,
 } from './backoff'
 
-import { accountRef, owaProfile, type AccountRef } from '../account'
+import { owaProfile, type AccountRef } from '../account'
 import { getToken, invalidate } from '../auth/owaPiggy'
 import { recordRequest } from '../log'
 
@@ -66,39 +66,12 @@ export class RateLimitError extends GraphError {
   }
 }
 
-// ponytail: scripts / e2e / tests only (with currentAccountContext). The app
-// never sets an ambient profile; every session binds its own client.
-let activeProfile: string | undefined = undefined
-
-export function setActiveProfile(profile: string | undefined): void {
-  activeProfile = profile
-}
-
-// Per-account audience preference for the default (no-explicit-scope)
-// Graph calls. 'graph' is the out-of-the-box behavior. When set to
-// 'ic3', default calls request the ic3-audience token first; on a
-// persistent 401 the client falls back to the other audience once (when
-// audienceFallback is on). Calls that pass an explicit `scope` are never
-// rewritten — those target a specific audience deliberately.
+// Token audience for default (no explicit `scope`) Graph calls. 'graph' is the
+// out-of-the-box behavior. With 'ic3', default calls request the ic3-audience
+// token first; on a persistent 401 the client falls back to the other audience
+// once (when the context's `fallback` is on). Calls that pass an explicit
+// `scope` are never rewritten — those target a specific audience deliberately.
 export type TokenAudience = 'graph' | 'ic3'
-let preferredAudience: TokenAudience = 'graph'
-// Off by default: a plain install with no per-account audience preference
-// behaves exactly as before (graph token, single same-audience 401 retry,
-// no cross-audience fallback request). bootstrap turns this on only for
-// accounts that explicitly opted into a non-default audience.
-let audienceFallback = false
-
-export function setAudiencePreference(
-  audience: TokenAudience,
-  opts?: { fallback?: boolean },
-): void {
-  preferredAudience = audience
-  if (opts?.fallback !== undefined) audienceFallback = opts.fallback
-}
-
-export function getAudiencePreference(): { audience: TokenAudience; fallback: boolean } {
-  return { audience: preferredAudience, fallback: audienceFallback }
-}
 
 function otherAudience(audience: TokenAudience): TokenAudience {
   return audience === 'graph' ? 'ic3' : 'graph'
@@ -114,16 +87,6 @@ export type AccountContext = Readonly<{
   // Whether a persistent 401 may retry once with the other audience.
   fallback: boolean
 }>
-
-// The context the ambient globals describe right now. Scripts, e2e and tests
-// use it; app code gets its client from the session.
-export function currentAccountContext(): AccountContext {
-  return {
-    account: accountRef(activeProfile),
-    audience: preferredAudience,
-    fallback: audienceFallback,
-  }
-}
 
 type Transport = (url: string, init: RequestInit) => Promise<Response>
 const realTransport: Transport = (url, init) => fetch(url, init)
@@ -483,9 +446,6 @@ export function __setSleepForTests(s: (ms: number) => Promise<void>): void {
 export function __resetForTests(): void {
   transport = realTransport
   __setBackoffSleepForTests(null)
-  activeProfile = undefined
-  preferredAudience = 'graph'
-  audienceFallback = false
 }
 
 export { parseRetryAfter }

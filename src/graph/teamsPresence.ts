@@ -49,7 +49,9 @@ export type TeamsPresenceEntry = {
 }
 
 export type TeamsPresenceOpts = {
-  profile?: string
+  // Required, undefined included: a forgotten profile would silently mean
+  // owa-piggy's default account.
+  profile: string | undefined
   signal?: AbortSignal
 }
 
@@ -86,7 +88,7 @@ type RawEntry = {
 // send (suspended laptop, slow DNS).
 async function withAadAuth<T>(
   fn: () => Promise<T>,
-  tokenOpts: { profile?: string; scope: string },
+  tokenOpts: { profile: string | undefined; scope: string },
 ): Promise<T> {
   try {
     return await fn()
@@ -121,11 +123,11 @@ function parseNote(raw: RawPresence['note']): TeamsPresenceEntry['note'] {
 
 export async function getTeamsPresenceByOid(
   oids: string[],
-  opts?: TeamsPresenceOpts,
+  opts: TeamsPresenceOpts,
 ): Promise<Map<string, TeamsPresenceEntry>> {
   const out = new Map<string, TeamsPresenceEntry>()
   if (oids.length === 0) return out
-  const tokenOpts = { profile: opts?.profile, scope: TEAMS_PRESENCE_SCOPE }
+  const tokenOpts = { profile: opts.profile, scope: TEAMS_PRESENCE_SCOPE }
   return withAadAuth(async () => {
     const token = await getToken(tokenOpts)
     const body = oids.map((oid) => ({ mri: mriFromOid(oid) }))
@@ -136,7 +138,7 @@ export async function getTeamsPresenceByOid(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
-      signal: opts?.signal,
+      signal: opts.signal,
     })
     if (!res.ok) {
       throw new TeamsPresenceError(
@@ -165,9 +167,9 @@ export async function getTeamsPresenceByOid(
 }
 
 export async function getMyTeamsPresence(
-  opts?: TeamsPresenceOpts,
+  opts: TeamsPresenceOpts,
 ): Promise<TeamsPresenceEntry | null> {
-  const token = await getToken({ profile: opts?.profile, scope: TEAMS_PRESENCE_SCOPE })
+  const token = await getToken({ profile: opts.profile, scope: TEAMS_PRESENCE_SCOPE })
   const claims = decodeJwtClaims(token)
   const oid = typeof claims.oid === 'string' ? claims.oid : undefined
   if (!oid) return null
@@ -192,9 +194,9 @@ export type ForceAvailabilityValue = 'Available' | 'Busy' | 'Away' | 'DoNotDistu
 
 export async function forceMyAvailability(
   availability: ForceAvailabilityValue,
-  opts?: TeamsPresenceOpts,
+  opts: TeamsPresenceOpts,
 ): Promise<void> {
-  const tokenOpts = { profile: opts?.profile, scope: TEAMS_PRESENCE_SCOPE }
+  const tokenOpts = { profile: opts.profile, scope: TEAMS_PRESENCE_SCOPE }
   await withAadAuth(async () => {
     const token = await getToken(tokenOpts)
     const url = 'https://presence.teams.microsoft.com/v1/me/forceavailability/'
@@ -205,7 +207,7 @@ export async function forceMyAvailability(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ availability }),
-      signal: opts?.signal,
+      signal: opts.signal,
     })
     if (!res.ok) {
       throw new TeamsPresenceError(
@@ -227,9 +229,9 @@ export async function forceMyAvailability(
 export async function publishMyNote(
   message: string,
   expiry: Date | null,
-  opts?: TeamsPresenceOpts,
+  opts: TeamsPresenceOpts,
 ): Promise<void> {
-  const tokenOpts = { profile: opts?.profile, scope: TEAMS_PRESENCE_SCOPE }
+  const tokenOpts = { profile: opts.profile, scope: TEAMS_PRESENCE_SCOPE }
   await withAadAuth(async () => {
     const token = await getToken(tokenOpts)
     const url = 'https://presence.teams.microsoft.com/v1/me/publishnote'
@@ -242,7 +244,7 @@ export async function publishMyNote(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
-      signal: opts?.signal,
+      signal: opts.signal,
     })
     if (!res.ok) {
       throw new TeamsPresenceError(
@@ -265,8 +267,8 @@ export async function publishMyNote(
 //           deviceType: "Desktop" }
 //   Response: 201 with empty body. Other availability/activity pairs 400
 //   ("Invalid Incoming Endpoint State"): force those afterwards.
-export async function registerMyEndpoint(id: string, opts?: TeamsPresenceOpts): Promise<void> {
-  const tokenOpts = { profile: opts?.profile, scope: TEAMS_PRESENCE_SCOPE }
+export async function registerMyEndpoint(id: string, opts: TeamsPresenceOpts): Promise<void> {
+  const tokenOpts = { profile: opts.profile, scope: TEAMS_PRESENCE_SCOPE }
   await withAadAuth(async () => {
     const token = await getToken(tokenOpts)
     const res = await sendWithBackoff(
@@ -284,7 +286,7 @@ export async function registerMyEndpoint(id: string, opts?: TeamsPresenceOpts): 
           activity: 'Available',
           deviceType: 'Desktop',
         }),
-        signal: opts?.signal,
+        signal: opts.signal,
       },
     )
     if (!res.ok) {

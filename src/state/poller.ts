@@ -79,11 +79,14 @@ export type PollerOpts = {
   }
   onMention?: (event: MentionEvent) => void
   onError?: (loop: PollerLoopName, err: Error) => void
+  // Concurrent mode: the chat-list filter from the root store (a background
+  // account's view resets it). Absent: the store's own.
+  listFilter?: () => string
 }
 
 // Mutable ref to the active poller handle. The handle is not available
-// at first render because bootstrap is async; consumers (the UI tree
-// and bootstrap itself) share a `{ current }` box rather than passing
+// at first render because bootstrap is async; the UI tree reads a
+// `{ current }` box (written by the AccountManager) rather than passing
 // a handle through props/context that does not exist yet.
 export type PollerHandleRef = { current: PollerHandle | null }
 
@@ -219,6 +222,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
     stopSignal: sessionAbort.signal,
     isStopped,
     reportError: (err) => reportError('presence', err),
+    listFilter: opts.listFilter ?? (() => store.get().filter),
   })
 
   // Kick off all loops; failures inside any loop are caught locally so

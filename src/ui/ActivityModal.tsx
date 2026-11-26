@@ -18,6 +18,7 @@ import { useEffect } from 'react'
 import type { ActivityItem } from '../graph/teamsActivity'
 import { accountStore } from '../state/accountStore'
 import { countUnreadMentions, markActivityRead, refreshActivityFeed } from '../state/activityFeed'
+import { foregroundLabel, labelSuffix } from '../state/selectables'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { localDate } from './localTime'
 
@@ -68,13 +69,16 @@ export function ActivityModal() {
   const modal = useAppState((s) => s.modal)
   const items = useAppState((s) => s.activityFeed)
   const theme = useTheme()
+  // Several accounts open: the foreground account's label.
+  const accountLabel = useAppState(foregroundLabel)
   const isOpen = modal?.kind === 'activity'
   const cursor = isOpen ? modal.cursor : 0
 
   // On open, opportunistically refresh from the server so the user sees
   // any items that arrived between the last reconcile and now.
   useEffect(() => {
-    if (!isOpen) return
+    // No account at all (every account removed): nothing to refresh.
+    if (!isOpen || !store.get().account) return
     void refreshActivityFeed(accountStore(store))
   }, [isOpen, store])
 
@@ -176,7 +180,8 @@ export function ActivityModal() {
         maxWidth="100%"
       >
         <Text bold={theme.emphasis.modalTitleBold}>
-          Notifications{totalUnread > 0 ? ` (${totalUnread} unread)` : ''}
+          Notifications{labelSuffix(accountLabel)}
+          {totalUnread > 0 ? ` (${totalUnread} unread)` : ''}
         </Text>
         <Box height={1} />
         {items.length === 0 ? (

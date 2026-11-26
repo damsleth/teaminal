@@ -1,17 +1,16 @@
-import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // Live smoke for src/graph/chats.listChats.
 //
 // Prints the most recent N chats with topic, type, and last-message preview
 // timestamp. Use to confirm $orderby=lastMessagePreview/createdDateTime works
 // against the user's tenant.
 
-import { setActiveProfile } from '../src/graph/client'
+import { accountRef } from '../src/account'
+import { createGraphClient } from '../src/graph/client'
 import { listChats } from '../src/graph/chats'
 
-const testClient = () => createGraphClient(currentAccountContext())
-
 const profile = Bun.argv[2]
-if (profile) setActiveProfile(profile)
+const testClient = () =>
+  createGraphClient({ account: accountRef(profile), audience: 'graph', fallback: false })
 
 const top = 10
 const t0 = performance.now()

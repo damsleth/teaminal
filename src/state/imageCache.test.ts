@@ -1,5 +1,5 @@
 import { accountRef } from '../account'
-import { createGraphClient, currentAccountContext } from '../graph/client'
+import { createGraphClient, type AccountContext } from '../graph/client'
 import { afterEach, describe, expect, it, mock, setSystemTime } from 'bun:test'
 import { statSync, readdirSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -10,7 +10,6 @@ import type { MessageAttachment } from '../types'
 import {
   __resetForTests as resetClient,
   __setTransportForTests as setClientTransport,
-  setAudiencePreference,
 } from '../graph/client'
 import {
   __resetForTests as resetAsyncGw,
@@ -44,7 +43,8 @@ import {
   readCachedImage,
 } from './imageCache'
 
-const testClient = () => createGraphClient(currentAccountContext())
+const testClient = (over: Partial<AccountContext> = {}) =>
+  createGraphClient({ account: accountRef(undefined), audience: 'graph', fallback: false, ...over })
 
 describe('imageCacheKey', () => {
   it('combines messageId and attachmentId with ::', () => {
@@ -219,7 +219,6 @@ describe('fetchAndCacheImage hosted-content routing', () => {
   it('ic3-only routes a hosted-content image to asyncgw, never Graph', async () => {
     cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-ic3`)
     process.env.XDG_CACHE_HOME = cacheRoot
-    setAudiencePreference('ic3', { fallback: false })
     setAuthRunner(async () => ({
       stdout: makeJwt({ exp: FAR_FUTURE, oid: 'oid-self' }),
       stderr: '',
@@ -255,7 +254,11 @@ describe('fetchAndCacheImage hosted-content routing', () => {
       '/chats/chat-1/messages/msg-1/hostedContents/AAA/$value',
       `ic3-test-${Date.now()}`,
       { contentType: '', name: 'image' },
-      { client: testClient(), objectId: '0-na-d2-eb96', region: 'amer' },
+      {
+        client: testClient({ audience: 'ic3', fallback: false }),
+        objectId: '0-na-d2-eb96',
+        region: 'amer',
+      },
     )
     expect(buf).not.toBeNull()
     expect(buf!.byteLength).toBe(5)
@@ -268,7 +271,6 @@ describe('fetchAndCacheImage hosted-content routing', () => {
     process.env.XDG_CACHE_HOME = cacheRoot
     // Default graph audience, audience fallback OFF — the 404 fallback must
     // not depend on it (cross-tenant chats happen on plain accounts).
-    setAudiencePreference('graph', { fallback: false })
     setAuthRunner(async () => ({
       stdout: makeJwt({ exp: FAR_FUTURE, oid: 'oid-self' }),
       stderr: '',
@@ -318,7 +320,6 @@ describe('fetchAndCacheImage hosted-content routing', () => {
     process.env.XDG_CACHE_HOME = cacheRoot
     // Default graph audience, audience fallback OFF — the 403 fallback must
     // not depend on it (channel images 403 on plain graph accounts).
-    setAudiencePreference('graph', { fallback: false })
     setAuthRunner(async () => ({
       stdout: makeJwt({ exp: FAR_FUTURE, oid: 'oid-self' }),
       stderr: '',
@@ -454,8 +455,7 @@ describe('image ownership across accounts', () => {
     const pngB = seed('beta', 2)
     const a = accountRef('alpha')
     const b = accountRef('beta')
-    const clientFor = (account: typeof a) =>
-      createGraphClient({ ...currentAccountContext(), account })
+    const clientFor = (account: typeof a) => testClient({ account })
     for (const account of [a, b]) {
       ensureImageFetched(
         'ignored',
@@ -493,7 +493,6 @@ describe('profile photos', () => {
   // `respond(url)`; returns the URLs requested.
   function setup(respond: (url: string) => Response): string[] {
     process.env.XDG_CACHE_HOME = join(tmpdir(), `teaminal-cache-${Date.now()}-${Math.random()}`)
-    setAudiencePreference('graph', { fallback: false })
     const exp = Math.floor(Date.now() / 1000) + 3600
     const jwt = `${Buffer.from('{"alg":"none"}').toString('base64url')}.${Buffer.from(
       JSON.stringify({ exp, oid: 'oid-self' }),

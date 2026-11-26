@@ -13,18 +13,21 @@
 //     guessing the user's "real" state, which we do not own.
 //
 // Failure modes:
-//   - 401/403/404 from the endpoint: mark unreachable for the whole
-//     session (same pattern as the read-side teamsPresenceUnreachable
+//   - 401/403/404 from the endpoint: mark unreachable for this driver's
+//     account (same pattern as the read-side teamsPresenceUnreachable
 //     flag in the poller). Never log access tokens.
+//
+// One driver per account session: it owns its endpoint id and latch, reads
+// the global presence choice / focus / settings through its account's
+// handle and stops reacting once that handle is stale.
 //   - 5xx / network: warn once and try again on the next refresh tick.
 //   - Aborts during shutdown are silent.
 
-import { owaProfile, type AccountRef } from '../account'
+import { owaProfile } from '../account'
 import { forceMyAvailability, registerMyEndpoint, TeamsPresenceError } from '../graph/teamsPresence'
 import { warn } from '../log'
 import type { Presence } from '../types'
-import { accountStore } from './accountStore'
-import type { AppState, Store } from './store'
+import type { AccountStore, AccountView } from './accountStore'
 
 // Refresh well inside the server-side ~5 minute expiry. Four minutes
 // gives one full retry window if a single PUT fails.
@@ -37,12 +40,8 @@ export type ForceAvailabilityHandle = {
   reset: () => Promise<void>
 }
 
-// `getAccount` names the account currently in the foreground; the driver
-// follows it across switches.
-export function startForceAvailabilityDriver(
-  store: Store<AppState>,
-  getAccount: () => AccountRef,
-): ForceAvailabilityHandle {
+export function startForceAvailabilityDriver(acc: AccountStore): ForceAvailabilityHandle {
+  const profile = owaProfile(acc.ref)
   let timer: ReturnType<typeof setTimeout> | null = null
   let inFlight: AbortController | null = null
   let unreachable = false
@@ -59,18 +58,17 @@ export function startForceAvailabilityDriver(
 
   const fire = async (): Promise<void> => {
     if (stopped || unreachable) return
-    if (!shouldFire(store.get())) return
+    if (!shouldFire(acc.get())) return
     inFlight?.abort()
     inFlight = new AbortController()
     const signal = inFlight.signal
     try {
-      const profile = owaProfile(getAccount())
       // forceavailability is ignored unless an endpoint of ours is active.
       await registerMyEndpoint(endpointId, { profile, signal })
-      const choice = store.get().presenceChoice
+      const choice = acc.get().presenceChoice
       await forceMyAvailability(choice, { profile, signal })
       // Show it now; the presence poll (~60s) would otherwise lag the header.
-      if (!signal.aborted) mirrorPresence(store, choice)
+      if (!signal.aborted) mirrorPresence(acc, choice)
     } catch (err) {
       if (signal.aborted) return
       if (err instanceof Error && /abort/i.test(err.message)) return
@@ -94,26 +92,14 @@ export function startForceAvailabilityDriver(
     if (stopped || unreachable) return
     timer = setTimeout(() => {
       void fire().finally(() => {
-        if (!stopped && !unreachable && shouldFire(store.get())) schedule()
+        if (!stopped && !unreachable && shouldFire(acc.get())) schedule()
       })
     }, REFRESH_MS)
   }
 
   let prevOn = false
-  let prevChoice = store.get().presenceChoice
-  let lastAccount = getAccount().id
-  const handle = (s: AppState): void => {
-    // Account switch: a 403 on the previous account must not latch this one
-    // off, and the new account should go Available now rather than at the
-    // next 4-minute tick.
-    const account = getAccount().id
-    if (account !== lastAccount) {
-      lastAccount = account
-      unreachable = false
-      prevOn = false
-      cancelTimer()
-      inFlight?.abort()
-    }
+  let prevChoice = acc.get().presenceChoice
+  const handle = (s: AccountView): void => {
     const isOn = shouldFire(s)
     const choiceChanged = s.presenceChoice !== prevChoice
     prevChoice = s.presenceChoice
@@ -128,16 +114,16 @@ export function startForceAvailabilityDriver(
   }
 
   // Bootstrap with current state before subscribing so the initial
-  // focused-on-launch case fires exactly once.
-  handle(store.get())
-  const unsub = store.subscribe(handle)
+  // focused-on-launch case (and a freshly started account) fires exactly once.
+  handle(acc.get())
+  const unsub = acc.subscribe(handle)
 
   return {
     async reset() {
-      if (unreachable || store.get().presenceChoice === 'Available') return
+      if (unreachable || acc.get().presenceChoice === 'Available') return
       try {
         await forceMyAvailability('Available', {
-          profile: owaProfile(getAccount()),
+          profile,
           signal: AbortSignal.timeout(3000),
         })
       } catch (err) {
@@ -154,7 +140,7 @@ export function startForceAvailabilityDriver(
   }
 }
 
-function shouldFire(s: AppState): boolean {
+function shouldFire(s: AccountView): boolean {
   // A picked presence (Busy, DND, ...) is held regardless of focus or the
   // setting; only plain Available follows them.
   if (s.presenceChoice !== 'Available') return true
@@ -163,9 +149,8 @@ function shouldFire(s: AppState): boolean {
   return true
 }
 
-function mirrorPresence(store: Store<AppState>, choice: Presence['availability']): void {
-  if (!store.get().account) return
-  accountStore(store).set((s) => ({
+function mirrorPresence(acc: AccountStore, choice: Presence['availability']): void {
+  acc.set((s) => ({
     myPresence: {
       id: s.me?.id ?? s.myPresence?.id ?? '',
       ...s.myPresence,

@@ -1,4 +1,3 @@
-import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // Live smoke for src/graph/presence.
 //
 // Tries getMyPresence and getPresencesByUserId(self). Prints availability
@@ -6,14 +5,14 @@ import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // probe earlier indicated this user's tenant returns 403 on /me/presence,
 // so a non-error walk-through of the failure path is the actual smoke goal.
 
-import { setActiveProfile, GraphError } from '../src/graph/client'
+import { accountRef } from '../src/account'
+import { createGraphClient, GraphError } from '../src/graph/client'
 import { getMe } from '../src/graph/me'
 import { getMyPresence, getPresencesByUserId } from '../src/graph/presence'
 
-const testClient = () => createGraphClient(currentAccountContext())
-
 const profile = Bun.argv[2]
-if (profile) setActiveProfile(profile)
+const testClient = () =>
+  createGraphClient({ account: accountRef(profile), audience: 'graph', fallback: false })
 
 async function describe(label: string, fn: () => Promise<unknown>): Promise<void> {
   try {

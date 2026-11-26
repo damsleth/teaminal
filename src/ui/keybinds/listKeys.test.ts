@@ -1,7 +1,10 @@
 import { describe, expect, mock, test } from 'bun:test'
 import type { Key } from 'ink'
 import { handleListKeys, type ListKeysCtx } from './listKeys'
-import { createAppStore } from '../../state/store'
+import { accountRef } from '../../account'
+import { openAccount, setForeground } from '../../state/accountStore'
+import { CHAT_SECTION_CAP, cursorAt, unifiedListInput, visibleList } from '../../state/selectables'
+import { createAppStore, type AccountSlice, type Settings } from '../../state/store'
 import type { Chat } from '../../types'
 
 // Collapsing a section persists to config.json; keep the fire-and-forget
@@ -369,5 +372,215 @@ describe('ctrl+d delete chat', () => {
     handleListKeys({ input: 'd', key: makeKey() }, a.ctx)
     expect(a.store.get().modal).toBeNull()
     expect(a.store.get().cursor).toBeGreaterThan(0)
+  })
+})
+
+describe('unified sidebar (M2 F.3)', () => {
+  type Slice = Partial<AccountSlice>
+  // alpha in front, beta in the background, both with the same chat ids.
+  // Keys are pressed against a ctx read from the store each time, as App does.
+  function unified(beta: Slice = {}, alpha: Slice = {}, settings: Partial<Settings> = {}) {
+    const store = createAppStore()
+    openAccount(store, accountRef('alpha'), { foreground: true }).set({
+      chats: [chat('a'), chat('b')],
+      ...alpha,
+    })
+    openAccount(store, accountRef('beta'), { foreground: false }).set({
+      chats: [chat('a'), chat('b')],
+      ...beta,
+    })
+    store.set((s) => ({ settings: { ...s.settings, accounts: ['alpha', 'beta'], ...settings } }))
+    const swaps: string[] = []
+    const prompts: string[] = []
+    const press = (input: string, key: Partial<Key> = {}) => {
+      const s = store.get()
+      return handleListKeys(
+        { input, key: makeKey(key) },
+        {
+          store,
+          me: s.me,
+          chats: s.chats,
+          teams: s.teams,
+          channelsByTeam: s.channelsByTeam,
+          settings: s.settings,
+          filter: s.filter,
+          expandedChatSections: s.expandedChatSections,
+          cursor: s.cursor,
+          cursorKey: s.cursorKey,
+          focus: s.focus,
+          exit: () => {},
+          refresh: () => {},
+          hardRefresh: () => {},
+          openNewChatPrompt: (q) => prompts.push(q ?? ''),
+          toForeground: (alias) => {
+            swaps.push(alias)
+            setForeground(store, accountRef(alias).id, { restoreUi: false })
+          },
+        },
+      )
+    }
+    return { store, swaps, prompts, press }
+  }
+  const alphaId = accountRef('alpha').id
+  const betaId = accountRef('beta').id
+
+  test('j crosses into the next account; Enter brings it to the front, then focuses', () => {
+    const u = unified()
+    // account:alpha, alpha a, alpha b, account:beta, beta a
+    for (let i = 0; i < 4; i++) u.press('j')
+    expect(u.store.get().cursorKey).toBe(`${betaId}/chat:a`)
+    u.press('', { return: true })
+    expect(u.swaps).toEqual(['beta'])
+    const s = u.store.get()
+    expect(s.account?.id).toBe(betaId)
+    expect(s.focus).toEqual({ kind: 'chat', chatId: 'a' })
+    // The list cursor stays on the row it opened.
+    expect(s.cursorKey).toBe(`${betaId}/chat:a`)
+    // A row of the foreground account opens without a swap.
+    u.press('h')
+    u.store.set({ focus: { kind: 'list' } })
+    u.press('j')
+    u.press('', { return: true })
+    expect(u.swaps).toEqual(['beta'])
+    expect(u.store.get().focus).toEqual({ kind: 'chat', chatId: 'b' })
+  })
+
+  test('m flips the row’s own account’s unread mark, not the foreground’s', () => {
+    const u = unified()
+    for (let i = 0; i < 4; i++) u.press('j')
+    u.press('m')
+    const s = u.store.get()
+    expect(s.account?.id).toBe(alphaId)
+    expect(s.unreadByChatId.a).toBeUndefined()
+    expect(s.backgroundAccounts[betaId]!.unreadByChatId.a?.unreadCount).toBe(1)
+    expect(u.swaps).toEqual([])
+  })
+
+  test('. and ctrl+d on another account’s row name that account', () => {
+    const u = unified()
+    for (let i = 0; i < 4; i++) u.press('j')
+    u.press('.')
+    expect(u.store.get().modal).toMatchObject({
+      kind: 'context-menu',
+      target: { kind: 'chat', chatId: 'a', alias: 'beta' },
+    })
+    u.store.set({ modal: null, inputZone: 'list' })
+    u.press('d', { ctrl: true })
+    expect(u.store.get().modal).toMatchObject({
+      kind: 'confirm-delete-chat',
+      chatId: 'a',
+      alias: 'beta',
+    })
+    expect(u.swaps).toEqual([])
+  })
+
+  test('h collapses an account header; Enter expands it and moves to its first row', () => {
+    const u = unified()
+    expect(u.store.get().cursor).toBe(0)
+    u.press('h')
+    expect(u.store.get().settings.chatListCollapsedSections).toEqual({ 'account:alpha': true })
+    u.press('', { return: true })
+    expect(u.store.get().settings.chatListCollapsedSections).toEqual({})
+    expect(u.store.get().cursorKey).toBe(`${alphaId}/chat:a`)
+    // h on a chat collapses its account (ungrouped: no section) onto its header.
+    u.press('h')
+    expect(u.store.get().cursorKey).toBe(`account:${alphaId}`)
+  })
+
+  test('Enter on an empty account stays on its header; on a failed one opens Accounts', () => {
+    const empty = unified({ chats: [] })
+    for (let i = 0; i < 3; i++) empty.press('j')
+    empty.press('', { return: true })
+    expect(empty.store.get().cursorKey).toBe(`account:${betaId}`)
+    expect(empty.store.get().modal).toBeNull()
+
+    const failed = unified({ chats: [], conn: 'authError' })
+    for (let i = 0; i < 3; i++) failed.press('j')
+    failed.press('', { return: true })
+    expect(failed.store.get().modal).toMatchObject({ kind: 'accounts', mode: 'list', cursor: 1 })
+    expect(failed.swaps).toEqual([])
+  })
+
+  test('reopening a section writes false under the account’s key over a legacy key', () => {
+    const u = unified(
+      { teams: [{ id: 't1', displayName: 'T' }], channelsByTeam: { t1: [] } },
+      {},
+      { chatListCollapsedSections: { 'team:t1': true } },
+    )
+    // account:alpha, a, b, account:beta, a, b, beta team:t1 (collapsed)
+    for (let i = 0; i < 6; i++) u.press('j')
+    expect(u.store.get().cursorKey).toBe(`${betaId}/team:t1`)
+    u.press('', { return: true })
+    expect(u.store.get().settings.chatListCollapsedSections).toEqual({
+      'team:t1': true,
+      'beta/team:t1': false,
+    })
+  })
+
+  test('… N more expands the row’s own account', () => {
+    const many = Array.from({ length: CHAT_SECTION_CAP + 1 }, (_, i) => chat(`c${i}`))
+    const u = unified({ chats: many }, { chats: many }, { chatListGroupByType: true })
+    const more = () =>
+      visibleList(unifiedListInput(u.store.get())!).findIndex(
+        (it) => it.kind === 'more' && it.alias === 'beta',
+      )
+    u.store.set(cursorAt(visibleList(unifiedListInput(u.store.get())!), more()))
+    u.press('', { return: true })
+    const s = u.store.get()
+    expect(s.backgroundAccounts[betaId]!.expandedChatSections).toEqual({ oneOnOne: true })
+    expect(s.expandedChatSections).toEqual({})
+    expect(more()).toBe(-1)
+  })
+
+  test('a swap that shows auth-expired stops there: no focus, no prompt behind it', () => {
+    const u = unified()
+    // Like the manager: an account that failed for auth comes to the front
+    // with its auth-expired modal.
+    const press = (input: string, key: Partial<Key> = {}) => {
+      const s = u.store.get()
+      return handleListKeys(
+        { input, key: makeKey(key) },
+        {
+          store: u.store,
+          chats: s.chats,
+          teams: s.teams,
+          channelsByTeam: s.channelsByTeam,
+          settings: s.settings,
+          filter: s.filter,
+          expandedChatSections: s.expandedChatSections,
+          cursor: s.cursor,
+          cursorKey: s.cursorKey,
+          focus: s.focus,
+          exit: () => {},
+          refresh: () => {},
+          hardRefresh: () => {},
+          openNewChatPrompt: (q) => u.prompts.push(q ?? ''),
+          toForeground: (alias) => {
+            setForeground(u.store, accountRef(alias).id, { restoreUi: false })
+            u.store.set({
+              modal: { kind: 'auth-expired', profile: alias, message: 'expired', status: 'idle' },
+              inputZone: 'menu',
+            })
+          },
+        },
+      )
+    }
+    for (let i = 0; i < 4; i++) u.press('j')
+    press('', { return: true })
+    expect(u.store.get().focus).toEqual({ kind: 'list' })
+    expect(u.store.get()).toMatchObject({ modal: { kind: 'auth-expired' }, inputZone: 'menu' })
+    // Back on alpha, n on a beta row: the prompt does not open behind the modal.
+    setForeground(u.store, alphaId, { restoreUi: false })
+    press('n')
+    expect(u.prompts).toEqual([])
+  })
+
+  test('n brings the account under the cursor to the front before the prompt', () => {
+    const u = unified()
+    for (let i = 0; i < 3; i++) u.press('j')
+    u.press('n')
+    expect(u.swaps).toEqual(['beta'])
+    expect(u.prompts).toEqual([''])
+    expect(u.store.get().account?.id).toBe(betaId)
   })
 })

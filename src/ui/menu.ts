@@ -61,6 +61,7 @@ export type ToggleKey =
   | 'forceAvailableWhenFocused'
   | 'useTeamsPresence'
   | 'realtimeEnabled'
+  | 'concurrentAccounts'
   | 'notifyMuted'
   | 'notifyChatMessages'
   | 'notifyActiveBanner'
@@ -416,6 +417,12 @@ export const ROOT_MENU: MenuItem[] = [
         hint: 'restart',
       },
       {
+        id: 'concurrentAccounts',
+        label: 'All accounts at once (experimental)',
+        action: { kind: 'toggle-setting', key: 'concurrentAccounts' },
+        hint: 'restart to apply',
+      },
+      {
         id: 'tailEvents',
         label: 'Tail event log',
         action: { kind: 'toggle-setting', key: 'tailEvents' },
@@ -604,6 +611,7 @@ export function cycleSetting<K extends ToggleKey>(
     case 'forceAvailableWhenFocused':
     case 'useTeamsPresence':
     case 'realtimeEnabled':
+    case 'concurrentAccounts':
     case 'notifyMuted':
     case 'notifyChatMessages':
     case 'notifyActiveBanner':
@@ -670,6 +678,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'forceAvailableWhenFocused':
     case 'useTeamsPresence':
     case 'realtimeEnabled':
+    case 'concurrentAccounts':
     case 'notifyMuted':
     case 'notifyChatMessages':
     case 'notifyActiveBanner':

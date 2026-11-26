@@ -318,6 +318,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     useTeamsPresence: settings.useTeamsPresence,
     forceAvailableWhenFocused: settings.forceAvailableWhenFocused,
     realtimeEnabled: settings.realtimeEnabled,
+    concurrentAccounts: settings.concurrentAccounts,
     notifyMuted: settings.notifyMuted,
     notifyChatMessages: settings.notifyChatMessages,
     notifyActiveBanner: settings.notifyActiveBanner,
@@ -630,6 +631,7 @@ function validateAndAssign(
     case 'useTeamsPresence':
     case 'forceAvailableWhenFocused':
     case 'realtimeEnabled':
+    case 'concurrentAccounts':
     case 'notifyMuted':
     case 'notifyChatMessages':
     case 'notifyActiveBanner':

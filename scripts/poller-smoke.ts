@@ -1,23 +1,22 @@
-import { createGraphClient, currentAccountContext } from '../src/graph/client'
 // Live smoke for src/state/poller.
 //
 // Wires the capability probe + me + poller together, waits ~6s, prints
 // store state, and stops cleanly. This is the first end-to-end exercise
 // of the active+list+presence loops against real Graph.
 
-import { setActiveProfile } from '../src/graph/client'
+import { accountRef } from '../src/account'
+import { createGraphClient } from '../src/graph/client'
 import { probeCapabilities } from '../src/graph/capabilities'
 import { getMe } from '../src/graph/me'
 import { startPoller, type MentionEvent } from '../src/state/poller'
 import { accountStore } from '../src/state/accountStore'
 import { createAppStore } from '../src/state/store'
 
-const testClient = () => createGraphClient(currentAccountContext())
-
 const profile = Bun.argv[2]
-if (profile) setActiveProfile(profile)
+const testClient = () =>
+  createGraphClient({ account: accountRef(profile), audience: 'graph', fallback: false })
 
-const store = createAppStore(currentAccountContext().account)
+const store = createAppStore(accountRef(profile))
 const me = await getMe(testClient())
 store.set({ me })
 const capabilities = await probeCapabilities(testClient())

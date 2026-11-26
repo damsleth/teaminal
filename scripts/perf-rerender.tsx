@@ -24,6 +24,8 @@ import { StoreProvider } from '../src/ui/StoreContext'
 import { PollerProvider } from '../src/ui/PollerContext'
 import { SessionProvider, type SessionApi } from '../src/ui/SessionContext'
 import { createAppStore } from '../src/state/store'
+import { accountRef } from '../src/account'
+import { accountStore } from '../src/state/accountStore'
 import { applySeededState } from '../src/state/seedFixtures'
 import { mergeActivePagePatch } from '../src/state/poller/pagePatch'
 import type { ConvKey } from '../src/state/store'
@@ -70,8 +72,8 @@ const stdin = new FakeTty()
 // ---------------------------------------------------------------------------
 // Store + seeded state
 // ---------------------------------------------------------------------------
-const store = createAppStore()
-applySeededState(store)
+const store = createAppStore(accountRef(null))
+applySeededState(accountStore(store))
 
 let notifications = 0
 store.subscribe(() => {

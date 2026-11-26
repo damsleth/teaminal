@@ -16,7 +16,6 @@ import {
   __setRunnerForTests as setAuthRunner,
 } from '../auth/owaPiggy'
 import { __setRegionForTests } from './teamsRegion'
-import { setActiveProfile } from './client'
 
 const ACCOUNT = accountRef(undefined)
 
@@ -187,27 +186,6 @@ describe('searchExternalUsers', () => {
     await searchExternalUsers('k@example.com', { account: accountRef('a'), region: 'emea' })
     await searchExternalUsers('k@example.com', { account: accountRef('b'), region: 'emea' })
     expect(calls).toBe(2)
-  })
-
-  test('the active account changing mid-search does not move the token off its account', async () => {
-    __setRegionForTests('a', 'emea')
-    __setRegionForTests('b', 'emea')
-    const profiles: (string | undefined)[] = []
-    setAuthRunner(async (args) => {
-      const i = args.indexOf('--profile')
-      profiles.push(i >= 0 ? args[i + 1] : undefined)
-      return { stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }
-    })
-    __setTransportForTests(async () => jsonResponse([]))
-    setActiveProfile('a')
-    try {
-      const pending = searchExternalUsers('k@example.com', { account: accountRef('a') })
-      setActiveProfile('b') // switch lands while the search awaits its region
-      await pending
-    } finally {
-      setActiveProfile(undefined)
-    }
-    expect(profiles[0]).toBe('a')
   })
 
   test('returns empty list on 404', async () => {

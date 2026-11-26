@@ -9,7 +9,8 @@
 // not Graph /me/presence, since the Teams path is what the runtime uses.
 //
 // Triggered by Help -> Diagnostics in the modal menu. Esc / Enter to close.
-// No keys are bound to this beyond closing - it's a read-only inspector.
+// With more than one account open, an overview lists every account (j/k
+// selects); the detail below and `r` act on the selected one.
 //
 // Anything that would identify the user (oid, sub, upn, full email) is
 // shown but not redacted: the user is looking at their own session and
@@ -19,10 +20,13 @@ import { Box, useApp } from 'ink'
 import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
-import { useEffect, useState } from 'react'
+import { fitCells } from './textSizing'
+import { useEffect, useMemo, useState } from 'react'
+import type { AccountId } from '../account'
 import { accessTokenClaims } from '../state/authActions'
+import { accountDiagnostics, type AccountDiagnostics } from '../state/diagnostics'
+import { accountSlice } from '../state/store'
 import type { CapabilityResult } from '../graph/capabilities'
-import { getActiveTransport } from '../realtime/transport'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useSessionApi } from './SessionContext'
 
@@ -56,20 +60,26 @@ export function DiagnosticsModal() {
   const { exit } = useApp()
   const store = useAppStore()
   const session = useSessionApi()
-  const modal = useAppState((s) => s.modal)
-  const capabilities = useAppState((s) => s.capabilities)
-  const me = useAppState((s) => s.me)
-  const lastListPollAt = useAppState((s) => s.lastListPollAt)
-  const conn = useAppState((s) => s.conn)
-  const realtimeState = useAppState((s) => s.realtimeState)
-  const chats = useAppState((s) => s.chats)
-  const teams = useAppState((s) => s.teams)
-  const channelsByTeam = useAppState((s) => s.channelsByTeam)
-  const messagesByConvo = useAppState((s) => s.messagesByConvo)
-  const terminalFocused = useAppState((s) => s.terminalFocused)
-  const focusReportingHealthy = useAppState((s) => s.focusReportingHealthy)
+  // App mounts this only while Diagnostics is open, so following the whole
+  // state costs nothing on the typing path.
+  const state = useAppState((s) => s)
   const theme = useTheme()
-  const isOpen = modal?.kind === 'diagnostics'
+  const isOpen = state.modal?.kind === 'diagnostics'
+
+  // Every open account; the overview shows when there is more than one.
+  const rows = useMemo(() => accountDiagnostics(state), [state])
+  const [selectedId, setSelectedId] = useState<AccountId | null>(null)
+  useEffect(() => {
+    if (isOpen) setSelectedId(state.account?.id ?? null)
+  }, [isOpen])
+  const selected = rows.find((r) => r.ref.id === selectedId) ?? rows.find((r) => r.foreground)
+  const selectedIsForeground = !selected || selected.foreground
+  // The detail reads the selected account's slot (the flat fields for the
+  // foreground).
+  const slice = (selected && accountSlice(state, selected.ref.id)) || state
+  const { capabilities, me, lastListPollAt, conn, realtimeState } = slice
+  const { chats, teams, channelsByTeam, messagesByConvo } = slice
+  const { terminalFocused, focusReportingHealthy } = state
 
   const [load, setLoad] = useState<LoadState>({ status: 'loading' })
 
@@ -79,8 +89,10 @@ export function DiagnosticsModal() {
     setLoad({ status: 'loading' })
     ;(async () => {
       try {
-        // The open account's token, not the default profile's.
-        const claims = await accessTokenClaims(session.client())
+        // The selected account's token, not the default profile's.
+        const claims = await accessTokenClaims(
+          selectedIsForeground ? session.client() : session.clientFor(selected.ref.id),
+        )
         if (cancelled) return
         setLoad({ status: 'ready', claims })
       } catch (err) {
@@ -92,7 +104,7 @@ export function DiagnosticsModal() {
     return () => {
       cancelled = true
     }
-  }, [isOpen])
+  }, [isOpen, selected?.ref.id])
 
   useInput(
     (input, key) => {
@@ -102,10 +114,16 @@ export function DiagnosticsModal() {
         return
       }
       if (key.ctrl && ch === 'c') exit()
+      if (rows.length > 1 && (ch === 'j' || ch === 'k' || key.downArrow || key.upArrow)) {
+        const i = rows.findIndex((r) => r.ref.id === selected?.ref.id)
+        const step = ch === 'k' || key.upArrow ? -1 : 1
+        setSelectedId(rows[(i + step + rows.length) % rows.length]!.ref.id)
+        return
+      }
       if (ch === 'r') {
         // Manual realtime push retry — useful when the dot has been red
         // for a while because trouter exhausted its automatic retries.
-        getActiveTransport()?.retry()
+        session.retryRealtime(selectedIsForeground ? undefined : selected.ref.id)
       }
     },
     { isActive: isOpen },
@@ -113,7 +131,9 @@ export function DiagnosticsModal() {
 
   if (!isOpen) return null
 
-  const profile = session.getActiveProfile() ?? '(default)'
+  const profile = selectedIsForeground
+    ? (session.getActiveProfile() ?? '(default)')
+    : selected.ref.label
 
   return (
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
@@ -129,6 +149,7 @@ export function DiagnosticsModal() {
       >
         <Text bold={theme.emphasis.modalTitleBold}>Diagnostics</Text>
         <Box height={1} />
+        {rows.length > 1 && <Overview rows={rows} selected={selected} theme={theme} />}
 
         <Text>
           <Text muted>profile: </Text>
@@ -239,10 +260,62 @@ export function DiagnosticsModal() {
         )}
 
         <Box height={1} />
-        <Text muted>r: retry realtime · esc / enter to close</Text>
+        <Text muted>
+          {rows.length > 1 ? 'j/k: account · ' : ''}r: retry realtime · esc / enter to close
+        </Text>
       </Box>
     </Box>
   )
+}
+
+// One row per open account, two lines each: status, then cache files.
+function Overview(props: {
+  rows: AccountDiagnostics[]
+  selected: AccountDiagnostics | undefined
+  theme: ReturnType<typeof useTheme>
+}) {
+  const { rows, selected, theme } = props
+  const labelWidth = Math.min(10, Math.max(7, ...rows.map((r) => Bun.stringWidth(r.ref.label))))
+  return (
+    <>
+      <Text muted>
+        {`  ${fitCells('account', labelWidth)} ${fitCells('conn', 11)} ${fitCells('realtime', 12)} ${fitCells('last poll', 9)} ${fitCells('routing', 10)} caps`}
+      </Text>
+      {rows.map((r) => {
+        const isSelected = r.ref.id === selected?.ref.id
+        const poll = r.lastListPollAt ? r.lastListPollAt.toTimeString().slice(0, 8) : '-'
+        return (
+          <Box key={r.ref.id} flexDirection="column">
+            <Text>
+              <Text color={theme.selected}>{isSelected ? '▸ ' : '  '}</Text>
+              <Text bold={isSelected}>{fitCells(r.ref.label, labelWidth)}</Text>
+              <Text
+                color={r.conn === 'online' ? undefined : theme.warnText}
+              >{` ${fitCells(r.conn, 11)}`}</Text>
+              <Text>{` ${fitCells(r.realtimeState, 12)} ${fitCells(poll, 9)} ${fitCells(r.routing, 10)} `}</Text>
+              <Text muted>{r.capabilities}</Text>
+            </Text>
+            <Text muted>{`    ${compactCachePaths(r.cachePaths)}`}</Text>
+          </Box>
+        )
+      })}
+      <Box height={1} />
+    </>
+  )
+}
+
+// `<dir>/{messages,list,names}.<slug>.json` for the three cache files.
+function compactCachePaths(paths: readonly string[]): string {
+  const home = process.env.HOME
+  const short = paths.map((p) =>
+    home && p.startsWith(`${home}/`) ? `~${p.slice(home.length)}` : p,
+  )
+  const dir = short[0]!.slice(0, short[0]!.lastIndexOf('/') + 1)
+  if (!short.every((p) => p.startsWith(dir))) return short.join(' · ')
+  const names = short.map((p) => p.slice(dir.length))
+  const suffix = names[0]!.slice(names[0]!.indexOf('.'))
+  if (!names.every((n) => n.endsWith(suffix))) return short.join(' · ')
+  return `${dir}{${names.map((n) => n.slice(0, -suffix.length)).join(',')}}${suffix}`
 }
 
 function countChannels(channelsByTeam: Record<string, unknown[]>): number {

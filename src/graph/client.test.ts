@@ -8,23 +8,21 @@ import {
   __resetForTests,
   __setSleepForTests,
   createGraphClient,
-  currentAccountContext,
+  type AccountContext,
   __setTransportForTests,
   GraphError,
   parseRetryAfter,
   type GraphOpts,
   RateLimitError,
-  setActiveProfile,
-  setAudiencePreference,
 } from './client'
 
 // These tests drive the retry/pagination core through a client bound to the
-// ambient (M1 shim) context, so setActiveProfile / setAudiencePreference in a
-// test apply to the next call.
-const ambient = () => createGraphClient(currentAccountContext())
-const graph = <T>(opts: GraphOpts) => ambient().graph<T>(opts)
-const paginate = <T>(opts: GraphOpts) => ambient().paginate<T>(opts)
-const paginateAll = <T>(opts: GraphOpts) => ambient().paginateAll<T>(opts)
+// default account with the out-of-the-box audience, unless a test names its own.
+const client = (over: Partial<AccountContext> = {}) =>
+  createGraphClient({ account: accountRef(undefined), audience: 'graph', fallback: false, ...over })
+const graph = <T>(opts: GraphOpts) => client().graph<T>(opts)
+const paginate = <T>(opts: GraphOpts) => client().paginate<T>(opts)
+const paginateAll = <T>(opts: GraphOpts) => client().paginateAll<T>(opts)
 
 const FAR_FUTURE = Math.floor(Date.now() / 1000) + 3600
 
@@ -164,15 +162,14 @@ describe('graph success path', () => {
     expect(seenSignal).toBe(ctrl.signal)
   })
 
-  test('passes activeProfile through to owa-piggy', async () => {
+  test("passes the bound account's profile through to owa-piggy", async () => {
     let seenArgs: string[] = []
     setAuthRunner(async (args) => {
       seenArgs = args
       return { stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }
     })
     __setTransportForTests(async () => jsonResponse({}))
-    setActiveProfile('work')
-    await graph({ method: 'GET', path: '/me' })
+    await client({ account: accountRef('work') }).graph({ method: 'GET', path: '/me' })
     expect(seenArgs).toEqual(['token', '--audience', 'graph', '--profile', 'work'])
   })
 
@@ -183,8 +180,7 @@ describe('graph success path', () => {
       return { stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }
     })
     __setTransportForTests(async () => jsonResponse({}))
-    setActiveProfile('work')
-    await graph({
+    await client({ account: accountRef('work') }).graph({
       method: 'GET',
       path: '/teams/t/channels/c/messages',
       scope: 'https://graph.microsoft.com/ChannelMessage.Read.All',
@@ -260,9 +256,7 @@ describe('audience preference + fallback', () => {
       return { stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }
     })
     __setTransportForTests(async () => jsonResponse({ value: [] }))
-    setAudiencePreference('ic3', { fallback: true })
-
-    await graph({ method: 'GET', path: '/chats' })
+    await client({ audience: 'ic3', fallback: true }).graph({ method: 'GET', path: '/chats' })
     expect(seenArgs[0]).toEqual(['token', '--audience', 'ic3'])
   })
 
@@ -281,9 +275,7 @@ describe('audience preference + fallback', () => {
       }
       return jsonResponse({ value: [] })
     })
-    setAudiencePreference('ic3', { fallback: true })
-
-    await graph({ method: 'GET', path: '/chats' })
+    await client({ audience: 'ic3', fallback: true }).graph({ method: 'GET', path: '/chats' })
     expect(httpCalls).toBe(3)
     const audiences = seenArgs.map((a) => a[a.indexOf('--audience') + 1])
     expect(audiences).toEqual(['ic3', 'ic3', 'graph'])
@@ -296,9 +288,9 @@ describe('audience preference + fallback', () => {
       httpCalls++
       return jsonResponse({ error: { code: 'x', message: 'no' } }, { status: 401 })
     })
-    setAudiencePreference('ic3', { fallback: false })
-
-    await graph({ method: 'GET', path: '/chats' }).catch(() => {})
+    await client({ audience: 'ic3', fallback: false })
+      .graph({ method: 'GET', path: '/chats' })
+      .catch(() => {})
     // ic3 attempt + one same-audience retry only; no graph fallback.
     expect(httpCalls).toBe(2)
   })
@@ -310,9 +302,7 @@ describe('audience preference + fallback', () => {
       return { stdout: makeJwt({ exp: FAR_FUTURE }), stderr: '', exitCode: 0 }
     })
     __setTransportForTests(async () => jsonResponse({ value: [] }))
-    setAudiencePreference('ic3', { fallback: true })
-
-    await graph({
+    await client({ audience: 'ic3', fallback: true }).graph({
       method: 'GET',
       path: '/chats',
       scope: 'https://presence.teams.microsoft.com/.default',
@@ -621,11 +611,7 @@ describe('bound clients', () => {
         return jsonResponse({}, { status: 429, headers: { 'Retry-After': '0' } })
       return jsonResponse({ ok: path })
     })
-    // The ambient account changes while B is backing off.
-    __setSleepForTests(async () => {
-      setActiveProfile('z')
-      setAudiencePreference('graph', { fallback: true })
-    })
+    __setSleepForTests(async () => {})
     // Same audience on purpose: only the profile separates their tokens.
     const a = createGraphClient({ account: accountRef('a'), audience: 'graph', fallback: false })
     const b = createGraphClient({ account: accountRef('b'), audience: 'graph', fallback: false })
@@ -669,8 +655,6 @@ describe('bound clients', () => {
     __setTransportForTests(async (url, init) => {
       seen.push(tokenClaims(init))
       if (url.includes('page2')) return jsonResponse({ value: [2] })
-      // The active account switches between page 1 and page 2.
-      setActiveProfile('z')
       return jsonResponse({
         value: [1],
         '@odata.nextLink': 'https://graph.microsoft.com/v1.0/items?page2=1',

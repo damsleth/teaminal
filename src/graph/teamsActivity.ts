@@ -278,6 +278,7 @@ export async function listActivityFeed(opts: ActivityOpts): Promise<ActivityPage
       })
     } catch (err) {
       recordRequest({
+        account: opts.account.label,
         ts: startedAt,
         method: 'GET',
         path: '/api/csa/.../updates',
@@ -288,6 +289,7 @@ export async function listActivityFeed(opts: ActivityOpts): Promise<ActivityPage
       throw err
     }
     recordRequest({
+      account: opts.account.label,
       ts: startedAt,
       method: 'GET',
       path: '/api/csa/.../updates',

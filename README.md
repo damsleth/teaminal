@@ -118,6 +118,7 @@ warnings and fall back to defaults.
   "useTeamsPresence": true,
   "forceAvailableWhenFocused": true,
   "realtimeEnabled": false,
+  "concurrentAccounts": false,
   "notifyMuted": false,
   "notifyChatMessages": true,
   "notifyActiveBanner": false,
@@ -169,6 +170,7 @@ warnings and fall back to defaults.
 | `useTeamsPresence`             | boolean              |  `true` | Use the Teams unified presence endpoint (`presence.teams.microsoft.com`) for own presence. Falls back to Graph `/me/presence` automatically on 401/403/404. Set to `false` to force Graph-only in tenants that block public-client access to that host. |
 | `forceAvailableWhenFocused`    | boolean              |  `true` | While the terminal window has focus (DEC focus reporting; CSI ?1004), register a Desktop endpoint with `presence.teams.microsoft.com` and force your picked presence (default Available) so Teams shows you active, like the desktop client does. Refreshed every 4 min; a picked non-Available presence is also held while blurred, and teaminal resets to Available on quit. Set to `false` to leave presence to Teams' own desktop client / inactivity timer. |
 | `realtimeEnabled`              | boolean              | `false` | Enables the experimental Teams trouter push transport for typing, read-receipt, presence, and immediate refresh signals. Polling remains the source of truth and fallback. |
+| `concurrentAccounts`           | boolean              | `false` | **Experimental.** Run every profile in `accounts` at the same time instead of one at a time: each keeps polling (and pushing, with `realtimeEnabled`) in the background, and picking an account in the Accounts modal swaps to it instantly, back on the conversation you had open there. With two or more accounts the sidebar lists them all, one section per account in `accounts` order under an account header (`▾ beta 3 @1 · example.com`: chats with unread activity, unread mentions, tenant, and `! signed out` / `! offline` when it needs attention). Opening a row brings its account to the front (the list cursor and filter stay); mark read, delete and the context menu act on the row's account without switching. The pane title, composer, status bar and modals name the account in front, and the Accounts modal shows each account's state. Notifications come from every account and name it (`teaminal · beta · Alice`). A picked presence and the status message apply to every running account. An account whose sign-in expires stops on its own; the others keep running. Read at startup (restart to apply); `--profile` forces single-account mode. Also in the menu as **Settings → All accounts at once (experimental)**. |
 | `notifyMuted`                  | boolean              | `false` | Suppress desktop notification banners while keeping terminal bells.                      |
 | `notifyChatMessages`           | boolean              |  `true` | Notify on every new 1:1 / group chat message, not just @mentions. Meeting chats and channels stay mention-only. |
 | `notifyActiveBanner`           | boolean              | `false` | Show banners even for the conversation currently open in a focused terminal.             |
@@ -192,7 +194,7 @@ warnings and fall back to defaults.
 | `headerUserFormat`             | `full`, `tenant`     |  `full` | Header identity format: `full` shows `user (tenant)`, `tenant` shows the tenant only. |
 | `statusBarShowKeyHints`        | boolean              |  `true` | Show the keybinding hints line in the status bar. |
 | `headerBarCentered`            | boolean              | `false` | Center the header bar segments. Off keeps them left-aligned. |
-| `chatListCollapsedSections`    | object               |    `{}` | Collapsed sidebar headers, keyed by section (`oneOnOne`, `group`, `meeting`, `other`, `teams`) or `team:<id>`. Maintained by `h`/`l` in the list; a collapsed header hides its rows and shows `▸` plus the hidden count. |
+| `chatListCollapsedSections`    | object               |    `{}` | Collapsed sidebar headers, keyed by section (`oneOnOne`, `group`, `meeting`, `other`, `teams`) or `team:<id>`. Maintained by `h`/`l` in the list (with several accounts open, keys are prefixed with the account: `alpha/team:<id>`, `account:alpha`); a collapsed header hides its rows and shows `▸` plus the hidden count. |
 | `chatListWidth`                | integer or null      |  `null` | Explicit chat-list panel width in columns. `null` = automatic (~28% of terminal, clamped 18–60). Adjusted interactively with Ctrl-X resize mode. |
 | `composerHeight`               | integer or null      |  `null` | Explicit composer height in rows. `null` = automatic (from draft line count, clamped 3–10). Adjusted interactively with Ctrl-X resize mode. |
 
@@ -333,6 +335,63 @@ colors, and out-of-range values are dropped with a warning at startup.
 
 The in-app Settings menu persists changes back to `config.json`.
 
+## Several accounts
+
+teaminal runs any owa-piggy profiles listed in `accounts`, in one of two
+modes, chosen once at startup:
+
+- **Single mode** (the default). One account runs at a time. Picking another
+  in the Accounts modal stops the running one and starts the new one.
+- **Concurrent mode** (`"concurrentAccounts": true`, experimental). Every
+  alias in `accounts` runs at once and stays live; switching is instant.
+  Active only when the flag is on, `accounts` is not empty and no
+  `--profile` was given.
+- **`--profile <alias>`** always runs that one account alone, whatever the
+  flag says.
+
+Both modes read and write the same per-profile cache files
+(`~/.cache/teaminal/{messages,list,names}.<alias>.json`), so turning the
+flag on or off needs no migration.
+
+**Cost per account.** Every running account polls its chat list (every 30 s),
+re-reads its teams and channels (at most every 5 min), polls its own presence
+(every 60 s) and, with `realtimeEnabled`, keeps its own push connection. Only
+the account in front polls the open conversation (every 10 s). With push
+connected the loops slow to 60 s, and to 5 min while the terminal is
+unfocused. Background traffic therefore grows with each account you add. To
+measure it from a source checkout, run with a network log, leave teaminal idle
+for a while, then summarize requests per minute per account:
+
+```bash
+teaminal --network-log /tmp/teaminal-net-2.log
+bun run scripts/network-log-summary.ts /tmp/teaminal-net-2.log --skip-minutes 5
+```
+
+Repeat with one, two, three and five aliases in `accounts` to compare. Use a
+fresh log file for each run (the log appends), and keep the terminal focus and
+`realtimeEnabled` the same across runs, since both change the poll intervals.
+
+**Partial failures.** An account whose sign-in expires, or that fails to start,
+stops and stays listed (`! signed out` / `! offline`); one that drops offline
+while running keeps retrying on its own. The others keep running and nothing
+exits. `r` in the Accounts modal starts it again (after `owa-piggy reseed` for
+an expired sign-in).
+
+**Notifications** come from every running account. With more than one
+running, the title names the account: `teaminal · beta · Alice`.
+
+**Presence and status message.** A picked presence (forced Available while
+the terminal is focused, with `forceAvailableWhenFocused`) and the status
+message go to every running account.
+
+**Same user twice.** Two aliases that sign in as the same user run as two
+accounts, so every message notifies twice; teaminal logs one warning naming
+both aliases.
+
+**Diagnostics** (Help → Diagnostics) lists every open account: connection,
+push state, last list poll, chat routing, capability probe and cache files.
+`j` / `k` select the account the details below and `r` act on.
+
 ## Keybindings
 
 | Keys                   | When                   | Action                                                                                                                                                                                                                                                                           |
@@ -359,9 +418,14 @@ The in-app Settings menu persists changes back to `config.json`.
 | `m`                    | list                   | Toggle the focused chat read/unread.                                                                                                                                                                                                                                             |
 | `h` / Left             | list                   | Collapse the focused row's section (chat type, team, or all Teams).                                                                                                                                                                                                              |
 | `l` / Right            | list                   | Expand the focused collapsed section, or show a section's hidden chats.                                                                                                                                                                                                          |
+| Enter                  | list, account header   | Several accounts open: move into the account (expanding it when collapsed); on an account that failed (`! signed out`, `! offline`), open the Accounts modal on it.                                                                                                              |
+| `h` / `l`              | list, account header   | Several accounts open: collapse / expand the account's whole section.                                                                                                                                                                                                            |
 | `a`                    | Accounts               | Find valid `owa-piggy status` profiles to add.                                                                                                                                                                                                                                   |
 | `d` / Delete           | Accounts               | Remove the focused account from teaminal's list.                                                                                                                                                                                                                                 |
 | `t`                    | Accounts               | Cycle the focused account's chat routing mode.                                                                                                                                                                                                                                   |
+| `r`                    | Accounts               | With `concurrentAccounts`: start the focused account again when it shows `auth expired` (runs `owa-piggy reseed` first) or `offline`.                                                                                                                                            |
+| `j` / `k`              | Diagnostics            | Several accounts open: select the account the details show.                                                                                                                                                                                                                      |
+| `r`                    | Diagnostics            | Reconnect the selected account's push transport.                                                                                                                                                                                                                                 |
 | `h` / Left             | chat / channel         | Return to chat list.                                                                                                                                                                                                                                                             |
 | `j` / Down             | chat / channel         | Focus next message.                                                                                                                                                                                                                                                              |
 | `k` / Up               | chat / channel         | Focus previous message, or load older when focused at the top.                                                                                                                                                                                                                   |

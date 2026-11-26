@@ -50,6 +50,27 @@ export function parseStatusEnd(input: string, now: Date = new Date()): Date | nu
   return null
 }
 
+// Concurrent mode: the status note goes to every running account
+// (decision 2026-11-25). Throws one error naming each account that failed;
+// the others keep the new note.
+export async function setStatusNoteOnAll(
+  accs: AccountStore[],
+  message: string,
+  expiry: Date | null,
+  // Test seam.
+  setOne: typeof setStatusNote = setStatusNote,
+): Promise<void> {
+  const results = await Promise.allSettled(accs.map((acc) => setOne(acc, message, expiry)))
+  const failed = results.flatMap((r, i) =>
+    r.status === 'rejected'
+      ? [
+          `${accs[i]!.ref.label}: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}`,
+        ]
+      : [],
+  )
+  if (failed.length > 0) throw new Error(failed.join(' · '))
+}
+
 // Publish `message` (empty clears) and reflect it in myPresence.
 export async function setStatusNote(
   acc: AccountStore,

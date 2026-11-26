@@ -44,7 +44,9 @@ const scopeFallbacks = new Set<string>()
 const DEFAULT_SCOPE_KEY = '<graph-default>'
 
 export type GetTokenOpts = {
-  profile?: string
+  // owa-piggy profile alias. Required, undefined included: a forgotten
+  // profile would silently mean owa-piggy's default account.
+  profile: string | undefined
   // Pass-through to owa-piggy's --scope flag. Lets callers ask for a token
   // with a non-default audience (e.g. Teams unified presence) without
   // adding a new flag to owa-piggy. Cached separately from the default
@@ -59,8 +61,7 @@ export type GetTokenOpts = {
   audience?: string
 }
 
-function normalizeOpts(opts?: GetTokenOpts | string): GetTokenOpts {
-  if (opts === undefined) return {}
+function normalizeOpts(opts: GetTokenOpts | string): GetTokenOpts {
   if (typeof opts === 'string') return { profile: opts }
   return opts
 }
@@ -158,7 +159,7 @@ export function decodeJwtExp(token: string): number {
   return exp
 }
 
-export async function getToken(opts?: GetTokenOpts | string): Promise<string> {
+export async function getToken(opts: GetTokenOpts | string): Promise<string> {
   const normalized = normalizeOpts(opts)
   const key = fullCacheKey(normalized)
   const now = Math.floor(Date.now() / 1000)
@@ -217,7 +218,7 @@ export async function getToken(opts?: GetTokenOpts | string): Promise<string> {
   }
 }
 
-export function invalidate(opts?: GetTokenOpts | string): void {
+export function invalidate(opts: GetTokenOpts | string): void {
   cache.delete(fullCacheKey(normalizeOpts(opts)))
 }
 

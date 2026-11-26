@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { enterKeyAction, failedSendPlacement, findRootQuote } from './Composer'
+import { accountRef } from '../account'
+import { openAccount } from '../state/accountStore'
+import { createAppStore, resetAccountScopedState } from '../state/store'
+import { composerOwner, enterKeyAction, failedSendPlacement, findRootQuote } from './Composer'
 import type { ChatMessage } from '../types'
 
 const ROOT_FOCUS = {
@@ -87,4 +90,17 @@ describe('failedSendPlacement: a failed send only goes back to its own conversat
       kind: 'drop',
     })
   })
+})
+
+test('composerOwner follows the foreground slot, not other accounts restarting', () => {
+  const store = createAppStore(accountRef('alice'))
+  store.set({ focus: { kind: 'chat', chatId: 'c1' } })
+  const owner = composerOwner(store.get())
+  openAccount(store, accountRef('bob'), { foreground: false })
+  openAccount(store, accountRef('bob'), { foreground: false })
+  expect(composerOwner(store.get())).toBe(owner)
+  // A new incarnation of the foreground account is a new owner.
+  resetAccountScopedState(store, accountRef('alice'))
+  store.set({ focus: { kind: 'chat', chatId: 'c1' } })
+  expect(composerOwner(store.get())).not.toBe(owner)
 })

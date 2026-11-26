@@ -2,7 +2,14 @@
 // Each entry runs the same action as its key (itemActions), and shows that
 // key, so the menu also teaches the shortcuts.
 
-import { focusKey, type AppState, type FocusChannel, type FocusChat } from '../state/store'
+import { accountRef } from '../account'
+import {
+  accountSlice,
+  focusKey,
+  type AppState,
+  type FocusChannel,
+  type FocusChat,
+} from '../state/store'
 import {
   confirmDeleteChat,
   confirmDeleteMessage,
@@ -12,10 +19,13 @@ import {
   openReactionPicker,
   startEditMessage,
   toggleChatRead,
+  type ToForeground,
 } from './keybinds/itemActions'
 
+// A chat row's `alias` is its account in the unified sidebar (absent = the
+// foreground): the entries act on that account's chat.
 export type ContextMenuTarget =
-  | { kind: 'chat'; chatId: string; label: string }
+  | { kind: 'chat'; chatId: string; label: string; alias?: string }
   | { kind: 'message'; focus: FocusChat | FocusChannel; messageId: string }
 
 export type ContextMenuEntry = {
@@ -31,27 +41,35 @@ export function contextMenuEntries(
   deps: {
     store: Parameters<typeof openChat>[0]
     openThread?: (focus: FocusChannel, messageId: string) => void
+    toForeground?: ToForeground
   },
 ): ContextMenuEntry[] {
   const { store } = deps
   if (target.kind === 'chat') {
-    const chat = state.chats.find((c) => c.id === target.chatId)
-    if (!chat) return []
-    const unread = state.unreadByChatId[chat.id]
+    const { alias } = target
+    const slice = alias === undefined ? state : accountSlice(state, accountRef(alias).id)
+    const chat = slice?.chats.find((c) => c.id === target.chatId)
+    if (!slice || !chat) return []
+    const unread = slice.unreadByChatId[chat.id]
     const isUnread = Boolean(unread && (unread.unreadCount > 0 || unread.mentionCount > 0))
     return [
-      { id: 'open', label: 'Open', key: 'Enter', run: () => openChat(store, chat.id) },
+      {
+        id: 'open',
+        label: 'Open',
+        key: 'Enter',
+        run: () => openChat(store, chat.id, alias, deps.toForeground),
+      },
       {
         id: 'toggle-read',
         label: isUnread ? 'Mark as read' : 'Mark as unread',
         key: 'm',
-        run: () => toggleChatRead(store, chat),
+        run: () => toggleChatRead(store, chat, alias),
       },
       {
         id: 'delete',
         label: 'Delete chat…',
         key: 'Ctrl+D',
-        run: () => confirmDeleteChat(store, chat.id, target.label),
+        run: () => confirmDeleteChat(store, chat.id, target.label, alias),
       },
     ]
   }

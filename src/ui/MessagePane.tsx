@@ -10,7 +10,7 @@ import { messageAnchorRef } from './contextAnchor'
 import { Box, useStdout, useApp, type DOMElement } from 'ink'
 import { Text } from './Text'
 import { createContext, useContext, type ReactNode, useEffect, useRef, useState } from 'react'
-import { chatLabel, shortName } from '../state/selectables'
+import { chatLabel, foregroundLabel, labelSuffix, shortName } from '../state/selectables'
 import { focusKey, type ReadReceipt, type TypingIndicator } from '../state/store'
 import {
   groupChannelThreads,
@@ -159,6 +159,8 @@ export function MessagePane(props: {
   const focusedAttachmentIndex = useAppState((s) => s.focusedAttachmentIndex)
   const theme = useTheme()
   const session = useSessionApi()
+  // Several accounts open: the title names the foreground account.
+  const accountLabel = useAppState(foregroundLabel)
 
   const listPaneWidth = props.listPaneWidth ?? LIST_PANE_WIDTH_DEFAULT
   const composerRows = props.composerRows ?? DEFAULT_COMPOSER_ROWS
@@ -253,7 +255,7 @@ export function MessagePane(props: {
         channelsByTeam,
         me?.id,
         nameByUserId,
-      )
+      ) + labelSuffix(accountLabel)
   const pageState = readMessagePageState(cache ?? messages)
   const loadMoreState =
     props.loadOlderState ??
@@ -1404,7 +1406,8 @@ function TypingLine(props: { typing: TypingIndicator[]; theme: Theme }) {
   )
 }
 
-function headerForFocus(
+// The conversation's title: the pane header, and the composer placeholder.
+export function headerForFocus(
   focus:
     | { kind: 'chat'; chatId: string }
     | { kind: 'channel'; teamId: string; channelId: string }
