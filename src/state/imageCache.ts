@@ -10,6 +10,7 @@ import { request } from 'node:https'
 import { Readable } from 'node:stream'
 import { BlockList, isIP } from 'node:net'
 import { sendWithBackoff } from '../graph/backoff'
+import { readBodyCapped } from '../graph/body'
 import { createHash } from 'node:crypto'
 import {
   chmodSync,
@@ -163,12 +164,13 @@ async function fetchHostedContent(path: string, opts: FetchImageOpts): Promise<U
   const { audience, fallback } = opts.client.ctx
   const objectId = opts.objectId
   const viaGraph = (): Promise<Uint8Array> =>
-    opts.client.graphBinary({ method: 'GET', path, signal: opts.signal })
+    opts.client.graphBinary({ method: 'GET', path, signal: opts.signal, maxBytes: MAX_IMAGE_BYTES })
   const viaAsyncGw = async (): Promise<Uint8Array> => {
     const { bytes } = await fetchObjectById(objectId!, {
       account: opts.client.ctx.account,
       region: opts?.region,
       signal: opts?.signal,
+      maxBytes: MAX_IMAGE_BYTES,
     })
     return bytes
   }
@@ -228,6 +230,7 @@ export async function fetchAndCacheImage(
       const fetched = await fetchObjectByUrl(path, {
         account: opts.client.ctx.account,
         signal: opts.signal,
+        maxBytes: MAX_IMAGE_BYTES,
       })
       bytes = fetched.bytes
     } else if (opts?.isExternal) {
@@ -411,27 +414,7 @@ export async function fetchExternalImage(url: string, signal?: AbortSignal): Pro
     await res.body?.cancel()
     throw new Error(`external image fetch ${res.status} ${res.statusText}`)
   }
-  if (Number(res.headers.get('content-length')) > MAX_IMAGE_BYTES) {
-    await res.body?.cancel()
-    throw new Error('external image too large')
-  }
-  const reader = res.body?.getReader()
-  if (!reader) return new Uint8Array()
-  const chunks: Uint8Array[] = []
-  let size = 0
-  try {
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      size += value.byteLength
-      if (size > MAX_IMAGE_BYTES) throw new Error('external image too large')
-      chunks.push(value)
-    }
-    return Buffer.concat(chunks, size)
-  } finally {
-    await reader.cancel()
-    reader.releaseLock()
-  }
+  return readBodyCapped(res, MAX_IMAGE_BYTES, () => new Error('external image too large'))
 }
 
 // Trigger an async fetch for a key. Every caller that asked while it loads
@@ -601,7 +584,11 @@ function ensurePhoto(
   photoWaiters.set(owned, new Set([opts.onChange]))
   enqueuePhotoFetch(account.id, async () => {
     try {
-      const bytes = await opts.client.graphBinary({ method: 'GET', path })
+      const bytes = await opts.client.graphBinary({
+        method: 'GET',
+        path,
+        maxBytes: MAX_IMAGE_BYTES,
+      })
       if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error('photo too large')
       const buf = Buffer.from(bytes)
       writeCachedImage(

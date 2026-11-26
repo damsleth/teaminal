@@ -19,6 +19,7 @@
 // with the same care as the Skype token.
 
 import { sendWithBackoff } from './backoff'
+import { readBodyCapped } from './body'
 import { owaProfile, type AccountRef } from '../account'
 import { getToken } from '../auth/owaPiggy'
 import { recordEvent, recordRequest } from '../log'
@@ -63,6 +64,8 @@ export type AsyncGwOpts = {
   account: AccountRef
   signal?: AbortSignal
   region?: string
+  // Object fetches: a cap below MAX_OBJECT_BYTES (never above it).
+  maxBytes?: number
 }
 
 type Transport = (url: string, init: RequestInit) => Promise<Response>
@@ -345,11 +348,12 @@ export async function fetchObjectByUrl(
         `asyncgw fetch ${status}: ${text.slice(0, 240) || 'request failed'}`,
       )
     }
-    const ab = await res.arrayBuffer()
-    const bytes = new Uint8Array(ab)
-    if (bytes.byteLength > MAX_OBJECT_BYTES) {
-      throw new TeamsAsyncGwError(0, `asyncgw fetch: object exceeds ${MAX_OBJECT_BYTES} bytes`)
-    }
+    const max = Math.min(opts.maxBytes ?? MAX_OBJECT_BYTES, MAX_OBJECT_BYTES)
+    const bytes = await readBodyCapped(
+      res,
+      max,
+      () => new TeamsAsyncGwError(0, `asyncgw fetch: object exceeds ${max} bytes`),
+    )
     const contentType = res.headers.get('content-type') ?? 'application/octet-stream'
     return { bytes, contentType }
   }

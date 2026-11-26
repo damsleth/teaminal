@@ -665,3 +665,43 @@ describe('bound clients', () => {
     expect(seen.map((c) => c.p)).toEqual(['a', 'a'])
   })
 })
+
+describe('graphBinary size cap', () => {
+  // 100 chunks of 1 KB, counting how many the client pulled.
+  function bigBody() {
+    const state = { pulled: 0 }
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (state.pulled === 100) return controller.close()
+        state.pulled++
+        controller.enqueue(new Uint8Array(1024))
+      },
+    })
+    return { stream, state }
+  }
+
+  test('maxBytes stops the download once passed; the error is not a GraphError', async () => {
+    primeAuth()
+    const { stream, state } = bigBody()
+    __setTransportForTests(async () => new Response(stream, { status: 200 }))
+    const err = await client()
+      .graphBinary({
+        method: 'GET',
+        path: '/chats/c1/messages/m1/hostedContents/h1/$value',
+        maxBytes: 2500,
+      })
+      .catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(Error)
+    // A GraphError 401/403/404 would send the image path to its asyncgw fallback.
+    expect(err).not.toBeInstanceOf(GraphError)
+    expect(state.pulled).toBeLessThanOrEqual(4)
+  })
+
+  test('without maxBytes the whole body is returned', async () => {
+    primeAuth()
+    const { stream } = bigBody()
+    __setTransportForTests(async () => new Response(stream, { status: 200 }))
+    const bytes = await client().graphBinary({ method: 'GET', path: '/me/photo/$value' })
+    expect(bytes.byteLength).toBe(100 * 1024)
+  })
+})

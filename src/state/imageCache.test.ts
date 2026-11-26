@@ -219,6 +219,41 @@ describe('fetchAndCacheImage hosted-content routing', () => {
     rmSync(cacheRoot, { recursive: true, force: true })
   })
 
+  it('an oversized Graph image stops downloading at the cap and does not fall back', async () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-cap`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    setAuthRunner(async () => ({
+      stdout: makeJwt({ exp: FAR_FUTURE, oid: 'oid-self' }),
+      stderr: '',
+      exitCode: 0,
+    }))
+    // 6 MB in 64 KB chunks, no Content-Length: only the stream reveals the size.
+    let pulled = 0
+    setClientTransport(async () => {
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (pulled === 96) return controller.close()
+          pulled++
+          controller.enqueue(new Uint8Array(64 * 1024))
+        },
+      })
+      return new Response(stream, { status: 200 })
+    })
+    setAsyncGwTransport(async () => {
+      throw new Error('asyncgw should not be tried for an oversized Graph image')
+    })
+
+    const buf = await fetchAndCacheImage(
+      '/chats/chat-1/messages/msg-1/hostedContents/AAA/$value',
+      `cap-test-${Date.now()}`,
+      { contentType: '', name: 'image' },
+      { client: testClient({ fallback: true }), objectId: '0-eu-d2-abc' },
+    )
+    expect(buf).toBeNull()
+    // 4 MB is 64 chunks; the remaining ~2 MB is never read.
+    expect(pulled).toBeLessThanOrEqual(66)
+  })
+
   it('ic3-only routes a hosted-content image to asyncgw, never Graph', async () => {
     cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-ic3`)
     process.env.XDG_CACHE_HOME = cacheRoot
