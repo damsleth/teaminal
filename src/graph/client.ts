@@ -25,6 +25,7 @@ import {
 import { owaProfile, type AccountRef } from '../account'
 import { getToken, invalidate } from '../auth/owaPiggy'
 import { recordRequest } from '../log'
+import { readBodyCapped } from './body'
 
 const BASE_V1 = 'https://graph.microsoft.com/v1.0'
 const BASE_BETA = 'https://graph.microsoft.com/beta'
@@ -40,6 +41,9 @@ export type GraphOpts = {
   beta?: boolean
   scope?: string
   signal?: AbortSignal
+  // graphBinary only: fail once the body passes this many bytes, without
+  // buffering the rest (a ResponseTooLargeError, not a GraphError).
+  maxBytes?: number
 }
 
 export class GraphError extends Error {
@@ -373,7 +377,9 @@ async function executeBinaryRequest(
     throw new GraphError(res.status, opts.path, res.statusText || `HTTP ${res.status}`)
   }
 
-  return new Uint8Array(await res.arrayBuffer())
+  if (opts.maxBytes === undefined) return new Uint8Array(await res.arrayBuffer())
+  const max = opts.maxBytes
+  return readBodyCapped(res, max, `binary response over ${max} bytes`)
 }
 
 type PagedResponse<T> = { value: T[]; '@odata.nextLink'?: string }

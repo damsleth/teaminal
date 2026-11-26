@@ -6,17 +6,18 @@ teaminal is a lightweight terminal Microsoft Teams client written in TypeScript.
 
 ## Module Responsibilities
 
-| Module        | Purpose                                              | Key Files                                                                                                              |
-| ------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `src/account` | Account identity (`AccountRef`), layer-neutral       | `index.ts`                                                                                                             |
-| `src/auth`    | owa-piggy subprocess wrapper, in-process token cache | `owaPiggy.ts`                                                                                                          |
-| `src/graph`   | Microsoft Graph HTTP client + per-resource calls     | `client.ts`, `me.ts`, `chats.ts`, `teams.ts`, `presence.ts`, `capabilities.ts`                                         |
-| `src/state`   | Store with account slots, sessions, polling loops    | `store.ts`, `poller.ts`, `accountManager.ts`, `accountStore.ts`, `bootstrap.ts`, `chatActions.ts`                      |
-| `src/ui`      | Ink components + HTML→ANSI rendering + keybinds      | `App.tsx`, `ChatList.tsx`, `MessagePane.tsx`, `Composer.tsx`, `StatusBar.tsx`, `CommandPalette.tsx`, `ContextMenu.tsx` |
-| `src/config`  | JSON config loader                                   | `index.ts`                                                                                                             |
-| `src/notify`  | Terminal bell + system notifications                 | `notify.ts`                                                                                                            |
-| `src/text`    | Teams HTML → plain text, links, inline images (pure) | `html.ts`, `links.ts`, `inlineImages.ts`                                                                               |
-| `bin`         | CLI entry point                                      | `teaminal.tsx`                                                                                                         |
+| Module         | Purpose                                                         | Key Files                                                                                                              |
+| -------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `src/account`  | Account identity (`AccountRef`), layer-neutral                  | `index.ts`                                                                                                             |
+| `src/auth`     | owa-piggy subprocess wrapper, in-process token cache            | `owaPiggy.ts`                                                                                                          |
+| `src/graph`    | Microsoft Graph HTTP client + per-resource calls                | `client.ts`, `me.ts`, `chats.ts`, `teams.ts`, `presence.ts`, `capabilities.ts`                                         |
+| `src/state`    | Store with account slots, sessions, polling loops               | `store.ts`, `poller.ts`, `accountManager.ts`, `accountStore.ts`, `bootstrap.ts`, `chatActions.ts`                      |
+| `src/ui`       | Ink components + HTML→ANSI rendering + keybinds                 | `App.tsx`, `ChatList.tsx`, `MessagePane.tsx`, `Composer.tsx`, `StatusBar.tsx`, `CommandPalette.tsx`, `ContextMenu.tsx` |
+| `src/settings` | `Settings` shape, defaults, chat-routing helpers; layer-neutral | `index.ts`                                                                                                             |
+| `src/config`   | JSON config loader                                              | `index.ts`                                                                                                             |
+| `src/notify`   | Terminal bell + system notifications                            | `notify.ts`                                                                                                            |
+| `src/text`     | Teams HTML → plain text, links, inline images (pure)            | `html.ts`, `links.ts`, `inlineImages.ts`                                                                               |
+| `bin`          | CLI entry point                                                 | `teaminal.tsx`                                                                                                         |
 
 ## Architecture Rules
 
@@ -28,7 +29,7 @@ teaminal is a lightweight terminal Microsoft Teams client written in TypeScript.
    - **Slots:** the store holds one slot per open account. The flat account fields are the foreground's; the others live in `backgroundAccounts`, read with `accountSlice(s, id)`. `openAccount` / `closeAccount` / `setForeground` in `src/state/accountStore.ts` are the only slot operations.
    - **Writes:** session code and state actions write through an `AccountStore` bound when the work starts (`accountStore(store)` for the foreground, `accountStoreFor(store, ref)` for any open slot). It accepts only account-owned fields, follows its account across a foreground swap, and drops writes once that slot is closed or re-opened. Global UI writes (focus, modal, inputZone) go through the raw `Store` in the caller.
    - There is no ambient account: scripts, e2e and tests build `createGraphClient({ account: accountRef(profile), audience, fallback })` themselves. `getToken` and the Teams-presence / push-transport option types take `profile: string | undefined` explicitly, so a forgotten profile is a compile error.
-5. **Auth boundary:** Only `src/auth/owaPiggy.ts` spawns subprocesses. Only `src/graph/client.ts` injects `Authorization` headers.
+5. **Auth boundary:** Only `src/auth/owaPiggy.ts` runs owa-piggy. The other subprocesses are OS helpers (notifications, appearance, opening links / images / the editor, the emoji picker), each listed in `SPAWNERS` in `src/architecture.test.ts`; a new one goes on that list. Graph requests get their bearer only from `src/graph/client.ts`. The Teams-service clients that still build their own `Authorization` header (other audiences, skype / asyncgw session tokens) are listed in `AUTH_HEADER_SITES` in the same test; don't add to that list without a reason the shared client can't cover.
 6. **HTML utilities are layer-neutral:** Teams-HTML → plain text lives in `src/text/html.ts` (pure, no Ink dependency). Both UI and `src/notify` consume it.
 
 ## Release Hygiene
@@ -146,7 +147,7 @@ in a worktree changes nothing they can see.
 
 1. **Adding a Graph call:** add to the relevant `src/graph/*.ts`, route through `graph<T>()` so it inherits 401 retry, 429 backoff, and pagination. If the UI needs to invoke it directly (one-shot action), expose a wrapper from `src/state/chatActions.ts` and call the wrapper from UI - not the raw Graph function. The boundary test in `src/architecture.test.ts` will fail on direct UI -> graph operation imports.
 2. **Adding a keybind:** edit `src/ui/App.tsx` (`useInput` handler) and update the keybinds table in README.
-3. **Adding a config key:** edit `src/config/index.ts`, append to the recognized-keys list, document it in README.
+3. **Adding a config key:** add the field and its default in `src/settings/index.ts`, its validation in `src/config/index.ts`, document it in README.
 4. **Adding a poll loop:** edit `src/state/poller.ts`. Honor jitter, AbortController, and the seen-set conventions.
 
 ## Performance

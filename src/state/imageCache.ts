@@ -10,6 +10,7 @@ import { request } from 'node:https'
 import { Readable } from 'node:stream'
 import { BlockList, isIP } from 'node:net'
 import { sendWithBackoff } from '../graph/backoff'
+import { readBodyCapped, ResponseTooLargeError } from '../graph/body'
 import { createHash } from 'node:crypto'
 import {
   chmodSync,
@@ -88,9 +89,8 @@ export function clearImageCache(profile?: string | null): string {
     // best-effort
   }
   const prefix = ownedImageKey(accountRef(profile).id, '')
-  for (const map of [fetchStatus, imageDataCache]) {
-    for (const k of map.keys()) if (k.startsWith(prefix)) map.delete(k)
-  }
+  for (const k of fetchStatus.keys()) if (k.startsWith(prefix)) fetchStatus.delete(k)
+  for (const k of imageDataCache.keys()) if (k.startsWith(prefix)) dropImage(k)
   return dir
 }
 
@@ -164,12 +164,13 @@ async function fetchHostedContent(path: string, opts: FetchImageOpts): Promise<U
   const { audience, fallback } = opts.client.ctx
   const objectId = opts.objectId
   const viaGraph = (): Promise<Uint8Array> =>
-    opts.client.graphBinary({ method: 'GET', path, signal: opts.signal })
+    opts.client.graphBinary({ method: 'GET', path, signal: opts.signal, maxBytes: MAX_IMAGE_BYTES })
   const viaAsyncGw = async (): Promise<Uint8Array> => {
     const { bytes } = await fetchObjectById(objectId!, {
       account: opts.client.ctx.account,
       region: opts?.region,
       signal: opts?.signal,
+      maxBytes: MAX_IMAGE_BYTES,
     })
     return bytes
   }
@@ -179,7 +180,9 @@ async function fetchHostedContent(path: string, opts: FetchImageOpts): Promise<U
     if (!fallback || !canGraph) return viaAsyncGw()
     try {
       return await viaAsyncGw()
-    } catch {
+    } catch (err) {
+      // Too big is too big on either route.
+      if (err instanceof ResponseTooLargeError) throw err
       return viaGraph()
     }
   }
@@ -229,6 +232,7 @@ export async function fetchAndCacheImage(
       const fetched = await fetchObjectByUrl(path, {
         account: opts.client.ctx.account,
         signal: opts.signal,
+        maxBytes: MAX_IMAGE_BYTES,
       })
       bytes = fetched.bytes
     } else if (opts?.isExternal) {
@@ -263,6 +267,59 @@ type FetchStatus = 'pending' | 'loading' | 'ready' | 'error'
 const fetchStatus = new Map<string, FetchStatus>()
 const imageDataCache = new Map<string, Buffer>()
 
+// The in-memory blobs are bounded by bytes, least recently read first out
+// (Map order is the recency order). Every blob in memory is also on disk, so
+// an evicted one also drops its 'ready' status: the next ensure* call reads
+// it back from disk instead of trusting a status with no bytes behind it.
+// Reads (getImageData) count as use, so the pictures on screen stay. The
+// kitty transmit refs and avatar decodes are weak on the Buffer and go with
+// it; copies the terminal holds are bounded by the terminal's own quota.
+const DEFAULT_IMAGE_MEMORY_BUDGET = 64 * 1024 * 1024
+// A blob used this recently is not evicted even over budget: the pane that
+// shows it does not ask again until its visible set changes, so evicting a
+// picture that just arrived or was just painted would leave a placeholder.
+// ponytail: soft cap, a burst of large visible images can exceed the budget
+// until they age out.
+const DEFAULT_IMAGE_EVICT_GRACE_MS = 30_000
+let imageMemoryBudget = DEFAULT_IMAGE_MEMORY_BUDGET
+let imageEvictGraceMs = DEFAULT_IMAGE_EVICT_GRACE_MS
+let imageBytes = 0
+const imageUsedAt = new Map<string, number>()
+
+function dropImage(owned: string): void {
+  const buf = imageDataCache.get(owned)
+  if (!buf) return
+  imageBytes -= buf.byteLength
+  imageDataCache.delete(owned)
+  imageUsedAt.delete(owned)
+}
+
+function keepImage(owned: string, buf: Buffer): void {
+  dropImage(owned)
+  imageDataCache.set(owned, buf)
+  imageUsedAt.set(owned, Date.now())
+  imageBytes += buf.byteLength
+  const fresh = Date.now() - imageEvictGraceMs
+  for (const old of imageDataCache.keys()) {
+    // The newest blob stays even when it alone is over the budget. Map order
+    // is recency order, so the first recently used blob ends the sweep.
+    if (imageBytes <= imageMemoryBudget || old === owned) break
+    if ((imageUsedAt.get(old) ?? 0) > fresh) break
+    dropImage(old)
+    fetchStatus.delete(old)
+  }
+}
+
+// Tests that set a budget get no grace period unless they ask for one.
+export function __setImageMemoryBudgetForTests(bytes?: number, graceMs = 0): void {
+  imageMemoryBudget = bytes ?? DEFAULT_IMAGE_MEMORY_BUDGET
+  imageEvictGraceMs = bytes === undefined ? DEFAULT_IMAGE_EVICT_GRACE_MS : graceMs
+}
+
+export function __imageMemoryBytesForTests(): number {
+  return imageBytes
+}
+
 // Reads take the owning account; with none (no session bound yet) nothing
 // is loaded.
 export function getImageStatus(account: AccountId | undefined, key: string): FetchStatus {
@@ -270,7 +327,16 @@ export function getImageStatus(account: AccountId | undefined, key: string): Fet
 }
 
 export function getImageData(account: AccountId | undefined, key: string): Buffer | undefined {
-  return account ? imageDataCache.get(ownedImageKey(account, key)) : undefined
+  if (!account) return undefined
+  const owned = ownedImageKey(account, key)
+  const buf = imageDataCache.get(owned)
+  if (buf) {
+    // Most recently used: move to the end of the eviction order.
+    imageDataCache.delete(owned)
+    imageDataCache.set(owned, buf)
+    imageUsedAt.set(owned, Date.now())
+  }
+  return buf
 }
 
 // Fetch an arbitrary image URL without auth headers. Applies the same
@@ -366,27 +432,7 @@ export async function fetchExternalImage(url: string, signal?: AbortSignal): Pro
     await res.body?.cancel()
     throw new Error(`external image fetch ${res.status} ${res.statusText}`)
   }
-  if (Number(res.headers.get('content-length')) > MAX_IMAGE_BYTES) {
-    await res.body?.cancel()
-    throw new Error('external image too large')
-  }
-  const reader = res.body?.getReader()
-  if (!reader) return new Uint8Array()
-  const chunks: Uint8Array[] = []
-  let size = 0
-  try {
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      size += value.byteLength
-      if (size > MAX_IMAGE_BYTES) throw new Error('external image too large')
-      chunks.push(value)
-    }
-    return Buffer.concat(chunks, size)
-  } finally {
-    await reader.cancel()
-    reader.releaseLock()
-  }
+  return readBodyCapped(res, MAX_IMAGE_BYTES, 'external image too large')
 }
 
 // Trigger an async fetch for a key. Every caller that asked while it loads
@@ -416,7 +462,7 @@ export function ensureImageFetched(
   const disk = readCachedImage(key, owaProfile(opts.client.ctx.account))
   if (disk) {
     fetchStatus.set(owned, 'ready')
-    imageDataCache.set(owned, disk.data)
+    keepImage(owned, disk.data)
     // Notify like the network path does: a caller that rendered a "loading…"
     // state before this ran would otherwise never learn the blob is available.
     // Safe against a render loop — the 'ready' guard above makes every later
@@ -439,7 +485,7 @@ export function ensureImageFetched(
   fetchAndCacheImage(path, key, meta, opts)
     .then((buf) => {
       if (buf) {
-        imageDataCache.set(owned, buf)
+        keepImage(owned, buf)
         fetchStatus.set(owned, 'ready')
       } else {
         failed()
@@ -478,6 +524,8 @@ const photoQueues = new Map<AccountId, { active: number; waiting: (() => void)[]
 export function __forgetImagesInMemoryForTests(): void {
   fetchStatus.clear()
   imageDataCache.clear()
+  imageUsedAt.clear()
+  imageBytes = 0
   inlineRetryAt.clear()
   inlineWaiters.clear()
 }
@@ -537,7 +585,7 @@ function ensurePhoto(
   const disk = readCachedImage(key, profile)
   if (disk) {
     fetchStatus.set(owned, 'ready')
-    imageDataCache.set(owned, disk.data)
+    keepImage(owned, disk.data)
     opts.onChange()
     return
   }
@@ -555,7 +603,11 @@ function ensurePhoto(
   photoWaiters.set(owned, new Set([opts.onChange]))
   enqueuePhotoFetch(account.id, async () => {
     try {
-      const bytes = await opts.client.graphBinary({ method: 'GET', path })
+      const bytes = await opts.client.graphBinary({
+        method: 'GET',
+        path,
+        maxBytes: MAX_IMAGE_BYTES,
+      })
       if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error('photo too large')
       const buf = Buffer.from(bytes)
       writeCachedImage(
@@ -564,7 +616,7 @@ function ensurePhoto(
         { contentType: 'image/jpeg', name: key, size: buf.length },
         profile,
       )
-      imageDataCache.set(owned, buf)
+      keepImage(owned, buf)
       settle(false, false)
     } catch (err) {
       const status = err instanceof GraphError ? err.status : null

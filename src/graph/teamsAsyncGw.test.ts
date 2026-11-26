@@ -266,3 +266,33 @@ describe('fetchObjectById', () => {
     expect(objectUrl).toContain('/views/imgo')
   })
 })
+
+describe('object size cap', () => {
+  test('an object over maxBytes fails mid-stream and is not retried', async () => {
+    primeAuth()
+    primeSkype()
+    let pulled = 0
+    let objectCalls = 0
+    __setTransportForTests(async (url) => {
+      if (url.endsWith('/skypetokenauth')) {
+        return new Response(null, { status: 200, headers: { 'set-cookie': 'AGW=session-1' } })
+      }
+      objectCalls++
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (pulled === 100) return controller.close()
+          pulled++
+          controller.enqueue(new Uint8Array(1024))
+        },
+      })
+      return new Response(stream, { status: 200, headers: { 'content-type': 'image/png' } })
+    })
+    const objectUrl =
+      'https://eu-prod.asyncgw.teams.microsoft.com/v1/objects/abc/views/imgpsh_fullsize'
+    await expect(fetchObjectByUrl(objectUrl, { account: ACCOUNT, maxBytes: 2500 })).rejects.toThrow(
+      'exceeds 2500 bytes',
+    )
+    expect(pulled).toBeLessThanOrEqual(4)
+    expect(objectCalls).toBe(1)
+  })
+})

@@ -26,7 +26,9 @@ import {
 } from '../auth/owaPiggy'
 import {
   __forgetImagesInMemoryForTests,
+  __imageMemoryBytesForTests,
   __resetPhotoStateForTests,
+  __setImageMemoryBudgetForTests,
   clearImageCache,
   ensureTeamPhoto,
   ensureUserPhoto,
@@ -38,6 +40,7 @@ import {
   __setExternalImageTransportForTests,
   getImageCacheDir,
   getImageData,
+  getImageStatus,
   imageCacheKey as cacheKey,
   ownedImageKey,
   readCachedImage,
@@ -214,6 +217,89 @@ describe('fetchAndCacheImage hosted-content routing', () => {
     if (realXdg === undefined) delete process.env.XDG_CACHE_HOME
     else process.env.XDG_CACHE_HOME = realXdg
     rmSync(cacheRoot, { recursive: true, force: true })
+  })
+
+  it('an oversized Graph image stops downloading at the cap and does not fall back', async () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-cap`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    setAuthRunner(async () => ({
+      stdout: makeJwt({ exp: FAR_FUTURE, oid: 'oid-self' }),
+      stderr: '',
+      exitCode: 0,
+    }))
+    // 6 MB in 64 KB chunks, no Content-Length: only the stream reveals the size.
+    let pulled = 0
+    setClientTransport(async () => {
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (pulled === 96) return controller.close()
+          pulled++
+          controller.enqueue(new Uint8Array(64 * 1024))
+        },
+      })
+      return new Response(stream, { status: 200 })
+    })
+    setAsyncGwTransport(async () => {
+      throw new Error('asyncgw should not be tried for an oversized Graph image')
+    })
+
+    const buf = await fetchAndCacheImage(
+      '/chats/chat-1/messages/msg-1/hostedContents/AAA/$value',
+      `cap-test-${Date.now()}`,
+      { contentType: '', name: 'image' },
+      { client: testClient({ fallback: true }), objectId: '0-eu-d2-abc' },
+    )
+    expect(buf).toBeNull()
+    // 4 MB is 64 chunks; the remaining ~2 MB is never read.
+    expect(pulled).toBeLessThanOrEqual(66)
+  })
+
+  it('an oversized asyncgw image on an ic3 account with fallback does not retry via Graph', async () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-cap-ic3`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    setAuthRunner(async () => ({
+      stdout: makeJwt({ exp: FAR_FUTURE, oid: 'oid-self' }),
+      stderr: '',
+      exitCode: 0,
+    }))
+    __setRegionForTests(undefined, 'emea')
+    setFederationTransport(
+      async () =>
+        new Response(JSON.stringify({ tokens: { skypeToken: 'skype-test', expiresIn: 3600 } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    )
+    // Before the cap, a 4-16 MB object was returned and rejected afterwards;
+    // Graph was never asked. Failing at the cap must not change that.
+    let graphCalls = 0
+    setClientTransport(async () => {
+      graphCalls++
+      return new Response(new Uint8Array([1, 2, 3]), { status: 200 })
+    })
+    setAsyncGwTransport(async (url) => {
+      if (url.endsWith('/skypetokenauth')) {
+        return new Response(null, { status: 200, headers: { 'set-cookie': 'AGW=s1' } })
+      }
+      let pulled = 0
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (pulled === 96) return controller.close()
+          pulled++
+          controller.enqueue(new Uint8Array(64 * 1024))
+        },
+      })
+      return new Response(stream, { status: 200, headers: { 'content-type': 'image/png' } })
+    })
+
+    const buf = await fetchAndCacheImage(
+      '/chats/chat-1/messages/msg-1/hostedContents/AAA/$value',
+      `cap-ic3-test-${Date.now()}`,
+      { contentType: '', name: 'image' },
+      { client: testClient({ audience: 'ic3', fallback: true }), objectId: '0-eu-d2-abc' },
+    )
+    expect(buf).toBeNull()
+    expect(graphCalls).toBe(0)
   })
 
   it('ic3-only routes a hosted-content image to asyncgw, never Graph', async () => {
@@ -422,6 +508,109 @@ describe('ensureImageFetched disk-cache notification', () => {
       { client: testClient(), onChange: () => notified++ },
     )
     expect(notified).toBe(1)
+  })
+})
+
+describe('in-memory image budget', () => {
+  const realXdg = process.env.XDG_CACHE_HOME
+  let cacheRoot = ''
+
+  afterEach(() => {
+    __setImageMemoryBudgetForTests()
+    __forgetImagesInMemoryForTests()
+    if (realXdg === undefined) delete process.env.XDG_CACHE_HOME
+    else process.env.XDG_CACHE_HOME = realXdg
+    if (cacheRoot) rmSync(cacheRoot, { recursive: true, force: true })
+  })
+
+  // A 100-byte PNG-looking blob on disk under `key`, filled with `fill`.
+  const seed = (key: string, fill: number): Buffer => {
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(92, fill),
+    ])
+    const dir = getImageCacheDir()
+    mkdirSync(dir, { recursive: true })
+    const hash = createHash('sha1').update(key).digest('hex')
+    writeFileSync(join(dir, `${hash}.bin`), png)
+    writeFileSync(join(dir, `${hash}.meta.json`), JSON.stringify({ contentType: 'image/png' }))
+    return png
+  }
+  const ensure = (key: string, onChange: () => void = () => {}) =>
+    ensureImageFetched(
+      'ignored',
+      key,
+      { contentType: 'image/png', name: 'x.png' },
+      { client: testClient(), onChange },
+    )
+
+  it('keeps recently used blobs over the budget, so pictures on screen are not dropped', () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-grace`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    __forgetImagesInMemoryForTests()
+    __setImageMemoryBudgetForTests(250, 60_000)
+    const me = testClient().ctx.account.id
+    const pngA = seed('img-a', 1)
+    seed('img-b', 2)
+    seed('img-c', 3)
+    ensure('img-a')
+    ensure('img-b')
+    ensure('img-c')
+    expect(__imageMemoryBytesForTests()).toBe(300)
+    expect(getImageData(me, 'img-a')).toEqual(pngA)
+    expect(getImageStatus(me, 'img-a')).toBe('ready')
+  })
+
+  it('evicts the least recently read blob over the budget; it comes back from disk', () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-budget`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    __forgetImagesInMemoryForTests()
+    __setImageMemoryBudgetForTests(250)
+    const me = testClient().ctx.account.id
+    const [a, b, c] = ['img-a', 'img-b', 'img-c']
+    const pngA = seed(a, 1)
+    const pngB = seed(b, 2)
+    seed(c, 3)
+
+    ensure(a)
+    ensure(b)
+    expect(__imageMemoryBytesForTests()).toBe(200)
+    // a is on screen (read by the painter), b is not.
+    expect(getImageData(me, a)).toEqual(pngA)
+    ensure(c)
+
+    expect(__imageMemoryBytesForTests()).toBe(200)
+    expect(getImageData(me, a)).toEqual(pngA)
+    expect(getImageData(me, b)).toBeUndefined()
+    // Not 'ready' with no bytes: the next ensure reloads it.
+    expect(getImageStatus(me, b)).toBe('pending')
+    let notified = 0
+    ensure(b, () => notified++)
+    expect(notified).toBe(1)
+    expect(getImageData(me, b)).toEqual(pngB)
+    expect(__imageMemoryBytesForTests()).toBeLessThanOrEqual(250)
+  })
+
+  it('keeps the newest blob even when it alone is over the budget', () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-budget-one`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    __forgetImagesInMemoryForTests()
+    __setImageMemoryBudgetForTests(50)
+    const png = seed('img-big', 4)
+    ensure('img-big')
+    expect(getImageData(testClient().ctx.account.id, 'img-big')).toEqual(png)
+    expect(__imageMemoryBytesForTests()).toBe(100)
+  })
+
+  it('a cleared account gives its bytes back to the budget', () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-budget-clear`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    __forgetImagesInMemoryForTests()
+    seed('img-a', 1)
+    ensure('img-a')
+    expect(__imageMemoryBytesForTests()).toBe(100)
+    clearImageCache(undefined)
+    expect(__imageMemoryBytesForTests()).toBe(0)
   })
 })
 

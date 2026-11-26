@@ -7,7 +7,7 @@
 // <a>, and entity refs render correctly.
 
 import { messageAnchorRef } from './contextAnchor'
-import { Box, useStdout, useApp, type DOMElement } from 'ink'
+import { Box, useStdout, type DOMElement } from 'ink'
 import { Text } from './Text'
 import { createContext, useContext, type ReactNode, useEffect, useRef, useState } from 'react'
 import { chatLabel, foregroundLabel, labelSuffix, shortName } from '../state/selectables'
@@ -71,7 +71,7 @@ import {
   initialsKey,
   isGeneratedKey,
 } from './avatarImage'
-import { requestKittyPaint, setKittyOwner } from './kittyPainter'
+import { useKittyOwner } from './hooks/useKittyOwner'
 import { initialsOf, PictureSlot } from './PictureSlot'
 import type { AccountId } from '../account'
 import { messageFocusables } from './messageFocusables'
@@ -196,7 +196,6 @@ export function MessagePane(props: {
   const windowStartRef = useRef(0)
   const paneRef = useRef<DOMElement>(null)
   const imageSlots = useRef<InlineImageSlots>(new Map())
-  const { waitUntilRenderFlush } = useApp()
 
   const isListFocus = focus.kind === 'list'
   const rawMessages = convMessages ?? []
@@ -417,30 +416,27 @@ export function MessagePane(props: {
   // before reading those positions and placing graphics over their slots.
   // The shared painter (kittyPainter) does the clearing and placing, so the
   // chat list's thumbnails and these images don't erase each other.
-  useEffect(() => {
-    if (!stdout || !isKittyCapable()) return
-    setKittyOwner('messages', {
-      viewport: () => paneRef.current,
-      slots: imageSlots.current,
-      escape: (cacheKey, rows, fallbackKey) => {
-        if (isGeneratedKey(cacheKey)) return iconEscape(cacheKey, rows)
-        const data = getImageData(accountId, cacheKey)
-        const owned = accountId ? ownedImageKey(accountId, cacheKey) : null
-        if (isPhotoKey(cacheKey)) {
-          const photo = data && owned ? avatarEscape(owned, data, rows) : ''
-          return photo || (fallbackKey ? iconEscape(fallbackKey, rows) : '')
+  useKittyOwner(
+    'messages',
+    isKittyCapable()
+      ? {
+          viewport: () => paneRef.current,
+          slots: imageSlots.current,
+          escape: (cacheKey, rows, fallbackKey) => {
+            if (isGeneratedKey(cacheKey)) return iconEscape(cacheKey, rows)
+            const data = getImageData(accountId, cacheKey)
+            const owned = accountId ? ownedImageKey(accountId, cacheKey) : null
+            if (isPhotoKey(cacheKey)) {
+              const photo = data && owned ? avatarEscape(owned, data, rows) : ''
+              return photo || (fallbackKey ? iconEscape(fallbackKey, rows) : '')
+            }
+            return data && owned
+              ? buildKittyImageEscape(owned, data, { rows, reservedRows: rows })
+              : ''
+          },
         }
-        return data && owned ? buildKittyImageEscape(owned, data, { rows, reservedRows: rows }) : ''
-      },
-    })
-    requestKittyPaint({ stdout, flush: waitUntilRenderFlush, suppressed: modalOpen })
-  })
-  useEffect(
-    () => () => {
-      setKittyOwner('messages', null)
-      requestKittyPaint()
-    },
-    [],
+      : null,
+    modalOpen,
   )
 
   // While the reaction picker is open we delegate to the macOS Character

@@ -23,7 +23,7 @@ import {
   updateSettings,
   validateThemeOverrides,
 } from './index'
-import { defaultSettings, type Settings } from '../state/store'
+import { defaultSettings, type Settings } from '../settings'
 
 let tmpDir: string
 let cfgPath: string
