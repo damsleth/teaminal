@@ -1361,7 +1361,7 @@ function inlineImagePlaceholder(
 // loaded, or a gap-free window back to the root) would drop the "+" sooner.
 export type ReplyBadge = { count: number; more: boolean }
 
-function replyBadgeFor(
+export function replyBadgeFor(
   threads: ChannelThreads,
   rootId: string,
   complete: boolean,
