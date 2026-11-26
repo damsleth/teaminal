@@ -1,17 +1,26 @@
 import { describe, expect, mock, test } from 'bun:test'
 import type { Key } from 'ink'
-import { handleListKeys, type ListKeysCtx } from './listKeys'
+import {
+  activateListRow,
+  handleListKeys,
+  listCtxNow,
+  toggleListHeader,
+  type ListKeysCtx,
+} from './listKeys'
 import { accountRef } from '../../account'
 import { openAccount, setForeground } from '../../state/accountStore'
 import {
+  accountRowKey,
   CHAT_SECTION_CAP,
   cursorAt,
   favoritesFor,
+  NEW_CHAT_ROW,
   resolveCursor,
+  selectableKey,
   unifiedListInput,
   visibleList,
 } from '../../state/selectables'
-import { createAppStore, type AccountSlice, type Settings } from '../../state/store'
+import { createAppStore, type AccountSlice, type AppState, type Settings } from '../../state/store'
 import type { Chat } from '../../types'
 
 // Collapsing a section persists to config.json; keep the fire-and-forget
@@ -733,5 +742,215 @@ describe('f: favorites', () => {
     expect(store.get().settings.favoritesByAccount).toEqual({})
     handleListKeys({ input: 'F', key: makeKey({ shift: true }) }, { ...ctx, cursor: 1 })
     expect(store.get().settings.favoritesByAccount).toEqual({})
+  })
+})
+
+describe('mouse actions: activateListRow / toggleListHeader', () => {
+  // A single-account store holding the list's inputs, and the ctx App builds
+  // for a click (listCtxNow reads them from the store).
+  function single(state: Partial<AppState> = {}, settings: Partial<Settings> = {}) {
+    const base = makeCtx()
+    base.store.set((s) => ({
+      chats: [chat('a'), chat('b'), chat('c')],
+      ...state,
+      settings: { ...s.settings, ...settings },
+    }))
+    return { ...base, now: () => listCtxNow(base.ctx) }
+  }
+  const pick = (s: AppState) => ({
+    focus: s.focus,
+    cursor: s.cursor,
+    cursorKey: s.cursorKey,
+    collapsed: s.settings.chatListCollapsedSections,
+    expanded: s.expandedChatSections,
+    modal: s.modal,
+  })
+  const keyAt = (ctx: ListKeysCtx, i: number) => selectableKey(visibleList(ctx)[i]!)
+
+  // Enter / l on the row at `cursor`, and a click (activateListRow) on the
+  // same row's key from a fresh store, end in the same state.
+  function sameAsEnter(state: Partial<AppState>, settings: Partial<Settings>, cursor: number) {
+    const keyed = single({ ...state, cursor }, settings)
+    handleListKeys({ input: '', key: makeKey({ return: true }) }, keyed.now())
+    const clicked = single(state, settings)
+    const key =
+      cursor === visibleList(clicked.now()).length ? NEW_CHAT_ROW : keyAt(clicked.now(), cursor)
+    activateListRow(clicked.now(), key, { enter: true })
+    expect(pick(clicked.store.get())).toEqual(pick(keyed.store.get()))
+    expect(clicked.newChats).toEqual(keyed.newChats)
+    return clicked
+  }
+
+  test('same result as Enter: chat, channel, more, synthetic row, collapsed header', () => {
+    const chatRow = sameAsEnter({}, {}, 1)
+    expect(chatRow.store.get().focus).toEqual({ kind: 'chat', chatId: 'b' })
+
+    const teams = {
+      teams: [{ id: 't1', displayName: 'Contoso' }],
+      channelsByTeam: { t1: [{ id: 'ch', displayName: 'General' }] },
+    }
+    // [a, b, c, Contoso (expanded, not a stop), # General]
+    const channel = sameAsEnter(teams, {}, 4)
+    expect(channel.store.get().focus).toEqual({ kind: 'channel', teamId: 't1', channelId: 'ch' })
+
+    const many = Array.from({ length: 12 }, (_, i) => chat(`d${i}`))
+    const more = sameAsEnter({ chats: many }, { chatListGroupByType: true }, 11)
+    expect(more.store.get().expandedChatSections).toEqual({ oneOnOne: true })
+
+    const synthetic = sameAsEnter({ chats: [], filter: 'Kari' }, {}, 0)
+    expect(synthetic.newChats).toEqual(['Kari'])
+
+    const header = sameAsEnter(
+      {},
+      { chatListGroupByType: true, chatListCollapsedSections: { oneOnOne: true } },
+      0,
+    )
+    expect(header.store.get().settings.chatListCollapsedSections).toEqual({})
+    expect(header.store.get().cursor).toBe(1)
+  })
+
+  test('works with a conversation open, and moves the cursor to the clicked row', () => {
+    const u = single({ focus: { kind: 'chat', chatId: 'a' }, cursor: 0 })
+    activateListRow(u.now(), 'chat:c', { enter: true })
+    expect(u.store.get().focus).toEqual({ kind: 'chat', chatId: 'c' })
+    expect(u.store.get().cursorKey).toBe('chat:c')
+    expect(u.store.get().cursor).toBe(2)
+  })
+
+  test('a key that is gone, or a synthetic row the filter no longer offers, does nothing', () => {
+    const u = single({ cursor: 1 })
+    const before = pick(u.store.get())
+    activateListRow(u.now(), 'chat:gone', { enter: true })
+    activateListRow(u.now(), NEW_CHAT_ROW, { enter: true })
+    expect(toggleListHeader(u.now(), 'section:gone')).toBe(false)
+    expect(pick(u.store.get())).toEqual(before)
+    expect(u.newChats).toEqual([])
+  })
+
+  test('the list is read from the store at click time, not from the last render', () => {
+    const u = single({ cursor: 0 })
+    const rendered = u.now()
+    // A poll reorders the list and drops b before the click lands.
+    u.store.set({ chats: [chat('c'), chat('d'), chat('a')] })
+    activateListRow(listCtxNow(rendered), 'chat:a', { enter: true })
+    expect(u.store.get().focus).toEqual({ kind: 'chat', chatId: 'a' })
+    expect(u.store.get().cursor).toBe(2)
+    activateListRow(listCtxNow(rendered), 'chat:b', { enter: true })
+    expect(u.store.get().focus).toEqual({ kind: 'chat', chatId: 'a' })
+  })
+
+  test('section and team headers: an expanded one collapses onto itself, a collapsed one expands', () => {
+    const u = single(
+      {
+        teams: [{ id: 't1', displayName: 'Contoso' }],
+        channelsByTeam: { t1: [{ id: 'ch', displayName: 'General' }] },
+      },
+      { chatListGroupByType: true },
+    )
+    // [Direct, a, b, c, Teams, Contoso, # General]
+    expect(toggleListHeader(u.now(), 'section:oneOnOne')).toBe(true)
+    expect(u.store.get().settings.chatListCollapsedSections).toEqual({ oneOnOne: true })
+    expect(u.store.get().cursorKey).toBe('section:oneOnOne')
+    expect(toggleListHeader(u.now(), 'section:oneOnOne')).toBe(true)
+    expect(u.store.get().settings.chatListCollapsedSections).toEqual({})
+    expect(u.store.get().cursorKey).toBe('chat:a')
+
+    expect(toggleListHeader(u.now(), 'team:t1')).toBe(true)
+    expect(u.store.get().settings.chatListCollapsedSections).toEqual({ 'team:t1': true })
+    expect(u.store.get().cursorKey).toBe('team:t1')
+    expect(toggleListHeader(u.now(), 'team:t1')).toBe(true)
+    expect(u.store.get().settings.chatListCollapsedSections).toEqual({})
+    expect(u.store.get().cursorKey).toBe('channel:t1/ch')
+    // Not a header: left to activateListRow. Nothing opened.
+    expect(toggleListHeader(u.now(), 'chat:a')).toBe(false)
+    expect(u.store.get().focus).toEqual({ kind: 'list' })
+  })
+
+  test('while filtering, a header click changes nothing', () => {
+    const u = single({ filter: 'a', teams: [{ id: 't1', displayName: 'Contoso a' }] })
+    expect(toggleListHeader(u.now(), 'team:t1')).toBe(true)
+    expect(u.store.get().settings.chatListCollapsedSections).toEqual({})
+  })
+
+  describe('unified sidebar', () => {
+    function unified(beta: Partial<AccountSlice> = {}, settings: Partial<Settings> = {}) {
+      const store = createAppStore()
+      openAccount(store, accountRef('alpha'), { foreground: true }).set({
+        chats: [chat('a'), chat('b')],
+      })
+      openAccount(store, accountRef('beta'), { foreground: false }).set({
+        chats: [chat('a'), chat('b')],
+        ...beta,
+      })
+      store.set((s) => ({ settings: { ...s.settings, accounts: ['alpha', 'beta'], ...settings } }))
+      const swaps: string[] = []
+      const base = makeCtx()
+      const ctx = () =>
+        listCtxNow({
+          ...base.ctx,
+          store,
+          toForeground: (alias) => {
+            swaps.push(alias)
+            setForeground(store, accountRef(alias).id, { restoreUi: false })
+          },
+        })
+      return { store, swaps, ctx }
+    }
+    const betaId = accountRef('beta').id
+
+    test('a background account’s row comes to the front, then opens', () => {
+      const u = unified()
+      activateListRow(u.ctx(), `${betaId}/chat:b`, { enter: true })
+      expect(u.swaps).toEqual(['beta'])
+      expect(u.store.get().account?.id).toBe(betaId)
+      expect(u.store.get().focus).toEqual({ kind: 'chat', chatId: 'b' })
+      expect(u.store.get().cursorKey).toBe(`${betaId}/chat:b`)
+    })
+
+    test('account header: collapses onto itself, expands onto its first row, no swap', () => {
+      const u = unified()
+      const header = accountRowKey(betaId)
+      expect(toggleListHeader(u.ctx(), header)).toBe(true)
+      expect(u.store.get().settings.chatListCollapsedSections).toEqual({ 'account:beta': true })
+      expect(u.store.get().cursorKey).toBe(header)
+      expect(toggleListHeader(u.ctx(), header)).toBe(true)
+      expect(u.store.get().settings.chatListCollapsedSections).toEqual({})
+      expect(u.store.get().cursorKey).toBe(`${betaId}/chat:a`)
+      expect(u.swaps).toEqual([])
+      expect(u.store.get().focus).toEqual({ kind: 'list' })
+    })
+
+    test('a failed account header opens Accounts; l on it (enter: false) does not', () => {
+      const u = unified({ conn: 'authError' })
+      activateListRow(u.ctx(), accountRowKey(betaId), { enter: false })
+      expect(u.store.get().modal).toBeNull()
+      expect(toggleListHeader(u.ctx(), accountRowKey(betaId))).toBe(true)
+      expect(u.store.get().modal).toMatchObject({ kind: 'accounts', mode: 'list', cursor: 1 })
+      expect(u.store.get().settings.chatListCollapsedSections).toEqual({})
+    })
+
+    test('the cross-account Favorites header and an alias-scoped section toggle', () => {
+      const u = unified(
+        {},
+        { crossAccountFavorites: { beta: ['chat:a'] }, chatListGroupByType: true },
+      )
+      expect(toggleListHeader(u.ctx(), 'section:crossFavorites')).toBe(true)
+      expect(u.store.get().settings.chatListCollapsedSections).toEqual({ crossFavorites: true })
+      expect(toggleListHeader(u.ctx(), 'section:crossFavorites')).toBe(true)
+      expect(u.store.get().settings.chatListCollapsedSections).toEqual({})
+      expect(u.store.get().cursorKey).toBe(`${betaId}/chat:a`)
+      // beta's Direct section: its key is beta's; alpha's stays open.
+      expect(toggleListHeader(u.ctx(), `${betaId}/section:oneOnOne`)).toBe(true)
+      expect(u.store.get().settings.chatListCollapsedSections).toEqual({ 'beta/oneOnOne': true })
+      expect(toggleListHeader(u.ctx(), `${betaId}/section:oneOnOne`)).toBe(true)
+      expect(u.store.get().settings.chatListCollapsedSections).toEqual({ 'beta/oneOnOne': false })
+    })
+
+    test('while filtering, an account header click changes nothing', () => {
+      const u = unified()
+      u.store.set({ filter: 'a' })
+      expect(toggleListHeader(u.ctx(), accountRowKey(betaId))).toBe(true)
+      expect(u.store.get().settings.chatListCollapsedSections).toEqual({})
+    })
   })
 })
