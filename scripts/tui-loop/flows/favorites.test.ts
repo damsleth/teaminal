@@ -134,6 +134,38 @@ test.describe('Ctrl+F: cross-account favorites', () => {
   })
 })
 
+test.describe('stored favorites and the palette', () => {
+  const file = useAccounts({
+    favoritesByAccount: { alpha: ['chat:seed-chat-design-sync'] },
+    crossAccountFavorites: { beta: ['chat:seed-chat-ops'] },
+  })
+  test('favorites: start on the first favorite; the palette removes a cross-account one', async ({
+    terminal,
+  }) => {
+    await ready(terminal)
+    await expect(terminal.getByText('OPS CHANNEL · beta')).toBeVisible()
+    // The block on top and alpha's own section.
+    assert.equal(lines(terminal).filter((l) => l.includes('▾ Favorites')).length, 2)
+    // The cursor starts on the block's first row, not its (expanded) header.
+    terminal.submit()
+    await expect(terminal.getByText('beta · j/k msg')).toBeVisible()
+    await expect(terminal.getByText('GOOD, LEAVE THE MONITOR OPEN.')).toBeVisible()
+
+    // Back in the list, the palette acts on the cursor row.
+    await press(terminal, 'h')
+    await press(terminal, '\x10') // Ctrl+P
+    for (const ch of 'remove from cross') await press(terminal, ch, 1)
+    await expect(terminal.getByText('Remove from cross-account favorites')).toBeVisible()
+    terminal.submit()
+    await expect(terminal.getByText('OPS CHANNEL · beta')).not.toBeVisible()
+    await expect(terminal.getByText('OPS CHANNEL')).toBeVisible()
+    assert.equal(lines(terminal).filter((l) => l.includes('▾ Favorites')).length, 1)
+    const cfg = await waitForConfig(file, (c) => c && !c.crossAccountFavorites?.beta)
+    assert.deepEqual(cfg?.crossAccountFavorites, {})
+    assert.deepEqual(cfg?.favoritesByAccount, { alpha: ['chat:seed-chat-design-sync'] })
+  })
+})
+
 test.describe('account gap', () => {
   // 24 rows: a 15-row list. alpha's block (7) + gap (2) + beta's header and
   // chats (7) is 16, so beta's last chat starts below the pane.

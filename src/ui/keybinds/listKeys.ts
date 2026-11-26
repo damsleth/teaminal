@@ -165,27 +165,26 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
   // '.' (Ctrl+. where the terminal reports it) opens the context menu for
   // the chat or channel row under the cursor.
   if (input === '.' && ctx.focus.kind === 'list') {
-    const target = deleteTarget(ctx)
-    const alias = (a: string | undefined) => (a === undefined ? {} : { alias: a })
-    if (target)
-      openContextMenu(store, {
-        kind: 'chat',
-        chatId: target.chat.id,
-        label: target.label,
-        ...alias(target.alias),
-      })
-    else {
-      const visible = listFor(ctx)
-      const it = visible[resolveCursor(visible, visible.length, ctx.cursorKey ?? null, ctx.cursor)]
-      if (it?.kind === 'channel')
-        openContextMenu(store, {
-          kind: 'channel',
-          teamId: it.team.id,
-          channelId: it.channel.id,
-          label: it.label,
-          ...alias(it.alias),
-        })
-    }
+    const visible = listFor(ctx)
+    const at = resolveCursor(visible, visible.length, ctx.cursorKey ?? null, ctx.cursor)
+    const it = visible[at]
+    if (it?.kind !== 'chat' && it?.kind !== 'channel') return 'handled'
+    // Pin the row: a favorite toggle in the menu moves it, and the cursor
+    // goes with it.
+    store.set(cursorAt(visible, at))
+    const alias = it.alias === undefined ? {} : { alias: it.alias }
+    openContextMenu(
+      store,
+      it.kind === 'chat'
+        ? { kind: 'chat', chatId: it.chat.id, label: it.label, ...alias }
+        : {
+            kind: 'channel',
+            teamId: it.team.id,
+            channelId: it.channel.id,
+            label: it.label,
+            ...alias,
+          },
+    )
     return 'handled'
   }
 

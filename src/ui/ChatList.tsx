@@ -44,6 +44,9 @@ import {
   cursorAt,
   favoritesFor,
   labelSuffix,
+  firstSelectableIndex,
+  isSelectable,
+  nextSelectableIndex,
   resolveCursor,
   shortName,
   visibleList,
@@ -376,7 +379,13 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     filter && items.length === 0 && isNewChatQueryCandidate(filter) ? filter.trim() : null
 
   const selectableCount = items.length + (syntheticNewChatQuery ? 1 : 0)
-  const safeCursor = resolveCursor(items, selectableCount, cursorKey, cursor)
+  let safeCursor = resolveCursor(items, selectableCount, cursorKey, cursor)
+  // An expanded header is no cursor stop (at startup the first row can be
+  // one, e.g. Favorites): land on the next row that is, as j/k would.
+  if (safeCursor < items.length && !isSelectable(items[safeCursor]!)) {
+    const next = nextSelectableIndex(items, safeCursor, 1)
+    safeCursor = next !== safeCursor ? next : firstSelectableIndex(items)
+  }
   // Keep the fallback index on the row the key resolved to, so if that row
   // later goes away (deleted, filtered out) the cursor stays near it rather
   // than jumping to where it was before a reorder.

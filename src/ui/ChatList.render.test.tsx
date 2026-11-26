@@ -288,3 +288,35 @@ test('unified sidebar: the cross-account block names each row’s account; the g
   // beta's own list no longer has the chat.
   expect(lines.filter((l) => l.includes('ADA BYRON'))).toHaveLength(1)
 })
+
+test('the cursor never rests on an expanded header: at startup it lands on the first favorite', () => {
+  const store = createAppStore(accountRef(null))
+  applySeededState(accountStore(store))
+  const chatId = store.get().chats[1]!.id
+  store.set((s) => ({
+    settings: {
+      ...s.settings,
+      favoritesByAccount: { '': [`chat:${chatId}`] },
+      themeOverrides: { selectedRowBackground: '#ff0000' },
+    },
+    cursor: 0,
+    cursorKey: null,
+  }))
+  const raw = renderToString(
+    <StoreProvider store={store}>
+      <SessionProvider api={session}>
+        <ChatList listPaneWidth={40} />
+      </SessionProvider>
+    </StoreProvider>,
+    { columns: 40 },
+  ).split('\n')
+  // eslint-disable-next-line no-control-regex
+  const plain = raw.map((l) => l.replace(/\x1b\[[0-9;]*m/g, ''))
+  expect(plain[0]).toBe('▾ Favorites')
+  expect(raw[0]).not.toContain('48;2;255;0;0m')
+  expect(plain[1]).toContain('Design Sync')
+  expect(raw[1]).toContain('48;2;255;0;0m')
+  // The store follows: index and key on the favorite.
+  expect(store.get().cursor).toBe(1)
+  expect(store.get().cursorKey).toBe(`chat:${chatId}`)
+})

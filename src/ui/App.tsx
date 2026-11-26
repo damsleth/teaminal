@@ -28,7 +28,7 @@ import { useEffect, useRef, useState } from 'react'
 import { accountStore } from '../state/accountStore'
 import { createOneOnOneChat, materializeChat, resolveFederatedChatId } from '../state/chatActions'
 import { indexNameFromDirectoryUser } from '../state/nameIndex'
-import { clampCursor, favoritesFor, unifiedSidebar } from '../state/selectables'
+import { clampCursor, favoritesFor, selectableKey, unifiedSidebar } from '../state/selectables'
 import {
   focusKey,
   moveMessageCursor as nextMessageCursor,
@@ -71,6 +71,7 @@ import {
   favoriteTarget,
   isFavorite,
   toggleFavorite,
+  type FavoriteList,
   type FavoriteTarget,
 } from './keybinds/itemActions'
 import { handleListKeys, listCursorRow, type ListKeysCtx } from './keybinds/listKeys'
@@ -428,8 +429,14 @@ export function App() {
   function favoriteKeyActions(): typeof paletteKeyActions {
     // Reads listCtx: called below, once it is set.
     if (modal?.kind !== 'command-palette') return []
-    const t: FavoriteTarget | null = favoriteTarget(store, listCursorRow(listCtx))
-    if (!t) return []
+    const row = listCursorRow(listCtx)
+    const t: FavoriteTarget | null = favoriteTarget(store, row)
+    if (!row || !t) return []
+    // Pin the row first, so the cursor goes with it when it moves.
+    const toggle = (list: FavoriteList) => {
+      store.set({ cursorKey: selectableKey(row) })
+      toggleFavorite(store, list, t)
+    }
     return [
       {
         id: 'favorite',
@@ -437,7 +444,7 @@ export function App() {
           ? 'Remove from favorites'
           : 'Add to favorites',
         keys: 'f',
-        run: () => toggleFavorite(store, 'favoritesByAccount', t),
+        run: () => toggle('favoritesByAccount'),
       },
       {
         id: 'cross-favorite',
@@ -445,7 +452,7 @@ export function App() {
           ? 'Remove from cross-account favorites'
           : 'Add to cross-account favorites',
         keys: 'Ctrl+F',
-        run: () => toggleFavorite(store, 'crossAccountFavorites', t),
+        run: () => toggle('crossAccountFavorites'),
       },
     ]
   }

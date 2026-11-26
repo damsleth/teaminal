@@ -680,6 +680,27 @@ describe('f: favorites', () => {
     expect(list().some((it) => it.kind === 'section')).toBe(false)
   })
 
+  test('f and . on a channel row: its favorite id, and a channel context menu', () => {
+    const store = createAppStore(accountRef(null))
+    const { ctx } = makeCtx({
+      store,
+      chats: [],
+      teams: [{ id: 't1', displayName: 'Contoso' }],
+      channelsByTeam: { t1: [{ id: 'g', displayName: 'General' }] },
+      cursor: 1,
+    })
+    handleListKeys({ input: 'f', key: makeKey() }, ctx)
+    expect(store.get().settings.favoritesByAccount).toEqual({ '': ['channel:t1/g'] })
+    handleListKeys({ input: 'f', key: makeKey({ ctrl: true }) }, ctx)
+    expect(store.get().settings.crossAccountFavorites).toEqual({ '': ['channel:t1/g'] })
+    handleListKeys({ input: '.', key: makeKey() }, ctx)
+    expect(store.get().modal).toMatchObject({
+      kind: 'context-menu',
+      target: { kind: 'channel', teamId: 't1', channelId: 'g', label: 'General' },
+    })
+    expect(store.get().cursorKey).toBe('channel:t1/g')
+  })
+
   test('f on a header or a more row does nothing; F is not f', () => {
     const store = createAppStore(accountRef(null))
     const { ctx } = makeCtx({
