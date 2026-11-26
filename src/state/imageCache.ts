@@ -275,30 +275,45 @@ const imageDataCache = new Map<string, Buffer>()
 // kitty transmit refs and avatar decodes are weak on the Buffer and go with
 // it; copies the terminal holds are bounded by the terminal's own quota.
 const DEFAULT_IMAGE_MEMORY_BUDGET = 64 * 1024 * 1024
+// A blob used this recently is not evicted even over budget: the pane that
+// shows it does not ask again until its visible set changes, so evicting a
+// picture that just arrived or was just painted would leave a placeholder.
+// ponytail: soft cap, a burst of large visible images can exceed the budget
+// until they age out.
+const DEFAULT_IMAGE_EVICT_GRACE_MS = 30_000
 let imageMemoryBudget = DEFAULT_IMAGE_MEMORY_BUDGET
+let imageEvictGraceMs = DEFAULT_IMAGE_EVICT_GRACE_MS
 let imageBytes = 0
+const imageUsedAt = new Map<string, number>()
 
 function dropImage(owned: string): void {
   const buf = imageDataCache.get(owned)
   if (!buf) return
   imageBytes -= buf.byteLength
   imageDataCache.delete(owned)
+  imageUsedAt.delete(owned)
 }
 
 function keepImage(owned: string, buf: Buffer): void {
   dropImage(owned)
   imageDataCache.set(owned, buf)
+  imageUsedAt.set(owned, Date.now())
   imageBytes += buf.byteLength
+  const fresh = Date.now() - imageEvictGraceMs
   for (const old of imageDataCache.keys()) {
-    // The newest blob stays even when it alone is over the budget.
+    // The newest blob stays even when it alone is over the budget. Map order
+    // is recency order, so the first recently used blob ends the sweep.
     if (imageBytes <= imageMemoryBudget || old === owned) break
+    if ((imageUsedAt.get(old) ?? 0) > fresh) break
     dropImage(old)
     fetchStatus.delete(old)
   }
 }
 
-export function __setImageMemoryBudgetForTests(bytes?: number): void {
+// Tests that set a budget get no grace period unless they ask for one.
+export function __setImageMemoryBudgetForTests(bytes?: number, graceMs = 0): void {
   imageMemoryBudget = bytes ?? DEFAULT_IMAGE_MEMORY_BUDGET
+  imageEvictGraceMs = bytes === undefined ? DEFAULT_IMAGE_EVICT_GRACE_MS : graceMs
 }
 
 export function __imageMemoryBytesForTests(): number {
@@ -319,6 +334,7 @@ export function getImageData(account: AccountId | undefined, key: string): Buffe
     // Most recently used: move to the end of the eviction order.
     imageDataCache.delete(owned)
     imageDataCache.set(owned, buf)
+    imageUsedAt.set(owned, Date.now())
   }
   return buf
 }
@@ -508,6 +524,7 @@ const photoQueues = new Map<AccountId, { active: number; waiting: (() => void)[]
 export function __forgetImagesInMemoryForTests(): void {
   fetchStatus.clear()
   imageDataCache.clear()
+  imageUsedAt.clear()
   imageBytes = 0
   inlineRetryAt.clear()
   inlineWaiters.clear()

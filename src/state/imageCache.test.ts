@@ -544,6 +544,23 @@ describe('in-memory image budget', () => {
       { client: testClient(), onChange },
     )
 
+  it('keeps recently used blobs over the budget, so pictures on screen are not dropped', () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-grace`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    __forgetImagesInMemoryForTests()
+    __setImageMemoryBudgetForTests(250, 60_000)
+    const me = testClient().ctx.account.id
+    const pngA = seed('img-a', 1)
+    seed('img-b', 2)
+    seed('img-c', 3)
+    ensure('img-a')
+    ensure('img-b')
+    ensure('img-c')
+    expect(__imageMemoryBytesForTests()).toBe(300)
+    expect(getImageData(me, 'img-a')).toEqual(pngA)
+    expect(getImageStatus(me, 'img-a')).toBe('ready')
+  })
+
   it('evicts the least recently read blob over the budget; it comes back from disk', () => {
     cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-budget`)
     process.env.XDG_CACHE_HOME = cacheRoot

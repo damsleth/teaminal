@@ -38,7 +38,8 @@ export async function readBodyCapped(
     }
     return Buffer.concat(chunks, size)
   } finally {
-    await reader.cancel()
+    // A stream that already errored rejects cancel too; still release.
+    await reader.cancel().catch(() => {})
     reader.releaseLock()
   }
 }
