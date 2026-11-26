@@ -10,7 +10,7 @@
 
 import type { Me } from '../graph/me'
 import type { Capabilities } from '../graph/capabilities'
-import type { Chat, ChatMessage } from '../types'
+import type { Channel, Chat, ChatMessage, Team } from '../types'
 import type { AccountStore } from './accountStore'
 import { emptyMessageCache, messagesFromCaches, type AppState } from './store'
 
@@ -196,12 +196,63 @@ const SEED_MESSAGES: Record<string, ChatMessage[]> = {
 }
 
 // ---------------------------------------------------------------------------
+// Channel fixtures (TEAMINAL_SEED=channels only)
+// ---------------------------------------------------------------------------
+//
+// One team, one channel, one flat stream the way the chatsvc normalizer
+// returns it: a root carries rootMessageId === id and no replyToId; a reply
+// carries both, pointing at its root. Two roots (the newer one with two
+// replies, the older one with one) plus a reply whose root is not loaded. The
+// cache stays incomplete, so the reply badges read "N+".
+
+export const SEED_TEAM_ID = 'seed-team-contoso'
+export const SEED_CHANNEL_ID = 'seed-channel-launch'
+export const SEED_CHANNEL_CONV = `channel:${SEED_TEAM_ID}:${SEED_CHANNEL_ID}`
+
+const SEED_TEAMS: Team[] = [{ id: SEED_TEAM_ID, displayName: 'Contoso' }]
+const SEED_CHANNELS: Record<string, Channel[]> = {
+  [SEED_TEAM_ID]: [{ id: SEED_CHANNEL_ID, displayName: 'Launch' }],
+}
+
+const KARI = { id: 'seed-user-kari', displayName: 'Kari Nordmann' }
+const BOB = { id: 'seed-user-bob', displayName: 'Bob' }
+const ALICE = { id: 'seed-user-alice', displayName: 'Alice' }
+
+function channelMessage(
+  id: string,
+  minute: number,
+  user: { id: string; displayName: string },
+  content: string,
+  rootId = id,
+): ChatMessage {
+  return {
+    id,
+    createdDateTime: `2026-05-29T10:${String(minute).padStart(2, '0')}:00.000Z`,
+    messageType: 'message',
+    body: { contentType: 'text', content },
+    from: { user },
+    rootMessageId: rootId,
+    ...(rootId === id ? {} : { replyToId: rootId }),
+  }
+}
+
+const SEED_CHANNEL_MESSAGES: ChatMessage[] = [
+  channelMessage('seed-ch-orphan', 0, BOB, 'Picking up the old thread here.', 'seed-ch-unloaded'),
+  channelMessage('seed-ch-root-1', 1, KARI, 'Venue for the offsite is booked.'),
+  channelMessage('seed-ch-r1-a', 2, ALICE, 'Great, I will sort the travel.', 'seed-ch-root-1'),
+  channelMessage('seed-ch-root-2', 3, ALICE, 'Release notes draft is up.'),
+  channelMessage('seed-ch-r2-a', 4, BOB, 'Added the migration section.', 'seed-ch-root-2'),
+  channelMessage('seed-ch-r2-b', 5, KARI, 'Looks good to ship.', 'seed-ch-root-2'),
+]
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
  * Returns true when the app should run in seeded/offline mode.
- * Triggered by TEAMINAL_SEED=fixtures (or any truthy value).
+ * Triggered by TEAMINAL_SEED=fixtures (or any truthy value). The value
+ * `channels` also seeds the channel fixtures.
  */
 export function isSeededMode(): boolean {
   const v = process.env.TEAMINAL_SEED
@@ -239,17 +290,21 @@ function textVariant<T>(value: T, f: (text: string) => string): T {
 export function applySeededState(acc: AccountStore, profile?: string | null): void {
   const variant = profile ? TEXT_VARIANTS.get(profile) : undefined
   const pick = <T>(v: T): T => (variant ? textVariant(v, variant) : v)
+  const channels = process.env.TEAMINAL_SEED === 'channels'
   const messageCacheByConvo: AppState['messageCacheByConvo'] = {}
   for (const [key, msgs] of Object.entries(SEED_MESSAGES)) {
     messageCacheByConvo[key] = emptyMessageCache(pick(msgs))
+  }
+  if (channels) {
+    messageCacheByConvo[SEED_CHANNEL_CONV] = emptyMessageCache(pick(SEED_CHANNEL_MESSAGES))
   }
 
   acc.set({
     me: pick(SEED_ME),
     capabilities: SEED_CAPABILITIES,
     chats: pick(SEED_CHATS),
-    teams: [],
-    channelsByTeam: {},
+    teams: channels ? pick(SEED_TEAMS) : [],
+    channelsByTeam: channels ? pick(SEED_CHANNELS) : {},
     messageCacheByConvo,
     messagesByConvo: messagesFromCaches(messageCacheByConvo),
     conn: 'online',
