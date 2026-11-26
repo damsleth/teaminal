@@ -54,6 +54,7 @@ import { accountRowKey, unifiedSidebar } from './selectables'
 import {
   accountSlice,
   audienceFromRouting,
+  enabledAccounts,
   messagesFromCaches,
   resetAccountScopedState,
   routingForAccount,
@@ -94,8 +95,9 @@ export type AccountManager = {
   // Concurrent mode: start an account again that has no session, or whose
   // running session reports authError / offline.
   retry(profile: string): Promise<void>
-  // Concurrent mode: open and start added accounts, stop and close removed
-  // ones. No-op in single mode.
+  // Concurrent mode: open and start added (or turned on) accounts, stop and
+  // close removed (or turned off) ones. Caches and config stay. No-op in
+  // single mode.
   reconcile(): Promise<void>
   // Stop every session, detach cache subscriptions, flush caches. Idempotent.
   stopAll(): Promise<void>
@@ -105,6 +107,18 @@ export type AccountManager = {
 // and at least one account is configured. Decided once, at startup.
 export function concurrentMode(settings: Settings, cliProfile: string | undefined): boolean {
   return settings.concurrentAccounts && !cliProfile && settings.accounts.length > 0
+}
+
+// The account to start with: --profile always wins, even when turned off.
+// Otherwise activeAccount, unless it is turned off: then the first enabled
+// account, or none (single mode then runs the owa-piggy default profile).
+export function startupProfile(settings: Settings, cliProfile: string | undefined): string | null {
+  if (cliProfile !== undefined) return cliProfile
+  const { activeAccount } = settings
+  if (activeAccount === null || !settings.disabledAccounts.includes(activeAccount)) {
+    return activeAccount
+  }
+  return enabledAccounts(settings)[0] ?? null
 }
 
 type Persisted = Pick<AccountSlice, 'messageCacheByConvo' | 'chats' | 'teams' | 'nameByUserId'>
@@ -307,23 +321,37 @@ export function createAccountManager(
       ...audienceFromRouting(routingForAccount(store.get().settings, p)),
     })
 
+  // No account left (all removed or turned off): no session, and the
+  // Accounts modal stays open so one can be added or turned on again.
+  const showNoAccounts = (): void =>
+    store.set({
+      modal: { kind: 'accounts', mode: 'list', cursor: 0, accounts: [] },
+      inputZone: 'menu',
+    })
+
   // Open the slots before mount; hydrate only the foreground's caches (cold
-  // start: the others hydrate right before their own start).
+  // start: the others hydrate right before their own start). Concurrent
+  // mode opens the enabled accounts only.
   let activeProfile = profile
   if (concurrent) {
-    const configured = store.get().settings.accounts
-    activeProfile = profile !== null && configured.includes(profile) ? profile : configured[0]!
-    for (const p of [activeProfile, ...configured.filter((c) => c !== activeProfile)]) {
-      addSlot(openAccount(store, accountRef(p), { foreground: p === activeProfile }), p)
+    const enabled = enabledAccounts(store.get().settings)
+    activeProfile = profile !== null && enabled.includes(profile) ? profile : (enabled[0] ?? null)
+    if (activeProfile === null) showNoAccounts()
+    else {
+      for (const p of [activeProfile, ...enabled.filter((c) => c !== activeProfile)]) {
+        addSlot(openAccount(store, accountRef(p), { foreground: p === activeProfile }), p)
+      }
     }
   } else {
     addSlot(openAccount(store, accountRef(activeProfile), { foreground: true }), activeProfile)
   }
   {
-    const fg = foregroundSlot()!
-    if (persistCaches) hydrate(fg.acc, fg.profile)
-    fg.hydrated = true
-    fg.last = persisted(fg.acc.get())
+    const fg = foregroundSlot()
+    if (fg) {
+      if (persistCaches) hydrate(fg.acc, fg.profile)
+      fg.hydrated = true
+      fg.last = persisted(fg.acc.get())
+    }
   }
 
   // Persist caches on store changes (debounced inside each scheduler), one
@@ -591,8 +619,10 @@ export function createAccountManager(
     await stopSlot(slot)
     flushCaches()
     if (slot.acc.isForeground()) {
-      const { accounts, activeAccount } = store.get().settings
-      const order = activeAccount ? [activeAccount, ...accounts] : accounts
+      const { activeAccount } = store.get().settings
+      const enabled = enabledAccounts(store.get().settings)
+      const order =
+        activeAccount && enabled.includes(activeAccount) ? [activeAccount, ...enabled] : enabled
       // Remaining slots that are being removed too (reconcile) count as a
       // last resort: one of them must hold the foreground until it closes.
       const next = order.map(slotForProfile).find((s) => s !== undefined) ?? [...slots.values()][0]
@@ -600,13 +630,8 @@ export function createAccountManager(
     }
     closeAccount(store, slot.ref.id)
     if (store.get().account === null) {
-      // Nothing left: no session, and the Accounts modal stays open so an
-      // account can be added again.
       activeProfile = null
-      store.set({
-        modal: { kind: 'accounts', mode: 'list', cursor: 0, accounts: [] },
-        inputZone: 'menu',
-      })
+      showNoAccounts()
     }
     syncPollerRef()
   }
@@ -745,7 +770,7 @@ export function createAccountManager(
     async reconcile() {
       if (stopped || !concurrent) return
       await serialize(async () => {
-        const configured = store.get().settings.accounts
+        const configured = enabledAccounts(store.get().settings)
         for (const slot of [...slots.values()]) {
           if (slot.profile === null || !configured.includes(slot.profile)) await removeSlot(slot)
         }

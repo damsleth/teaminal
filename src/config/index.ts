@@ -300,6 +300,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     themeOverrides: cloneThemeOverrides(settings.themeOverrides),
     accounts: [...settings.accounts],
     activeAccount: settings.activeAccount,
+    disabledAccounts: [...settings.disabledAccounts],
     chatListSort: settings.chatListSort,
     chatListGroupByType: settings.chatListGroupByType,
     chatListSectionCap: settings.chatListSectionCap,
@@ -482,6 +483,7 @@ function cloneSettings(settings: Settings): Settings {
   return {
     ...settings,
     accounts: [...settings.accounts],
+    disabledAccounts: [...settings.disabledAccounts],
     themeOverrides: cloneThemeOverrides(settings.themeOverrides),
     headerElements: { ...settings.headerElements },
     chatRoutingByAccount: { ...settings.chatRoutingByAccount },
@@ -600,11 +602,12 @@ function validateAndAssign(
       return true
     }
     case 'accounts':
+    case 'disabledAccounts':
       if (Array.isArray(value) && value.every((v) => typeof v === 'string')) {
-        out.accounts = [...new Set(value.map((v) => v.trim()).filter(Boolean))]
+        out[key] = [...new Set(value.map((v) => v.trim()).filter(Boolean))]
         return true
       }
-      warnings.push('config: "accounts" must be an array of profile names')
+      warnings.push(`config: "${key}" must be an array of profile names`)
       return false
     case 'activeAccount':
       if (value === null) {

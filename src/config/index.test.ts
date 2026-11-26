@@ -218,6 +218,16 @@ describe('mergeSettings', () => {
     expect(w).toEqual([])
   })
 
+  test('disabledAccounts: trimmed, deduped profile names; anything else warns', () => {
+    const w: string[] = []
+    expect(mergeSettings({ disabledAccounts: [' beta ', 'beta', ''] }, w).disabledAccounts).toEqual(
+      ['beta'],
+    )
+    expect(w).toEqual([])
+    expect(mergeSettings({ disabledAccounts: 'beta' }, w).disabledAccounts).toEqual([])
+    expect(w).toEqual(['config: "disabledAccounts" must be an array of profile names'])
+  })
+
   test('concurrentAccounts defaults to true; an explicit false wins', () => {
     expect(mergeSettings({ accounts: ['alpha'] }, []).concurrentAccounts).toBe(true)
     expect(
@@ -429,6 +439,7 @@ describe('Settings ↔ config.json parity', () => {
     },
     accounts: ['profile-a', 'profile-b'],
     activeAccount: 'profile-a',
+    disabledAccounts: ['profile-b'],
     chatListSort: 'alphabetical',
     chatListGroupByType: !defaultSettings.chatListGroupByType,
     chatListSectionCap: !defaultSettings.chatListSectionCap,

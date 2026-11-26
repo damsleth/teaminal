@@ -96,6 +96,7 @@ warnings and fall back to defaults.
   "theme": "dark",
   "accounts": [],
   "activeAccount": null,
+  "disabledAccounts": [],
   "chatListShortNames": false,
   "chatListPreviewLines": 1,
   "messagePaneShortNames": true,
@@ -149,6 +150,7 @@ warnings and fall back to defaults.
 | `theme`                        | `auto`, `dark`, `light`, or a custom name | `auto` | Terminal palette + layout preset. `auto` isn't a theme of its own: it picks `light` or `dark` to match the terminal's background color (asked at startup), falling back to the macOS appearance when the terminal doesn't say; a later macOS appearance switch flips it too. Custom names load `~/.config/teaminal/themes/<name>.json` (see [Themes](#themes) below). |
 | `accounts`                     | string array         |    `[]` | owa-piggy profile aliases managed by Accounts.                                           |
 | `activeAccount`                | string or null       |  `null` | Default profile alias used at startup when `--profile` is not passed.                    |
+| `disabledAccounts`             | string array         |    `[]` | Aliases in `accounts` turned off with Space in the Accounts modal. They stay listed (as `off`) with their routing, favorites and caches, but do not start: no polling, push, notifications or presence, and no section in the sidebar. Space turns one on again without a restart. `--profile` still runs a turned-off alias. |
 | `chatListShortNames`           | boolean              | `false` | Show first names in chat list rows.                                                      |
 | `chatListPreviewLines`         | 0–3                  |     `1` | Last-message preview lines under each chat list row (0 = off). Shorter previews use fewer lines. Replaces `showMessagePreviews` (`false` reads as 0). |
 | `messagePaneShortNames`        | boolean              |  `true` | Show first names in the message-pane sender column.                                      |
@@ -354,6 +356,17 @@ modes, chosen once at startup:
 - **`--profile <alias>`** always runs that one account alone, whatever the
   flag says.
 
+**Turning an account off.** Space in the Accounts modal turns the focused
+account off without removing it (`disabledAccounts` in the config). It stays
+listed as `off` with its routing mode, favorites, collapsed sections and cache
+files, but does not run. In concurrent mode it stops at once and its sidebar
+section and notifications go away; turning off the account in front moves to
+the next enabled one, and turning off the last one leaves the Accounts modal
+open, as removing it does. In single mode it cannot be picked; turning off the
+running account moves to the next enabled one (the owa-piggy default profile
+when none is left). Space again turns it on, no restart needed. `--profile`
+still runs a turned-off alias.
+
 Both modes read and write the same per-profile cache files
 (`~/.cache/teaminal/{messages,list,names}.<alias>.json`), so turning the
 flag on or off needs no migration.
@@ -452,6 +465,7 @@ header** and **Account header bold** (`accountHeader`, `emphasis.accountHeaderBo
 | `h` / `l`              | list, account header   | Several accounts open: collapse / expand the account's whole section.                                                                                                                                                                                                            |
 | `a`                    | Accounts               | Find valid `owa-piggy status` profiles to add.                                                                                                                                                                                                                                   |
 | `d` / Delete           | Accounts               | Remove the focused account from teaminal's list.                                                                                                                                                                                                                                 |
+| Space                  | Accounts               | Turn the focused account off or on. An account that is off stays listed but does not run; with `concurrentAccounts` it stops (or starts) at once.                                                                                                                                |
 | `t`                    | Accounts               | Cycle the focused account's chat routing mode.                                                                                                                                                                                                                                   |
 | `r`                    | Accounts               | With `concurrentAccounts`: start the focused account again when it shows `auth expired` (runs `owa-piggy reseed` first) or `offline`.                                                                                                                                            |
 | `j` / `k`              | Diagnostics            | Several accounts open: select the account the details show.                                                                                                                                                                                                                      |

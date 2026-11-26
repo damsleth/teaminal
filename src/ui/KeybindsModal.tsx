@@ -64,6 +64,7 @@ const BINDINGS: Binding[] = [
   { keys: 'n', when: 'search', action: 'next match' },
   { keys: 'Enter', when: 'search', action: 'jump to most recent match' },
   { keys: 'Ctrl+A', when: 'list / chat', action: 'notifications (all open accounts)' },
+  { keys: 'Space', when: 'Accounts', action: 'turn the focused account off / on' },
   { keys: '?', when: 'list', action: 'show this help' },
   { keys: 'r', when: 'list / channel', action: 'refresh now' },
   { keys: 'Shift+R', when: 'any', action: 'hard refresh' },

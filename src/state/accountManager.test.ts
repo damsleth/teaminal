@@ -1097,6 +1097,251 @@ describe('mode toggle', () => {
   })
 })
 
+describe('turned-off accounts (disabledAccounts)', () => {
+  const setDisabled = (
+    store: ReturnType<typeof createAppStore>,
+    disabledAccounts: string[],
+    activeAccount?: string | null,
+  ) =>
+    store.set((s) => ({
+      settings: {
+        ...s.settings,
+        disabledAccounts,
+        activeAccount: activeAccount === undefined ? s.settings.activeAccount : activeAccount,
+      },
+    }))
+  const labels = (m: ReturnType<typeof createAccountManager>) =>
+    m
+      .running()
+      .map((r) => r.label)
+      .join()
+
+  test('startupProfile: --profile wins; a turned-off activeAccount yields the first enabled one', async () => {
+    const { startupProfile } = await import('./accountManager')
+    const s = {
+      ...createAppStore().get().settings,
+      accounts: ['alpha', 'beta', 'gamma'],
+      activeAccount: 'alpha',
+      disabledAccounts: ['alpha'],
+    }
+    expect(startupProfile(s, 'alpha')).toBe('alpha')
+    expect(startupProfile(s, undefined)).toBe('beta')
+    expect(startupProfile({ ...s, disabledAccounts: [] }, undefined)).toBe('alpha')
+    expect(startupProfile({ ...s, disabledAccounts: ['beta'] }, undefined)).toBe('alpha')
+    expect(startupProfile({ ...s, activeAccount: null }, undefined)).toBeNull()
+    // All off: none (single mode then runs the default profile).
+    expect(
+      startupProfile({ ...s, disabledAccounts: ['alpha', 'beta', 'gamma'] }, undefined),
+    ).toBeNull()
+  })
+
+  test('off stops and closes the account without deleting anything; on starts it again', async () => {
+    nonSeeded()
+    saveMessageCacheNow(
+      { 'chat:c1': emptyMessageCache([msg('m1', 'beta text')]) },
+      getMessageCachePath(process.env, 'beta'),
+    )
+    const sessions: FakeSession[] = []
+    const { drivers, start: startDriver } = driverRecorder()
+    const store = concurrentStore(['alpha', 'beta'])
+    const kept = {
+      chatRoutingByAccount: { beta: 'ic3-only' as const },
+      favoritesByAccount: { beta: ['chat:c1'] },
+      chatListCollapsedSections: { [`account:${accountRef('beta').id}`]: true },
+    }
+    store.set((s) => ({ settings: { ...s.settings, ...kept } }))
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => {
+        const s = fakeSession(opts)
+        sessions.push(s)
+        return s
+      },
+      startDriver,
+      true,
+    )
+    await m.start(() => {})
+    await waitFor(() => m.running().length === 2)
+    const betaId = accountRef('beta').id
+
+    setDisabled(store, ['beta'])
+    await m.reconcile()
+    const first = sessions.find((s) => s.profile === 'beta')!
+    expect(first.stopped).toBe(true)
+    expect(first.opts.account.isCurrent()).toBe(false)
+    expect(drivers.find((d) => d.account === 'beta')!.ops).toEqual(['stop'])
+    expect(store.get().backgroundAccounts[betaId]).toBeUndefined()
+    expect(store.get().generationById[betaId]).toBeUndefined()
+    expect(labels(m)).toBe('alpha')
+    expect(store.get().account?.id).toBe(accountRef('alpha').id)
+    // Nothing deleted: its place, routing, favorites, collapse state, cache.
+    expect(store.get().settings).toMatchObject({ accounts: ['alpha', 'beta'], ...kept })
+    expect(existsSync(getMessageCachePath(process.env, 'beta'))).toBe(true)
+
+    setDisabled(store, [])
+    await m.reconcile()
+    await waitFor(() => m.running().length === 2)
+    const second = sessions.filter((s) => s.profile === 'beta')
+    expect(second).toHaveLength(2)
+    expect(second[1]!.stopped).toBe(false)
+    // Hydrated from the cache it kept.
+    expect(
+      store.get().backgroundAccounts[betaId]?.messagesByConvo['chat:c1']?.[0]?.body.content,
+    ).toBe('beta text')
+    expect(labels(m)).toBe('alpha,beta')
+    await m.stopAll()
+  })
+
+  test('off on the foreground moves it to the next enabled account; off on the last leaves the Accounts modal; on brings it back', async () => {
+    nonSeeded()
+    const sessions: FakeSession[] = []
+    const store = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => {
+        const s = fakeSession(opts)
+        sessions.push(s)
+        return s
+      },
+      noDriver,
+      true,
+    )
+    await m.start(() => {})
+    await waitFor(() => m.running().length === 2)
+
+    // What the Accounts modal persists: activeAccount moves to the first
+    // enabled account with it.
+    setDisabled(store, ['alpha'], 'beta')
+    await m.reconcile()
+    expect(store.get().account?.id).toBe(accountRef('beta').id)
+    expect(m.activeProfile()).toBe('beta')
+    expect(m.pollerHandleRef.current).toBe(sessions.find((s) => s.profile === 'beta')!.poller)
+    expect(labels(m)).toBe('beta')
+    expect(store.get().modal).toBeNull()
+
+    // The remove-all path: no account, no session, the Accounts modal open.
+    setDisabled(store, ['alpha', 'beta'], null)
+    await m.reconcile()
+    expect(store.get().account).toBeNull()
+    expect(store.get().modal?.kind).toBe('accounts')
+    expect(m.running()).toEqual([])
+    expect(m.activeProfile()).toBeNull()
+    expect(sessions.every((s) => s.stopped)).toBe(true)
+
+    setDisabled(store, ['beta'])
+    await m.reconcile()
+    await waitFor(() => m.running().length === 1)
+    expect(store.get().account?.id).toBe(accountRef('alpha').id)
+    expect(m.activeProfile()).toBe('alpha')
+    await m.stopAll()
+  })
+
+  test('startup: a turned-off activeAccount is skipped; every account off opens no slot and the Accounts modal', async () => {
+    nonSeeded()
+    const store = concurrentStore(['alpha', 'beta', 'gamma'], 'alpha')
+    setDisabled(store, ['alpha', 'gamma'])
+    const m = createAccountManager(store, 'alpha', instant, noDriver, true)
+    expect(store.get().account?.id).toBe(accountRef('beta').id)
+    expect(store.get().backgroundAccounts).toEqual({})
+    await m.start(() => {})
+    await waitFor(() => labels(m) === 'beta')
+    await m.stopAll()
+
+    const none = concurrentStore(['alpha'])
+    setDisabled(none, ['alpha'])
+    const requested: string[] = []
+    const n = createAccountManager(
+      none,
+      'alpha',
+      async (opts) => {
+        requested.push(String(opts.profile))
+        return fakeSession(opts)
+      },
+      noDriver,
+      true,
+    )
+    expect(none.get().account).toBeNull()
+    expect(none.get().modal?.kind).toBe('accounts')
+    expect(n.activeProfile()).toBeNull()
+    await n.start(() => {})
+    expect(requested).toEqual([])
+    // Turning it on starts it in front, no restart.
+    setDisabled(none, [])
+    await n.reconcile()
+    await waitFor(() => labels(n) === 'alpha')
+    expect(none.get().account?.id).toBe(accountRef('alpha').id)
+    await n.stopAll()
+  })
+
+  test('off then on while its stop hangs: the old session is stopped, one new one runs', async () => {
+    nonSeeded()
+    managerTimings.stopBoundMs = 30
+    const sessions: FakeSession[] = []
+    const store = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => {
+        const s = fakeSession(opts)
+        if (opts.profile === 'beta' && sessions.every((x) => x.profile !== 'beta')) {
+          s.stop = () => {
+            s.stopped = true
+            return new Promise(() => {})
+          }
+        }
+        sessions.push(s)
+        return s
+      },
+      noDriver,
+      true,
+    )
+    await m.start(() => {})
+    await waitFor(() => m.running().length === 2)
+    setDisabled(store, ['beta'])
+    const off = m.reconcile()
+    await tick()
+    setDisabled(store, [])
+    const on = m.reconcile()
+    await Promise.all([off, on])
+    await waitFor(() => labels(m) === 'alpha,beta')
+    const betas = sessions.filter((s) => s.profile === 'beta')
+    expect(betas.map((s) => s.stopped)).toEqual([true, false])
+    expect(m.running().filter((r) => r.label === 'beta')).toHaveLength(1)
+    await m.stopAll()
+  })
+
+  test('off then on while its start hangs: the late first bootstrap is discarded, the second runs', async () => {
+    nonSeeded()
+    const held = heldSessions()
+    const store = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(store, 'alpha', held.start, noDriver, true)
+    const starting = m.start(() => {})
+    await tick()
+    held.pending.alpha!.release()
+    await starting
+    await waitFor(() => held.requested.includes('beta'))
+    const firstBeta = held.pending.beta!
+    setDisabled(store, ['beta'])
+    await m.reconcile()
+    setDisabled(store, [])
+    await m.reconcile()
+    await waitFor(() => held.requested.filter((p) => p === 'beta').length === 2)
+    held.pending.beta!.release()
+    await waitFor(() => labels(m) === 'alpha,beta')
+    firstBeta.release()
+    await tick()
+    await tick()
+    const betas = held.sessions.filter((s) => s.profile === 'beta')
+    expect(betas).toHaveLength(2)
+    // The second one runs; the first landed late and was stopped.
+    expect(betas.map((s) => s.stopped)).toEqual([false, true])
+    expect(labels(m)).toBe('alpha,beta')
+    await m.stopAll()
+  })
+})
+
 async function waitFor(predicate: () => boolean, timeoutMs = 2_000): Promise<void> {
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {

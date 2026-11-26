@@ -9,6 +9,7 @@ import { updateSettings } from '../config'
 import { applyChatRouting } from '../state/bootstrap'
 import {
   accountUnreadCount,
+  enabledAccounts,
   nextChatRouting,
   routingForAccount,
   type AccountSlice,
@@ -129,9 +130,9 @@ export function AccountsModal() {
 
   async function removeProfile(profile: string): Promise<void> {
     const accounts = settings.accounts.filter((p) => p !== profile)
-    const activeAccount =
-      settings.activeAccount === profile ? (accounts[0] ?? null) : settings.activeAccount
-    await persist({ accounts, activeAccount })
+    const disabledAccounts = settings.disabledAccounts.filter((p) => p !== profile)
+    const activeAccount = nextActive(settings.activeAccount, { accounts, disabledAccounts })
+    await persist({ accounts, activeAccount, disabledAccounts })
     // Concurrent mode stops and closes it, moving the foreground on first
     // when it was in front (no-op otherwise).
     await session.reconcile()
@@ -142,6 +143,30 @@ export function AccountsModal() {
       kind: 'list',
       cursor: Math.min(mode.kind === 'confirm-remove' ? 0 : 0, accounts.length),
     })
+  }
+
+  // Turn an account off (kept in the list with its routing, favorites and
+  // caches, but not started) or on again. Nothing is deleted.
+  async function toggleProfile(profile: string): Promise<void> {
+    // From the store, not this render: a quick second Space sees the first.
+    const current = store.get().settings
+    const turningOff = !current.disabledAccounts.includes(profile)
+    const disabledAccounts = turningOff
+      ? [...current.disabledAccounts, profile]
+      : current.disabledAccounts.filter((p) => p !== profile)
+    const activeAccount = nextActive(current.activeAccount, {
+      accounts: current.accounts,
+      disabledAccounts,
+    })
+    await persist({ disabledAccounts, activeAccount })
+    // Concurrent mode stops and closes it, moving the foreground on first
+    // (or opens and starts it); no-op otherwise.
+    await session.reconcile()
+    // Single mode: turning off the running account moves to the next
+    // enabled one (the default profile when none is left), like removing it.
+    if (!concurrent && turningOff && session.getActiveProfile() === profile) {
+      await session.switchAccount(activeAccount)
+    }
   }
 
   useInput(
@@ -213,6 +238,19 @@ export function AccountsModal() {
         if (profile) setMode({ kind: 'confirm-remove', profile })
         return
       }
+      if (input === ' ' && settings.accounts.length > 0) {
+        const cursor = clamp(mode.cursor, settings.accounts.length)
+        const profile = settings.accounts[cursor]
+        if (!profile) return
+        void toggleProfile(profile).catch((err) => {
+          setMode({
+            kind: 'list',
+            cursor,
+            error: `${profile}: ${err instanceof Error ? err.message : String(err)}`,
+          })
+        })
+        return
+      }
       // Cycle the focused account's chat routing mode
       // (graph+ic3 → ic3+graph → ic3-only → graph-only).
       if (ch === 't' && settings.accounts.length > 0) {
@@ -255,6 +293,10 @@ export function AccountsModal() {
       if (key.return && settings.accounts.length > 0) {
         const profile = settings.accounts[clamp(mode.cursor, settings.accounts.length)]
         if (!profile) return
+        if (settings.disabledAccounts.includes(profile)) {
+          setMode({ ...mode, error: `${profile} is off: Space turns it on` })
+          return
+        }
         if (settings.activeAccount === profile && session.getActiveProfile() === profile) {
           // Already active; close the modal as a no-op.
           store.set({ modal: null, inputZone: 'list' })
@@ -347,13 +389,16 @@ export function AccountsModal() {
                   {profile}
                   {concurrent ? (
                     <Text color={theme.mutedText}>
-                      {`  ${rowStatus(slice(profile), accountRef(profile).id === foregroundId)}`}
+                      {settings.disabledAccounts.includes(profile)
+                        ? '  off'
+                        : `  ${rowStatus(slice(profile), accountRef(profile).id === foregroundId)}`}
                       {`  [${routingForAccount(settings, profile)}]`}
                       {unreadSuffix(slice(profile))}
                     </Text>
                   ) : (
                     <Text color={theme.mutedText}>
                       {activeProfile === profile ? '  active' : ''}
+                      {settings.disabledAccounts.includes(profile) ? '  off' : ''}
                       {`  [${routingForAccount(settings, profile)}]`}
                     </Text>
                   )}
@@ -363,7 +408,8 @@ export function AccountsModal() {
             {mode.error && <Text color={theme.errorText}>{mode.error.slice(0, 180)}</Text>}
             <Box height={1} />
             <Text color={theme.mutedText}>
-              Enter switch · a add · d remove · t routing (graph+ic3/ic3+graph/ic3-only/graph-only)
+              Enter switch · a add · d remove · Space on/off · t routing
+              (graph+ic3/ic3+graph/ic3-only/graph-only)
               {concurrent ? ' · r retry failed' : ''} · Esc close
             </Text>
           </>
@@ -371,6 +417,18 @@ export function AccountsModal() {
       </Box>
     </Box>
   )
+}
+
+// activeAccount after the account list changed: kept while it is enabled,
+// else the first enabled account (null when none is left).
+function nextActive(
+  activeAccount: string | null,
+  settings: Pick<Settings, 'accounts' | 'disabledAccounts'>,
+): string | null {
+  const enabled = enabledAccounts(settings)
+  return activeAccount === null || enabled.includes(activeAccount)
+    ? activeAccount
+    : (enabled[0] ?? null)
 }
 
 function unreadSuffix(slice: RowState | undefined): string {

@@ -362,6 +362,9 @@ export type Settings = {
   themeOverrides: ThemeOverrides
   accounts: string[]
   activeAccount: string | null
+  // Aliases in `accounts` turned off in the Accounts modal (Space): kept in
+  // the list with their routing, favorites and caches, but not started.
+  disabledAccounts: string[]
   // Order chats appear in the sidebar. 'recent' (default) preserves the
   // server's last-message ordering; 'alphabetical' sorts by display label.
   chatListSort: ChatListSort
@@ -561,6 +564,13 @@ export function routingForAccount(
   return settings.chatRoutingByAccount[account] ?? DEFAULT_CHAT_ROUTING
 }
 
+// The aliases in `accounts` that are not turned off, in configured order.
+export function enabledAccounts(
+  settings: Pick<Settings, 'accounts' | 'disabledAccounts'>,
+): string[] {
+  return settings.accounts.filter((p) => !settings.disabledAccounts.includes(p))
+}
+
 // Next mode in the cycle, for the Accounts-list toggle.
 export function nextChatRouting(mode: ChatRoutingMode): ChatRoutingMode {
   const i = CHAT_ROUTING_MODES.indexOf(mode)
@@ -590,6 +600,7 @@ export const defaultSettings: Settings = {
   themeOverrides: {},
   accounts: [],
   activeAccount: null,
+  disabledAccounts: [],
   chatListSort: 'recent',
   chatListGroupByType: false,
   chatListSectionCap: true,

@@ -4,7 +4,7 @@ import { render } from 'ink'
 import { isRefreshExpiredError } from '../src/auth/owaPiggy'
 import { loadSettings } from '../src/config'
 import { loadThemeFile } from '../src/config/themes'
-import { concurrentMode, createAccountManager } from '../src/state/accountManager'
+import { concurrentMode, createAccountManager, startupProfile } from '../src/state/accountManager'
 import { startSystemAppearanceDriver } from '../src/state/systemAppearance'
 import { probeTerminalBackground } from '../src/ui/terminalBackground'
 import { createAppStore } from '../src/state/store'
@@ -173,7 +173,7 @@ if (themeResult.source === 'file') {
   debug(`theme: loaded "${themeResult.name}" from ${themeResult.path}`)
 }
 for (const w of themeResult.warnings) warn(w)
-const initialProfile: string | null = cliProfile ?? configResult.settings.activeAccount ?? null
+const initialProfile = startupProfile(configResult.settings, cliProfile)
 const resolvedLogFile = cliLogFile ?? configResult.settings.logFile ?? null
 if (resolvedLogFile) setLogFile(resolvedLogFile)
 if (cliNetworkLog) setNetworkLog(cliNetworkLog)

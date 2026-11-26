@@ -3,7 +3,7 @@
 // fake terminal input and a fake SessionApi that records what it is asked.
 
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
@@ -41,10 +41,14 @@ function mount({
   retry = async () => {},
   switchAccount = async () => {},
   concurrent = true,
+  disabledAccounts = [],
+  running = 'alpha',
 }: {
   retry?: (profile: string) => Promise<void>
   switchAccount?: (profile: string | null) => Promise<void>
   concurrent?: boolean
+  disabledAccounts?: string[]
+  running?: string
 } = {}) {
   const calls: string[] = []
   const owaPiggy: string[][] = []
@@ -53,14 +57,15 @@ function mount({
     return { stdout: '', stderr: '', exitCode: 0 }
   })
   const store = createAppStore()
-  store.set((s) => ({
-    settings: {
-      ...s.settings,
-      accounts: ['alpha', 'beta', 'gamma'],
-      activeAccount: 'alpha',
-      concurrentAccounts: true,
-    },
-  }))
+  const accounts = {
+    accounts: ['alpha', 'beta', 'gamma'],
+    activeAccount: 'alpha',
+    disabledAccounts,
+  }
+  // The same accounts on disk: the modal persists through the config file.
+  mkdirSync(join(cfg, 'teaminal'), { recursive: true })
+  writeFileSync(join(cfg, 'teaminal', 'config.json'), JSON.stringify(accounts))
+  store.set((s) => ({ settings: { ...s.settings, ...accounts, concurrentAccounts: true } }))
   openAccount(store, accountRef('alpha'), { foreground: true }).set({
     conn: 'online',
     unreadByChatId: { c1: { unreadCount: 2, mentionCount: 0 } },
@@ -71,7 +76,7 @@ function mount({
 
   const api: SessionApi = {
     concurrent,
-    getActiveProfile: () => 'alpha',
+    getActiveProfile: () => running,
     switchAccount: async (p) => {
       calls.push(`switch:${p}`)
       await switchAccount(p)
@@ -220,5 +225,99 @@ test("t cycles that row's routing, not the foreground's", async () => {
   await tick(80)
   expect(store.get().settings.chatRoutingByAccount).toEqual({ gamma: 'ic3+graph' })
   expect(configFile().chatRoutingByAccount).toEqual({ gamma: 'ic3+graph' })
+  app.unmount()
+})
+
+test('Space turns the focused account off and on again; nothing else changes', async () => {
+  const { store, calls, app, press, frame } = mount()
+  await tick()
+  await press('j')
+  await press(' ')
+  await tick(80)
+  expect(calls).toEqual(['reconcile'])
+  expect(configFile()).toMatchObject({
+    accounts: ['alpha', 'beta', 'gamma'],
+    activeAccount: 'alpha',
+    disabledAccounts: ['beta'],
+  })
+  expect(frame()).toContain('beta  off  [graph+ic3]')
+  expect(frame()).toContain('Space on/off')
+  // A second Space works from the first one's settings.
+  await press(' ')
+  await tick(80)
+  expect(calls).toEqual(['reconcile', 'reconcile'])
+  expect(store.get().settings.disabledAccounts).toEqual([])
+  expect(configFile().disabledAccounts).toEqual([])
+  expect(configFile().accounts).toEqual(['alpha', 'beta', 'gamma'])
+  app.unmount()
+})
+
+test('Space on the foreground account moves activeAccount to the next enabled one', async () => {
+  const { calls, app, press } = mount({ disabledAccounts: ['beta'] })
+  await tick()
+  await press(' ')
+  await tick(80)
+  expect(configFile()).toMatchObject({
+    activeAccount: 'gamma',
+    disabledAccounts: ['beta', 'alpha'],
+  })
+  // Concurrent mode: reconcile moves the foreground; no switch.
+  expect(calls).toEqual(['reconcile'])
+  app.unmount()
+})
+
+test('single mode: Space on the running account switches to the next enabled one; a turned-off account cannot be picked', async () => {
+  const { calls, app, press, frame } = mount({ concurrent: false })
+  await tick()
+  await press(' ')
+  await tick(80)
+  expect(calls).toEqual(['reconcile', 'switch:beta'])
+  expect(configFile()).toMatchObject({ activeAccount: 'beta', disabledAccounts: ['alpha'] })
+  expect(frame()).toContain('alpha  active  off  [graph+ic3]')
+  await press('\r')
+  await tick(80)
+  expect(calls).toEqual(['reconcile', 'switch:beta'])
+  expect(frame()).toContain('alpha is off: Space turns it on')
+  app.unmount()
+})
+
+test('single mode: turning off the last enabled account falls back to the default profile, like removing it', async () => {
+  const { calls, app, press } = mount({ concurrent: false, disabledAccounts: ['beta', 'gamma'] })
+  await tick()
+  await press(' ')
+  await tick(80)
+  expect(calls).toEqual(['reconcile', 'switch:null'])
+  expect(configFile()).toMatchObject({ activeAccount: null })
+  app.unmount()
+})
+
+test('removing a turned-off account drops it from disabledAccounts too', async () => {
+  const { app, press } = mount({ disabledAccounts: ['beta'] })
+  await tick()
+  await press('j')
+  await press('d')
+  await press('y')
+  await tick(80)
+  expect(configFile()).toMatchObject({ accounts: ['alpha', 'gamma'], disabledAccounts: [] })
+  app.unmount()
+})
+
+test('single mode: a turned-off activeAccount never becomes the switch target', async () => {
+  // activeAccount alpha is off (startup ran beta instead); turning beta off
+  // moves to gamma, not back to alpha.
+  const { calls, app, press } = mount({
+    concurrent: false,
+    disabledAccounts: ['alpha'],
+    running: 'beta',
+  })
+  await tick()
+  await press('j')
+  await press(' ')
+  await tick(80)
+  expect(calls).toEqual(['reconcile', 'switch:gamma'])
+  expect(configFile()).toMatchObject({
+    activeAccount: 'gamma',
+    disabledAccounts: ['alpha', 'beta'],
+  })
   app.unmount()
 })
