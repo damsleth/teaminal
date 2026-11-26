@@ -27,6 +27,7 @@ import { accessTokenClaims } from '../state/authActions'
 import { accountDiagnostics, type AccountDiagnostics } from '../state/diagnostics'
 import { accountSlice } from '../state/store'
 import type { CapabilityResult } from '../graph/capabilities'
+import type { TransportStats } from '../realtime/transport'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useSessionApi } from './SessionContext'
 
@@ -82,6 +83,16 @@ export function DiagnosticsModal() {
   const { terminalFocused, focusReportingHealthy } = state
 
   const [load, setLoad] = useState<LoadState>({ status: 'loading' })
+
+  // Push counters are read on every render; a local one-second clock keeps
+  // "last event Ns ago" moving while nothing else changes. Only while open.
+  const stats = session.realtimeStats?.(selectedIsForeground ? undefined : selected.ref.id) ?? null
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!isOpen || !session.realtimeStats) return
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [isOpen])
 
   useEffect(() => {
     if (!isOpen) return
@@ -162,6 +173,7 @@ export function DiagnosticsModal() {
         <Text>
           <Text muted>realtime: </Text>
           <Text>{realtimeState}</Text>
+          {stats && <Text muted>{` · ${pushLiveness(stats, now)}`}</Text>}
         </Text>
         <Text>
           <Text muted>user: </Text>
@@ -266,6 +278,16 @@ export function DiagnosticsModal() {
       </Box>
     </Box>
   )
+}
+
+// Counters only, no verdict: `never` means no mapped event yet, which a quiet
+// account and a broken subscription look the same as.
+function pushLiveness(stats: TransportStats, now: number): string {
+  const last =
+    stats.lastEventAt === null
+      ? 'never'
+      : `${Math.max(0, Math.floor((now - stats.lastEventAt) / 1000))}s ago`
+  return `last event ${last} · reconnects ${stats.reconnects} · dropped ${stats.dropped}`
 }
 
 // One row per open account, two lines each: status, then cache files.

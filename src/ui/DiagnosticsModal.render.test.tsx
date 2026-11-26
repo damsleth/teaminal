@@ -8,6 +8,7 @@ import {
 } from '../auth/owaPiggy'
 import { createGraphClient } from '../graph/client'
 import { openAccount } from '../state/accountStore'
+import type { TransportStats } from '../realtime/transport'
 import { createAppStore } from '../state/store'
 import { DiagnosticsModal } from './DiagnosticsModal'
 import { SessionProvider, type SessionApi } from './SessionContext'
@@ -133,5 +134,117 @@ test('j selects the next account: its details, its token and r act on it', async
     expect(frame).toMatch(/▸ alpha/)
   } finally {
     app.unmount()
+  }
+})
+
+// Mount with a keyboard and capture the last frame.
+function mountInteractive(store: ReturnType<typeof createAppStore>, api: SessionApi) {
+  const stdin = new PassThrough() as unknown as NodeJS.ReadStream & { isTTY: boolean }
+  stdin.isTTY = true
+  stdin.setRawMode = () => stdin
+  stdin.ref = () => stdin
+  stdin.unref = () => stdin
+  const stdout = new PassThrough() as unknown as NodeJS.WriteStream & { columns: number }
+  stdout.columns = 120
+  let frame = ''
+  stdout.on('data', (d: Buffer) => (frame = d.toString().replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')))
+  const app = render(
+    <StoreProvider store={store}>
+      <SessionProvider api={api}>
+        <DiagnosticsModal />
+      </SessionProvider>
+    </StoreProvider>,
+    { stdin, stdout, debug: true, exitOnCtrlC: false, patchConsole: false },
+  )
+  return {
+    frame: () => frame,
+    press: async (k: string) => {
+      stdin.write(k)
+      await tick()
+    },
+    unmount: () => app.unmount(),
+  }
+}
+
+const stats = (over: Partial<TransportStats>): TransportStats => ({
+  frames: { '1::': 0, '2::': 0, '3': 0, '5': 0, json: 0, other: 0 },
+  mapped: 0,
+  dropped: 0,
+  lastEventAt: null,
+  reconnects: 0,
+  ...over,
+})
+
+test('push liveness follows the selected account; never before the first event', async () => {
+  const store = createAppStore()
+  store.set((s) => ({ settings: { ...s.settings, accounts: ['alpha', 'beta'] } }))
+  openAccount(store, accountRef('alpha'), { foreground: true }).set({ realtimeState: 'connected' })
+  openAccount(store, accountRef('beta'), { foreground: false }).set({ realtimeState: 'error' })
+  store.set({ modal: { kind: 'diagnostics' } })
+  const betaId = accountRef('beta').id
+  const asked: string[] = []
+  const lastEventAt = Date.now() - 4_000
+  const ui = mountInteractive(store, {
+    ...session('alpha'),
+    realtimeStats: (id) => {
+      asked.push(id ?? 'foreground')
+      return id === betaId
+        ? stats({ reconnects: 10, dropped: 2 })
+        : stats({ lastEventAt, reconnects: 1 })
+    },
+  })
+  try {
+    await tick()
+    expect(ui.frame()).toContain(
+      'realtime: connected · last event 4s ago · reconnects 1 · dropped 0',
+    )
+    await ui.press('j')
+    expect(ui.frame()).toContain('realtime: error · last event never · reconnects 10 · dropped 2')
+    expect(asked).toContain(betaId)
+  } finally {
+    ui.unmount()
+  }
+})
+
+test('no push line without push stats', () => {
+  const store = createAppStore(accountRef('alpha'))
+  store.set({ modal: { kind: 'diagnostics' } })
+  const out = renderOnce(store, 'alpha')
+  expect(out).toContain('realtime: off')
+  expect(out).not.toContain('last event')
+})
+
+test('the idle clock advances once a second and stops on unmount', async () => {
+  const realSet = globalThis.setInterval
+  const realClear = globalThis.clearInterval
+  const live = new Set<unknown>()
+  globalThis.setInterval = ((fn: () => void, ms?: number) => {
+    const id = realSet(fn, ms)
+    if (ms === 1000) live.add(id)
+    return id
+  }) as unknown as typeof setInterval
+  globalThis.clearInterval = ((id: Parameters<typeof clearInterval>[0]) => {
+    live.delete(id)
+    realClear(id)
+  }) as typeof clearInterval
+  const store = createAppStore(accountRef('alpha'))
+  store.set({ modal: { kind: 'diagnostics' } })
+  const lastEventAt = Date.now() - 5_000
+  const ui = mountInteractive(store, {
+    ...session('alpha'),
+    realtimeStats: () => stats({ lastEventAt }),
+  })
+  try {
+    await tick()
+    expect(ui.frame()).toContain('last event 5s ago')
+    expect(live.size).toBe(1)
+    await tick(1_100)
+    expect(ui.frame()).toContain('last event 6s ago')
+    ui.unmount()
+    expect(live.size).toBe(0)
+  } finally {
+    ui.unmount()
+    globalThis.setInterval = realSet
+    globalThis.clearInterval = realClear
   }
 })

@@ -44,6 +44,8 @@ export interface RealtimeTransport {
    * Idempotent; safe to call from any state.
    */
   retry(): void
+  /** Frame and reconnect counters, for the diagnostics push liveness line. */
+  stats?(): TransportStats
 }
 
 export type TransportOpts = {

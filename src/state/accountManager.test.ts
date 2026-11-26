@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { accountRef } from '../account'
+import { accountRef, type AccountId } from '../account'
 import { subscribeEvents } from '../log'
 import { createAccountManager, managerTimings } from './accountManager'
 import { accountStoreFor, type AccountStore } from './accountStore'
@@ -40,6 +40,8 @@ function fakeSession(opts: RunSessionOpts): FakeSession {
       retry: () => {
         session.retries++
       },
+      // Tagged with the profile so a test can tell whose counters it got.
+      stats: () => ({ reconnects: 0, profile: opts.profile }),
     } as never,
     stop: async () => {
       session.stopped = true
@@ -1020,6 +1022,31 @@ describe('AccountManager (concurrent)', () => {
     expect(starts).toBe(0)
     await m.stopAll()
   })
+  test('realtimeStats follow the slot: the foreground by default, any open account by id', async () => {
+    nonSeeded()
+    const store = concurrentStore(['alpha', 'beta'])
+    const m = createAccountManager(
+      store,
+      'alpha',
+      async (opts) => fakeSession(opts),
+      noDriver,
+      true,
+    )
+    const whose = (id?: AccountId) =>
+      (m.realtimeStats(id) as unknown as { profile: string } | null)?.profile ?? null
+    expect(whose()).toBeNull() // no session yet
+    await m.start(() => {})
+    await waitFor(() => m.running().length === 2)
+    expect(whose()).toBe('alpha')
+    expect(whose(accountRef('beta').id)).toBe('beta')
+    expect(whose(accountRef('gamma').id)).toBeNull() // not open
+    m.setForeground('beta')
+    expect(whose()).toBe('beta')
+    expect(whose(accountRef('alpha').id)).toBe('alpha')
+    await m.stopAll()
+    expect(whose()).toBeNull()
+  })
+
   test('two aliases of the same user: one warning per pair, naming both', async () => {
     nonSeeded()
     const sessions: FakeSession[] = []
