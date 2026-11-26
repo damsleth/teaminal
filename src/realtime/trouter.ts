@@ -23,12 +23,14 @@ import { decodeJwtClaims } from '../auth/owaPiggy'
 import { getSkypeToken } from '../graph/teamsFederation'
 import { getCachedTrouterUrl } from '../graph/teamsRegion'
 import { debug, recordEvent, recordRequest, warn } from '../log'
-import type { RealtimeEventBus, RealtimeEvent } from './events'
+import type { RealtimeEventBus, RealtimeEvent, RealtimeEventKind } from './events'
+import { describeFrame, outerKind } from './frameShape'
 import type {
   RealtimeTransport,
   TransportOpts,
   TransportState,
   TransportStateListener,
+  TransportStats,
 } from './transport'
 
 const RECONNECT_BASE_MS = 2_000
@@ -43,6 +45,9 @@ const RECONNECT_CAP_MS = 5 * 60_000
 // trigger a manual retry from the diagnostics modal.
 const MAX_RECONNECT_ATTEMPTS = 10
 const KEEPALIVE_INTERVAL_MS = 30_000
+// TEAMINAL_TROUTER_CAPTURE=1 writes each distinct frame shape once, up to
+// this many lines per session.
+const CAPTURE_MAX_LINES = 200
 
 // Regional trouter URL returned by authsvc in older experiments. The
 // successful Teams web trace uses the same host but connects to /v4/c,
@@ -345,6 +350,17 @@ export class TrouterTransport implements RealtimeTransport {
   // The registrar request in flight: aborted on disconnect or a new
   // registration, so a long 429 back-off can't outlive the connection.
   private registrarAbort: AbortController | null = null
+  private counters: TransportStats = {
+    frames: { '1::': 0, '2::': 0, '3': 0, '5': 0, json: 0, other: 0 },
+    mapped: 0,
+    dropped: 0,
+    lastEventAt: null,
+    reconnects: 0,
+  }
+  // Read per transport (not at module load) so a session started with the
+  // variable set captures; shapes already written are not written again.
+  private readonly captureShapes = process.env.TEAMINAL_TROUTER_CAPTURE === '1'
+  private captured = new Set<string>()
 
   constructor(opts: TransportOpts) {
     this.bus = opts.bus
@@ -356,6 +372,10 @@ export class TrouterTransport implements RealtimeTransport {
 
   get state(): TransportState {
     return this._state
+  }
+
+  stats(): TransportStats {
+    return { ...this.counters, frames: { ...this.counters.frames } }
   }
 
   onStateChange(listener: TransportStateListener): () => void {
@@ -527,58 +547,96 @@ export class TrouterTransport implements RealtimeTransport {
     })
   }
 
+  // Every frame is counted by outer kind. Control frames (auth, keepalive,
+  // trouter.connected, message-loss, pings) are never drops; an application
+  // frame that maps to no event is.
   private async handleSocketMessage(raw: string, ic3Token: string): Promise<boolean> {
-    if (raw === '1::') {
-      this.sendSocketEvent('user.authenticate', [
-        {
-          headers: {
-            Authorization: `Bearer ${ic3Token}`,
-            'X-MS-Migration': 'True',
+    this.counters.frames[outerKind(raw)]++
+    let control = true
+    let kinds: RealtimeEventKind[] = []
+    try {
+      if (raw === '1::') {
+        this.sendSocketEvent('user.authenticate', [
+          {
+            headers: {
+              Authorization: `Bearer ${ic3Token}`,
+              'X-MS-Migration': 'True',
+            },
           },
-        },
-      ])
-      recordEvent('trouter', 'debug', `${this.tag} ws authenticated`)
-      return false
-    }
-
-    if (raw === '2::') {
-      this.ws?.send('2::')
-      return false
-    }
-
-    const packet = parseSocketIoEvent(raw)
-    if (packet) {
-      const name = packet.event.name ?? ''
-      const firstArg = packet.event.args?.[0]
-      if (name === 'trouter.connected' && firstArg && typeof firstArg === 'object') {
-        const connected = firstArg as TrouterConnectedPayload
-        recordEvent(
-          'trouter',
-          'debug',
-          `${this.tag} connected registrar=${connected.registrarUrl ? 'yes' : 'no'}`,
-        )
-        await this.registerRegistrar(connected)
-        return true
-      }
-
-      if (name === 'trouter.message_loss') {
-        if (packet.id && firstArg !== undefined) {
-          this.sendSocketEvent('trouter.processed_message_loss', [firstArg], `${packet.id}+`)
-        }
+        ])
+        recordEvent('trouter', 'debug', `${this.tag} ws authenticated`)
         return false
       }
 
-      if (firstArg && typeof firstArg === 'object') {
-        for (const event of this.mapToRealtimeEvents(firstArg as TrouterEventBody)) {
-          this.bus.emit(event)
-        }
+      if (raw === '2::') {
+        this.ws?.send('2::')
+        return false
       }
-      return false
-    }
 
-    const frame = this.parseFrame(raw)
-    this.handleFrame(frame)
-    return false
+      const packet = parseSocketIoEvent(raw)
+      if (packet) {
+        const name = packet.event.name ?? ''
+        const firstArg = packet.event.args?.[0]
+        if (name === 'trouter.connected' && firstArg && typeof firstArg === 'object') {
+          const connected = firstArg as TrouterConnectedPayload
+          recordEvent(
+            'trouter',
+            'debug',
+            `${this.tag} connected registrar=${connected.registrarUrl ? 'yes' : 'no'}`,
+          )
+          await this.registerRegistrar(connected)
+          return true
+        }
+
+        if (name === 'trouter.message_loss') {
+          if (packet.id && firstArg !== undefined) {
+            this.sendSocketEvent('trouter.processed_message_loss', [firstArg], `${packet.id}+`)
+          }
+          return false
+        }
+
+        control = false
+        kinds = this.emitMapped(firstArg)
+        return false
+      }
+
+      const frame = this.parseFrame(raw)
+      if (frame.type === 'ping') {
+        this.sendPong()
+        return false
+      }
+      control = false
+      if (frame.type === 'event') kinds = this.emitMapped(frame.body)
+      return false
+    } finally {
+      if (!control && kinds.length === 0) this.counters.dropped++
+      this.captureShape(raw, kinds)
+    }
+  }
+
+  // Map an application payload and emit its events. A payload whose
+  // eventType or resource is not a string is malformed: nothing is mapped
+  // (the mapper would throw on it).
+  private emitMapped(body: unknown): RealtimeEventKind[] {
+    if (!body || typeof body !== 'object') return []
+    const b = body as TrouterEventBody
+    if (b.eventType !== undefined && typeof b.eventType !== 'string') return []
+    if (b.resource !== undefined && typeof b.resource !== 'string') return []
+    const events = this.mapToRealtimeEvents(b)
+    for (const event of events) this.bus.emit(event)
+    if (events.length > 0) {
+      this.counters.mapped += events.length
+      this.counters.lastEventAt = Date.now()
+    }
+    return events.map((e) => e.kind)
+  }
+
+  private captureShape(raw: string, kinds: RealtimeEventKind[]): void {
+    if (!this.captureShapes || this.captured.size >= CAPTURE_MAX_LINES) return
+    const shape = describeFrame(raw, kinds)
+    if (this.captured.has(shape)) return
+    this.captured.add(shape)
+    recordEvent('trouter', 'info', `${this.tag} shape ${shape}`)
   }
 
   private sendSocketEvent(name: string, args: unknown[], id = ''): void {
@@ -667,20 +725,6 @@ export class TrouterTransport implements RealtimeTransport {
     }
 
     return { type: 'unknown', raw }
-  }
-
-  private handleFrame(frame: TrouterFrame): void {
-    if (frame.type === 'ping') {
-      this.sendPong()
-      return
-    }
-
-    if (frame.type !== 'event') return
-
-    const events = this.mapToRealtimeEvents(frame.body)
-    for (const event of events) {
-      this.bus.emit(event)
-    }
   }
 
   /** Map a trouter event body to zero or more RealtimeEvents. */
@@ -869,6 +913,7 @@ export class TrouterTransport implements RealtimeTransport {
     this.reconnectAttempts++
 
     debug(`${this.tag}: reconnecting in ${jittered}ms (attempt ${this.reconnectAttempts})`)
+    this.counters.reconnects++
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null
       void this.connect()

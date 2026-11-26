@@ -13,8 +13,23 @@
 //   5. disconnect() is idempotent and cancels pending reconnects.
 
 import type { RealtimeEventBus } from './events'
+import type { FrameOuterKind } from './frameShape'
 
 export type TransportState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error'
+
+/** Per-transport counters since the transport was created. */
+export type TransportStats = {
+  /** Frames received, by outer kind. */
+  frames: Record<FrameOuterKind, number>
+  /** Application events mapped and emitted onto the bus. */
+  mapped: number
+  /** Application frames that mapped to nothing (unknown or malformed). */
+  dropped: number
+  /** When the last mapped application event arrived (not keepalive/auth). */
+  lastEventAt: number | null
+  /** Reconnects scheduled. */
+  reconnects: number
+}
 
 export type TransportStateListener = (state: TransportState) => void
 

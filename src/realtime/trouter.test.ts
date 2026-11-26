@@ -933,3 +933,148 @@ describe('TrouterTransport logs', () => {
       expect(logged.text()).not.toContain(SENTINEL)
     }))
 })
+
+describe('TrouterTransport frame counters and capture', () => {
+  const realCapture = process.env.TEAMINAL_TROUTER_CAPTURE
+  const restoreCapture = () => {
+    if (realCapture === undefined) delete process.env.TEAMINAL_TROUTER_CAPTURE
+    else process.env.TEAMINAL_TROUTER_CAPTURE = realCapture
+  }
+
+  // A transport that failed its first registration, reconnected and is now
+  // connected on its second socket.
+  async function connectedAfterOneReconnect(h: { setFetch: (f: FetchStub) => void }) {
+    const statuses = [500, 200]
+    h.setFetch(async () => fakeResponse(statuses.shift()!))
+    const t = makeTransport()
+    await handshake(await startConnect(t))
+    jest.advanceTimersToNextTimer()
+    await flush()
+    const sock = FakeSocket.made.at(-1)!
+    await handshake(sock)
+    expect(t.state).toBe('connected')
+    return { t, sock }
+  }
+
+  const newMessage = `5:::${JSON.stringify({
+    name: 'trouter.message',
+    args: [{ eventType: 'NewMessage', resource: "/chats('19:c1@thread.v2')/messages" }],
+  })}`
+
+  test('unknown and malformed frames are dropped; controls are not', () =>
+    withHarness(async (h) => {
+      delete process.env.TEAMINAL_TROUTER_CAPTURE
+      try {
+        const { t, sock } = await connectedAfterOneReconnect(h)
+        const emitted: string[] = []
+        ;(t as unknown as { bus: RealtimeEventBus }).bus.on((e) => emitted.push(e.kind))
+        const base = t.stats()
+        expect(base.reconnects).toBe(1)
+        expect(base.dropped).toBe(0)
+        expect(base.lastEventAt).toBeNull()
+
+        for (const control of [
+          '2::',
+          '5:4+::{"name":"trouter.message_loss","args":[{"tag":"x"}]}',
+          '{"type":"ping"}',
+          '',
+        ]) {
+          sock.receive(control)
+        }
+        await flush()
+        expect(t.stats().dropped).toBe(0)
+
+        for (const junk of [
+          '3:::{"x":1}',
+          'not json',
+          '5:::{"name":"x","args":[{"eventType":"NewMessage","resource":42}]}',
+          '5:::{"name":"x","args":[{"eventType":7}]}',
+          '5:::{"name":"x","args":["text"]}',
+          '{"foo":1}',
+          '5:::{"name":"x","args":[{"eventType":"SomeFutureEvent"}]}',
+        ]) {
+          sock.receive(junk)
+        }
+        await flush()
+        sock.receive(newMessage)
+        await flush()
+
+        const s = t.stats()
+        expect(s.dropped).toBe(7)
+        expect(s.mapped).toBe(1)
+        expect(s.lastEventAt).not.toBeNull()
+        expect(emitted).toEqual(['new-message'])
+        expect(s.frames['2::']).toBe(base.frames['2::'] + 1)
+        expect(s.frames['3']).toBe(1)
+        expect(s.frames.json).toBe(2)
+        expect(s.frames.other).toBe(2)
+        expect(t.state).toBe('connected')
+        t.disconnect()
+      } finally {
+        restoreCapture()
+      }
+    }))
+
+  test('capture is off unless TEAMINAL_TROUTER_CAPTURE=1', () =>
+    withHarness(async (h) => {
+      delete process.env.TEAMINAL_TROUTER_CAPTURE
+      const logged = captureLogs()
+      try {
+        const { t, sock } = await connectedAfterOneReconnect(h)
+        sock.receive(newMessage)
+        await flush()
+        t.disconnect()
+      } finally {
+        logged.stop()
+        restoreCapture()
+      }
+      expect(logged.events.filter((m) => m.includes(' shape '))).toEqual([])
+    }))
+
+  test('capture writes each shape once, with the account, at most 200 lines, no raw values', () =>
+    withHarness(async (h) => {
+      process.env.TEAMINAL_TROUTER_CAPTURE = '1'
+      const logged = captureLogs()
+      const thread = `19:${crypto.randomUUID()}@thread.v2`
+      const address = `ola.${crypto.randomUUID().slice(0, 8)}@example.com`
+      try {
+        const { t, sock } = await connectedAfterOneReconnect(h)
+        const frame = `5:::${JSON.stringify({
+          name: 'trouter.message',
+          args: [
+            {
+              eventType: 'NewMessage',
+              resource: `/chats/${thread}/messages?st=${SENTINEL}`,
+              resourceData: { from: address, content: SENTINEL },
+            },
+          ],
+        })}`
+        sock.receive(frame)
+        sock.receive(frame)
+        // 250 distinct shapes: n unknown keys each.
+        for (let n = 1; n <= 250; n++) {
+          const extra = Object.fromEntries(
+            Array.from({ length: n }, (_, i) => [`${SENTINEL}-${i}`, address]),
+          )
+          sock.receive(JSON.stringify({ eventType: 'Future', ...extra }))
+        }
+        await flush()
+        t.disconnect()
+      } finally {
+        logged.stop()
+        restoreCapture()
+      }
+      const shapes = logged.events.filter((m) => m.includes(' shape '))
+      expect(shapes).toHaveLength(200)
+      expect(shapes.every((m) => m.startsWith('trouter[alpha] shape outer='))).toBe(true)
+      expect(
+        shapes.filter((m) => m.includes('resource=string:/chats/:other/messages?:other')),
+      ).toEqual([
+        'trouter[alpha] shape outer=5 name=other keys=eventType,resource,resourceData resource=string:/chats/:other/messages?:other kinds=new-message',
+      ])
+      const text = shapes.join('\n')
+      for (const secret of [SENTINEL, thread, address, 'ic3-tok']) {
+        expect(text).not.toContain(secret)
+      }
+    }))
+})
