@@ -88,6 +88,16 @@ export async function refreshActivityFeed(store: AccountStore): Promise<void> {
   }
 }
 
+// Mark items read in the account that owns them, keeping its unread-mentions
+// count in step. Local only: CSA has a server-side "mark read" endpoint, but
+// the badge is what matters and it is computed from this list.
+export function markAccountActivityRead(store: AccountStore, ids: string[] | 'all'): void {
+  store.set((s) => {
+    const next = markActivityRead(s.activityFeed, ids)
+    return { activityFeed: next, unreadMentionCount: countUnreadMentions(next) }
+  })
+}
+
 export function markActivityRead(items: ActivityItem[], ids: string[] | 'all'): ActivityItem[] {
   if (items.length === 0) return items
   const targets: Set<string> | null = ids === 'all' ? null : new Set(ids)
