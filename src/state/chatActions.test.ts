@@ -1,5 +1,6 @@
 import { accountRef } from '../account'
-import { accountStore } from './accountStore'
+import { accountStore, openAccount, setForeground } from './accountStore'
+import { groupChannelThreads, replyCountForRoot } from './channelThreads'
 import { createGraphClient, type AccountContext } from '../graph/client'
 import { afterEach, describe, expect, it } from 'bun:test'
 import {
@@ -12,7 +13,13 @@ import {
 } from '../graph/client'
 import { __resetChatMessageFallbackForTests } from '../graph/chats'
 import type { ChatMessage, IdentityUser } from '../types'
-import { createAppStore, emptyMessageCache, focusKey, resetAccountScopedState } from './store'
+import {
+  accountSlice,
+  createAppStore,
+  emptyMessageCache,
+  focusKey,
+  resetAccountScopedState,
+} from './store'
 import {
   __resetForTests as resetChatsvc,
   __setTransportForTests as setChatsvcTransport,
@@ -379,6 +386,35 @@ describe('actions and the next poll', () => {
     expect(convMsgs(store).map((m) => m.id)).toEqual(['m1', 'server-1'])
   })
 
+  it('a POST that fails after its echo landed still counts as sent', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    const store = withCache(
+      setup(async () => {
+        await gate
+        return fail()
+      }),
+    )
+    store.set({ draftsByConvo: { 'chat:c1': 'hi' } })
+    const pending = sendMessage(testClient(), accountStore(store), chat, 'hi')
+    const cmid = convMsgs(store).at(-1)!.clientMessageId
+    poll(store, [
+      m1,
+      {
+        id: 'server-1',
+        clientMessageId: cmid,
+        createdDateTime: '2026-05-29T10:01:00Z',
+        body: { contentType: 'text', content: 'hi' },
+      },
+    ])
+    release()
+    expect(await pending).toEqual({ ok: true })
+    expect(convMsgs(store).map((m) => m.id)).toEqual(['m1', 'server-1'])
+    expect(store.get().messageCacheByConvo['chat:c1']!.messages).toBe(convMsgs(store))
+    expect(convMsgs(store).some((m) => m._sendError || m._sending)).toBe(false)
+    expect(store.get().draftsByConvo['chat:c1']).toBeUndefined()
+  })
+
   it('a reaction survives a poll that does not carry it yet', async () => {
     const store = withCache(setup(ok))
     await toggleReaction(testClient(), accountStore(store), 'c1', 'm1', 'like', me)
@@ -449,16 +485,129 @@ describe('thread reply send', () => {
     resetFederation()
   })
 
-  it("sends with the optimistic row's client id and lands in the loaded channel stream", async () => {
-    const store = setup(ok)
-    // chatsvc auth: Skype token via the federation transport, fixed region.
+  // chatsvc auth: Skype token via the federation transport, fixed region.
+  const chatsvcAuth = (...profiles: string[]) => {
     setFederationTransport(
       async () =>
         new Response(JSON.stringify({ tokens: { skypeToken: 'skype', expiresIn: 3600 } }), {
           headers: { 'content-type': 'application/json' },
         }),
     )
-    __setRegionForTests('test', 'emea')
+    for (const p of profiles) __setRegionForTests(p, 'emea')
+  }
+  const root: ChatMessage = {
+    id: 'root1',
+    rootMessageId: 'root1',
+    createdDateTime: '2026-05-29T09:00:00Z',
+    body: { contentType: 'text', content: 'root' },
+  }
+  const focus = { kind: 'thread', teamId: 't1', channelId: 'ch1', rootId: 'root1' } as const
+  const channelFocus = { kind: 'channel', teamId: 't1', channelId: 'ch1' } as const
+  const threadConv = 'thread:t1:ch1:root1'
+  const channelConv = 'channel:t1:ch1'
+  // Both conversations loaded with caches, so the send goes through convPatch.
+  const loadedThread = () => ({
+    messagesByConvo: { [channelConv]: [root], [threadConv]: [root] },
+    messageCacheByConvo: {
+      [channelConv]: emptyMessageCache([root]),
+      [threadConv]: emptyMessageCache([root]),
+    },
+  })
+  const created = (body: unknown) =>
+    new Response(JSON.stringify(body), {
+      status: 201,
+      headers: { 'content-type': 'application/json' },
+    })
+
+  it('a reply whose POST returns no id merges with the poll copy carrying its client id', async () => {
+    const store = setup(ok)
+    chatsvcAuth('test')
+    // 201 with neither a body id nor a Location header: the row's id is the client id.
+    setChatsvcTransport(async () => created({ OriginalArrivalTime: '2026-05-29T09:05:00Z' }))
+    store.set({ me: me as never, ...loadedThread() })
+    expect(await sendMessage(testClient(), accountStore(store), focus, 'hi')).toEqual({ ok: true })
+    const cmid = store.get().messagesByConvo[channelConv]!.at(-1)!.clientMessageId!
+    expect(store.get().messagesByConvo[channelConv]!.map((m) => m.id)).toEqual(['root1', cmid])
+
+    const serverReply: ChatMessage = {
+      id: 'reply-1',
+      clientMessageId: cmid,
+      replyToId: 'root1',
+      rootMessageId: 'root1',
+      createdDateTime: '2026-05-29T09:05:00Z',
+      body: { contentType: 'text', content: 'hi' },
+    }
+    store.set(
+      mergeActivePagePatch(
+        store.get(),
+        channelConv,
+        { messages: [root, serverReply], nextLink: 'older' },
+        channelFocus,
+      ),
+    )
+    const stream = store.get().messagesByConvo[channelConv]!
+    expect(store.get().messageCacheByConvo[channelConv]!.messages).toBe(stream)
+    expect(stream.map((m) => [m.id, m.replyToId, m.rootMessageId])).toEqual([
+      ['root1', undefined, 'root1'],
+      ['reply-1', 'root1', 'root1'],
+    ])
+    expect(replyCountForRoot(groupChannelThreads(stream), 'root1')).toBe(1)
+
+    // The thread door's copy settles the thread view the same way.
+    store.set(
+      mergeActivePagePatch(store.get(), threadConv, { messages: [root, serverReply] }, focus),
+    )
+    const thread = store.get().messagesByConvo[threadConv]!
+    expect(store.get().messageCacheByConvo[threadConv]!.messages).toBe(thread)
+    expect(thread.map((m) => m.id)).toEqual(['root1', 'reply-1'])
+  })
+
+  it('a reply sent from A lands in A after B comes to the foreground mid-send', async () => {
+    const alice = accountRef('alice')
+    const bob = accountRef('bob')
+    const store = setup(ok)
+    resetAccountScopedState(store, alice)
+    chatsvcAuth('alice')
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    setChatsvcTransport(async () => {
+      await gate
+      return created({ id: 'reply-1', OriginalArrivalTime: '2026-05-29T09:05:00Z' })
+    })
+    const a = accountStore(store)
+    a.set({ me: me as never, ...loadedThread(), draftsByConvo: { [threadConv]: 'hi' } })
+    const b = openAccount(store, bob, { foreground: false })
+    b.set({ ...loadedThread(), draftsByConvo: { [threadConv]: 'bob draft' } })
+    const bobBefore = accountSlice(store.get(), bob.id)!
+
+    // A's client and handle are bound before the await, as the composer does.
+    const pending = sendMessage(testClient({ account: alice }), a, focus, 'hi')
+    setForeground(store, bob.id)
+    release()
+    expect(await pending).toEqual({ ok: true })
+
+    const aSlice = accountSlice(store.get(), alice.id)!
+    expect(store.get().account?.id).toBe(bob.id)
+    expect(store.get().backgroundAccounts[alice.id]).toBe(aSlice as never)
+    for (const conv of [threadConv, channelConv]) {
+      expect(aSlice.messagesByConvo[conv]!.map((m) => [m.id, m.replyToId])).toEqual([
+        ['root1', undefined],
+        ['reply-1', 'root1'],
+      ])
+      expect(aSlice.messageCacheByConvo[conv]!.messages).toBe(aSlice.messagesByConvo[conv]!)
+    }
+    expect(aSlice.draftsByConvo[threadConv]).toBeUndefined()
+
+    const bobNow = accountSlice(store.get(), bob.id)!
+    expect(bobNow.messagesByConvo).toBe(bobBefore.messagesByConvo)
+    expect(bobNow.messageCacheByConvo).toBe(bobBefore.messageCacheByConvo)
+    expect(bobNow.draftsByConvo).toBe(bobBefore.draftsByConvo)
+    expect(bobNow.draftsByConvo[threadConv]).toBe('bob draft')
+  })
+
+  it("sends with the optimistic row's client id and lands in the loaded channel stream", async () => {
+    const store = setup(ok)
+    chatsvcAuth('test')
     let wireCmid: unknown
     let wireName: unknown
     let wireUrl = ''
@@ -474,16 +623,8 @@ describe('thread reply send', () => {
         headers: { 'content-type': 'application/json' },
       })
     })
-    const root: ChatMessage = {
-      id: 'root1',
-      rootMessageId: 'root1',
-      createdDateTime: '2026-05-29T09:00:00Z',
-      body: { contentType: 'text', content: 'root' },
-    }
-    const channelConv = 'channel:t1:ch1'
     store.set({ me: me as never, messagesByConvo: { [channelConv]: [root] } })
-    const focus = { kind: 'thread', teamId: 't1', channelId: 'ch1', rootId: 'root1' } as const
-    expect(focusKey(focus)).toBe('thread:t1:ch1:root1')
+    expect(focusKey(focus)).toBe(threadConv)
     expect(await sendMessage(testClient(), accountStore(store), focus, 'hi')).toEqual({ ok: true })
     expect(wireCmid).toBeTruthy()
     expect(wireCmid).toBe(rowCmid)

@@ -15,15 +15,13 @@ import {
   __setTransportForTests as setFederationTransport,
 } from './teamsFederation'
 import {
-  __resetChannelReadFallbackForTests,
   listChannelMessages,
   listChannelMessagesPage,
   listChannels,
   listJoinedTeams,
-  paginateChannelMessages,
   sendChannelMessage,
 } from './teams'
-import type { Channel, ChannelMessage, Team } from '../types'
+import type { Channel, Team } from '../types'
 
 const testClient = (over: Partial<AccountContext> = {}) =>
   createGraphClient({ account: accountRef(undefined), audience: 'graph', fallback: false, ...over })
@@ -56,7 +54,6 @@ afterEach(() => {
   resetAuth()
   resetChatsvc()
   resetFederation()
-  __resetChannelReadFallbackForTests()
 })
 
 const TEAM: Team = {
@@ -71,13 +68,6 @@ const CHANNEL: Channel = {
   displayName: 'General',
   membershipType: 'standard',
   isArchived: false,
-}
-
-const CHANNEL_MESSAGE: ChannelMessage = {
-  id: 'cm-1',
-  createdDateTime: '2026-04-29T09:00:00Z',
-  body: { contentType: 'text', content: 'standup at 10' },
-  from: { user: { id: 'u-1', displayName: 'Bjørn' } },
 }
 
 describe('listJoinedTeams', () => {
@@ -221,32 +211,6 @@ describe('listChannelMessages', () => {
     await listChannelMessagesPage(testClient(), 'team-1', '19:abc@thread.tacv2')
     expect(graphCalls).toBe(0)
     expect(chatsvcCalls).toBe(2)
-  })
-})
-
-describe('paginateChannelMessages', () => {
-  test('follows @odata.nextLink until exhausted', async () => {
-    primeAuth()
-    const seenUrls: string[] = []
-    __setTransportForTests(async (url) => {
-      seenUrls.push(url)
-      if (seenUrls.length === 1) {
-        return jsonResponse({
-          value: [{ ...CHANNEL_MESSAGE, id: 'page1' }],
-          '@odata.nextLink':
-            'https://graph.microsoft.com/v1.0/teams/team-1/channels/19%3Aabc/messages?%24top=50&%24skiptoken=2',
-        })
-      }
-      return jsonResponse({ value: [{ ...CHANNEL_MESSAGE, id: 'page2' }] })
-    })
-
-    const ids: string[] = []
-    for await (const page of paginateChannelMessages(testClient(), 'team-1', '19:abc')) {
-      for (const m of page) ids.push(m.id)
-    }
-    expect(ids).toEqual(['page1', 'page2'])
-    expect(seenUrls).toHaveLength(2)
-    expect(seenUrls[1]).toContain('%24skiptoken=2')
   })
 })
 

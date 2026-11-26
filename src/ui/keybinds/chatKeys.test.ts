@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { Key } from 'ink'
 import { handleChatKeys, type ChatKeysCtx } from './chatKeys'
 import { createAppStore } from '../../state/store'
+import { mergeActivePagePatch } from '../../state/poller/pagePatch'
 import type { Focus } from '../../state/store'
 import type { ChatMessage } from '../../types'
 
@@ -274,6 +275,89 @@ describe('handleChatKeys', () => {
       rootId: 'r1',
     })
     expect(store.get().messagesByConvo['thread:t1:ch1:r1']?.map((m) => m.id)).toEqual(['r1', 'a1'])
+  })
+
+  // The seed above, then the thread door's first page through the real
+  // active-loop merge.
+  describe('seeded thread, then the door page', () => {
+    const THREAD = 'thread:t1:ch1:r1'
+    const CHANNEL: Focus = { kind: 'channel', teamId: 't1', channelId: 'ch1' }
+    const THREAD_FOCUS: Focus = { kind: 'thread', teamId: 't1', channelId: 'ch1', rootId: 'r1' }
+    const msg = (id: string, minute: number, rootId = 'r1'): ChatMessage => ({
+      id,
+      createdDateTime: `2026-06-01T00:0${minute}:00.000Z`,
+      body: { contentType: 'text', content: id },
+      rootMessageId: rootId,
+      ...(id === rootId ? {} : { replyToId: rootId }),
+    })
+    const root = msg('r1', 0)
+    const a1 = msg('a1', 1)
+    const a2 = msg('a2', 3)
+
+    const paging = (a: ReturnType<typeof makeCtx>) => {
+      const cache = a.store.get().messageCacheByConvo[THREAD]!
+      return { nextLink: cache.nextLink, fullyLoaded: cache.fullyLoaded }
+    }
+
+    function openSeeded() {
+      const a = makeCtx(CHANNEL, { focusedMessageId: 'r1', focusedMessage: root })
+      a.store.set({ messagesByConvo: { 'channel:t1:ch1': [root, a1, msg('b1', 2, 'r2')] } })
+      expect(handleChatKeys({ input: 't', key: makeKey() }, a.ctx)).toBe('handled')
+      expect(paging(a)).toEqual({ nextLink: undefined, fullyLoaded: false })
+      return a
+    }
+    const door = (a: ReturnType<typeof makeCtx>, messages: ChatMessage[], nextLink?: string) =>
+      a.store.set(
+        mergeActivePagePatch(
+          a.store.get(),
+          THREAD,
+          { messages, ...(nextLink ? { nextLink } : {}) },
+          THREAD_FOCUS,
+        ),
+      )
+    const thread = (a: ReturnType<typeof makeCtx>) => {
+      const s = a.store.get()
+      // Both message maps hold the same list.
+      expect(s.messageCacheByConvo[THREAD]!.messages).toBe(s.messagesByConvo[THREAD]!)
+      return s.messagesByConvo[THREAD]!
+    }
+
+    for (const nextLink of [undefined, 'older-page']) {
+      test(`root + seeded replies + a new reply merge once, root first (nextLink: ${nextLink})`, () => {
+        const a = openSeeded()
+        door(a, [root, a1, a2], nextLink)
+        const list = thread(a)
+        expect(list.map((m) => m.id)).toEqual(['r1', 'a1', 'a2'])
+        expect(new Set(list.map((m) => m.id)).size).toBe(list.length)
+        const times = list.map((m) => m.createdDateTime)
+        expect(times).toEqual([...times].sort())
+        expect(paging(a)).toEqual({ nextLink, fullyLoaded: nextLink === undefined })
+      })
+
+      test(`a door page without the root keeps the seeded root (nextLink: ${nextLink})`, () => {
+        const a = openSeeded()
+        door(a, [a1, a2], nextLink)
+        expect(thread(a).map((m) => m.id)).toEqual(['r1', 'a1', 'a2'])
+        expect(paging(a)).toEqual({ nextLink, fullyLoaded: nextLink === undefined })
+      })
+    }
+
+    test('reopening a cached thread keeps its history and cursors', () => {
+      const a = openSeeded()
+      door(a, [a1, a2], 'older-page')
+      const before = a.store.get()
+      handleChatKeys({ input: 'h', key: makeKey() }, { ...a.ctx, focus: THREAD_FOCUS })
+      expect(a.store.get().focus).toEqual(CHANNEL)
+      // The channel stream moves on; the cached thread must not be re-seeded from it.
+      a.store.set({ messagesByConvo: { ...before.messagesByConvo, 'channel:t1:ch1': [root] } })
+      handleChatKeys({ input: 't', key: makeKey() }, a.ctx)
+      const after = a.store.get()
+      expect(after.focus).toEqual(THREAD_FOCUS)
+      expect(after.messagesByConvo[THREAD]).toBe(before.messagesByConvo[THREAD]!)
+      expect(after.messageCacheByConvo[THREAD]).toBe(before.messageCacheByConvo[THREAD]!)
+      expect(after.messageCacheByConvo[THREAD]!.nextLink).toBe('older-page')
+      expect(after.messageCursorByConvo[THREAD]).toBe(before.messageCursorByConvo[THREAD]!)
+    })
   })
 
   test('h in thread returns to parent channel, not to list', () => {

@@ -44,7 +44,8 @@ OPTIONS
 
 ENVIRONMENT
   TEAMINAL_DEBUG       1/0, enables debug logging on stderr
-  TEAMINAL_SEED        set to "fixtures" to run in seeded/offline mode (no auth)
+  TEAMINAL_SEED        set to "fixtures" to run in seeded/offline mode (no auth);
+                       "channels" also seeds a team channel with threads
   XDG_CONFIG_HOME      override config dir (default ~/.config)
 `
 

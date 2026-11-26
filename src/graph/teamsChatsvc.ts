@@ -322,14 +322,6 @@ export function skypeToChannelMessage(raw: SkypeMessage): ChatMessage {
   }
 }
 
-// Returns root channel messages in chronological order (oldest first),
-// to match listChannelMessagesPage in src/graph/teams.ts.
-//
-// The Skype endpoint returns messages newest-first; we reverse before
-// returning so the caller can append in render order. The FULL stream is
-// returned (roots + replies interleaved); the view layer groups it on
-// rootMessageId/replyToId (src/state/channelThreads.ts) to render roots
-// with reply counts and to reconstruct each thread.
 // Latched when we've already logged a "successful but empty/unparsed
 // chatsvc response" diagnostic for the current session, so the network
 // panel doesn't fill up with one event per active poll.
@@ -360,6 +352,14 @@ export function __resetChatsvcDiagnosticsForTests(): void {
   emptyResponseLogged.clear()
 }
 
+// Returns a channel's full message stream, roots and replies interleaved,
+// in chronological order (oldest first); listChannelMessagesPage in
+// src/graph/teams.ts passes it through.
+//
+// The Skype endpoint returns messages newest-first; we reverse before
+// returning so the caller can append in render order. The view layer groups
+// the stream on rootMessageId/replyToId (src/state/channelThreads.ts) to
+// render roots with reply counts and to reconstruct each thread.
 export async function listChannelMessagesViaChatsvc(
   threadId: string,
   opts: ChatsvcOpts & { pageSize?: number },
@@ -516,9 +516,9 @@ export function newClientMessageId(): string {
 
 // Posts a message (root or reply) into a channel via chatsvc. Returns
 // the canonical ChannelMessage shape so the UI can replace its
-// optimistic row in place. Reply semantics: chatsvc encodes the
-// parent in `properties.parentmessageid`, not via a separate
-// /replies endpoint as Graph does.
+// optimistic row in place. A reply goes to the thread's
+// `{channel};messageid={root}` sub-conversation (see below);
+// `properties.parentmessageid` rides along only as a hint.
 export async function sendChannelMessageViaChatsvc(
   threadId: string,
   content: string,

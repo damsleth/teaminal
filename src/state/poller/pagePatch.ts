@@ -39,9 +39,10 @@ export function mergeActivePagePatch(
   const legacyMessages = state.messagesByConvo[conv] ?? []
   // When a cache exists, prefer it, but pick up any optimistic
   // _sending/_sendError rows from the legacy mirror that the cache
-  // has not yet seen. Composer writes optimistic rows only to
-  // messagesByConvo, so without this rescue a poll that lands while
-  // a send is in flight would drop the pending row.
+  // has not yet seen. sendMessage writes both maps when a cache exists
+  // (convPatch); a row written while the conversation had no cache lives
+  // only in messagesByConvo, and this rescue keeps it if a cache appears
+  // without it.
   const cachedMessages = cache?.messages ?? []
   const cachedIds = new Set(cachedMessages.map((m) => m.id))
   const orphanOptimistic = cache
