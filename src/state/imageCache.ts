@@ -10,7 +10,7 @@ import { request } from 'node:https'
 import { Readable } from 'node:stream'
 import { BlockList, isIP } from 'node:net'
 import { sendWithBackoff } from '../graph/backoff'
-import { readBodyCapped } from '../graph/body'
+import { readBodyCapped, ResponseTooLargeError } from '../graph/body'
 import { createHash } from 'node:crypto'
 import {
   chmodSync,
@@ -180,7 +180,9 @@ async function fetchHostedContent(path: string, opts: FetchImageOpts): Promise<U
     if (!fallback || !canGraph) return viaAsyncGw()
     try {
       return await viaAsyncGw()
-    } catch {
+    } catch (err) {
+      // Too big is too big on either route.
+      if (err instanceof ResponseTooLargeError) throw err
       return viaGraph()
     }
   }
@@ -414,7 +416,7 @@ export async function fetchExternalImage(url: string, signal?: AbortSignal): Pro
     await res.body?.cancel()
     throw new Error(`external image fetch ${res.status} ${res.statusText}`)
   }
-  return readBodyCapped(res, MAX_IMAGE_BYTES, () => new Error('external image too large'))
+  return readBodyCapped(res, MAX_IMAGE_BYTES, 'external image too large')
 }
 
 // Trigger an async fetch for a key. Every caller that asked while it loads

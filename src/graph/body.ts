@@ -5,11 +5,21 @@
 // body without one is cut off as soon as it passes the cap, so an oversized
 // download is never buffered whole.
 
+// Over the cap. Its own type so a caller with a fallback route (asyncgw <->
+// Graph) can tell "too big" from "this route failed" and not try the other.
+export class ResponseTooLargeError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ResponseTooLargeError'
+  }
+}
+
 export async function readBodyCapped(
   res: Response,
   maxBytes: number,
-  tooLarge: () => Error,
+  message: string,
 ): Promise<Uint8Array> {
+  const tooLarge = () => new ResponseTooLargeError(message)
   if (Number(res.headers.get('content-length')) > maxBytes) {
     await res.body?.cancel()
     throw tooLarge()

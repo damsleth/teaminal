@@ -254,6 +254,54 @@ describe('fetchAndCacheImage hosted-content routing', () => {
     expect(pulled).toBeLessThanOrEqual(66)
   })
 
+  it('an oversized asyncgw image on an ic3 account with fallback does not retry via Graph', async () => {
+    cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-cap-ic3`)
+    process.env.XDG_CACHE_HOME = cacheRoot
+    setAuthRunner(async () => ({
+      stdout: makeJwt({ exp: FAR_FUTURE, oid: 'oid-self' }),
+      stderr: '',
+      exitCode: 0,
+    }))
+    __setRegionForTests(undefined, 'emea')
+    setFederationTransport(
+      async () =>
+        new Response(JSON.stringify({ tokens: { skypeToken: 'skype-test', expiresIn: 3600 } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+    )
+    // Before the cap, a 4-16 MB object was returned and rejected afterwards;
+    // Graph was never asked. Failing at the cap must not change that.
+    let graphCalls = 0
+    setClientTransport(async () => {
+      graphCalls++
+      return new Response(new Uint8Array([1, 2, 3]), { status: 200 })
+    })
+    setAsyncGwTransport(async (url) => {
+      if (url.endsWith('/skypetokenauth')) {
+        return new Response(null, { status: 200, headers: { 'set-cookie': 'AGW=s1' } })
+      }
+      let pulled = 0
+      const stream = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (pulled === 96) return controller.close()
+          pulled++
+          controller.enqueue(new Uint8Array(64 * 1024))
+        },
+      })
+      return new Response(stream, { status: 200, headers: { 'content-type': 'image/png' } })
+    })
+
+    const buf = await fetchAndCacheImage(
+      '/chats/chat-1/messages/msg-1/hostedContents/AAA/$value',
+      `cap-ic3-test-${Date.now()}`,
+      { contentType: '', name: 'image' },
+      { client: testClient({ audience: 'ic3', fallback: true }), objectId: '0-eu-d2-abc' },
+    )
+    expect(buf).toBeNull()
+    expect(graphCalls).toBe(0)
+  })
+
   it('ic3-only routes a hosted-content image to asyncgw, never Graph', async () => {
     cacheRoot = join(tmpdir(), `teaminal-cache-${Date.now()}-ic3`)
     process.env.XDG_CACHE_HOME = cacheRoot

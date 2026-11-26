@@ -42,7 +42,7 @@ export type GraphOpts = {
   scope?: string
   signal?: AbortSignal
   // graphBinary only: fail once the body passes this many bytes, without
-  // buffering the rest (a plain Error, not a GraphError).
+  // buffering the rest (a ResponseTooLargeError, not a GraphError).
   maxBytes?: number
 }
 
@@ -379,7 +379,7 @@ async function executeBinaryRequest(
 
   if (opts.maxBytes === undefined) return new Uint8Array(await res.arrayBuffer())
   const max = opts.maxBytes
-  return readBodyCapped(res, max, () => new Error(`binary response over ${max} bytes`))
+  return readBodyCapped(res, max, `binary response over ${max} bytes`)
 }
 
 type PagedResponse<T> = { value: T[]; '@odata.nextLink'?: string }

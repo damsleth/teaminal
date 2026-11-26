@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { readBodyCapped } from './body'
+import { readBodyCapped, ResponseTooLargeError } from './body'
 
 // A body of `chunks` chunks of `size` bytes, counting how many were pulled.
 function countedBody(chunks: number, size: number) {
@@ -14,7 +14,7 @@ function countedBody(chunks: number, size: number) {
   return { stream, state }
 }
 
-const tooLarge = () => new Error('too large')
+const tooLarge = 'too large'
 
 describe('readBodyCapped', () => {
   test('returns a body under the cap intact', async () => {
@@ -26,7 +26,9 @@ describe('readBodyCapped', () => {
 
   test('stops reading as soon as the body passes the cap', async () => {
     const { stream, state } = countedBody(100, 1024)
-    await expect(readBodyCapped(new Response(stream), 2500, tooLarge)).rejects.toThrow('too large')
+    await expect(readBodyCapped(new Response(stream), 2500, tooLarge)).rejects.toBeInstanceOf(
+      ResponseTooLargeError,
+    )
     // Three 1 KB chunks pass 2500 bytes; the other 97 are never pulled
     // (the stream may read one ahead).
     expect(state.pulled).toBeLessThanOrEqual(4)

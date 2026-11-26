@@ -349,11 +349,7 @@ export async function fetchObjectByUrl(
       )
     }
     const max = Math.min(opts.maxBytes ?? MAX_OBJECT_BYTES, MAX_OBJECT_BYTES)
-    const bytes = await readBodyCapped(
-      res,
-      max,
-      () => new TeamsAsyncGwError(0, `asyncgw fetch: object exceeds ${max} bytes`),
-    )
+    const bytes = await readBodyCapped(res, max, `asyncgw fetch: object exceeds ${max} bytes`)
     const contentType = res.headers.get('content-type') ?? 'application/octet-stream'
     return { bytes, contentType }
   }
