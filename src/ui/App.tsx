@@ -187,6 +187,7 @@ export function App() {
   const nameByUserId = useAppState((s) => s.nameByUserId)
   const showFavorites = useAppState((s) => s.settings.showFavorites)
   const favoritesByAccount = useAppState((s) => s.settings.favoritesByAccount)
+  const crossAccountFavorites = useAppState((s) => s.settings.crossAccountFavorites)
   const account = useAppState((s) => s.account)
 
   const [newChatPrompt, setNewChatPrompt] = useState<string | null>(null)
@@ -476,7 +477,7 @@ export function App() {
     },
     filter,
     expandedChatSections,
-    favorites: favoritesFor({ showFavorites, favoritesByAccount }, account),
+    favorites: favoritesFor({ showFavorites, favoritesByAccount, crossAccountFavorites }, account),
     cursor,
     cursorKey,
     focus,

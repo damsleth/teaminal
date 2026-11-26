@@ -277,6 +277,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   const chatListCollapsedSections = useAppState((s) => s.settings.chatListCollapsedSections)
   const showFavorites = useAppState((s) => s.settings.showFavorites)
   const favoritesByAccount = useAppState((s) => s.settings.favoritesByAccount)
+  const crossAccountFavorites = useAppState((s) => s.settings.crossAccountFavorites)
   const account = useAppState((s) => s.account)
   const shortNames = useAppState((s) => s.settings.chatListShortNames)
   const previewLines = useAppState((s) => s.settings.chatListPreviewLines)
@@ -341,7 +342,10 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
       },
       filter,
       expandedChatSections,
-      favorites: favoritesFor({ showFavorites, favoritesByAccount }, account),
+      favorites: favoritesFor(
+        { showFavorites, favoritesByAccount, crossAccountFavorites },
+        account,
+      ),
     })
   }, [
     me,
@@ -357,6 +361,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     expandedChatSections,
     showFavorites,
     favoritesByAccount,
+    crossAccountFavorites,
     account,
     unified,
   ])

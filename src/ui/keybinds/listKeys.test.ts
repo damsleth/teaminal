@@ -498,6 +498,26 @@ describe('unified sidebar (M2 F.3)', () => {
     expect(u.store.get().focus).toEqual({ kind: 'chat', chatId: 'a' })
   })
 
+  test('favoriting into a collapsed Favorites expands it, so the cursor stays on the row', () => {
+    const u = unified()
+    u.store.set((s) => ({
+      settings: {
+        ...s.settings,
+        crossAccountFavorites: { alpha: ['chat:a'] },
+        chatListCollapsedSections: { crossFavorites: true },
+      },
+    }))
+    const list = () => visibleList(unifiedListInput(u.store.get())!)
+    const at = list().findIndex((it) => it.kind === 'chat' && it.alias === 'beta')
+    u.store.set({ cursor: at, cursorKey: null })
+    const key = `${betaId}/chat:${(list()[at] as { chat: { id: string } }).chat.id}`
+    u.press('f', { ctrl: true })
+    expect(u.store.get().settings.chatListCollapsedSections).toEqual({})
+    expect(u.store.get().cursorKey).toBe(key)
+    const now = resolveCursor(list(), list().length, u.store.get().cursorKey, u.store.get().cursor)
+    expect(list()[now]).toMatchObject({ kind: 'chat', alias: 'beta', favorite: 'crossFavorites' })
+  })
+
   test('m flips the row’s own account’s unread mark, not the foreground’s', () => {
     const u = unified()
     for (let i = 0; i < 4; i++) u.press('j')

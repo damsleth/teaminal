@@ -320,3 +320,25 @@ test('the cursor never rests on an expanded header: at startup it lands on the f
   expect(store.get().cursor).toBe(1)
   expect(store.get().cursorKey).toBe(`chat:${chatId}`)
 })
+
+test('one account open: a cross-account favorite shows in the Favorites section', () => {
+  const store = createAppStore(accountRef(null))
+  applySeededState(accountStore(store))
+  const chatId = store.get().chats[1]!.id
+  store.set((s) => ({
+    settings: { ...s.settings, crossAccountFavorites: { '': [`chat:${chatId}`] } },
+  }))
+  const plain = renderToString(
+    <StoreProvider store={store}>
+      <SessionProvider api={session}>
+        <ChatList listPaneWidth={40} />
+      </SessionProvider>
+    </StoreProvider>,
+    { columns: 40 },
+  )
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b\[[0-9;]*m/g, '')
+    .split('\n')
+  expect(plain[0]).toBe('▾ Favorites')
+  expect(plain[1]).toContain('Design Sync')
+})

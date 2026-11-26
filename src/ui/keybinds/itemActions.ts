@@ -171,15 +171,26 @@ export function toggleFavorite(
   t: FavoriteTarget,
 ): void {
   let next: Record<string, string[]> = {}
+  let collapsed: Record<string, boolean> = {}
   store.set((s) => {
     const ids = s.settings[list][t.account] ?? []
     next = { ...s.settings[list] }
     const kept = ids.filter((id) => id !== t.id)
     if (kept.length < ids.length && kept.length === 0) delete next[t.account]
     else next[t.account] = kept.length < ids.length ? kept : [...ids, t.id]
-    return { settings: { ...s.settings, [list]: next } }
+    // A row added to a collapsed Favorites would vanish and leave the cursor
+    // on its neighbour, so adding expands the sections it can land in.
+    collapsed = { ...s.settings.chatListCollapsedSections }
+    if (kept.length === ids.length) {
+      delete collapsed.favorites
+      delete collapsed.crossFavorites
+      delete collapsed[`${encodeURIComponent(t.account)}/favorites`]
+    }
+    return {
+      settings: { ...s.settings, [list]: next, chatListCollapsedSections: collapsed },
+    }
   })
-  void updateSettings({ [list]: next }).catch((err) => {
+  void updateSettings({ [list]: next, chatListCollapsedSections: collapsed }).catch((err) => {
     warn('config: failed to persist favorites:', err instanceof Error ? err.message : String(err))
   })
 }
