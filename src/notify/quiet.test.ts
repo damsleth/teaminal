@@ -98,6 +98,18 @@ describe('decideQuiet', () => {
     ).toBe('bell-only')
   })
 
+  test('an open thread is an active conv too', () => {
+    expect(
+      decideQuiet(
+        ctx({
+          conv: 'thread:t1:ch1:r1',
+          focus: { kind: 'thread', teamId: 't1', channelId: 'ch1', rootId: 'r1' },
+          terminalFocused: true,
+        }),
+      ),
+    ).toBe('bell-only')
+  })
+
   test('notifyActiveBanner overrides active-conv suppression', () => {
     expect(
       decideQuiet(

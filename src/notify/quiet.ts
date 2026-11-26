@@ -91,5 +91,6 @@ export function decideQuiet(ctx: QuietContext): QuietDecision {
 function focusToKey(focus: AppState['focus']): ConvKey | null {
   if (focus.kind === 'chat') return `chat:${focus.chatId}`
   if (focus.kind === 'channel') return `channel:${focus.teamId}:${focus.channelId}`
+  if (focus.kind === 'thread') return `thread:${focus.teamId}:${focus.channelId}:${focus.rootId}`
   return null
 }

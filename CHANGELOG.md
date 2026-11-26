@@ -34,6 +34,8 @@ adheres to [Semantic Versioning](https://semver.org/).
   one failure. That used up the retry budget twice as fast and could reopen a
   push connection for an account that had been stopped or turned off.
 - A late message from a replaced push connection could register on the new one.
+- A mention in the channel thread you have open rings the bell only, like any
+  open conversation, instead of also raising a desktop banner.
 - A malformed push frame is dropped and counted instead of raising an error.
 
 ## [0.27.0] - 2026-11-26
