@@ -7,7 +7,28 @@ import {
   TrouterTransport,
 } from './trouter'
 import { RealtimeEventBus } from './events'
-import { subscribeEvents } from '../log'
+import { __setBackoffSleepForTests } from '../graph/backoff'
+import { subscribeEvents, subscribeRequests, type RequestRecord } from '../log'
+
+const SENTINEL = 'SENTINEL-7f3a'
+
+// Every event and request record while active, for "no secret in the logs"
+// assertions.
+function captureLogs() {
+  const events: string[] = []
+  const requests: RequestRecord[] = []
+  const offEvents = subscribeEvents((e) => events.push(e.message))
+  const offRequests = subscribeRequests((r) => requests.push(r))
+  return {
+    events,
+    requests,
+    text: () => JSON.stringify({ events, requests }),
+    stop: () => {
+      offEvents()
+      offRequests()
+    },
+  }
+}
 
 function makeDummyTransport() {
   const bus = new RealtimeEventBus()
@@ -370,7 +391,7 @@ describe('TrouterTransport state', () => {
 
 describe('resolveSkypeAuth', () => {
   test('returns the minted token when authsvc answers', async () => {
-    expect(await resolveSkypeAuth(async () => 'skype-abc')).toEqual({
+    expect(await resolveSkypeAuth(async () => 'skype-abc', 'alpha')).toEqual({
       skypeToken: 'skype-abc',
       unavailable: false,
     })
@@ -382,8 +403,21 @@ describe('resolveSkypeAuth', () => {
     expect(
       await resolveSkypeAuth(async () => {
         throw new Error('teams authz 410: {"errorCode":"ApiRestricted"}')
-      }),
+      }, 'alpha'),
     ).toEqual({ skypeToken: null, unavailable: true })
+  })
+
+  test('logs the account and status, never the error text', async () => {
+    const logged = captureLogs()
+    try {
+      await resolveSkypeAuth(async () => {
+        throw Object.assign(new Error(`authz refused ${SENTINEL}`), { status: 410 })
+      }, 'alpha')
+    } finally {
+      logged.stop()
+    }
+    expect(logged.text()).toContain('trouter[alpha] authz unavailable (Error status=410)')
+    expect(logged.text()).not.toContain(SENTINEL)
   })
 })
 
@@ -436,8 +470,8 @@ class FakeSocket {
     this.readyState = 3
     if (FakeSocket.closeMode === 'microtask') queueMicrotask(() => this.fireClose())
   }
-  fireClose(code = 1006) {
-    this.onclose?.({ code, reason: '' })
+  fireClose(code = 1006, reason = '') {
+    this.onclose?.({ code, reason })
   }
   open() {
     this.readyState = FakeSocket.OPEN
@@ -791,5 +825,111 @@ describe('TrouterTransport lifecycle', () => {
       expect(h.fetchCalls()).toBe(0)
       expect(t.state).toBe('connecting')
       t.disconnect()
+    }))
+})
+
+describe('TrouterTransport logs', () => {
+  const REGISTRAR_PATH = '/registrar/prod/V2/registrations'
+
+  test('a registrar 500 logs the account and status, never the body, and records the request', () =>
+    withHarness(async (h) => {
+      h.setFetch(async () => fakeResponse(500, `{"error":"${SENTINEL}"}`))
+      const logged = captureLogs()
+      try {
+        const t = makeTransport()
+        await handshake(await startConnect(t))
+        t.disconnect()
+      } finally {
+        logged.stop()
+      }
+      expect(logged.events).toContain('trouter[alpha] registrar status=500 (server error)')
+      expect(logged.events).toContain(
+        'trouter[alpha]: connect failed: registrar status=500 (server error)',
+      )
+      expect(logged.events.every((m) => m.startsWith('trouter[alpha]'))).toBe(true)
+      expect(logged.requests).toHaveLength(1)
+      expect(logged.requests[0]).toMatchObject({
+        method: 'POST',
+        path: REGISTRAR_PATH,
+        account: 'alpha',
+        status: 500,
+      })
+      expect(logged.text()).not.toContain(SENTINEL)
+    }))
+
+  test('two 429s and a success are three request records', () =>
+    withHarness(async (h) => {
+      const statuses = [429, 429, 200]
+      h.setFetch(async () => fakeResponse(statuses.shift()!))
+      __setBackoffSleepForTests(async () => {})
+      const logged = captureLogs()
+      try {
+        const t = makeTransport()
+        await handshake(await startConnect(t))
+        expect(t.state).toBe('connected')
+        t.disconnect()
+      } finally {
+        logged.stop()
+        __setBackoffSleepForTests(null)
+      }
+      expect(logged.requests.map((r) => [r.path, r.account, r.status])).toEqual([
+        [REGISTRAR_PATH, 'alpha', 429],
+        [REGISTRAR_PATH, 'alpha', 429],
+        [REGISTRAR_PATH, 'alpha', 200],
+      ])
+    }))
+
+  test('an aborted and a failed request are records without the error text', () =>
+    withHarness(async (h) => {
+      const logged = captureLogs()
+      try {
+        h.setFetch(
+          (_url, init) =>
+            new Promise((_, reject) =>
+              init.signal!.addEventListener('abort', () =>
+                reject(new Error(`aborted ${SENTINEL}`)),
+              ),
+            ),
+        )
+        const a = makeTransport()
+        await handshake(await startConnect(a))
+        a.disconnect()
+        await flush()
+
+        h.setFetch(async () => {
+          throw new Error(`getaddrinfo ${SENTINEL}.example.com`)
+        })
+        const b = makeTransport('beta')
+        await handshake(await startConnect(b))
+        b.disconnect()
+      } finally {
+        logged.stop()
+      }
+      expect(logged.requests.map((r) => [r.account, r.status, r.error])).toEqual([
+        ['alpha', null, 'aborted'],
+        ['beta', null, 'network'],
+      ])
+      expect(logged.events).toContain('trouter[beta]: connect failed: Error')
+      expect(logged.text()).not.toContain(SENTINEL)
+    }))
+
+  test('socket errors and close reasons are logged as fixed text', () =>
+    withHarness(async (h) => {
+      h.setFetch(async () => fakeResponse(200))
+      const logged = captureLogs()
+      try {
+        const t = makeTransport()
+        const sock = await startConnect(t)
+        await handshake(sock)
+        sock.onerror?.({ message: `tls ${SENTINEL}` })
+        sock.fireClose(1011, `server said ${SENTINEL}`)
+        await flush()
+        t.disconnect()
+      } finally {
+        logged.stop()
+      }
+      expect(logged.events).toContain('trouter[alpha] ws error')
+      expect(logged.events).toContain('trouter[alpha] ws closed code=1011 (server error)')
+      expect(logged.text()).not.toContain(SENTINEL)
     }))
 })

@@ -22,7 +22,7 @@ import { accountRef } from '../account'
 import { decodeJwtClaims } from '../auth/owaPiggy'
 import { getSkypeToken } from '../graph/teamsFederation'
 import { getCachedTrouterUrl } from '../graph/teamsRegion'
-import { debug, recordEvent, warn } from '../log'
+import { debug, recordEvent, recordRequest, warn } from '../log'
 import type { RealtimeEventBus, RealtimeEvent } from './events'
 import type {
   RealtimeTransport,
@@ -51,6 +51,34 @@ const TROUTER_REGISTER_URL = 'https://go.trouter.teams.microsoft.com/v4/a'
 const TEAMS_REGISTRAR_URL = 'https://teams.microsoft.com/registrar/prod/V2/registrations'
 const TROUTER_CLIENT_VERSION = '2026.12.01.1'
 
+// Failures carry only fixed text plus a status or close code, so a message
+// is safe to log. Anything else is logged by its class name: server bodies,
+// close reasons, URLs and token text never reach the log.
+class TrouterFailure extends Error {}
+
+function failureText(err: unknown): string {
+  if (err instanceof TrouterFailure) return err.message
+  if (err instanceof Error && /^[A-Za-z]{1,40}$/.test(err.name)) return err.name
+  return 'error'
+}
+
+function registrarCategory(status: number): string {
+  if (status === 401 || status === 403) return 'unauthorized'
+  if (status === 429) return 'throttled'
+  if (status >= 500) return 'server error'
+  return 'rejected'
+}
+
+function closeCategory(code: number): string {
+  if (code === 1000) return 'normal'
+  if (code === 1001) return 'going away'
+  if (code === 1006) return 'abnormal'
+  if (code === 1008) return 'policy'
+  if (code === 1011) return 'server error'
+  if (code >= 4000 && code < 5000) return 'application'
+  return 'other'
+}
+
 // Resolve the optional Skype token for a trouter session.
 //
 // Registrar authorizes on the IC3 Bearer token — that is what the Teams web
@@ -60,6 +88,7 @@ const TROUTER_CLIENT_VERSION = '2026.12.01.1'
 // throws: aborting the connect here would take push down for no reason.
 export async function resolveSkypeAuth(
   mint: () => Promise<string>,
+  label: string,
 ): Promise<{ skypeToken: string | null; unavailable: boolean }> {
   try {
     return { skypeToken: await mint(), unavailable: false }
@@ -68,12 +97,13 @@ export async function resolveSkypeAuth(
     // trouter section of the events panel still surfaces the failure even
     // though the underlying request logs under the 'graph' source. Warn, not
     // error: push still works without it.
+    const status = (err as { status?: unknown } | null)?.status
     recordEvent(
       'trouter',
       'warn',
-      `trouter authz unavailable, continuing without a skype token: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
+      `trouter[${label}] authz unavailable (${failureText(err)}${
+        typeof status === 'number' ? ` status=${status}` : ''
+      }), continuing without a skype token`,
     )
     return { skypeToken: null, unavailable: true }
   }
@@ -182,15 +212,6 @@ function encodeConnectParams(raw: unknown): string {
   return ''
 }
 
-// Strip the query string from a WS URL so the sensitive trouter
-// session token in `?st=...` never lands in the events log. Keeps host
-// + path so routing / region issues remain debuggable.
-export function sanitizeWsUrlForLog(url: string): string {
-  const q = url.indexOf('?')
-  if (q < 0) return url
-  return `${url.slice(0, q)}?<redacted>`
-}
-
 export function buildTrouterConnectUrl(
   rawTrouterUrl: string | null,
   registrationId: string,
@@ -294,6 +315,10 @@ export class TrouterTransport implements RealtimeTransport {
   // shared per-profile cache in teamsFederation (instead of holding our
   // own copy).
   private profile: string | undefined
+  // Account label for request records, and the `trouter[label]` prefix of
+  // every log line, so N sockets' lines can be told apart.
+  private label: string
+  private tag: string
 
   private ws: WebSocket | null = null
   private skypeToken: string | null = null
@@ -325,6 +350,8 @@ export class TrouterTransport implements RealtimeTransport {
     this.bus = opts.bus
     this.getIc3Token = opts.getIc3Token ?? opts.getToken
     this.profile = opts.profile
+    this.label = accountRef(opts.profile).label
+    this.tag = `trouter[${this.label}]`
   }
 
   get state(): TransportState {
@@ -348,7 +375,7 @@ export class TrouterTransport implements RealtimeTransport {
       await this.openWebSocket(mine)
     } catch (err) {
       if (mine !== this.attempt) return
-      warn('trouter: connect failed:', err instanceof Error ? err.message : String(err))
+      warn(`${this.tag}: connect failed: ${failureText(err)}`)
       this.scheduleReconnect()
     }
   }
@@ -394,12 +421,13 @@ export class TrouterTransport implements RealtimeTransport {
   // header as well; the rest connect without it.
   private async ensureSkypeToken(): Promise<void> {
     if (!this.skypeTokenUnavailable) {
-      const { skypeToken, unavailable } = await resolveSkypeAuth(() =>
-        getSkypeToken({ account: accountRef(this.profile) }),
+      const { skypeToken, unavailable } = await resolveSkypeAuth(
+        () => getSkypeToken({ account: accountRef(this.profile) }),
+        this.label,
       )
       this.skypeToken = skypeToken
       this.skypeTokenUnavailable = unavailable
-      if (skypeToken) debug('trouter: obtained skype token via shared store')
+      if (skypeToken) debug(`${this.tag}: obtained skype token via shared store`)
     }
     this.trouterUrl =
       getCachedTrouterUrl({ account: accountRef(this.profile) }) ?? TROUTER_REGISTER_URL
@@ -412,11 +440,9 @@ export class TrouterTransport implements RealtimeTransport {
     const ic3Token = await this.getIc3Token()
     if (mine !== this.attempt) return
     const tokenSummary = summariseToken(ic3Token)
-    if (tokenSummary) recordEvent('trouter', 'debug', `trouter ic3 token ${tokenSummary}`)
+    if (tokenSummary) recordEvent('trouter', 'debug', `${this.tag} ic3 token ${tokenSummary}`)
     this.wsUrl = buildTrouterConnectUrl(this.trouterUrl, this.registrationId)
-
-    const sanitized = sanitizeWsUrlForLog(this.wsUrl)
-    recordEvent('trouter', 'debug', `trouter ws connecting ${sanitized}`)
+    recordEvent('trouter', 'debug', `${this.tag} ws connecting`)
 
     return new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(this.wsUrl!)
@@ -429,7 +455,7 @@ export class TrouterTransport implements RealtimeTransport {
           try {
             ws.close()
           } catch {}
-          reject(new Error('trouter: websocket authentication timeout'))
+          reject(new TrouterFailure('websocket authentication timeout'))
         }
       }, 15_000)
 
@@ -440,7 +466,7 @@ export class TrouterTransport implements RealtimeTransport {
           } catch {}
           return
         }
-        debug('trouter: websocket upgrade complete')
+        debug(`${this.tag}: websocket upgrade complete`)
         this.startKeepalive()
       }
 
@@ -458,35 +484,31 @@ export class TrouterTransport implements RealtimeTransport {
             resolve()
           })
           .catch((err) => {
-            const message = err instanceof Error ? err.message : String(err)
-            debug('trouter: frame handling error:', message)
+            debug(`${this.tag}: frame handling error: ${failureText(err)}`)
             if (!settled) {
               settled = true
               clearTimeout(timeout)
               try {
                 ws.close()
               } catch {}
-              reject(err instanceof Error ? err : new Error(message))
+              reject(err)
             }
           })
       }
 
-      ws.onerror = (event) => {
-        const msg = (event as ErrorEvent).message ?? 'unknown'
-        warn('trouter: websocket error:', msg)
-        recordEvent('trouter', 'error', `trouter ws error ${msg}`)
+      ws.onerror = () => {
+        warn(`${this.tag}: websocket error`)
+        recordEvent('trouter', 'error', `${this.tag} ws error`)
       }
 
       ws.onclose = (event) => {
         clearTimeout(timeout)
         const closeEvent = event as CloseEvent
         const code = typeof closeEvent.code === 'number' ? closeEvent.code : 0
-        const reason = typeof closeEvent.reason === 'string' ? closeEvent.reason : ''
-        debug('trouter: websocket closed', code, reason)
         recordEvent(
           'trouter',
           'warn',
-          `trouter ws closed code=${code}${reason ? ` reason=${reason.slice(0, 200)}` : ''}`,
+          `${this.tag} ws closed code=${code} (${closeCategory(code)})`,
         )
         if (this.ws === ws) this.ws = null
         // A superseded socket leaves the newer connection's keepalive and
@@ -495,7 +517,7 @@ export class TrouterTransport implements RealtimeTransport {
         if (current) this.clearKeepalive()
         if (!settled) {
           settled = true
-          reject(new Error(`trouter: websocket closed before registration code=${code}`))
+          reject(new TrouterFailure(`websocket closed before registration code=${code}`))
           return
         }
         if (current && !this.disconnecting) {
@@ -515,7 +537,7 @@ export class TrouterTransport implements RealtimeTransport {
           },
         },
       ])
-      recordEvent('trouter', 'debug', 'trouter ws authenticated')
+      recordEvent('trouter', 'debug', `${this.tag} ws authenticated`)
       return false
     }
 
@@ -533,7 +555,7 @@ export class TrouterTransport implements RealtimeTransport {
         recordEvent(
           'trouter',
           'debug',
-          `trouter connected id=${connected.id ? `${connected.id.slice(0, 12)}...` : 'missing'} registrar=${connected.registrarUrl ? 'yes' : 'no'}`,
+          `${this.tag} connected registrar=${connected.registrarUrl ? 'yes' : 'no'}`,
         )
         await this.registerRegistrar(connected)
         return true
@@ -566,9 +588,9 @@ export class TrouterTransport implements RealtimeTransport {
 
   private async registerRegistrar(connected: TrouterConnectedPayload): Promise<void> {
     const path = connected.surl ?? connected.url
-    if (!path) throw new Error('trouter.connected missing surl/url')
+    if (!path) throw new TrouterFailure('trouter.connected missing surl/url')
     const registrationId = this.registrationId
-    if (!registrationId) throw new Error('missing trouter registrationId')
+    if (!registrationId) throw new TrouterFailure('missing trouter registrationId')
 
     const ic3Token = await this.getIc3Token()
     const { url, init } = buildRegistrarRequest({
@@ -580,18 +602,39 @@ export class TrouterTransport implements RealtimeTransport {
     this.registrarAbort?.abort()
     const abort = new AbortController()
     this.registrarAbort = abort
-    const res = await sendWithBackoff(fetch, url, { ...init, signal: abort.signal })
+    // Every HTTP attempt (429 retries and network failures included) is a
+    // request record, so --network-log counts the registrar like Graph.
+    const send = async (u: string, i: RequestInit): Promise<Response> => {
+      const ts = Date.now()
+      const record = (status: number | null, error?: string) =>
+        recordRequest({
+          ts,
+          method: 'POST',
+          path: u,
+          account: this.label,
+          status,
+          durationMs: Date.now() - ts,
+          error,
+        })
+      try {
+        const r = await fetch(u, i)
+        record(r.status)
+        return r
+      } catch (err) {
+        record(null, i.signal?.aborted ? 'aborted' : 'network')
+        throw err
+      }
+    }
+    const res = await sendWithBackoff(send, url, { ...init, signal: abort.signal })
 
     if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      recordEvent(
-        'trouter',
-        'error',
-        `trouter registrar ${res.status} ${res.statusText || ''} body=${text.slice(0, 200).replace(/\s+/g, ' ')}`,
-      )
-      throw new Error(`Trouter registrar ${res.status}: ${text.slice(0, 200)}`)
+      // The body is never read: server error text stays out of the logs.
+      await res.body?.cancel().catch(() => {})
+      const failure = `registrar status=${res.status} (${registrarCategory(res.status)})`
+      recordEvent('trouter', 'error', `${this.tag} ${failure}`)
+      throw new TrouterFailure(failure)
     }
-    recordEvent('trouter', 'debug', `trouter registrar ${res.status}`)
+    recordEvent('trouter', 'debug', `${this.tag} registrar ${res.status}`)
   }
 
   // --- Frame parsing ---
@@ -789,7 +832,7 @@ export class TrouterTransport implements RealtimeTransport {
   // app. Idempotent — safe to call whether the transport is currently
   // connected, error'd, or already retrying.
   retry(): void {
-    recordEvent('trouter', 'info', 'trouter: manual retry requested')
+    recordEvent('trouter', 'info', `${this.tag}: manual retry requested`)
     this.reconnectAttempts = 0
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer)
@@ -807,11 +850,11 @@ export class TrouterTransport implements RealtimeTransport {
     // attempt, so a pending timer (or exhaustion already reported) wins.
     if (this.disconnecting || this.reconnectTimer || this._state === 'error') return
     if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      warn('trouter: max reconnect attempts reached, giving up')
+      warn(`${this.tag}: max reconnect attempts reached, giving up`)
       recordEvent(
         'trouter',
         'warn',
-        'realtime offline — falling back to polling. Trigger a retry from diagnostics.',
+        `${this.tag} realtime offline — falling back to polling. Trigger a retry from diagnostics.`,
       )
       this.setState('error')
       return
@@ -825,7 +868,7 @@ export class TrouterTransport implements RealtimeTransport {
     const jittered = Math.round(delay * (0.8 + Math.random() * 0.4))
     this.reconnectAttempts++
 
-    debug(`trouter: reconnecting in ${jittered}ms (attempt ${this.reconnectAttempts})`)
+    debug(`${this.tag}: reconnecting in ${jittered}ms (attempt ${this.reconnectAttempts})`)
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null
       void this.connect()
