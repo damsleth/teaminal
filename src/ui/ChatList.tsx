@@ -164,10 +164,14 @@ function accountHeaderParts(
             : slice?.realtimeState === 'error'
               ? ' ! push'
               : ''
-  const upn = slice?.me?.userPrincipalName
+  return { counts, status, tenant: tenantSuffix(slice?.me?.userPrincipalName) }
+}
+
+// ` · <domain>` of a user principal name, the account header's tenant hint
+// (also the Notifications modal's group headers), or ''.
+export function tenantSuffix(upn: string | null | undefined): string {
   const at = upn ? upn.lastIndexOf('@') : -1
-  const tenant = upn && at >= 0 && at < upn.length - 1 ? ` · ${upn.slice(at + 1)}` : ''
-  return { counts, status, tenant }
+  return upn && at >= 0 && at < upn.length - 1 ? ` · ${upn.slice(at + 1)}` : ''
 }
 
 export function isNewChatQueryCandidate(filter: string): boolean {
