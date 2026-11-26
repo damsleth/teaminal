@@ -149,6 +149,14 @@ describe('mergeSettings', () => {
     expect(w.some((m) => /"realtimeEnabled" must be a boolean/.test(m))).toBe(true)
   })
 
+  test('validates mouse as a boolean, off by default', () => {
+    const w: string[] = []
+    expect(defaultSettings.mouse).toBe(false)
+    expect(mergeSettings({ mouse: true }, w).mouse).toBe(true)
+    expect(mergeSettings({ mouse: 'yes' }, w).mouse).toBe(false)
+    expect(w.some((m) => /"mouse" must be a boolean/.test(m))).toBe(true)
+  })
+
   test('validates chatListSort enum', () => {
     const w: string[] = []
     expect(mergeSettings({ chatListSort: 'alphabetical' }, w).chatListSort).toBe('alphabetical')
@@ -477,6 +485,7 @@ describe('Settings ↔ config.json parity', () => {
     selfMessagesOnRight: !defaultSettings.selfMessagesOnRight,
     scrollOnNewMessages: !defaultSettings.scrollOnNewMessages,
     enterSends: !defaultSettings.enterSends,
+    mouse: !defaultSettings.mouse,
     showSenderNamesInPane: !defaultSettings.showSenderNamesInPane,
     showOwnNameInPane: !defaultSettings.showOwnNameInPane,
     inlineImages: 'off',

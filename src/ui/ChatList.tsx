@@ -10,6 +10,7 @@
 // re-computed each render.
 
 import { listAnchorRef } from './contextAnchor'
+import { listClipRef, listRowRef } from './listHits'
 import { Box, useApp, useStdout, type DOMElement } from 'ink'
 import { Text } from './Text'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -47,7 +48,9 @@ import {
   firstSelectableIndex,
   isSelectable,
   nextSelectableIndex,
+  NEW_CHAT_ROW,
   resolveCursor,
+  selectableKey,
   shortName,
   visibleList,
   type AccountListSlice,
@@ -606,7 +609,14 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
 
   return (
     <Box
-      ref={listRef}
+      ref={(node: DOMElement | null) => {
+        listRef.current = node
+        const unclip = listClipRef(node)
+        return () => {
+          listRef.current = null
+          unclip?.()
+        }
+      }}
       flexDirection="column"
       flexShrink={0}
       overflow="hidden"
@@ -618,7 +628,12 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         if (row.kind === 'synthetic-new-chat') {
           const isSelected = row.index === safeCursor
           return (
-            <Box key={`new-chat-${row.query}`} flexDirection="row" flexShrink={0}>
+            <Box
+              key={`new-chat-${row.query}`}
+              ref={listRowRef(NEW_CHAT_ROW)}
+              flexDirection="row"
+              flexShrink={0}
+            >
               <Box width={labelWidthFor} flexShrink={0}>
                 <Text
                   color={isSelected ? theme.selected : theme.mutedText}
@@ -652,6 +667,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
           return (
             <Box
               key={`acct-${row.index}`}
+              ref={listRowRef(selectableKey(row.item))}
               flexDirection="row"
               flexShrink={0}
               marginTop={gapAbove(row.item.kind, row.index, accountGap)}
@@ -684,7 +700,12 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
           const hdrBg = isSelected ? (theme.selectedRowBackground ?? undefined) : undefined
           const hdrLabel = rowLabel(row.item)
           return (
-            <Box key={`hdr-${row.index}`} flexDirection="row" flexShrink={0}>
+            <Box
+              key={`hdr-${row.index}`}
+              ref={listRowRef(selectableKey(row.item))}
+              flexDirection="row"
+              flexShrink={0}
+            >
               <Text
                 bold={
                   cross
@@ -758,6 +779,8 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         const stampRgb = stampStyle && presence?.dot === '●' ? presenceRgb(presence.color) : null
         const stamp = stampStyle && stampRgb ? { rgb: stampRgb, style: stampStyle } : undefined
         const rowWidth = previewContentWidth - rowFrame - (withPicture ? thumbColumn : 0)
+        // Click target, and the context menu's anchor while selected.
+        const rowRef = listRowRef(selectableKey(row.item))
         // The selected background covers the whole element: picture column,
         // name line and preview.
         return (
@@ -766,7 +789,14 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
             flexDirection="row"
             flexShrink={0}
             marginBottom={chatListGap}
-            ref={isSelected ? listAnchorRef : undefined}
+            ref={(node: DOMElement | null) => {
+              const unrow = rowRef(node)
+              const unanchor = isSelected ? listAnchorRef(node) : undefined
+              return () => {
+                unrow?.()
+                unanchor?.()
+              }
+            }}
             backgroundColor={rowBg}
             borderStyle={reservedBorder(theme.borders.selectedRow, isSelected)}
             borderColor={theme.selectedRowBorder ?? theme.borderActive}

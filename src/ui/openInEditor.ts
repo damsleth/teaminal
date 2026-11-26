@@ -2,7 +2,8 @@
 // running TUI, then reload what it holds.
 //
 // The editor gets the terminal to itself: raw mode off, the kitty keyboard
-// mode popped, and a blocking spawnSync so Ink reads nothing meanwhile.
+// mode popped, mouse reporting off, and a blocking spawnSync so Ink reads
+// nothing meanwhile.
 // Terminal editors draw on the alternate screen, so teaminal's last frame
 // is back as-is when they exit; GUI editors need a wait flag (`code -w`).
 
@@ -12,6 +13,7 @@ import { getThemePath, loadThemeFile } from '../config/themes'
 import { warn } from '../log'
 import type { AppState, Store } from '../state/store'
 import { kittyKeyboardEnabled } from './kittyKeyboard'
+import { suspendMouseReporting } from './mouseTracker'
 
 type Spawn = (cmd: string, args: string[]) => Pick<SpawnSyncReturns<Buffer>, 'status' | 'error'>
 
@@ -30,6 +32,9 @@ export function runEditor(
   const stdin = process.stdin
   const wasRaw = stdin.isTTY && stdin.isRaw
   const kitty = kittyKeyboardEnabled()
+  // Mouse reporting goes first: the editor must not get reports it never
+  // asked for, and nothing is parsed while it owns the terminal.
+  const resumeMouse = suspendMouseReporting()
   if (wasRaw) stdin.setRawMode(false)
   if (kitty) process.stdout.write('\x1b[<u')
   try {
@@ -43,6 +48,7 @@ export function runEditor(
   } finally {
     if (kitty) process.stdout.write('\x1b[>1u')
     if (wasRaw) stdin.setRawMode(true)
+    resumeMouse()
   }
 }
 

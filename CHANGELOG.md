@@ -6,6 +6,36 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Mouse support, off by default (**Settings → Navigation & input → Mouse
+  support**, config key `mouse`). Click a chat or channel in the sidebar to
+  open it, click a section or account header to collapse or expand it, and
+  scroll the wheel to move through the list or the open conversation. While it
+  is on, selecting text in the terminal needs the terminal's bypass modifier
+  (Shift in most terminals, Option in iTerm2).
+- Diagnostics shows push liveness for the selected account: last event,
+  reconnects and dropped frames.
+- `TEAMINAL_TROUTER_CAPTURE=1` writes redacted push frame shapes to the events
+  log, for reporting push problems. README has a "Push troubleshooting"
+  section.
+- `TEAMINAL_SEED=channels` seeds a team with a threaded channel, for demos and
+  tests.
+
+### Changed
+
+- Push log lines name their account, and push registration requests appear in
+  the network log, so the per-account cost summary includes them. Push logs no
+  longer contain server response bodies, socket URLs or raw error text.
+
+### Fixed
+
+- A push connection that failed while registering scheduled two reconnects for
+  one failure. That used up the retry budget twice as fast and could reopen a
+  push connection for an account that had been stopped or turned off.
+- A late message from a replaced push connection could register on the new one.
+- A malformed push frame is dropped and counted instead of raising an error.
+
 ## [0.27.0] - 2026-11-26
 
 ### Added

@@ -58,6 +58,7 @@ export type ToggleKey =
   | 'messageFocusIndicatorChar'
   | 'scrollOnNewMessages'
   | 'enterSends'
+  | 'mouse'
   | 'selfMessagesOnRight'
   | 'forceAvailableWhenFocused'
   | 'useTeamsPresence'
@@ -371,6 +372,11 @@ export const ROOT_MENU: MenuItem[] = [
         // so this mode would send half-written messages.
         hidden: () => !kittyKeyboardEnabled(),
       },
+      {
+        id: 'mouse',
+        label: 'Mouse support',
+        action: { kind: 'toggle-setting', key: 'mouse' },
+      },
       heading('Notifications'),
       {
         id: 'notifyMuted',
@@ -616,6 +622,7 @@ export function cycleSetting<K extends ToggleKey>(
     case 'selfMessagesOnRight':
     case 'scrollOnNewMessages':
     case 'enterSends':
+    case 'mouse':
     case 'forceAvailableWhenFocused':
     case 'useTeamsPresence':
     case 'realtimeEnabled':
@@ -684,6 +691,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
     case 'selfMessagesOnRight':
     case 'scrollOnNewMessages':
     case 'enterSends':
+    case 'mouse':
     case 'forceAvailableWhenFocused':
     case 'useTeamsPresence':
     case 'realtimeEnabled':

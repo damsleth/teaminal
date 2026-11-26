@@ -14,9 +14,11 @@ import {
   clampCursor,
   collapseKeyFor,
   cursorAt,
+  favoritesFor,
   firstSelectableIndex,
   headerIndexForKey,
   isSelectable,
+  NEW_CHAT_ROW,
   nextSelectableIndex,
   parentCollapseKey,
   resolveCursor,
@@ -153,6 +155,41 @@ function labelForChat(ctx: ListKeysCtx, chat: Chat): string {
   return item?.label ?? chat.topic ?? chat.id
 }
 
+// The filter as a "Create chat with" query: offered as a synthetic row after
+// the list when nothing matches and it looks like a name or an address.
+function newChatQuery(ctx: ListKeysCtx, visible: SelectableItem[]): string | null {
+  return ctx.filter && visible.length === 0 && isNewChatQueryCandidate(ctx.filter)
+    ? ctx.filter.trim()
+    : null
+}
+
+// The cursor's row index. Teams render as non-selectable headers; cursor
+// must skip them. If the stored cursor happens to land on a team (e.g. just
+// after a filter change reordered the list), advance forward to the next
+// selectable item first.
+function safeCursor(ctx: ListKeysCtx, visible: SelectableItem[], selectableCount: number): number {
+  let safe = resolveCursor(visible, selectableCount, ctx.cursorKey ?? null, ctx.cursor)
+  if (safe < visible.length && !isSelectable(visible[safe]!)) {
+    safe = nextSelectableIndex(visible, safe, +1)
+    if (safe < visible.length && !isSelectable(visible[safe]!)) {
+      safe = firstSelectableIndex(visible)
+    }
+  }
+  return safe
+}
+
+// One cursor stop down (1) or up (-1): j / k, and the mouse wheel over the
+// list. Moves the list cursor also while a conversation is open; opens
+// nothing.
+export function stepListCursor(ctx: ListKeysCtx, dir: 1 | -1): void {
+  const visible = listFor(ctx)
+  const selectableCount = visible.length + (newChatQuery(ctx, visible) ? 1 : 0)
+  if (selectableCount === 0) return
+  const next = nextSelectableIndex(visible, safeCursor(ctx, visible, selectableCount), dir)
+  const at = dir > 0 ? Math.min(next, selectableCount - 1) : next
+  ctx.store.set(cursorAt(visible, clampCursor(at, selectableCount)))
+}
+
 export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyResult {
   const { store, exit, refresh, hardRefresh, openNewChatPrompt } = ctx
   const ch = input.toLowerCase()
@@ -244,10 +281,7 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       return 'handled'
     }
     const visible = listFor(ctx)
-    const syntheticNewChatQuery =
-      ctx.filter && visible.length === 0 && isNewChatQueryCandidate(ctx.filter)
-        ? ctx.filter.trim()
-        : null
+    const syntheticNewChatQuery = newChatQuery(ctx, visible)
     const selectableCount = visible.length + (syntheticNewChatQuery ? 1 : 0)
     if (ch === 'n') {
       if (bringToFront(store, cursorAlias(ctx), ctx.toForeground)) openNewChatPrompt(ctx.filter)
@@ -282,26 +316,13 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       }
       return 'pass'
     }
-    // Teams render as non-selectable headers; cursor must skip them.
-    // If the stored cursor happens to land on a team (e.g. just after a
-    // filter change reordered the list), advance forward to the next
-    // selectable item first.
-    let safe = resolveCursor(visible, selectableCount, ctx.cursorKey ?? null, ctx.cursor)
-    if (safe < visible.length && !isSelectable(visible[safe]!)) {
-      safe = nextSelectableIndex(visible, safe, +1)
-      if (safe < visible.length && !isSelectable(visible[safe]!)) {
-        safe = firstSelectableIndex(visible)
-      }
-    }
+    const safe = safeCursor(ctx, visible, selectableCount)
     if (ch === 'j' || key.downArrow) {
-      const next = nextSelectableIndex(visible, safe, +1)
-      const max = selectableCount - 1
-      store.set(cursorAt(visible, clampCursor(Math.min(next, max), selectableCount)))
+      stepListCursor(ctx, 1)
       return 'handled'
     }
     if (ch === 'k' || key.upArrow) {
-      const next = nextSelectableIndex(visible, safe, -1)
-      store.set(cursorAt(visible, clampCursor(next, selectableCount)))
+      stepListCursor(ctx, -1)
       return 'handled'
     }
     if (ch === 'u' || (key as typeof key & { pageUp?: boolean }).pageUp) {
@@ -351,95 +372,10 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       return 'handled'
     }
     if (key.return || ch === 'l' || key.rightArrow) {
-      if (syntheticNewChatQuery && safe === visible.length) {
-        openNewChatPrompt(syntheticNewChatQuery)
-        return 'handled'
-      }
       const it = visible[safe]
-      if (!it) return 'handled'
-      if (it.kind === 'account') {
-        // Enter on a failed account opens the Accounts modal on its row,
-        // where it can be retried.
-        if (key.return && (it.conn === 'authError' || it.conn === 'offline')) {
-          const row = store.get().settings.accounts.indexOf(it.alias)
-          store.set({
-            modal: { kind: 'accounts', mode: 'list', cursor: Math.max(0, row), accounts: [] },
-            inputZone: 'menu',
-          })
-          return 'handled'
-        }
-        // Expand (when collapsed), then move to the account's first row; an
-        // empty account keeps the cursor on its header.
-        if (it.collapsed) setSectionCollapsed(store, collapseKeyFor(it)!, false)
-        const now = listFor(ctx)
-        const at = now.findIndex((row) => selectableKey(row) === selectableKey(it))
-        const next = at < 0 ? at : nextSelectableIndex(now, at, +1)
-        store.set(cursorAt(now, next > at && now[next]?.alias === it.alias ? next : at))
-        return 'handled'
-      }
-      const headerKey = collapseKeyFor(it)
-      // The cross-account block's header is untagged but only exists in the
-      // unified sidebar.
-      const unifiedHeader =
-        it.alias !== undefined || (it.kind === 'section' && it.section === 'crossFavorites')
-      if (headerKey && unifiedHeader) {
-        setSectionCollapsed(store, headerKey, false, it.alias !== undefined)
-        const expanded = listFor(ctx)
-        store.set(cursorAt(expanded, nextSelectableIndex(expanded, safe, +1)))
-        return 'handled'
-      }
-      if (headerKey) {
-        // Only collapsed headers are focusable, so this always expands. The
-        // cursor lands on the first selectable child — for Teams that skips
-        // the (expanded, unselectable) first team header to its channel.
-        setSectionCollapsed(store, headerKey, false)
-        const expanded = buildSelectableList({
-          ...ctx,
-          settings: {
-            ...ctx.settings,
-            chatListCollapsedSections: store.get().settings.chatListCollapsedSections,
-          },
-        })
-        store.set(cursorAt(expanded, nextSelectableIndex(expanded, safe, +1)))
-        return 'handled'
-      }
-      if (it.kind === 'more' && it.alias !== undefined) {
-        // The row's own account expands its section.
-        const section = it.section
-        accountStoreFor(store, accountRef(it.alias)).set((s) => ({
-          expandedChatSections: { ...s.expandedChatSections, [section]: true },
-        }))
-        store.set(cursorAt(listFor(ctx), safe))
-        return 'handled'
-      }
-      if (it.kind === 'more') {
-        // Expanding replaces the `… N more` row with the first hidden chat,
-        // so the cursor stays where it is and lands on real content.
-        const section = it.section
-        const expandedChatSections = { ...store.get().expandedChatSections, [section]: true }
-        store.set({
-          expandedChatSections,
-          ...cursorAt(buildSelectableList({ ...ctx, expandedChatSections }), safe),
-        })
-        return 'handled'
-      }
-      if (it.kind === 'chat' && it.alias !== undefined) {
-        openFocus(store, { kind: 'chat', chatId: it.chat.id }, it.alias, ctx.toForeground)
-      } else if (it.kind === 'channel' && it.alias !== undefined) {
-        openFocus(
-          store,
-          { kind: 'channel', teamId: it.team.id, channelId: it.channel.id },
-          it.alias,
-          ctx.toForeground,
-        )
-      } else if (it.kind === 'chat') {
-        store.set({ focus: { kind: 'chat', chatId: it.chat.id } })
-      } else if (it.kind === 'channel') {
-        store.set({
-          focus: { kind: 'channel', teamId: it.team.id, channelId: it.channel.id },
-        })
-      }
-      // team selection is a no-op in v1 (no team-detail view yet)
+      const rowKey =
+        syntheticNewChatQuery && safe === visible.length ? NEW_CHAT_ROW : it && selectableKey(it)
+      if (rowKey) activateListRow(ctx, rowKey, { enter: key.return })
       return 'handled'
     }
     if (key.escape) {
@@ -449,6 +385,167 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
   }
 
   return 'pass'
+}
+
+// ctx with its list inputs read from the store now instead of at the last
+// render: a click can land after a poll changed the list.
+export function listCtxNow(ctx: ListKeysCtx): ListKeysCtx {
+  const s = ctx.store.get()
+  return {
+    ...ctx,
+    me: s.me,
+    chats: s.chats,
+    teams: s.teams,
+    channelsByTeam: s.channelsByTeam,
+    nameByUserId: s.nameByUserId,
+    settings: {
+      chatListSort: s.settings.chatListSort,
+      chatListGroupByType: s.settings.chatListGroupByType,
+      chatListSectionCap: s.settings.chatListSectionCap,
+      chatListCollapsedSections: s.settings.chatListCollapsedSections,
+    },
+    filter: s.filter,
+    expandedChatSections: s.expandedChatSections,
+    favorites: favoritesFor(s.settings, s.account),
+    cursor: s.cursor,
+    cursorKey: s.cursorKey,
+    focus: s.focus,
+  }
+}
+
+// Open the row with selectable key `key` (Enter / l / right arrow, and a
+// click): a chat or channel opens, a collapsed header expands onto its first
+// row, `… N more` expands its section, the synthetic row opens the new-chat
+// prompt. Works with a conversation open. A key that is no longer in the
+// list does nothing. Only Enter (`enter`) opens the Accounts modal on a
+// failed account header.
+export function activateListRow(ctx: ListKeysCtx, key: string, opts: { enter: boolean }): void {
+  const { store, openNewChatPrompt } = ctx
+  const visible = listFor(ctx)
+  if (key === NEW_CHAT_ROW) {
+    const query = newChatQuery(ctx, visible)
+    if (query) {
+      store.set(cursorAt(visible, visible.length))
+      openNewChatPrompt(query)
+    }
+    return
+  }
+  const safe = visible.findIndex((row) => selectableKey(row) === key)
+  if (safe < 0) return
+  const it = visible[safe]!
+  store.set(cursorAt(visible, safe))
+  if (it.kind === 'account') {
+    // Enter on a failed account opens the Accounts modal on its row,
+    // where it can be retried.
+    if (opts.enter && (it.conn === 'authError' || it.conn === 'offline')) {
+      const row = store.get().settings.accounts.indexOf(it.alias)
+      store.set({
+        modal: { kind: 'accounts', mode: 'list', cursor: Math.max(0, row), accounts: [] },
+        inputZone: 'menu',
+      })
+      return
+    }
+    // Expand (when collapsed), then move to the account's first row; an
+    // empty account keeps the cursor on its header.
+    if (it.collapsed) setSectionCollapsed(store, collapseKeyFor(it)!, false)
+    const now = listFor(ctx)
+    const at = now.findIndex((row) => selectableKey(row) === selectableKey(it))
+    const next = at < 0 ? at : nextSelectableIndex(now, at, +1)
+    store.set(cursorAt(now, next > at && now[next]?.alias === it.alias ? next : at))
+    return
+  }
+  const headerKey = collapseKeyFor(it)
+  // The cross-account block's header is untagged but only exists in the
+  // unified sidebar.
+  const unifiedHeader =
+    it.alias !== undefined || (it.kind === 'section' && it.section === 'crossFavorites')
+  if (headerKey && unifiedHeader) {
+    setSectionCollapsed(store, headerKey, false, it.alias !== undefined)
+    const expanded = listFor(ctx)
+    store.set(cursorAt(expanded, nextSelectableIndex(expanded, safe, +1)))
+    return
+  }
+  if (headerKey) {
+    // Only collapsed headers are focusable, so this always expands. The
+    // cursor lands on the first selectable child — for Teams that skips
+    // the (expanded, unselectable) first team header to its channel.
+    setSectionCollapsed(store, headerKey, false)
+    const expanded = buildSelectableList({
+      ...ctx,
+      settings: {
+        ...ctx.settings,
+        chatListCollapsedSections: store.get().settings.chatListCollapsedSections,
+      },
+    })
+    store.set(cursorAt(expanded, nextSelectableIndex(expanded, safe, +1)))
+    return
+  }
+  if (it.kind === 'more' && it.alias !== undefined) {
+    // The row's own account expands its section.
+    const section = it.section
+    accountStoreFor(store, accountRef(it.alias)).set((s) => ({
+      expandedChatSections: { ...s.expandedChatSections, [section]: true },
+    }))
+    store.set(cursorAt(listFor(ctx), safe))
+    return
+  }
+  if (it.kind === 'more') {
+    // Expanding replaces the `… N more` row with the first hidden chat,
+    // so the cursor stays where it is and lands on real content.
+    const section = it.section
+    const expandedChatSections = { ...store.get().expandedChatSections, [section]: true }
+    store.set({
+      expandedChatSections,
+      ...cursorAt(buildSelectableList({ ...ctx, expandedChatSections }), safe),
+    })
+    return
+  }
+  if (it.kind === 'chat' && it.alias !== undefined) {
+    openFocus(store, { kind: 'chat', chatId: it.chat.id }, it.alias, ctx.toForeground)
+  } else if (it.kind === 'channel' && it.alias !== undefined) {
+    openFocus(
+      store,
+      { kind: 'channel', teamId: it.team.id, channelId: it.channel.id },
+      it.alias,
+      ctx.toForeground,
+    )
+  } else if (it.kind === 'chat') {
+    store.set({ focus: { kind: 'chat', chatId: it.chat.id } })
+  } else if (it.kind === 'channel') {
+    store.set({
+      focus: { kind: 'channel', teamId: it.team.id, channelId: it.channel.id },
+    })
+  }
+  // team selection is a no-op in v1 (no team-detail view yet)
+}
+
+// A click on a header row: collapse it when expanded, expand it (as Enter
+// does) when collapsed. Covers account, section (incl. the cross-account
+// Favorites block) and team headers; a failed account header opens the
+// Accounts modal, as Enter does. While a filter lifts collapse the click does
+// nothing, rather than store a change nobody can see. False when `key` is
+// not a header in the list now.
+export function toggleListHeader(ctx: ListKeysCtx, key: string): boolean {
+  const it = listFor(ctx).find((row) => selectableKey(row) === key)
+  if (!it || (it.kind !== 'account' && it.kind !== 'section' && it.kind !== 'team')) return false
+  const failed = it.kind === 'account' && (it.conn === 'authError' || it.conn === 'offline')
+  if (failed || (it.collapsed && !ctx.filter)) {
+    activateListRow(ctx, key, { enter: true })
+    return true
+  }
+  if (ctx.filter) return true
+  const collapseKey = collapseKeyFor(it)!
+  setSectionCollapsed(ctx.store, collapseKey, true)
+  const now = listFor({
+    ...ctx,
+    settings: {
+      ...ctx.settings,
+      chatListCollapsedSections: ctx.store.get().settings.chatListCollapsedSections,
+    },
+  })
+  const header = headerIndexForKey(now, collapseKey)
+  if (header !== null) ctx.store.set(cursorAt(now, header))
+  return true
 }
 
 // Re-export so consumers can derive focusKey without re-importing the store.

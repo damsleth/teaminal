@@ -132,6 +132,7 @@ warnings and fall back to defaults.
   "selfMessagesOnRight": false,
   "scrollOnNewMessages": true,
   "enterSends": false,
+  "mouse": false,
   "chatListSort": "recent",
   "chatListGroupByType": false,
   "chatListSectionCap": true,
@@ -188,6 +189,7 @@ warnings and fall back to defaults.
 | `selfMessagesOnRight`          | boolean              | `false` | When `true`, your own messages are right-aligned in the message pane (body on the right, sender/timestamp on the left of the body). Other users' messages remain left-aligned. |
 | `scrollOnNewMessages`          | boolean              |  `true` | Jump to a new message when it arrives in the open conversation. `false` keeps the cursor where it is. Also in the menu as **Scroll on new messages**. |
 | `enterSends` | boolean | `false` | Flip the composer keys: Enter sends, Shift+Enter / Ctrl+Enter / Ctrl+J insert a newline. Only takes effect (and only shown in the menu, as **Enter sends**) in terminals with the kitty keyboard protocol, since elsewhere Shift+Enter is indistinguishable from Enter. |
+| `mouse` | boolean | `false` | Mouse support (see [Mouse](#mouse)): click a sidebar row to open it, a header to collapse / expand it; the wheel moves the list and message cursors. Off by default because it takes over the terminal's own text selection. Also in the menu as **Mouse support** (Navigation & input); takes effect at once. |
 | `inlineImages`                 | `auto`, `off`        |  `auto` | `auto` renders message images inline in Kitty-compatible terminals, bounded to `inlineImageMaxRows` tall and the width of the message pane, so an image never overlaps neighbouring messages. `off` — and any terminal without Kitty graphics — renders one focusable `[img] name` row per image instead, reserving no picture rows. Space opens the focused image either way. |
 | `inlineImageMaxRows`           | integer 1-50         |    `10` | Maximum terminal rows reserved for a single inline image.                                |
 | `statusBarPosition`            | `bottom`, `top`, `hidden` | `bottom` | Where the status bar renders: below the composer (`bottom`) or on the top row above the header (`top`). `hidden` suppresses it entirely, freeing one row of vertical space in the message pane. |
@@ -485,6 +487,44 @@ before you share the file, for example
 `sed -e 's/trouter\[beta\]/trouter[account-1]/' -e 's/ @beta$/ @account-1/' /tmp/push-report.txt > /tmp/push-report-shared.txt`
 (anchored, because `beta` is also a resource path segment).
 Share only these lines: the rest of the events log is not reviewed for sharing.
+
+## Mouse
+
+Off by default. Turn it on with **Settings → Navigation & input → Mouse
+support** (or `"mouse": true`), and then:
+
+- a click on a chat, channel or `… N more` row in the sidebar opens it, as
+  Enter does, also while a conversation is open or the composer has focus
+  (the draft is kept);
+- a click on a header (an account, a chat section, Teams, a team, Favorites)
+  collapses it, or expands it when collapsed. A header of an account that
+  failed opens the Accounts modal;
+- the wheel over the sidebar moves the list cursor (it opens nothing); over
+  the conversation it moves the message cursor one message per step, and
+  loads older messages at the top. Each report the terminal sends is one
+  step.
+
+Clicks and the wheel do nothing behind a modal or the new-chat prompt, or
+with Shift / Alt / Ctrl held. A click on a row, or the wheel, takes focus
+out of the composer and keeps the draft.
+
+While it is on, the terminal sends mouse drags to teaminal instead of
+selecting text. Most terminals still select with **Shift** held; iTerm2
+uses **Option**. Which modifier works (if any) depends on the terminal, so
+check its documentation, or switch the setting off to copy text.
+
+Notes:
+
+- teaminal asks for SGR mouse reports (mode 1006), which every current
+  terminal supports. One that does not sends reports teaminal shows as stray
+  text; switch the setting off there.
+- Under tmux, whether clicks reach teaminal depends on tmux's own mouse
+  handling (`set -g mouse on` passes them on to an application that asked
+  for them). Check with your configuration.
+- Reporting is switched off when teaminal quits (`q`, Ctrl+C), exits on an
+  error, or gets SIGINT / SIGTERM / SIGHUP, and while `$EDITOR` runs. After
+  a `kill -9`, clicks in the shell print escape codes: run
+  `printf '\e[?1000l\e[?1006l'` (or `reset`).
 
 ## Keybindings
 

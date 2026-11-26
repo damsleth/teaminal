@@ -12,6 +12,7 @@ import { isSeededMode } from '../src/state/seedFixtures'
 import { App } from '../src/ui/App'
 import { ErrorBoundary } from '../src/ui/ErrorBoundary'
 import { startFocusTracker } from '../src/ui/focusTracker'
+import { startMouseTracker } from '../src/ui/mouseTracker'
 import { probeCellAspect } from '../src/ui/kittyGraphics'
 import {
   kittyKeyboardEnabled,
@@ -230,6 +231,10 @@ process.on('unhandledRejection', (reason) => {
 })
 
 const focusTracker = startFocusTracker(store)
+// After render(), so the pre-Ink probes never see mouse reports we asked for.
+// It also switches reporting off on process exit and on SIGINT / SIGTERM /
+// SIGHUP; the explicit stop() calls below just come first.
+const mouseTracker = startMouseTracker(store)
 
 function makeSessionApi(): SessionApi {
   return {
@@ -265,6 +270,7 @@ let cleanExit = false
       // keeps its slot (authError / offline) and the others run on.
       await accounts.start((kind, msg) => {
         ink.unmount()
+        mouseTracker.stop()
         process.stderr.write(`teaminal: auth failed (${kind}): ${msg}\n`)
         process.exit(3)
       })
@@ -287,6 +293,7 @@ let cleanExit = false
     cleanExit = true
   } catch (err) {
     ink.unmount()
+    mouseTracker.stop()
     if (err instanceof Error) {
       process.stderr.write(`teaminal: ${err.message}\n`)
     } else {
@@ -294,9 +301,13 @@ let cleanExit = false
     }
     process.exit(1)
   } finally {
-    // Best-effort shutdown. Stop the session (push + poll), flush the
-    // caches and reset a picked presence (all in stopAll), then the
-    // hardware-level helpers.
+    // Best-effort shutdown. Mouse reporting off first: stopAll may stall,
+    // and the terminal must not keep sending reports meanwhile. Then stop
+    // the session (push + poll), flush the caches and reset a picked
+    // presence (all in stopAll), then the hardware-level helpers.
+    try {
+      mouseTracker.stop()
+    } catch {}
     try {
       await accounts.stopAll()
     } catch {}

@@ -340,6 +340,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     selfMessagesOnRight: settings.selfMessagesOnRight,
     scrollOnNewMessages: settings.scrollOnNewMessages,
     enterSends: settings.enterSends,
+    mouse: settings.mouse,
     inlineImages: settings.inlineImages,
     inlineImageMaxRows: settings.inlineImageMaxRows,
     statusBarPosition: settings.statusBarPosition,
@@ -661,6 +662,7 @@ function validateAndAssign(
     case 'enterSends':
     case 'statusBarShowKeyHints':
     case 'headerBarCentered':
+    case 'mouse':
       if (typeof value === 'boolean') {
         out[key] = value
         return true

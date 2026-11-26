@@ -21,7 +21,7 @@
 // individual modal components. The dispatcher below only routes the
 // list / chat / filter zones plus a few app-wide shortcuts.
 
-import { Box, useApp, useStdin, useStdout } from 'ink'
+import { Box, useApp, useStdin, useStdout, type DOMElement } from 'ink'
 import { inkBorder } from './theme'
 import { useInput } from './useInput'
 import { useEffect, useRef, useState } from 'react'
@@ -74,10 +74,19 @@ import {
   type FavoriteList,
   type FavoriteTarget,
 } from './keybinds/itemActions'
-import { handleListKeys, listCursorRow, type ListKeysCtx } from './keybinds/listKeys'
+import {
+  activateListRow,
+  handleListKeys,
+  listCtxNow,
+  listCursorRow,
+  stepListCursor,
+  toggleListHeader,
+  type ListKeysCtx,
+} from './keybinds/listKeys'
 import { handleMessageSearchKeys } from './keybinds/messageSearchKeys'
 import { handleResizeKeys } from './keybinds/resizeKeys'
 import { computeLayout } from './layout'
+import { hitsElement, listRowKeyAt } from './listHits'
 import { readMessagePageState, type LoadMoreState } from './messageRows'
 import { messagesForTimelineNavigation } from './renderableMessage'
 import { channelReplyCount, messageFocusables } from './messageFocusables'
@@ -86,6 +95,7 @@ import { usePollerHandleRef } from './PollerContext'
 import { StatusBar } from './StatusBar'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useSessionApi } from './SessionContext'
+import { useMouse } from './useMouse'
 import type { Chat, DirectoryUser } from '../types'
 
 export function shouldShowTailPanels(modal: ModalState | null): boolean {
@@ -489,6 +499,51 @@ export function App() {
   }
   paletteKeyActions.push(...favoriteKeyActions())
 
+  // The wheel over the conversation: one message per report, onto the
+  // message body (j / k also step through attachments). Read from the store,
+  // so several reports in one chunk each count. At the top it loads older.
+  function wheelMessages(dir: 1 | -1): void {
+    const count = activeNavigationMessages.length
+    if (!activeConv || count === 0) return
+    const at = clampCursor(store.get().messageCursorByConvo[activeConv] ?? count - 1, count)
+    if (dir < 0 && at === 0) tryLoadOlder()
+    else setMessageCursor(at + dir)
+  }
+
+  // Mouse (settings.mouse): a left click on a sidebar row opens it, or
+  // collapses / expands a header; the wheel moves the list cursor over the
+  // sidebar and the message cursor over the conversation. Only over the
+  // panes, never behind a modal or the new-chat prompt, and never with a
+  // modifier held. A click from the composer or the filter, and the wheel
+  // from the composer, move to the list zone (the draft and the filter
+  // stay). Positions are those of the last painted frame.
+  const listPaneRef = useRef<DOMElement>(null)
+  const conversationRef = useRef<DOMElement>(null)
+  useMouse((e) => {
+    const { modal: openModal, inputZone: zone, focus: open } = store.get()
+    if (openModal !== null || newChatPrompt !== null) return
+    if (zone !== 'list' && zone !== 'composer' && zone !== 'filter') return
+    if (e.shift || e.meta || e.ctrl) return
+    const overList = hitsElement(listPaneRef.current, e.x, e.y)
+    if (e.kind === 'down' && e.button === 'left' && overList) {
+      const key = listRowKeyAt(e.x, e.y)
+      if (!key) return
+      store.set({ inputZone: 'list' })
+      const ctx = listCtxNow(listCtx)
+      if (!toggleListHeader(ctx, key)) activateListRow(ctx, key, { enter: true })
+      return
+    }
+    if (e.kind !== 'wheel' || !e.wheel) return
+    if (overList) {
+      if (zone === 'composer') store.set({ inputZone: 'list' })
+      stepListCursor(listCtxNow(listCtx), e.wheel)
+    } else if (open.kind !== 'list' && hitsElement(conversationRef.current, e.x, e.y)) {
+      // The pane follows the message cursor only in the list zone.
+      if (zone === 'composer') store.set({ inputZone: 'list' })
+      wheelMessages(e.wheel)
+    }
+  })
+
   // List / chat dispatcher. Tab is shared across both zones (move to
   // composer) so it lives here rather than being duplicated. The
   // per-zone handlers cover the rest.
@@ -652,11 +707,12 @@ export function App() {
       </Box>
       <Box flexDirection="row" flexGrow={1} position="relative">
         {showList && (
-          <Box width={listWidth} flexShrink={0} {...paneBorder('list')}>
+          <Box ref={listPaneRef} width={listWidth} flexShrink={0} {...paneBorder('list')}>
             <ChatList key={unified ? 'unified' : accountId} listPaneWidth={listWidth} />
           </Box>
         )}
         <Box
+          ref={conversationRef}
           display={showConversation ? 'flex' : 'none'}
           flexGrow={1}
           flexShrink={1}

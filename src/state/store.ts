@@ -487,6 +487,9 @@ export type Settings = {
   scrollOnNewMessages: boolean
   // Composer: Enter sends and Shift/Ctrl+Enter is a newline (flipped default).
   enterSends: boolean
+  // Mouse: click a sidebar row, wheel through the list and messages. Off by
+  // default: reporting takes over the terminal's own text selection.
+  mouse: boolean
   // Inline image rendering for message attachments.
   // 'auto': show images via Kitty graphics protocol when the terminal
   //   supports it (KITTY_WINDOW_ID / TERM=xterm-kitty); fall back to
@@ -641,6 +644,7 @@ export const defaultSettings: Settings = {
   selfMessagesOnRight: false,
   scrollOnNewMessages: true,
   enterSends: false,
+  mouse: false,
   inlineImages: 'auto',
   inlineImageMaxRows: 10,
   statusBarPosition: 'bottom',
