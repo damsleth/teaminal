@@ -76,7 +76,8 @@ function scanImports(fileName: string, source: string): ImportRef[] {
       out.push({ specifier: node.moduleReference.expression.text, typeOnly: node.isTypeOnly })
     } else if (
       ts.isCallExpression(node) &&
-      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) && node.expression.text === 'require')) &&
       node.arguments[0] &&
       ts.isStringLiteralLike(node.arguments[0])
     ) {
@@ -137,6 +138,7 @@ describe('architecture: import scanner', () => {
       "let f: import('../graph/me').Me",
       "import { type G } from '../graph/presence'",
       "import 'node:fs'",
+      "const cp = require('node:child_process')",
     ].join('\n')
     expect(scanImports(file, src)).toEqual([
       { specifier: '../auth/owaPiggy', typeOnly: false },
@@ -147,6 +149,7 @@ describe('architecture: import scanner', () => {
       { specifier: '../graph/me', typeOnly: true },
       { specifier: '../graph/presence', typeOnly: false },
       { specifier: 'node:fs', typeOnly: false },
+      { specifier: 'node:child_process', typeOnly: false },
     ])
   })
 
@@ -239,7 +242,8 @@ const SPAWNERS = [
 ]
 
 function spawnsProcess(file: string): boolean {
-  if (importsOf(file).some((r) => /^(node:)?child_process$/.test(r.specifier) && !r.typeOnly))
+  // child_process in any form; any value import of 'bun' ({ spawn, $ }).
+  if (importsOf(file).some((r) => /^((node:)?child_process|bun)$/.test(r.specifier) && !r.typeOnly))
     return true
   let found = false
   const visit = (node: ts.Node): void => {
@@ -290,6 +294,14 @@ function setsAuthorizationHeader(source: string, fileName = 'x.ts'): boolean {
   const visit = (node: ts.Node): void => {
     // { Authorization: ... } / { 'authorization': ... }
     if (ts.isPropertyAssignment(node) && isAuthorization(node.name)) found = true
+    // headers['Authorization'] = ...
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ts.isElementAccessExpression(node.left) &&
+      isAuthorization(node.left.argumentExpression)
+    )
+      found = true
     // headers.set('Authorization', ...) / headers.append(...)
     if (
       ts.isCallExpression(node) &&
@@ -311,6 +323,7 @@ describe('architecture: Authorization headers', () => {
       true,
     )
     expect(setsAuthorizationHeader("h.set('authorization', t)")).toBe(true)
+    expect(setsAuthorizationHeader("h['Authorization'] = t")).toBe(true)
     expect(setsAuthorizationHeader("// Authorization: Bearer\nif (k === 'authorization') {}")).toBe(
       false,
     )
