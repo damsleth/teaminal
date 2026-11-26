@@ -11,7 +11,7 @@
 
 import { listAnchorRef } from './contextAnchor'
 import { listClipRef, listRowRef } from './listHits'
-import { Box, useApp, useStdout, type DOMElement } from 'ink'
+import { Box, type DOMElement } from 'ink'
 import { Text } from './Text'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -36,7 +36,7 @@ import {
 import { reservedBorder, rgbOf } from './theme'
 import type { InlineImageSlots } from './inlineImageLayout'
 import { isKittyCapable } from './kittyGraphics'
-import { requestKittyPaint, setKittyOwner } from './kittyPainter'
+import { useKittyOwner } from './hooks/useKittyOwner'
 import { initialsOf, PictureSlot } from './PictureSlot'
 import { useSessionApi } from './SessionContext'
 import {
@@ -305,8 +305,6 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
   // only when one of its inputs changed.
   const unifiedSelector = useMemo(cachedUnifiedListInput, [])
   const unified = useAppState(unifiedSelector)
-  const { stdout } = useStdout()
-  const { waitUntilRenderFlush } = useApp()
   const [, setPictureRevision] = useState(0)
   const listRef = useRef<DOMElement>(null)
   const pictureSlots = useRef<InlineImageSlots>(new Map())
@@ -545,36 +543,28 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
     }
   })
   // Painted by the shared kitty painter, alongside the message pane's images.
-  useEffect(() => {
-    // Off: stay out of the painter, so chat-list re-renders (presence,
-    // unread) don't clear and re-place the message pane's images.
-    if (!stdout || thumbRows === 0) {
-      setKittyOwner('chat-list', null)
-      return
-    }
-    setKittyOwner('chat-list', {
-      viewport: () => listRef.current,
-      slots: pictureSlots.current,
-      escape: (cacheKey, rows, fallbackKey, stamp) => {
-        if (isGeneratedKey(cacheKey)) return iconEscape(cacheKey, rows, stamp)
-        // Unified sidebar slots carry their owner in the key.
-        const owned = splitOwnedImageKey(cacheKey)
-        const owner = owned ? owned.account : accountId
-        const key = owned ? owned.key : cacheKey
-        const data = getImageData(owner, key)
-        const photo =
-          data && owner ? avatarEscape(ownedImageKey(owner, key), data, rows, stamp) : ''
-        return photo || (fallbackKey ? iconEscape(fallbackKey, rows, stamp) : '')
-      },
-    })
-    requestKittyPaint({ stdout, flush: waitUntilRenderFlush, suppressed: modalOpen })
-  })
-  useEffect(
-    () => () => {
-      setKittyOwner('chat-list', null)
-      requestKittyPaint()
-    },
-    [],
+  // Off: stay out of the painter, so chat-list re-renders (presence,
+  // unread) don't clear and re-place the message pane's images.
+  useKittyOwner(
+    'chat-list',
+    thumbRows === 0
+      ? null
+      : {
+          viewport: () => listRef.current,
+          slots: pictureSlots.current,
+          escape: (cacheKey, rows, fallbackKey, stamp) => {
+            if (isGeneratedKey(cacheKey)) return iconEscape(cacheKey, rows, stamp)
+            // Unified sidebar slots carry their owner in the key.
+            const owned = splitOwnedImageKey(cacheKey)
+            const owner = owned ? owned.account : accountId
+            const key = owned ? owned.key : cacheKey
+            const data = getImageData(owner, key)
+            const photo =
+              data && owner ? avatarEscape(ownedImageKey(owner, key), data, rows, stamp) : ''
+            return photo || (fallbackKey ? iconEscape(fallbackKey, rows, stamp) : '')
+          },
+        },
+    modalOpen,
   )
 
   // Filter banner: shown while typing a filter, and when a filter is
