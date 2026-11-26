@@ -5,6 +5,11 @@
 // about (recordNotification, kind 'message'). j/k navigates, Enter jumps the main view to the
 // source chat + message. Esc closes.
 //
+// Several accounts open (the unified sidebar): every open account's feed,
+// grouped under an account header in sidebar order, accounts without items
+// left out. Enter brings an item's account to the front first; mark-read
+// writes to the owning account.
+//
 // The list is dedup'd at the reducer (mergeActivityItems) so the same
 // activity arriving twice — once via initial hydrate, once via trouter
 // push reconcile — renders as one row.
@@ -14,11 +19,14 @@ import { Box, useApp } from 'ink'
 import { Text } from './Text'
 import { inkBorder, modalBg } from './theme'
 import { useInput } from './useInput'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
+import { accountRef, type AccountRef } from '../account'
 import type { ActivityItem } from '../graph/teamsActivity'
-import { accountStore } from '../state/accountStore'
-import { countUnreadMentions, markActivityRead, refreshActivityFeed } from '../state/activityFeed'
-import { foregroundLabel, labelSuffix } from '../state/selectables'
+import { accountStore, accountStoreFor } from '../state/accountStore'
+import { markAccountActivityRead, refreshActivityFeed } from '../state/activityFeed'
+import { tenantSuffix } from './ChatList'
+import { bringToFront } from './keybinds/itemActions'
+import { useSessionApi } from './SessionContext'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { localDate } from './localTime'
 
@@ -63,24 +71,73 @@ function relativeTime(iso: string, now: number): string {
 
 const VISIBLE_ROWS = 14
 
+// One account's items. `alias` is set only when grouped (several accounts).
+type Group = { ref: AccountRef; alias?: string; tenant: string; items: ActivityItem[] }
+type Entry = { item: ActivityItem; group: Group }
+// A rendered line: an account header (grouped only) or the entry at `index`.
+type Row = { header: Group } | { entry: Entry; index: number }
+
 export function ActivityModal() {
   const { exit } = useApp()
   const store = useAppStore()
+  const session = useSessionApi()
   const modal = useAppState((s) => s.modal)
-  const items = useAppState((s) => s.activityFeed)
+  const account = useAppState((s) => s.account)
+  const activityFeed = useAppState((s) => s.activityFeed)
+  const me = useAppState((s) => s.me)
+  const backgroundAccounts = useAppState((s) => s.backgroundAccounts)
+  const aliases = useAppState((s) => s.settings.accounts)
   const theme = useTheme()
-  // Several accounts open: the foreground account's label.
-  const accountLabel = useAppState(foregroundLabel)
   const isOpen = modal?.kind === 'activity'
   const cursor = isOpen ? modal.cursor : 0
 
+  // Grouped when two or more accounts are open (the unified sidebar's
+  // condition), in its order; otherwise the foreground's feed, no header.
+  const { grouped, groups } = useMemo(() => {
+    const open: Group[] = aliases.flatMap((alias) => {
+      const ref = accountRef(alias)
+      const slice = account?.id === ref.id ? { activityFeed, me } : backgroundAccounts[ref.id]
+      if (!slice) return []
+      return [
+        {
+          ref,
+          alias,
+          tenant: tenantSuffix(slice.me?.userPrincipalName),
+          items: slice.activityFeed,
+        },
+      ]
+    })
+    if (open.length > 1) return { grouped: true, groups: open.filter((g) => g.items.length > 0) }
+    const single: Group[] = account ? [{ ref: account, tenant: '', items: activityFeed }] : []
+    return { grouped: false, groups: single }
+  }, [aliases, account, activityFeed, me, backgroundAccounts])
+
+  // The cursor indexes entries across groups, so headers are never stops.
+  const { entries, rows } = useMemo(() => {
+    const entries: Entry[] = []
+    const rows: Row[] = []
+    for (const group of groups) {
+      if (grouped) rows.push({ header: group })
+      for (const item of group.items) {
+        const entry = { item, group }
+        rows.push({ entry, index: entries.length })
+        entries.push(entry)
+      }
+    }
+    return { entries, rows }
+  }, [grouped, groups])
+
   // On open, opportunistically refresh from the server so the user sees
-  // any items that arrived between the last reconcile and now.
+  // any items that arrived between the last reconcile and now. Concurrent
+  // mode: every running account, each through its own AccountStore.
   useEffect(() => {
     // No account at all (every account removed): nothing to refresh.
     if (!isOpen || !store.get().account) return
-    void refreshActivityFeed(accountStore(store))
-  }, [isOpen, store])
+    const targets = session.concurrent
+      ? session.running().map((ref) => accountStoreFor(store, ref))
+      : [accountStore(store)]
+    for (const target of targets) void refreshActivityFeed(target)
+  }, [isOpen, store, session])
 
   useInput(
     (input, key) => {
@@ -95,7 +152,7 @@ export function ActivityModal() {
         return
       }
       if (ch === 'j' || key.downArrow) {
-        const next = Math.min(items.length - 1, cursor + 1)
+        const next = Math.min(entries.length - 1, cursor + 1)
         store.set({ modal: { kind: 'activity', cursor: next } })
         return
       }
@@ -105,52 +162,26 @@ export function ActivityModal() {
         return
       }
       if (ch === 'a') {
-        // Mark all as read locally. CSA exposes a server-side "mark
-        // read" endpoint, but we don't roundtrip it — the local count
-        // resets, which is what matters for the unread badge.
-        store.set((s) => {
-          const next = markActivityRead(s.activityFeed, 'all')
-          return {
-            activityFeed: next,
-            unreadMentionCount: countUnreadMentions(next),
-          }
-        })
+        // Mark all as read locally, in every account shown.
+        for (const g of groups) markAccountActivityRead(accountStoreFor(store, g.ref), 'all')
         return
       }
-      if (key.return && items[cursor]) {
-        const item = items[cursor]
+      const entry = entries[cursor]
+      if (key.return && entry) {
+        const { item, group } = entry
+        markAccountActivityRead(accountStoreFor(store, group.ref), [item.id])
         const chatId = item.chatId
-        if (chatId) {
-          // Open the source chat. Channel ids start with 19:...@thread.tacv2;
-          // chat ids look like 19:meeting_... or 19:..._@unq.gbl.spaces.
-          // Without a channel/team mapping at hand, dispatch to a chat focus
-          // — the existing list/realtime reconcile will surface unknown
-          // chats. (Channel jump is left as a follow-up.)
-          if (chatId.includes('@thread.tacv2')) {
-            // Channel — we don't have teamId here, fall through and just close.
-            // A future iteration can index channelsByTeam to resolve.
-          } else {
-            store.set((s) => {
-              const next = markActivityRead(s.activityFeed, [item.id])
-              return {
-                focus: { kind: 'chat', chatId },
-                modal: null,
-                inputZone: 'list',
-                activityFeed: next,
-                unreadMentionCount: countUnreadMentions(next),
-              }
-            })
-            return
-          }
-        }
-        // No chatId or unsupported jump target: at least mark this row as read.
-        store.set((s) => {
-          const next = markActivityRead(s.activityFeed, [item.id])
-          return {
-            activityFeed: next,
-            unreadMentionCount: countUnreadMentions(next),
-          }
-        })
+        // Open the source chat. Channel ids end in @thread.tacv2; without a
+        // channel/team mapping at hand such an item (or one without a
+        // chatId) is only marked read. Channel jump is left as a follow-up.
+        // Unknown chats surface through the list/realtime reconcile.
+        if (!chatId || chatId.includes('@thread.tacv2')) return
+        // Another account's item: its account comes to the front first, as
+        // when the unified sidebar opens one of its rows. Stops if that put
+        // up the auth-expired modal.
+        const toForeground = (alias: string) => session.setForeground(alias, { restoreUi: false })
+        if (!bringToFront(store, group.alias, toForeground)) return
+        store.set({ focus: { kind: 'chat', chatId }, modal: null, inputZone: 'list' })
       }
     },
     { isActive: isOpen },
@@ -158,14 +189,15 @@ export function ActivityModal() {
 
   if (!isOpen) return null
 
-  // Sliding window over the items list.
+  // Sliding window over the rendered rows, keeping the cursor's in view.
+  const cursorRow = rows.findIndex((r) => 'entry' in r && r.index === cursor)
   const top = Math.max(
     0,
-    Math.min(items.length - VISIBLE_ROWS, cursor - Math.floor(VISIBLE_ROWS / 2)),
+    Math.min(rows.length - VISIBLE_ROWS, cursorRow - Math.floor(VISIBLE_ROWS / 2)),
   )
-  const visible = items.slice(top, top + VISIBLE_ROWS)
+  const visible = rows.slice(top, top + VISIBLE_ROWS)
   const now = Date.now()
-  const totalUnread = items.filter((it) => !it.isRead).length
+  const totalUnread = entries.filter((e) => !e.item.isRead).length
 
   return (
     <Box alignItems="center" justifyContent="center" flexGrow={1}>
@@ -180,23 +212,32 @@ export function ActivityModal() {
         maxWidth="100%"
       >
         <Text bold={theme.emphasis.modalTitleBold}>
-          Notifications{labelSuffix(accountLabel)}
+          Notifications
           {totalUnread > 0 ? ` (${totalUnread} unread)` : ''}
         </Text>
         <Box height={1} />
-        {items.length === 0 ? (
+        {entries.length === 0 ? (
           <Text muted>(no notifications)</Text>
         ) : (
-          visible.map((it, i) => {
-            const absIdx = top + i
-            const focused = absIdx === cursor
+          visible.map((row) => {
+            if ('header' in row) {
+              const { ref, tenant } = row.header
+              return (
+                <Text key={`account:${ref.id}`}>
+                  <Text bold>{ref.label}</Text>
+                  <Text muted>{tenant}</Text>
+                </Text>
+              )
+            }
+            const it = row.entry.item
+            const focused = row.index === cursor
             const arrow = focused ? '>' : ' '
             const sender = fitCells(it.senderDisplayName ?? '?', 18)
             const preview = fitCells(it.preview ?? '', 40)
             const when = relativeTime(it.createdAt, now).padStart(4)
             const unreadDot = it.isRead ? ' ' : '●'
             return (
-              <Text key={it.id}>
+              <Text key={`${row.entry.group.ref.id}/${it.id}`}>
                 <Text color={theme.selected}>{arrow} </Text>
                 <Text color={theme.warnText}>{unreadDot} </Text>
                 <Text>{kindGlyph(it.kind)} </Text>
