@@ -65,6 +65,7 @@ const THEME_KEYS = new Set<keyof ThemeOverrides>([
   'senderMessageBorder',
   'chatListPreviewText',
   'accountHeader',
+  'crossFavoritesHeader',
   'appBackground',
   'systemEvent',
   'dateMarker',
@@ -128,6 +129,7 @@ const EMPHASIS_KEYS = new Set<keyof NonNullable<ThemeOverrides['emphasis']>>([
   'modalTitleBold',
   'sectionHeadingBold',
   'accountHeaderBold',
+  'crossFavoritesHeaderBold',
   'selectedBold',
   'focusedBold',
   'dateMarkerBold',
@@ -308,6 +310,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     showPresenceInList: settings.showPresenceInList,
     showFavorites: settings.showFavorites,
     favoritesByAccount: cloneIdLists(settings.favoritesByAccount),
+    crossAccountFavorites: cloneIdLists(settings.crossAccountFavorites),
     showTimestampsInPane: settings.showTimestampsInPane,
     centerDateMarkers: settings.centerDateMarkers,
     messageAvatars: settings.messageAvatars,
@@ -484,6 +487,7 @@ function cloneSettings(settings: Settings): Settings {
     chatRoutingByAccount: { ...settings.chatRoutingByAccount },
     chatListCollapsedSections: { ...settings.chatListCollapsedSections },
     favoritesByAccount: cloneIdLists(settings.favoritesByAccount),
+    crossAccountFavorites: cloneIdLists(settings.crossAccountFavorites),
   }
 }
 
@@ -803,7 +807,8 @@ function validateAndAssign(
       out.chatListCollapsedSections = out2
       return true
     }
-    case 'favoritesByAccount': {
+    case 'favoritesByAccount':
+    case 'crossAccountFavorites': {
       const parsed = validateIdLists(key, value, warnings)
       if (!parsed) return false
       out[key] = parsed

@@ -284,6 +284,7 @@ export type ThemeColorOverrides = {
   senderMessageBorder?: string | null
   chatListPreviewText?: string | null
   accountHeader?: string | null
+  crossFavoritesHeader?: string | null
   systemEvent?: string | null
   dateMarker?: string | null
   errorText?: string | null
@@ -330,6 +331,7 @@ export type ThemeOverrides = ThemeColorOverrides & {
     modalTitleBold: boolean
     sectionHeadingBold: boolean
     accountHeaderBold: boolean
+    crossFavoritesHeaderBold: boolean
     selectedBold: boolean
     focusedBold: boolean
     dateMarkerBold: boolean
@@ -401,6 +403,10 @@ export type Settings = {
   // owa-piggy default profile). Each id is `chat:<chatId>` or
   // `channel:<teamId>/<channelId>`. Local only: never written to Teams.
   favoritesByAccount: Record<string, string[]>
+  // Cross-account favorites (Ctrl+F), same keys and ids: one Favorites block
+  // above every account in the unified sidebar. An item in both lists shows
+  // here only.
+  crossAccountFavorites: Record<string, string[]>
   // 'transient': only on a message sent a while after the previous one
   // (TRANSIENT_TIMESTAMP_GAP_MS in MessagePane).
   showTimestampsInPane: 'off' | 'on' | 'transient'
@@ -594,6 +600,7 @@ export const defaultSettings: Settings = {
   showPresenceInList: true,
   showFavorites: true,
   favoritesByAccount: {},
+  crossAccountFavorites: {},
   showTimestampsInPane: 'on',
   centerDateMarkers: false,
   messageAvatars: 'off',

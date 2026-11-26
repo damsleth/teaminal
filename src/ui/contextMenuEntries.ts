@@ -64,6 +64,14 @@ export function contextMenuEntries(
         key: 'f',
         run: () => toggleFavorite(store, 'favoritesByAccount', t),
       },
+      {
+        id: 'cross-favorite',
+        label: isFavorite(state.settings, 'crossAccountFavorites', t)
+          ? 'Remove from cross-account favorites'
+          : 'Add to cross-account favorites',
+        key: 'Ctrl+F',
+        run: () => toggleFavorite(store, 'crossAccountFavorites', t),
+      },
     ]
   }
   if (target.kind === 'channel') {

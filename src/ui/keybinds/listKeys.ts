@@ -254,15 +254,16 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       if (bringToFront(store, cursorAlias(ctx), ctx.toForeground)) openNewChatPrompt(ctx.filter)
       return 'handled'
     }
-    // f toggles the chat or channel row in its own account's favorites
-    // (no account switch). The row keeps its key as it moves between
+    // f toggles the chat or channel row in its own account's favorites,
+    // Ctrl+F in the cross-account favorites (still keyed by the row's
+    // account; no account switch). The row keeps its key as it moves between
     // sections, so the cursor goes with it. Other rows: nothing.
-    if (input === 'f' && !key.ctrl) {
+    if ((input === 'f' && !key.ctrl) || (key.ctrl && ch === 'f')) {
       const safe = resolveCursor(visible, selectableCount, ctx.cursorKey ?? null, ctx.cursor)
       const target = favoriteTarget(store, visible[safe])
       if (target) {
         store.set(cursorAt(visible, safe))
-        toggleFavorite(store, 'favoritesByAccount', target)
+        toggleFavorite(store, key.ctrl ? 'crossAccountFavorites' : 'favoritesByAccount', target)
       }
       return 'handled'
     }
@@ -378,8 +379,12 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
         return 'handled'
       }
       const headerKey = collapseKeyFor(it)
-      if (headerKey && it.alias !== undefined) {
-        setSectionCollapsed(store, headerKey, false, true)
+      // The cross-account block's header is untagged but only exists in the
+      // unified sidebar.
+      const unifiedHeader =
+        it.alias !== undefined || (it.kind === 'section' && it.section === 'crossFavorites')
+      if (headerKey && unifiedHeader) {
+        setSectionCollapsed(store, headerKey, false, it.alias !== undefined)
         const expanded = listFor(ctx)
         store.set(cursorAt(expanded, nextSelectableIndex(expanded, safe, +1)))
         return 'handled'

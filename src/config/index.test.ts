@@ -430,6 +430,7 @@ describe('Settings ↔ config.json parity', () => {
     showPresenceInList: !defaultSettings.showPresenceInList,
     showFavorites: !defaultSettings.showFavorites,
     favoritesByAccount: { 'profile-a': ['chat:c1', 'channel:t1/ch1'], '': ['chat:c2'] },
+    crossAccountFavorites: { 'profile-b': ['chat:c3'] },
     showTimestampsInPane: 'transient',
     centerDateMarkers: !defaultSettings.centerDateMarkers,
     messageAvatars: 'large',
@@ -492,9 +493,9 @@ describe('Settings ↔ config.json parity', () => {
 
   test('account header theme tokens round-trip through themeOverrides', () => {
     const themeOverrides = {
-      dark: { accountHeader: 'magenta' },
+      dark: { accountHeader: 'magenta', crossFavoritesHeader: '#336699' },
       layout: { accountGap: 2 },
-      emphasis: { accountHeaderBold: false },
+      emphasis: { accountHeaderBold: false, crossFavoritesHeaderBold: false },
     }
     const warnings: string[] = []
     const settings = configToSettings({ themeOverrides } as Record<string, unknown>, warnings)

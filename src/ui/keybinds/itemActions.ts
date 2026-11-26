@@ -131,8 +131,9 @@ export function openChat(
   openFocus(store, { kind: 'chat', chatId }, alias, toForeground)
 }
 
-// The favorites list `f` toggles.
-export type FavoriteList = 'favoritesByAccount'
+// The favorites list `f` (an account's own) or Ctrl+F (cross-account)
+// toggles.
+export type FavoriteList = 'favoritesByAccount' | 'crossAccountFavorites'
 
 // What a favorite toggle acts on: an account's key (favoritesKey) and an
 // item id (favoriteId).

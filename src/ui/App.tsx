@@ -439,6 +439,14 @@ export function App() {
         keys: 'f',
         run: () => toggleFavorite(store, 'favoritesByAccount', t),
       },
+      {
+        id: 'cross-favorite',
+        title: isFavorite(store.get().settings, 'crossAccountFavorites', t)
+          ? 'Remove from cross-account favorites'
+          : 'Add to cross-account favorites',
+        keys: 'Ctrl+F',
+        run: () => toggleFavorite(store, 'crossAccountFavorites', t),
+      },
     ]
   }
 

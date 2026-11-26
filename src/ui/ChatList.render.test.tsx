@@ -248,3 +248,43 @@ test('unified sidebar: accountGap puts blank rows above the next account header;
   expect(bottom.some((l) => l.includes('OPS CHANNEL'))).toBe(true)
   expect(bottom.length).toBeLessThanOrEqual(15)
 })
+
+test('unified sidebar: the cross-account block names each row’s account; the gap follows it', () => {
+  const store = createAppStore()
+  applySeededState(openAccount(store, accountRef('alpha'), { foreground: true }), 'alpha')
+  applySeededState(openAccount(store, accountRef('beta'), { foreground: false }), 'beta')
+  const chatId = store.get().chats[0]!.id
+  store.set((s) => ({
+    settings: {
+      ...s.settings,
+      accounts: ['alpha', 'beta'],
+      crossAccountFavorites: { beta: [`chat:${chatId}`] },
+      themeOverrides: {
+        layout: { accountGap: 1 },
+        dark: { crossFavoritesHeader: '#ff0000' },
+        light: { crossFavoritesHeader: '#ff0000' },
+      },
+    },
+    cursor: 1,
+    cursorKey: null,
+  }))
+  const raw = renderToString(
+    <StoreProvider store={store}>
+      <SessionProvider api={session}>
+        <ChatList listPaneWidth={40} />
+      </SessionProvider>
+    </StoreProvider>,
+    { columns: 40 },
+  ).split('\n')
+  // eslint-disable-next-line no-control-regex
+  const lines = raw.map((l) => l.replace(/\x1b\[[0-9;]*m/g, ''))
+  expect(lines[0]).toBe('▾ Favorites')
+  expect(raw[0]).toContain('38;2;255;0;0m')
+  expect(lines[1]).toContain('ADA BYRON · beta')
+  // The block's row (plus its preview), a gap row, then alpha's header.
+  const alpha = lines.findIndex((l) => l.startsWith('▾ alpha'))
+  expect(lines[alpha - 1]!.trim()).toBe('')
+  expect(lines[alpha - 2]!.trim()).not.toBe('')
+  // beta's own list no longer has the chat.
+  expect(lines.filter((l) => l.includes('ADA BYRON'))).toHaveLength(1)
+})

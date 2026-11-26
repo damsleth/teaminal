@@ -28,6 +28,7 @@ const BINDINGS: Binding[] = [
   { keys: 'h / ←', when: 'list', action: 'collapse section (chat type / team / Teams)' },
   { keys: 'n', when: 'list', action: 'new chat prompt' },
   { keys: 'f', when: 'list', action: 'add / remove the chat or channel in Favorites' },
+  { keys: 'Ctrl+F', when: 'list', action: 'same, in the cross-account Favorites' },
   { keys: 'Ctrl+D', when: 'list / chat', action: 'delete chat (confirm y/n)' },
   { keys: 'Ctrl+B', when: 'list / chat', action: 'hide / show chat list (single pane)' },
   { keys: 'j / ↓', when: 'chat / channel', action: 'next message / attachment' },

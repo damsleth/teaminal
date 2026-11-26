@@ -470,6 +470,34 @@ describe('unified sidebar (M2 F.3)', () => {
     )
   })
 
+  test('Ctrl+F moves the row to the cross-account block; h / Enter collapse and reopen it', () => {
+    const u = unified()
+    // account:alpha, alpha a, alpha b, account:beta, beta a
+    for (let i = 0; i < 4; i++) u.press('j')
+    u.press('f', { ctrl: true })
+    expect(u.swaps).toEqual([])
+    expect(u.store.get().settings.crossAccountFavorites).toEqual({ beta: ['chat:a'] })
+    expect(u.store.get().settings.favoritesByAccount).toEqual({})
+    const list = () => visibleList(unifiedListInput(u.store.get())!)
+    expect(list()[0]).toMatchObject({ kind: 'section', section: 'crossFavorites' })
+    expect(list()[1]).toMatchObject({ kind: 'chat', alias: 'beta', favorite: 'crossFavorites' })
+    // The cursor followed the row to the top.
+    const at = () =>
+      resolveCursor(list(), list().length, u.store.get().cursorKey, u.store.get().cursor)
+    expect(at()).toBe(1)
+    // h collapses the block onto its header; Enter reopens it onto the row.
+    u.press('h')
+    expect(u.store.get().settings.chatListCollapsedSections).toEqual({ crossFavorites: true })
+    expect(at()).toBe(0)
+    u.press('', { return: true })
+    expect(u.store.get().settings.chatListCollapsedSections).toEqual({})
+    expect(at()).toBe(1)
+    // Enter opens it in its own account.
+    u.press('', { return: true })
+    expect(u.swaps).toEqual(['beta'])
+    expect(u.store.get().focus).toEqual({ kind: 'chat', chatId: 'a' })
+  })
+
   test('m flips the row’s own account’s unread mark, not the foreground’s', () => {
     const u = unified()
     for (let i = 0; i < 4; i++) u.press('j')

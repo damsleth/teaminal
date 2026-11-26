@@ -203,6 +203,8 @@ export const FIELDS: readonly EditableField[] = [
   color('accountHeader', 'Account header', 'Chat list', true),
   bool('accountHeaderBold', 'Account header bold', 'Chat list'),
   num('layout', 'accountGap', 'Account gap', 'Chat list', 0, 3),
+  color('crossFavoritesHeader', 'Cross-account favorites header', 'Chat list', true),
+  bool('crossFavoritesHeaderBold', 'Cross-account favorites bold', 'Chat list'),
   num('fontSize', 'chatListHeader', 'Header size', 'Chat list', 50, 100, 10),
   num('fontSize', 'chatListName', 'Name size', 'Chat list', 50, 100, 10),
   num('fontSize', 'chatListPreview', 'Preview size', 'Chat list', 50, 100, 10),

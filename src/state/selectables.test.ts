@@ -1020,3 +1020,113 @@ describe('favorites', () => {
     ])
   })
 })
+
+describe('cross-account favorites', () => {
+  const data = (topic: string): Partial<AccountSlice> => ({
+    chats: [chat('c1', { topic: `${topic} one` }), chat('c2', { topic: `${topic} two` })],
+    teams: [team('t1', `${topic} team`)],
+    channelsByTeam: { t1: [channel('g', `${topic} general`)] },
+  })
+  const a = accountRef('alpha').id
+  const b = accountRef('beta').id
+  function build(settings: Partial<Settings>, filter = '', open = ['alpha', 'beta']) {
+    const store = createAppStore()
+    open.forEach((alias, i) =>
+      openAccount(store, accountRef(alias), { foreground: i === 0 }).set(data(alias[0]!)),
+    )
+    store.set((s) => ({
+      settings: { ...s.settings, accounts: ['alpha', 'beta', 'gamma'], ...settings },
+      filter,
+    }))
+    const unified = unifiedListInput(store.get())
+    return unified ? visibleList(unified) : null
+  }
+  const keys = (items: SelectableItem[]) => items.map(selectableKey)
+
+  test('one block above every account, rows tagged with their own account', () => {
+    const items = build({
+      crossAccountFavorites: { beta: ['chat:c2'], alpha: ['channel:t1/g'] },
+    })!
+    expect(keys(items).slice(0, 4)).toEqual([
+      'section:crossFavorites',
+      `${a}/channel:t1/g`,
+      `${b}/chat:c2`,
+      `account:${a}`,
+    ])
+    expect(items[0]).toMatchObject({ label: 'Favorites', count: 2 })
+    expect(items[0]).not.toHaveProperty('alias')
+    expect(items[2]).toMatchObject({ alias: 'beta', accountId: b, favorite: 'crossFavorites' })
+    // Shown there only: not in its account's own rows.
+    expect(keys(items).filter((k) => k === `${b}/chat:c2`)).toHaveLength(1)
+    expect(new Set(keys(items)).size).toBe(items.length)
+    // Its own collapse key, outside every account; rows collapse into it.
+    expect(collapseKeyFor(items[0]!)).toBe('crossFavorites')
+    expect(parentCollapseKey(items[2]!, true)).toBe('crossFavorites')
+    expect(headerIndexForKey(items, 'crossFavorites')).toBe(0)
+  })
+
+  test('in both lists the cross-account block wins; the account section drops it', () => {
+    const items = build({
+      favoritesByAccount: { beta: ['chat:c1', 'chat:c2'] },
+      crossAccountFavorites: { beta: ['chat:c2'] },
+    })!
+    const beta = items.slice(items.findIndex((it) => it.kind === 'account' && it.alias === 'beta'))
+    expect(keys(items).filter((k) => k === `${b}/chat:c2`)).toHaveLength(1)
+    expect(items[1]).toMatchObject({ favorite: 'crossFavorites', alias: 'beta' })
+    expect(keys(beta).slice(0, 4)).toEqual([
+      `account:${b}`,
+      `${b}/section:favorites`,
+      `${b}/chat:c1`,
+      `${b}/team:t1`,
+    ])
+    expect(beta[1]).toMatchObject({ count: 1 })
+  })
+
+  test('a collapsed account still contributes; collapsing the block hides its rows', () => {
+    const fav = { crossAccountFavorites: { beta: ['chat:c1'] } }
+    const items = build({ ...fav, chatListCollapsedSections: { 'account:beta': true } })!
+    expect(keys(items).slice(0, 2)).toEqual(['section:crossFavorites', `${b}/chat:c1`])
+    expect(keys(items).at(-1)).toBe(`account:${b}`)
+    const collapsed = build({ ...fav, chatListCollapsedSections: { crossFavorites: true } })!
+    expect(keys(collapsed).slice(0, 2)).toEqual(['section:crossFavorites', `account:${a}`])
+    expect(collapsed[0]).toMatchObject({ collapsed: true, count: 1 })
+    // Collapsed rows stay out of their account's own sections too.
+    expect(keys(collapsed)).not.toContain(`${b}/chat:c1`)
+  })
+
+  test('hidden when empty, while filtering (rows listed in place) and with showFavorites off', () => {
+    const fav = { crossAccountFavorites: { beta: ['chat:c1'], alpha: ['chat:gone'] } }
+    expect(build({ crossAccountFavorites: { alpha: ['chat:gone'] } })![0]!.kind).toBe('account')
+    const filtered = build(fav, 'one')!
+    expect(keys(filtered)).toEqual([`account:${a}`, `${a}/chat:c1`, `account:${b}`, `${b}/chat:c1`])
+    const off = build({ ...fav, showFavorites: false })!
+    expect(off.some((it) => it.kind === 'section')).toBe(false)
+    expect(keys(off)).toContain(`${b}/chat:c1`)
+  })
+
+  test('rows of an account that is not open are not shown', () => {
+    const items = build({ crossAccountFavorites: { gamma: ['chat:c1'], beta: ['chat:c2'] } })!
+    expect(items[0]).toMatchObject({ count: 1 })
+    expect(items.filter((it) => it.alias === 'gamma')).toEqual([])
+  })
+
+  test('single account: both lists share the one Favorites section', () => {
+    // Only alpha is open: no unified list, so the caller builds alpha's own.
+    expect(build({}, '', ['alpha'])).toBeNull()
+    const settings = {
+      favoritesByAccount: { alpha: ['chat:c1'] },
+      crossAccountFavorites: { alpha: ['chat:c2'], beta: ['chat:c1'] },
+    }
+    const ids = favoritesFor(settings, accountRef('alpha'))
+    expect([...ids].sort()).toEqual(['chat:c1', 'chat:c2'])
+    const items = buildSelectableList({ ...initialAppState(), ...data('a'), favorites: ids })
+    expect(keys(items)).toEqual([
+      'section:favorites',
+      'chat:c1',
+      'chat:c2',
+      'team:t1',
+      'channel:t1/g',
+    ])
+    expect(items.filter((it) => it.kind === 'section')).toHaveLength(1)
+  })
+})

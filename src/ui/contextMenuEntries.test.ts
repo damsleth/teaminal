@@ -38,11 +38,12 @@ test('a chat row offers open, read toggle, favorite and delete, each with its ke
     ['open', 'Enter'],
     ['toggle-read', 'm'],
     ['favorite', 'f'],
+    ['cross-favorite', 'Ctrl+F'],
     ['delete', 'Ctrl+D'],
   ])
   entries[0]!.run()
   expect(store.get().focus).toEqual({ kind: 'chat', chatId: chat.id })
-  entries[3]!.run()
+  entries[4]!.run()
   expect(store.get().modal?.kind).toBe('confirm-delete-chat')
 })
 
@@ -62,6 +63,14 @@ test('the favorite entry toggles the row in its own account and names the next a
   expect(favorite().label).toBe('Remove from favorites')
   favorite().run()
   expect(store.get().settings.favoritesByAccount).toEqual({})
+  // The cross-account entry keeps its own list, keyed by the row's account.
+  const cross = () =>
+    contextMenuEntries(target, store.get(), { store }).find((e) => e.id === 'cross-favorite')!
+  expect(cross().label).toBe('Add to cross-account favorites')
+  cross().run()
+  expect(store.get().settings.crossAccountFavorites).toEqual({ beta: [`chat:${chat.id}`] })
+  expect(store.get().settings.favoritesByAccount).toEqual({})
+  expect(cross().label).toBe('Remove from cross-account favorites')
 })
 
 test('a channel row offers open and favorite', () => {
@@ -71,6 +80,7 @@ test('a channel row offers open and favorite', () => {
   expect(entries.map((e) => [e.id, e.key])).toEqual([
     ['open', 'Enter'],
     ['favorite', 'f'],
+    ['cross-favorite', 'Ctrl+F'],
   ])
   entries[1]!.run()
   // The default profile's favorites are stored under ''.

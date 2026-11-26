@@ -133,6 +133,8 @@ export type ThemeEmphasis = {
   sectionHeadingBold: boolean
   // ChatList account header (several accounts open).
   accountHeaderBold: boolean
+  // ChatList cross-account Favorites header (several accounts open).
+  crossFavoritesHeaderBold: boolean
   // ChatList / MenuModal / AccountsModal / NewChatPrompt selected rows.
   selectedBold: boolean
   // MessagePane focused message body.
@@ -187,6 +189,9 @@ export type Theme = {
   // Chat list account header (several accounts open); null = the
   // terminal's text color.
   accountHeader: string | null
+  // Header of the cross-account Favorites block; null = the terminal's text
+  // color.
+  crossFavoritesHeader: string | null
   systemEvent: string
   // MessagePane day separator.
   dateMarker: string
@@ -257,6 +262,7 @@ const EMPHASIS_DEFAULT: ThemeEmphasis = {
   modalTitleBold: true,
   sectionHeadingBold: true,
   accountHeaderBold: true,
+  crossFavoritesHeaderBold: true,
   selectedBold: true,
   focusedBold: true,
   dateMarkerBold: true,
@@ -312,6 +318,7 @@ const DARK: Theme = {
   senderMessageBorder: null,
   chatListPreviewText: null,
   accountHeader: null,
+  crossFavoritesHeader: null,
   systemEvent: 'gray',
   dateMarker: 'gray',
   errorText: 'red',
@@ -360,6 +367,7 @@ const LIGHT: Theme = {
   senderMessageBorder: null,
   chatListPreviewText: null,
   accountHeader: null,
+  crossFavoritesHeader: null,
   systemEvent: 'gray',
   dateMarker: 'gray',
   errorText: 'red',
@@ -414,6 +422,7 @@ export type PartialTheme = {
   senderMessageBorder?: string | null
   chatListPreviewText?: string | null
   accountHeader?: string | null
+  crossFavoritesHeader?: string | null
   systemEvent?: string | null
   dateMarker?: string | null
   errorText?: string | null

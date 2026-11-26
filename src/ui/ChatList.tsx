@@ -43,13 +43,14 @@ import {
   chatLabel,
   cursorAt,
   favoritesFor,
+  labelSuffix,
   resolveCursor,
   shortName,
   visibleList,
   type AccountListSlice,
   type SelectableItem,
 } from '../state/selectables'
-import type { AccountId } from '../account'
+import { accountRef, type AccountId } from '../account'
 import type { Presence } from '../types'
 import wrapAnsi from 'wrap-ansi'
 import { htmlToText } from '../text/html'
@@ -169,6 +170,16 @@ function accountHeaderParts(
   const at = upn ? upn.lastIndexOf('@') : -1
   const tenant = upn && at >= 0 && at < upn.length - 1 ? ` · ${upn.slice(at + 1)}` : ''
   return { counts, status, tenant }
+}
+
+// A cross-account favorite names its account after the label, as the pane
+// title does (` · alpha`).
+function accountSuffix(item: SelectableItem): string {
+  return (item.kind === 'chat' || item.kind === 'channel') &&
+    item.favorite === 'crossFavorites' &&
+    item.alias !== undefined
+    ? labelSuffix(accountRef(item.alias).label)
+    : ''
 }
 
 export function isNewChatQueryCandidate(filter: string): boolean {
@@ -441,7 +452,7 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         // Team / section / account headers render truncated to one row.
         if (row.item.kind === 'account') return 1 + gapAbove(row.item.kind, row.index, accountGap)
         if (row.item.kind === 'team' || row.item.kind === 'section') return 1
-        let h = visualLines(label + unreadBadge, cw)
+        let h = visualLines(label + accountSuffix(row.item) + unreadBadge, cw)
         if (row.item.kind === 'chat') {
           const preview = previewLineForChat(row.item.chat, cw, previewLines, data.meId)
           if (preview) h += preview.split('\n').length
@@ -645,13 +656,23 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
 
         if (row.item.kind === 'team' || row.item.kind === 'section') {
           const isSelected = row.index === safeCursor
-          const restColor = row.item.kind === 'team' ? theme.mutedText : undefined
+          const cross = row.item.kind === 'section' && row.item.section === 'crossFavorites'
+          const restColor =
+            row.item.kind === 'team'
+              ? theme.mutedText
+              : cross
+                ? (theme.crossFavoritesHeader ?? undefined)
+                : undefined
           const hdrBg = isSelected ? (theme.selectedRowBackground ?? undefined) : undefined
           const hdrLabel = rowLabel(row.item)
           return (
             <Box key={`hdr-${row.index}`} flexDirection="row" flexShrink={0}>
               <Text
-                bold={theme.emphasis.sectionHeadingBold}
+                bold={
+                  cross
+                    ? theme.emphasis.crossFavoritesHeaderBold
+                    : theme.emphasis.sectionHeadingBold
+                }
                 color={isSelected ? theme.selected : restColor}
                 backgroundColor={hdrBg}
                 wrap="truncate-end"
@@ -707,7 +728,8 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
         // rather than only behind glyphs (Ink paints background per text
         // cell, not per Box). Mirror the MenuModal pad-to-width approach.
         const rowBg = isSelected ? (theme.selectedRowBackground ?? undefined) : undefined
-        const labelText = label + unreadBadge
+        const suffix = accountSuffix(row.item)
+        const labelText = label + suffix + unreadBadge
         const labelPadded =
           isSelected && rowBg !== undefined
             ? labelText + ' '.repeat(Math.max(0, labelWidth - labelText.length))
@@ -776,7 +798,21 @@ export function ChatList({ listPaneWidth = LIST_PANE_WIDTH_DEFAULT }: { listPane
                     }
                     wrap="wrap"
                   >
-                    {fs(labelPadded, theme.fontSize.chatListName, theme.fontSize.tightSpacing)}
+                    {suffix ? (
+                      <>
+                        {fs(label, theme.fontSize.chatListName, theme.fontSize.tightSpacing)}
+                        <Text color={theme.mutedText}>
+                          {fs(suffix, theme.fontSize.chatListName, theme.fontSize.tightSpacing)}
+                        </Text>
+                        {fs(
+                          labelPadded.slice(label.length + suffix.length),
+                          theme.fontSize.chatListName,
+                          theme.fontSize.tightSpacing,
+                        )}
+                      </>
+                    ) : (
+                      fs(labelPadded, theme.fontSize.chatListName, theme.fontSize.tightSpacing)
+                    )}
                   </Text>
                 </Box>
               </Box>

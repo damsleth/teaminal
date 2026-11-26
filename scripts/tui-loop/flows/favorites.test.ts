@@ -101,6 +101,39 @@ test.describe('f: per-account favorites', () => {
   })
 })
 
+test.describe('Ctrl+F: cross-account favorites', () => {
+  const file = useAccounts({})
+  test('favorites: f, then Ctrl+F moves a background account’s row to the top block', async ({
+    terminal,
+  }) => {
+    await ready(terminal)
+    // alpha header, Ada, Design Sync, Ops Channel, beta header, ADA, DESIGN SYNC.
+    await press(terminal, 'j', 6)
+    await press(terminal, 'f')
+    await expect(terminal.getByText('▾ Favorites')).toBeVisible()
+    if (!(lineOf(terminal, '▾ beta') < lineOf(terminal, '▾ Favorites')))
+      throw new Error(`Favorites not inside beta\n${lines(terminal).join('\n')}`)
+
+    // Ctrl+F: the same row moves to the block above every account, named
+    // with its account; beta's own Favorites section is empty and goes.
+    await press(terminal, '\x06')
+    await expect(terminal.getByText('DESIGN SYNC · beta')).toBeVisible()
+    const top = lineOf(terminal, '▾ Favorites')
+    if (!(top < lineOf(terminal, '▾ alpha') && top < lineOf(terminal, 'DESIGN SYNC · beta')))
+      throw new Error(`block not on top\n${lines(terminal).join('\n')}`)
+    assert.equal(lines(terminal).filter((l) => l.includes('▾ Favorites')).length, 1)
+    const cfg = await waitForConfig(file, (c) => c?.crossAccountFavorites?.beta?.length === 1)
+    assert.deepEqual(cfg?.crossAccountFavorites, { beta: ['chat:seed-chat-design-sync'] })
+    assert.deepEqual(cfg?.favoritesByAccount, { beta: ['chat:seed-chat-design-sync'] })
+
+    // No account switch so far; Enter opens the row in beta.
+    await expect(terminal.getByText('beta · j/k msg')).not.toBeVisible()
+    terminal.submit()
+    await expect(terminal.getByText('beta · j/k msg')).toBeVisible()
+    await expect(terminal.getByText('TWO COMPACT LAYOUT OPTIONS LANDED.')).toBeVisible()
+  })
+})
+
 test.describe('account gap', () => {
   // 24 rows: a 15-row list. alpha's block (7) + gap (2) + beta's header and
   // chats (7) is 16, so beta's last chat starts below the pane.

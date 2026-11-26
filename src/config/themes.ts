@@ -91,6 +91,7 @@ const NULLABLE_COLOR_KEYS = new Set([
   'senderMessageBorder',
   'chatListPreviewText',
   'accountHeader',
+  'crossFavoritesHeader',
   'selfMessage',
   'modalBackground',
   'appBackground',

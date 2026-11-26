@@ -23,8 +23,9 @@ import type { Channel, Chat, Team } from '../types'
 // single-mode lists and keys are unchanged.
 type AccountTag = { accountId?: AccountId; alias?: string }
 // A favorited chat or channel: the section it is listed under instead of its
-// normal one.
-type FavoriteTag = { favorite?: 'favorites' }
+// normal one (its account's Favorites, or the cross-account block).
+type FavoriteSection = 'favorites' | 'crossFavorites'
+type FavoriteTag = { favorite?: FavoriteSection }
 
 export type SelectableItem =
   | ({ kind: 'chat'; chat: Chat; label: string } & AccountTag & FavoriteTag)
@@ -72,6 +73,7 @@ export type SelectableInput = Pick<AppState, 'chats' | 'teams' | 'channelsByTeam
       | 'chatListCollapsedSections'
       | 'showFavorites'
       | 'favoritesByAccount'
+      | 'crossAccountFavorites'
     >
   >
   // A non-empty filter must be able to reach chats hidden behind a section
@@ -82,6 +84,9 @@ export type SelectableInput = Pick<AppState, 'chats' | 'teams' | 'channelsByTeam
   // Ids (see favoriteId) listed under a Favorites section at the top instead
   // of their normal section. Single-mode callers get them from favoritesFor.
   favorites?: readonly string[]
+  // Ids listed elsewhere (the unified sidebar's cross-account block): left
+  // out of this list.
+  elsewhere?: readonly string[]
 }
 
 // Collapsed-state key for a team. Chat sections key on their ChatSection name,
@@ -143,8 +148,9 @@ export function isSelectable(item: SelectableItem): boolean {
 export function parentCollapseKey(item: SelectableItem, groupByType: boolean): string | null {
   if (item.kind === 'account') return null
   const account = item.alias === undefined ? null : accountCollapseKey(item.alias)
+  // The cross-account block sits above every account, so its key has none.
   if ((item.kind === 'chat' || item.kind === 'channel') && item.favorite)
-    return scopedKey(item, item.favorite)
+    return item.favorite === 'crossFavorites' ? CROSS_FAVORITES : scopedKey(item, item.favorite)
   if (item.kind === 'channel') return scopedKey(item, teamCollapseKey(item.team.id))
   // Ungrouped lists have no chat-type headers, so there is nothing to collapse.
   if (item.kind === 'chat')
@@ -166,9 +172,15 @@ export function headerIndexForKey(items: SelectableItem[], key: string): number 
 // Section identity when grouping by chat type. Anything unrecognised lands
 // in 'other', which sorts last. One source of truth for the sort rank, the
 // rendered header label, and the per-section cap. 'teams' is the header over
-// the team list and 'favorites' the one over favorited chats and channels;
-// neither is a chat type, so they stay out of CHAT_SECTIONS.
-export type ChatSection = 'oneOnOne' | 'group' | 'meeting' | 'other' | 'teams' | 'favorites'
+// the team list, 'favorites' the one over an account's favorited chats and
+// channels and 'crossFavorites' the cross-account block's; none is a chat
+// type, so they stay out of CHAT_SECTIONS.
+export type ChatSection =
+  'oneOnOne' | 'group' | 'meeting' | 'other' | 'teams' | 'favorites' | 'crossFavorites'
+
+// Collapse key of the cross-account block: untagged, so no alias prefix, and
+// not a name any other header key uses.
+const CROSS_FAVORITES = 'crossFavorites'
 
 const CHAT_SECTIONS: ChatSection[] = ['oneOnOne', 'group', 'meeting', 'other']
 
@@ -192,6 +204,7 @@ export function chatSectionLabel(section: ChatSection): string {
     case 'teams':
       return 'Teams'
     case 'favorites':
+    case 'crossFavorites':
       return 'Favorites'
     default:
       return 'Other'
@@ -212,14 +225,22 @@ export function buildSelectableList(state: SelectableInput): SelectableItem[] {
   const collapsed = filtering ? {} : (state.settings?.chatListCollapsedSections ?? {})
   // Favorites move out of their sections. A filter lists them in place, as
   // it does every row of a collapsed or capped section.
-  const favorites = new Set(filtering ? [] : (state.favorites ?? []))
+  const elsewhere = new Set(filtering ? [] : (state.elsewhere ?? []))
+  const favorites = new Set(
+    filtering ? [] : (state.favorites ?? []).filter((id) => !elsewhere.has(id)),
+  )
+  const listed = (id: string) => !favorites.has(id) && !elsewhere.has(id)
 
   let chatItems: ChatItem[] = state.chats
-    .filter((chat) => !favorites.has(chatFavoriteId(chat.id)))
+    .filter((chat) => listed(chatFavoriteId(chat.id)))
     .map((chat) => chatItem(state, chat))
   chatItems = orderChats(chatItems, sort, groupByType)
 
-  const items = favoritesSection(favoriteRows(state, favorites, 'favorites'), collapsed)
+  const items = favoritesSection(
+    'favorites',
+    favoriteRows(state, favorites, 'favorites'),
+    collapsed,
+  )
   if (groupByType && !filtering)
     items.push(...sectionedChats(chatItems, collapsed, state.expandedChatSections ?? {}, cap))
   else items.push(...chatItems)
@@ -240,7 +261,7 @@ export function buildSelectableList(state: SelectableInput): SelectableItem[] {
     if (teamCollapsed) continue
     const channels = state.channelsByTeam[team.id] ?? []
     for (const channel of channels) {
-      if (channel.isArchived || favorites.has(channelFavoriteId(team.id, channel.id))) continue
+      if (channel.isArchived || !listed(channelFavoriteId(team.id, channel.id))) continue
       items.push({ kind: 'channel', team, channel, label: channel.displayName })
     }
   }
@@ -277,14 +298,29 @@ export function favoritesKey(ref: AccountRef): string {
   return ref.profile === DEFAULT_PROFILE ? '' : ref.profile
 }
 
-// The ids an account's list shows under Favorites, or none while the
-// Favorites section is off.
+// One account's favorites from settings: its own list and its cross-account
+// list, or none while favorites are off.
+function accountFavorites(
+  settings: SelectableInput['settings'],
+  key: string,
+): { own: string[]; cross: string[] } {
+  if (settings?.showFavorites === false) return { own: [], cross: [] }
+  return {
+    own: settings?.favoritesByAccount?.[key] ?? [],
+    cross: settings?.crossAccountFavorites?.[key] ?? [],
+  }
+}
+
+// The ids a single-account list shows under Favorites. With one account open
+// the cross-account block would be a second "Favorites" right above the
+// first, so both lists share the one section.
 export function favoritesFor(
   settings: SelectableInput['settings'],
   ref: AccountRef | null | undefined,
 ): string[] {
-  if (!ref || settings?.showFavorites === false) return []
-  return settings?.favoritesByAccount?.[favoritesKey(ref)] ?? []
+  if (!ref) return []
+  const { own, cross } = accountFavorites(settings, favoritesKey(ref))
+  return [...cross, ...own]
 }
 
 // The favorited `ids` that exist, in list order: chats as sorted, then
@@ -293,7 +329,7 @@ export function favoritesFor(
 function favoriteRows(
   state: SelectableInput,
   ids: ReadonlySet<string>,
-  favorite: 'favorites',
+  favorite: FavoriteSection,
 ): SelectableItem[] {
   if (ids.size === 0) return []
   const chats = orderChats(
@@ -313,17 +349,18 @@ function favoriteRows(
   return out
 }
 
-// The Favorites header and its rows; nothing when there are no rows.
+// A Favorites header and its rows; nothing when there are no rows.
 function favoritesSection(
+  section: FavoriteSection,
   rows: SelectableItem[],
   collapsed: Record<string, boolean>,
 ): SelectableItem[] {
   if (rows.length === 0) return []
-  const isCollapsed = !!collapsed.favorites
+  const isCollapsed = !!collapsed[section]
   const header: SelectableItem = {
     kind: 'section',
-    section: 'favorites',
-    label: chatSectionLabel('favorites'),
+    section,
+    label: chatSectionLabel(section),
     collapsed: isCollapsed,
     count: rows.length,
   }
@@ -685,7 +722,21 @@ function collapsedFor(alias: string, all: Record<string, boolean>): Record<strin
 function unifiedList(input: UnifiedListInput): SelectableItem[] {
   const filter = input.filter ?? ''
   const all = input.settings?.chatListCollapsedSections ?? {}
-  const out: SelectableItem[] = []
+  // The cross-account block first, read from every open account's slice (a
+  // collapsed account's favorites still show). A filter lists them in place.
+  const favorites = (alias: string) =>
+    filter ? { own: [], cross: [] } : accountFavorites(input.settings, alias)
+  const out = favoritesSection(
+    'crossFavorites',
+    input.accounts.flatMap(({ alias, accountId, slice }) =>
+      favoriteRows(
+        { ...slice, settings: input.settings },
+        new Set(favorites(alias).cross),
+        'crossFavorites',
+      ).map((row) => ({ ...row, accountId, alias })),
+    ),
+    all,
+  )
   for (const { alias, slice } of input.accounts) {
     const ref = accountRef(alias)
     const collapsed = !filter && !!all[accountCollapseKey(alias)]
@@ -707,7 +758,8 @@ function unifiedList(input: UnifiedListInput): SelectableItem[] {
       ...slice,
       settings: { ...input.settings, chatListCollapsedSections: collapsedFor(alias, all) },
       filter,
-      favorites: favoritesFor(input.settings, ref),
+      favorites: favorites(alias).own,
+      elsewhere: favorites(alias).cross,
     })
     if (filter && rows.length === 0) continue
     out.push(header)
