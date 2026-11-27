@@ -69,6 +69,10 @@ async function fetchActiveMessages(
   return { messages: [] }
 }
 
+// Message ids already handled for notification, per shared seen map (one per
+// session): see the overlap note in the loop.
+const notifiedBy = new WeakMap<object, Set<string>>()
+
 export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
   const {
     store,
@@ -132,24 +136,27 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
               ? s0.chats.find((c) => c.id === focus.chatId)?.chatType
               : undefined
           const toNotify: Array<{ msg: ChatMessage; kind: NotifyKind }> = []
-          const twins = isFirst
-            ? []
-            : (deps.overlapKeys?.(focus) ?? []).flatMap((k) => seen.get(k) ?? [])
+          // A channel and its thread side by side both see a new reply.
+          // Whichever loop notifies first records the id here, so the other
+          // skips it. Not the other's seen-set: that also holds ids it only
+          // seeded on its first fetch, which nobody was notified about.
+          const overlapping = !isFirst && (deps.overlapKeys?.(focus) ?? []).length > 0
+          const notified = notifiedBy.get(seen) ?? new Set<string>()
+          notifiedBy.set(seen, notified)
           for (const msg of messages) {
             if (seenSet.has(msg.id)) continue
             seenSet.add(msg.id)
             if (isDebugEnabled()) logMessageImageShape(msg)
             if (isFirst || !myId) continue
-            let notifiedThere = false
-            for (const twin of twins) {
-              if (twin.has(msg.id)) notifiedThere = true
-              else twin.add(msg.id)
+            if (overlapping) {
+              if (notified.has(msg.id)) continue
+              notified.add(msg.id)
             }
-            if (notifiedThere) continue
             const kind = notifyKind(msg, myId, chatType, s0.settings.notifyChatMessages)
             if (kind) toNotify.push({ msg, kind })
           }
           capSeen(seenSet)
+          capSeen(notified)
           seen.set(conv, seenSet)
           // A conversation not on screen (a hidden passive pane) is not
           // marked read, and its new mentions count, as the cross-chat

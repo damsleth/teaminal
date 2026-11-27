@@ -498,6 +498,36 @@ describe('split panes: read state and notifications', () => {
     expect(events.map((e) => e.message.id)).toEqual(['r2'])
   })
 
+  test('a channel opened beside its thread seeds a new mention first: the thread still notifies', async () => {
+    primeAuth()
+    installChats(() => Response.json({ value: [] }))
+    const root = message('root')
+    let replies: ChatMessage[] = [message('r1', { replyToId: 'root' })]
+    let gate: Promise<void> | null = null
+    channelPage = async (focus) => {
+      if (focus.kind === 'thread' && gate) await gate
+      return { messages: [root, ...replies] }
+    }
+    const channel: Focus = { kind: 'channel', teamId: 't1', channelId: 'c1' }
+    const thread: Focus = { kind: 'thread', teamId: 't1', channelId: 'c1', rootId: 'root' }
+    const events: MentionEvent[] = []
+    const { store } = start(thread, null, { activeMs: 30, onMention: (e) => events.push(e) })
+    await waitFor(() => !!store.get().messagesByConvo['thread:t1:c1:root'])
+    await Bun.sleep(80)
+    // The mention arrives; the thread's fetches are held so the channel's
+    // first fetch (which only seeds) sees it first.
+    let release!: () => void
+    gate = new Promise<void>((r) => (release = r))
+    replies = [...replies, message('r2', { replyToId: 'root', mentions: mentionsMe })]
+    store.set({ split: { focus: channel, side: 'right' }, splitShown: true })
+    await waitFor(() => !!store.get().messagesByConvo['channel:t1:c1'])
+    gate = null
+    release()
+    await waitFor(() => events.length > 0)
+    await Bun.sleep(200)
+    expect(events.map((e) => e.message.id)).toEqual(['r2'])
+  })
+
   test('load older on the active thread lands in that thread after a pane switch', async () => {
     primeAuth()
     installChats((chatId) => Response.json({ value: [message(`${chatId}-1`)] }))
