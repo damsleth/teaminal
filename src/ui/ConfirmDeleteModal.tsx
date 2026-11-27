@@ -42,7 +42,7 @@ export function ConfirmDeleteModal() {
           modal.kind === 'confirm-delete-chat' && modal.alias !== undefined
             ? accountRef(modal.alias)
             : null
-        const { focus, account, tabs } = store.get()
+        const { focus, account, tabs, uiByAccount } = store.get()
         const deletingFocused =
           modal.kind === 'confirm-delete-chat' &&
           (!owner || owner.id === account?.id) &&
@@ -54,11 +54,24 @@ export function ConfirmDeleteModal() {
           modal.kind === 'confirm-delete-chat'
             ? withoutChatTab(tabs, (owner ?? account)?.id, modal.chatId)
             : tabs
+        // A background account that had this chat open would come back to
+        // the front on it (and tabs mode would give it its tab back).
+        const saved = owner && owner.id !== account?.id ? uiByAccount[owner.id] : undefined
+        const savedOpen =
+          saved?.focus.kind === 'chat' && saved.focus.chatId === modal.chatId ? saved : undefined
         store.set({
           modal: null,
           inputZone: 'list',
           ...(deletingFocused ? { focus: { kind: 'list' } } : {}),
           ...(nextTabs !== tabs ? { tabs: nextTabs } : {}),
+          ...(owner && savedOpen
+            ? {
+                uiByAccount: {
+                  ...uiByAccount,
+                  [owner.id]: { ...savedOpen, focus: { kind: 'list' } },
+                },
+              }
+            : {}),
         })
         // Both actions log + roll back on failure; swallow the rejection so a
         // Graph error never escapes as an unhandled rejection and tears down
