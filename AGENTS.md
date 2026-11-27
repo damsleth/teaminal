@@ -15,6 +15,7 @@ teaminal is a lightweight terminal Microsoft Teams client written in TypeScript.
 | `src/ui`       | Ink components + HTML→ANSI rendering + keybinds                 | `App.tsx`, `ChatList.tsx`, `MessagePane.tsx`, `Composer.tsx`, `StatusBar.tsx`, `CommandPalette.tsx`, `ContextMenu.tsx` |
 | `src/settings` | `Settings` shape, defaults, chat-routing helpers; layer-neutral | `index.ts`                                                                                                             |
 | `src/config`   | JSON config loader                                              | `index.ts`                                                                                                             |
+| `src/realtime` | Push transport (trouter), event bus, redacted frame shapes      | `trouter.ts`, `transport.ts`, `frameShape.ts`                                                                          |
 | `src/notify`   | Terminal bell + system notifications                            | `notify.ts`                                                                                                            |
 | `src/text`     | Teams HTML → plain text, links, inline images (pure)            | `html.ts`, `links.ts`, `inlineImages.ts`                                                                               |
 | `bin`          | CLI entry point                                                 | `teaminal.tsx`                                                                                                         |
@@ -107,6 +108,7 @@ content.replace(/<[^>]+>/g, '') // breaks on <at> mentions and entities
 - `*.test.ts` co-located with the source file (e.g. `src/auth/owaPiggy.test.ts`)
 - Run: `bun test`
 - JWT and HTTP-response fixtures only — never put real tokens or real account IDs in tests
+- Seeded runs need no account: `TEAMINAL_SEED=fixtures` (profiles alpha / beta / gamma), `TEAMINAL_SEED=channels` adds a team with a threaded channel. tui flows (`scripts/tui-loop/flows/`) run on these and must never send a message.
 - Test boundaries: token expiry edge cases, 401-then-retry, 429 with `Retry-After`, AppleScript escaping
 
 ## Debugging live behaviour
@@ -148,7 +150,8 @@ in a worktree changes nothing they can see.
 1. **Adding a Graph call:** add to the relevant `src/graph/*.ts`, route through `graph<T>()` so it inherits 401 retry, 429 backoff, and pagination. If the UI needs to invoke it directly (one-shot action), expose a wrapper from `src/state/chatActions.ts` and call the wrapper from UI - not the raw Graph function. The boundary test in `src/architecture.test.ts` will fail on direct UI -> graph operation imports.
 2. **Adding a keybind:** edit `src/ui/App.tsx` (`useInput` handler) and update the keybinds table in README.
 3. **Adding a config key:** add the field and its default in `src/settings/index.ts`, its validation in `src/config/index.ts`, document it in README.
-4. **Adding a poll loop:** edit `src/state/poller.ts`. Honor jitter, AbortController, and the seen-set conventions.
+4. **Writing to the terminal outside Ink** (a mode such as mouse reporting): switch it off on every exit path (clean quit, fatal `process.exit`, signals, editor handoff) and add the case to `scripts/check-probe-handoff.py`. See `src/ui/mouseTracker.ts`.
+5. **Adding a poll loop:** edit `src/state/poller.ts`. Honor jitter, AbortController, and the seen-set conventions.
 
 ## Performance
 

@@ -65,6 +65,8 @@ const BINDINGS: Binding[] = [
   { keys: 'Enter', when: 'search', action: 'jump to most recent match' },
   { keys: 'Ctrl+A', when: 'list / chat', action: 'notifications (all open accounts)' },
   { keys: 'Space', when: 'Accounts', action: 'turn the focused account off / on' },
+  { keys: 'click', when: 'mouse on', action: 'open a row / collapse or expand a header' },
+  { keys: 'wheel', when: 'mouse on', action: 'move the list / message cursor' },
   { keys: '?', when: 'list', action: 'show this help' },
   { keys: 'r', when: 'list / channel', action: 'refresh now' },
   { keys: 'Shift+R', when: 'any', action: 'hard refresh' },

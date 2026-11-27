@@ -612,7 +612,8 @@ no shell interpolation in notifications) are documented in
 teaminal uses [`@microsoft/tui-test`](https://github.com/microsoft/tui-test)
 to drive the real Ink app through a headless PTY and capture what it renders.
 Tests run against a **seeded offline mode** (`TEAMINAL_SEED=fixtures`) so no
-Microsoft 365 auth is required.
+Microsoft 365 auth is required. `TEAMINAL_SEED=channels` adds a team with a
+threaded channel to the same fixtures.
 
 ```bash
 # Run all TUI flow tests (text-snapshot regression gate)
