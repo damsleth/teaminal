@@ -34,6 +34,7 @@ export function StatusBar() {
   // Several accounts open: the foreground account's label.
   const accountLabel = useAppState(foregroundLabel)
   const enterSends = useAppState((s) => s.settings.enterSends) && kittyKeyboardEnabled()
+  const split = useAppState((s) => s.split !== null)
 
   let hint = 'j/k move · l/Enter open · / filter · n new chat · ? help · q quit'
   if (inputZone === 'filter') hint = 'type to filter · Enter accept · Esc clear'
@@ -49,7 +50,7 @@ export function StatusBar() {
   } else if (focus.kind !== 'list') {
     hint =
       attachmentHint ??
-      `j/k msg · u/d half · gg top · G bottom · h back${hasThread ? ' · t thread' : ''} · Tab compose · r refresh`
+      `j/k msg · u/d half · gg top · G bottom · h back${hasThread ? ' · t thread' : ''}${split ? ' · w pane' : ''} · Tab compose · r refresh`
   }
 
   // When key hints are turned off the status bar is reserved for the focused

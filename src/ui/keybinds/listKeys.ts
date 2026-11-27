@@ -9,6 +9,7 @@ import type { Me } from '../../graph/me'
 import { accountRef } from '../../account'
 import { accountStoreFor } from '../../state/accountStore'
 import { focusKey, type AppState, type Focus, type Settings, type Store } from '../../state/store'
+import { openInOtherPane, switchPane } from '../../state/panes'
 import {
   buildSelectableList,
   clampCursor,
@@ -317,6 +318,14 @@ export function handleListKeys({ input, key }: RawKey, ctx: ListKeysCtx): KeyRes
       return 'pass'
     }
     const safe = safeCursor(ctx, visible, selectableCount)
+    // v opens the chat or channel row in the other pane (split panes), the
+    // foreground account's rows only; the list keeps the keys.
+    if (ch === 'v' && !key.ctrl && !key.meta) {
+      const row = visible[safe]
+      const target = row ? rowFocus(store, row) : null
+      if (target) store.set((s) => openInOtherPane(s, target))
+      return 'handled'
+    }
     if (ch === 'j' || key.downArrow) {
       stepListCursor(ctx, 1)
       return 'handled'
@@ -500,6 +509,19 @@ export function activateListRow(ctx: ListKeysCtx, key: string, opts: { enter: bo
     })
     return
   }
+  // The other pane's conversation: switch panes instead of moving it, so it
+  // stays on its side and is not refetched.
+  const target = rowFocus(store, it)
+  const { split, focus } = store.get()
+  if (
+    target &&
+    split &&
+    focusKey(split.focus) === focusKey(target) &&
+    focusKey(focus) !== focusKey(target)
+  ) {
+    store.set((s) => switchPane(s))
+    return
+  }
   if (it.kind === 'chat' && it.alias !== undefined) {
     openFocus(store, { kind: 'chat', chatId: it.chat.id }, it.alias, ctx.toForeground)
   } else if (it.kind === 'channel' && it.alias !== undefined) {
@@ -546,6 +568,19 @@ export function toggleListHeader(ctx: ListKeysCtx, key: string): boolean {
   const header = headerIndexForKey(now, collapseKey)
   if (header !== null) ctx.store.set(cursorAt(now, header))
   return true
+}
+
+// The conversation a chat or channel row opens, when the row belongs to the
+// foreground account (split panes hold the foreground's conversations only).
+export function rowFocus(
+  store: Store<AppState>,
+  it: SelectableItem,
+): Exclude<Focus, { kind: 'list' }> | null {
+  if (it.alias !== undefined && accountRef(it.alias).id !== store.get().account?.id) return null
+  if (it.kind === 'chat') return { kind: 'chat', chatId: it.chat.id }
+  if (it.kind === 'channel')
+    return { kind: 'channel', teamId: it.team.id, channelId: it.channel.id }
+  return null
 }
 
 // Re-export so consumers can derive focusKey without re-importing the store.

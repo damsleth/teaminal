@@ -187,11 +187,11 @@ export function Composer({
     return ownedRef.current !== null && ownedRef.current === composerOwner(s)
   }
   const [sending, setSending] = useState(false)
-  // Several accounts open: the empty box says which conversation it posts
-  // to and as which account.
+  // Several accounts open, or split panes: the empty box says which
+  // conversation it posts to (and as which account, when labelled).
   const placeholder = useAppState((s) => {
     const label = foregroundLabel(s)
-    if (!label || s.focus.kind === 'list') return null
+    if ((!label && !s.split) || s.focus.kind === 'list') return null
     const title = headerForFocus(
       s.focus,
       s.chats,
@@ -200,7 +200,7 @@ export function Composer({
       s.me?.id,
       s.nameByUserId,
     )
-    return `Message ${title} as ${label}`
+    return label ? `Message ${title} as ${label}` : `Message ${title}`
   })
   const parserRef = useRef<ParserState>(initialParserState)
 

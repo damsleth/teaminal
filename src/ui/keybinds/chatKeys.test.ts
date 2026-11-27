@@ -518,3 +518,32 @@ describe('handleChatKeys', () => {
     expect(store.get().modal?.kind).toBe('menu')
   })
 })
+
+describe('split panes: v', () => {
+  test('without a split: the conversation stays on its side, the empty active pane opens', () => {
+    const focus: Focus = { kind: 'chat', chatId: 'chat-a' }
+    const { ctx, store } = makeCtx(focus)
+    store.set({ focus })
+    expect(handleChatKeys({ input: 'v', key: makeKey() }, ctx)).toBe('handled')
+    expect(store.get().split).toEqual({ focus, side: 'left' })
+    expect(store.get().focus).toEqual({ kind: 'list' })
+    expect(store.get().inputZone).toBe('list')
+  })
+
+  test('with a split: it replaces the other pane and empties this one', () => {
+    const focus: Focus = { kind: 'channel', teamId: 't1', channelId: 'c1' }
+    const { ctx, store } = makeCtx(focus)
+    store.set({ focus, split: { focus: { kind: 'chat', chatId: 'design' }, side: 'right' } })
+    handleChatKeys({ input: 'V', key: makeKey() }, ctx)
+    expect(store.get().split).toEqual({ focus, side: 'right' })
+    expect(store.get().focus).toEqual({ kind: 'list' })
+  })
+
+  test('Ctrl+V is not v', () => {
+    const focus: Focus = { kind: 'chat', chatId: 'chat-a' }
+    const { ctx, store } = makeCtx(focus)
+    store.set({ focus })
+    handleChatKeys({ input: 'v', key: makeKey({ ctrl: true }) }, ctx)
+    expect(store.get().split).toBeNull()
+  })
+})

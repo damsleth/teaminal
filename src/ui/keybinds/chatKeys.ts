@@ -14,6 +14,7 @@ import {
   type Store,
 } from '../../state/store'
 import { groupChannelThreads } from '../../state/channelThreads'
+import { sendToOtherPane } from '../../state/panes'
 import type { ChatMessage } from '../../types'
 import { openMenu } from '../MenuModal'
 import { openContextMenu } from '../ContextMenu'
@@ -117,6 +118,12 @@ export function handleChatKeys({ input, key }: RawKey, ctx: ChatKeysCtx): KeyRes
 
   if (ch === 'h' || key.leftArrow) {
     store.set({ focus: { kind: 'list' }, inputZone: 'list' })
+    return 'handled'
+  }
+  // v sends this conversation to the other pane (split panes) and empties
+  // this one, to pick its conversation from the list (vim's :vsplit).
+  if (ch === 'v' && !key.ctrl && !key.meta) {
+    store.set((s) => sendToOtherPane(s))
     return 'handled'
   }
   if (ch === 'j' || key.downArrow) {
