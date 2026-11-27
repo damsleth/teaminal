@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-27
+
 ### Added
 
 - Mouse support, off by default (**Settings → Navigation & input → Mouse
@@ -1910,7 +1912,8 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.27.0...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.28.0...HEAD
+[0.28.0]: https://github.com/damsleth/teaminal/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/damsleth/teaminal/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/damsleth/teaminal/compare/v0.25.3...v0.26.0
 [0.25.3]: https://github.com/damsleth/teaminal/compare/v0.25.2...v0.25.3
