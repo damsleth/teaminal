@@ -81,6 +81,11 @@ export type FocusThread = {
 }
 export type Focus = FocusList | FocusChat | FocusChannel | FocusThread
 
+// A conversation tab (settings.conversationMode 'tabs', src/state/tabs.ts):
+// a conversation of an open account. A channel's tab shows its thread while
+// one is open there.
+export type Tab = { account: AccountId; focus: Exclude<Focus, FocusList> }
+
 export type ConvKey = string
 
 // Stable string key per active conversation, used to index seen-set,
@@ -475,6 +480,9 @@ export type AppState = {
   backgroundAccounts: Record<AccountId, AccountState>
   // Saved focus / list cursor of accounts swapped out of the foreground.
   uiByAccount: Record<AccountId, AccountUi>
+  // Open conversation tabs, in bar order, across accounts. Kept while
+  // conversationMode is 'single' (hidden), never persisted.
+  tabs: Tab[]
   me?: Me
   capabilities?: Capabilities
   chats: Chat[]
@@ -628,6 +636,7 @@ export type GlobalKey =
   | 'generationById'
   | 'backgroundAccounts'
   | 'uiByAccount'
+  | 'tabs'
   // UI
   | 'focus'
   | 'inputZone'
@@ -686,6 +695,7 @@ export function initialAppState(): AppState {
     generationById: {},
     backgroundAccounts: {},
     uiByAccount: {},
+    tabs: [],
     chats: [],
     teams: [],
     channelsByTeam: {},

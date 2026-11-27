@@ -211,6 +211,8 @@ export function closeAccount(store: Store<AppState>, id: AccountId): void {
   if (s.generationById[id] === undefined) return
   const generationById = without(s.generationById, id)
   const uiByAccount = without(s.uiByAccount, id)
+  // Its conversation tabs go with it.
+  const tabs = s.tabs.filter((t) => t.account !== id)
   if (s.account?.id === id) {
     if (Object.keys(generationById).length > 0) {
       throw new Error('closeAccount: move another account to the foreground first')
@@ -224,6 +226,7 @@ export function closeAccount(store: Store<AppState>, id: AccountId): void {
       generationById,
       backgroundAccounts: {},
       uiByAccount,
+      tabs,
     })
     return
   }
@@ -232,6 +235,7 @@ export function closeAccount(store: Store<AppState>, id: AccountId): void {
     generationById,
     backgroundAccounts: without(s.backgroundAccounts, id),
     uiByAccount,
+    tabs,
   })
 }
 
