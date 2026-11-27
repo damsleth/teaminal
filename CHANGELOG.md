@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Split panes: two conversations side by side. `v` on a chat or channel in
+  the list opens it in a second pane; `v` inside a conversation sends it to the
+  other pane. `w` switches pane and `o` goes back to one. The composer follows
+  the active pane and names its target. Each pane needs 36 columns; in a
+  narrower terminal only the active pane shows and `w` toggles between the two.
+  Both conversations are polled, and both count as being viewed for read state
+  and notifications while they are on screen. Switching account closes the
+  split.
+
 ## [0.28.0] - 2026-11-27
 
 ### Added
