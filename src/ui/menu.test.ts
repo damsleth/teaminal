@@ -253,6 +253,7 @@ describe('ROOT_MENU shape', () => {
       'scrollOnNewMessages',
       'enterSends',
       'mouse',
+      'conversationMode',
       // Notifications (quietHours is a cycle action, not a toggle key)
       'notifyMuted',
       'notifyChatMessages',

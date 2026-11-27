@@ -59,6 +59,7 @@ export type ToggleKey =
   | 'scrollOnNewMessages'
   | 'enterSends'
   | 'mouse'
+  | 'conversationMode'
   | 'selfMessagesOnRight'
   | 'forceAvailableWhenFocused'
   | 'useTeamsPresence'
@@ -377,6 +378,12 @@ export const ROOT_MENU: MenuItem[] = [
         label: 'Mouse support',
         action: { kind: 'toggle-setting', key: 'mouse' },
       },
+      {
+        id: 'conversationMode',
+        label: 'Conversations',
+        action: { kind: 'toggle-setting', key: 'conversationMode' },
+        hint: 'single or tabs (Ctrl+T)',
+      },
       heading('Notifications'),
       {
         id: 'notifyMuted',
@@ -591,6 +598,8 @@ export function cycleSetting<K extends ToggleKey>(
       return step(['auto', 'dark', 'light'])
     case 'chatListSort':
       return step(['recent', 'alphabetical'])
+    case 'conversationMode':
+      return step(['single', 'tabs'])
     case 'headerUserFormat':
       return step(['full', 'tenant'])
     case 'statusBarPosition':
@@ -666,6 +675,7 @@ export function renderSettingValue<K extends ToggleKey>(key: K, value: Settings[
       return value === 'auto' ? 'inline' : 'as links'
     case 'theme':
     case 'chatListSort':
+    case 'conversationMode':
     case 'showReactions':
     case 'statusBarPosition':
     case 'showTimestampsInPane':

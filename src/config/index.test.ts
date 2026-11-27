@@ -157,6 +157,14 @@ describe('mergeSettings', () => {
     expect(w.some((m) => /"mouse" must be a boolean/.test(m))).toBe(true)
   })
 
+  test('validates conversationMode enum, single by default', () => {
+    const w: string[] = []
+    expect(defaultSettings.conversationMode).toBe('single')
+    expect(mergeSettings({ conversationMode: 'tabs' }, w).conversationMode).toBe('tabs')
+    expect(mergeSettings({ conversationMode: 'split' }, w).conversationMode).toBe('single')
+    expect(w.some((m) => /"conversationMode" must be "single" or "tabs"/.test(m))).toBe(true)
+  })
+
   test('validates chatListSort enum', () => {
     const w: string[] = []
     expect(mergeSettings({ chatListSort: 'alphabetical' }, w).chatListSort).toBe('alphabetical')
@@ -486,6 +494,7 @@ describe('Settings ↔ config.json parity', () => {
     scrollOnNewMessages: !defaultSettings.scrollOnNewMessages,
     enterSends: !defaultSettings.enterSends,
     mouse: !defaultSettings.mouse,
+    conversationMode: 'tabs',
     showSenderNamesInPane: !defaultSettings.showSenderNamesInPane,
     showOwnNameInPane: !defaultSettings.showOwnNameInPane,
     inlineImages: 'off',

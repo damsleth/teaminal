@@ -341,6 +341,7 @@ export function settingsToConfig(settings: Settings): TeaminalConfig {
     scrollOnNewMessages: settings.scrollOnNewMessages,
     enterSends: settings.enterSends,
     mouse: settings.mouse,
+    conversationMode: settings.conversationMode,
     inlineImages: settings.inlineImages,
     inlineImageMaxRows: settings.inlineImageMaxRows,
     statusBarPosition: settings.statusBarPosition,
@@ -628,6 +629,13 @@ function validateAndAssign(
         return true
       }
       warnings.push('config: "chatListSort" must be "recent" or "alphabetical"')
+      return false
+    case 'conversationMode':
+      if (value === 'single' || value === 'tabs') {
+        out.conversationMode = value
+        return true
+      }
+      warnings.push('config: "conversationMode" must be "single" or "tabs"')
       return false
     case 'headerUserFormat':
       if (value === 'full' || value === 'tenant') {

@@ -43,6 +43,10 @@ export type HeaderElementVisibility = {
 // last-message time, newest first); 'alphabetical' sorts by display label.
 export type ChatListSort = 'recent' | 'alphabetical'
 
+// 'single': opening a conversation replaces the open one. 'tabs': each
+// opened conversation keeps a tab above the message pane (src/state/tabs.ts).
+export type ConversationMode = 'single' | 'tabs'
+
 // How the HeaderBar renders the active identity when the user segment is
 // shown. 'full' → "Name (tenant)"; 'tenant' → just the tenant (or profile).
 export type HeaderUserFormat = 'full' | 'tenant'
@@ -292,6 +296,8 @@ export type Settings = {
   // Mouse: click a sidebar row, wheel through the list and messages. Off by
   // default: reporting takes over the terminal's own text selection.
   mouse: boolean
+  // One open conversation at a time, or tabs (src/state/tabs.ts).
+  conversationMode: ConversationMode
   // Inline image rendering for message attachments.
   // 'auto': show images via Kitty graphics protocol when the terminal
   //   supports it (KITTY_WINDOW_ID / TERM=xterm-kitty); fall back to
@@ -447,6 +453,7 @@ export const defaultSettings: Settings = {
   scrollOnNewMessages: true,
   enterSends: false,
   mouse: false,
+  conversationMode: 'single',
   inlineImages: 'auto',
   inlineImageMaxRows: 10,
   statusBarPosition: 'bottom',
