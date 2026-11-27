@@ -409,6 +409,29 @@ describe('split panes: read state and notifications', () => {
     await waitFor(() => store.get().unreadByChatId.design?.unreadCount === 0)
   })
 
+  test('a mention in a hidden passive chat counts; in a shown one it does not', async () => {
+    primeAuth()
+    let batch = [message('d1')]
+    installChats(() => Response.json({ value: batch }))
+    const events: MentionEvent[] = []
+    const { store } = start(
+      A,
+      { focus: B, side: 'right' },
+      { activeMs: 30, onMention: (e) => events.push(e) },
+    )
+    await waitFor(() => !!store.get().messagesByConvo['chat:design'])
+    batch = [message('d1'), message('d2', { mentions: mentionsMe })]
+    await waitFor(() => events.some((e) => e.message.id === 'd2'))
+    await waitFor(() => store.get().unreadByChatId.design?.mentionCount === 1)
+    // Shown: the next poll reads it.
+    store.set({ splitShown: true })
+    await waitFor(() => store.get().unreadByChatId.design?.mentionCount === 0)
+    batch = [...batch, message('d3', { mentions: mentionsMe })]
+    await waitFor(() => events.some((e) => e.message.id === 'd3'))
+    await Bun.sleep(60)
+    expect(store.get().unreadByChatId.design?.mentionCount).toBe(0)
+  })
+
   test('cross-chat pass: a shown passive chat is read and silent; hidden, unread', async () => {
     primeAuth()
     let preview = 'p1'

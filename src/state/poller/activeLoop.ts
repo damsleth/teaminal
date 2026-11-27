@@ -16,7 +16,7 @@ import { listChannelMessagesPage, listChannelRepliesPage } from '../../graph/tea
 import { recordEvent, isDebugEnabled } from '../../log'
 import { logMessageImageShape } from './imageDebug'
 import type { ChatMessage } from '../../types'
-import { focusKey, type ConvKey, type Focus } from '../store'
+import { bumpChatMention, focusKey, type ConvKey, type Focus } from '../store'
 import { visibleConvKeys } from '../panes'
 import type { MentionEvent } from '../poller'
 import { backoff, isAbortError, jitter } from './intervals'
@@ -152,10 +152,18 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
           capSeen(seenSet)
           seen.set(conv, seenSet)
           // A conversation not on screen (a hidden passive pane) is not
-          // marked read.
-          store.set((s) => ({
-            ...mergeActivePagePatch(s, conv, page, focus, visibleConvKeys(s).includes(conv)),
-          }))
+          // marked read, and its new mentions count, as the cross-chat
+          // probe counts them for any other chat.
+          store.set((s) => {
+            const viewed = visibleConvKeys(s).includes(conv)
+            const patch = mergeActivePagePatch(s, conv, page, focus, viewed)
+            if (viewed || focus.kind !== 'chat') return patch
+            let unread = patch.unreadByChatId ?? s.unreadByChatId
+            for (const { kind } of toNotify) {
+              if (kind === 'mention') unread = bumpChatMention(unread, focus.chatId)
+            }
+            return unread === s.unreadByChatId ? patch : { ...patch, unreadByChatId: unread }
+          })
           for (const { msg, kind } of toNotify) {
             onMention?.({ conv, message: msg, source: 'active', kind })
           }
