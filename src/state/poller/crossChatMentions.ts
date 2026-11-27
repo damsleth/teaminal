@@ -2,8 +2,8 @@
 //
 // After each successful list-poll, walk the chats whose
 // lastMessagePreview.id changed since the previous poll. For each one
-// that's (a) from a non-self sender and (b) not a conversation on screen
-// (the active pane, or the passive pane while it is shown), fetch the top 5 messages, find the one matching the new
+// that's (a) from a non-self sender and (b) not the currently-active
+// focus, fetch the top 5 messages, find the one matching the new
 // preview id, and fire onMention if it has a mention to me.
 //
 // The seen-message-ID set is also seeded for these chats so a later
@@ -16,8 +16,7 @@ import type { AccountStore } from '../accountStore'
 import { listMessages } from '../../graph/chats'
 import type { GraphClient } from '../../graph/client'
 import type { Chat } from '../../types'
-import { bumpChatMention, markChatRead, markChatUnread, type ConvKey } from '../store'
-import { visibleConvKeys } from '../panes'
+import { bumpChatMention, focusKey, markChatRead, markChatUnread, type ConvKey } from '../store'
 import { isAbortError } from './intervals'
 import { notifyKind } from './mentions'
 import type { MentionEvent } from '../poller'
@@ -46,7 +45,7 @@ export async function runCrossChatMentionPass(
   signal: AbortSignal,
 ): Promise<void> {
   const { store, prevPreviewIds } = deps
-  const viewed = visibleConvKeys(store.get())
+  const activeKey = focusKey(store.get().focus)
   const candidates: Chat[] = []
   let nextUnread = store.get().unreadByChatId
   for (const chat of chats) {
@@ -58,7 +57,7 @@ export async function runCrossChatMentionPass(
     if (prevId === undefined) continue // first time seeing this chat after seed phase
     const senderId = chat.lastMessagePreview?.from?.user?.id
     const conv: ConvKey = `chat:${chat.id}`
-    if (viewed.includes(conv) || senderId === myId) {
+    if (conv === activeKey || senderId === myId) {
       nextUnread = markChatRead(nextUnread, chat.id, curId)
       continue
     }

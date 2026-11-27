@@ -59,15 +59,3 @@ test('two accounts with the same conv id coalesce separately and keep their labe
     ['teaminal · beta · Bob', 'Alice: b2'],
   ])
 })
-
-test('visibleConvs reaches the quiet predicate: no banner for a pane on screen', () => {
-  const banners = capture()
-  const onScreen = { ...ctx(1_000), terminalFocused: true, visibleConvs: ['chat:c2'] }
-  notifyMention({ conv: 'chat:c2', senderName: 'Alice', preview: 'hi', scope: 'Bob' }, onScreen)
-  expect(banners).toEqual([])
-  notifyMention(
-    { conv: 'chat:c3', senderName: 'Alice', preview: 'hi', scope: 'Bob' },
-    { ...onScreen, now: new Date(2_000) },
-  )
-  expect(banners.map((b) => b.body)).toEqual(['Alice: hi'])
-})

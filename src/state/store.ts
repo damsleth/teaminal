@@ -458,12 +458,6 @@ export type ReadReceipt = {
   seenAt: number
 }
 
-// The second conversation pane (split panes): the passive conversation and
-// the side it sits on. The active pane is `focus`, on the opposite side.
-// `focus: { kind: 'list' }` is an empty passive pane. Ephemeral, foreground
-// account only.
-export type SplitPane = { focus: Focus; side: 'left' | 'right' }
-
 // List-pane UI an account gets back when it returns to the foreground.
 export type AccountUi = { focus: Focus; cursor: number; cursorKey: string | null }
 
@@ -521,13 +515,6 @@ export type AppState = {
   // showing whichever has focus (h/Left reveals the list, l/Right opens the
   // chat). Ephemeral.
   chatListCollapsed: boolean
-  // Split panes: the passive pane, or null for one pane (src/state/panes.ts).
-  split: SplitPane | null
-  // Whether the passive pane is on screen. App publishes it from the layout
-  // (too narrow, Ctrl+B showing the list, a prompt over the panes: false).
-  // A hidden passive conversation keeps polling but is not viewed: it is not
-  // marked read and notifies as any other conversation.
-  splitShown: boolean
   // In-conversation message search (S1). Empty query closes the bar.
   // focusedHitMessageId tracks the message the search bar last jumped
   // to so n can step relative to it across re-renders.
@@ -649,8 +636,6 @@ export type GlobalKey =
   | 'focusedAttachmentIndex'
   | 'filter'
   | 'chatListCollapsed'
-  | 'split'
-  | 'splitShown'
   | 'messageSearchQuery'
   | 'messageSearchFocusedId'
   | 'modal'
@@ -717,8 +702,6 @@ export function initialAppState(): AppState {
     filter: '',
     expandedChatSections: {},
     chatListCollapsed: false,
-    split: null,
-    splitShown: false,
     messageSearchQuery: '',
     messageSearchFocusedId: null,
     memberPresence: {},

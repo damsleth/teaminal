@@ -18,7 +18,7 @@ import { useAppState, useAppStore, useTheme } from './StoreContext'
 
 type Binding = { keys: string; when: string; action: string }
 
-export const BINDINGS: Binding[] = [
+const BINDINGS: Binding[] = [
   { keys: 'Ctrl+P', when: 'list / chat / composer', action: 'command palette' },
   { keys: '. / Ctrl+.', when: 'list / chat', action: 'context menu for the row / message' },
   { keys: 'j / ↓', when: 'list', action: 'cursor down' },
@@ -32,10 +32,6 @@ export const BINDINGS: Binding[] = [
   { keys: 'Ctrl+F', when: 'list', action: 'same, in the cross-account Favorites' },
   { keys: 'Ctrl+D', when: 'list / chat', action: 'delete chat (confirm y/n)' },
   { keys: 'Ctrl+B', when: 'list / chat', action: 'hide / show chat list (single pane)' },
-  { keys: 'v', when: 'list', action: 'open the chat / channel in the other pane (split)' },
-  { keys: 'v', when: 'chat / channel', action: 'move it to the other pane, pick one here' },
-  { keys: 'w', when: 'list / chat (split)', action: 'switch to the other pane' },
-  { keys: 'o', when: 'list / chat (split)', action: 'close the other pane' },
   { keys: 'j / ↓', when: 'chat / channel', action: 'next message / attachment' },
   { keys: 'k / ↑', when: 'chat / channel', action: 'prev message / attachment / older' },
   { keys: 'Space', when: 'chat / channel', action: 'open focused image / link' },

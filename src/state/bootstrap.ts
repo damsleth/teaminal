@@ -28,8 +28,7 @@ import { startPoller, type PollerHandle } from './poller'
 import type { AccountStore } from './accountStore'
 import { startRealtimeBridge } from './realtimeBridge'
 import { chatLabel } from './selectables'
-import { audienceFromRouting, routingForAccount } from './store'
-import { visibleConvKeys } from './panes'
+import { audienceFromRouting, focusKey, routingForAccount } from './store'
 
 // Clear an account's chatsvc message latch after its chat routing mode
 // changed, so a graph-401 fallback taken under the old mode doesn't outlive
@@ -181,9 +180,7 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
           : chatId
             ? 'chat'
             : 'channel'
-        // On screen: the active pane, or the passive pane while it is shown.
-        const visibleConvs = visibleConvKeys(s)
-        const viewing = visibleConvs.includes(event.conv) && s.terminalFocused !== false
+        const viewing = focusKey(s.focus) === event.conv && s.terminalFocused !== false
         // Plain messages in the chat you're reading: no bell, no record.
         // Mentions keep their bell-only path (decideQuiet).
         if (viewing && event.kind === 'message') return
@@ -210,7 +207,6 @@ export async function runSession(opts: RunSessionOpts): Promise<SessionHandle> {
           {
             now: new Date(),
             terminalFocused: s.terminalFocused !== false,
-            visibleConvs,
             state: { focus: s.focus, myPresence: s.myPresence, settings: s.settings },
           },
         )

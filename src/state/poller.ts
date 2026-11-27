@@ -3,9 +3,8 @@
 //
 // Three independent loops run concurrently:
 //
-//   - active   (~10s; 60s with push connected, 5min blurred): re-fetches
-//                     messages for the currently-focused chat or channel.
-//                     Seeds the seen-message-ID set on first
+//   - active   (~5s): re-fetches messages for the currently-focused chat
+//                     or channel. Seeds the seen-message-ID set on first
 //                     fetch (no notifications); subsequent fetches diff
 //                     against the set and fire onMention for newly-seen
 //                     mentions of `me` from non-self senders.
@@ -25,18 +24,12 @@
 //
 // Focus change wakes the active loop's interruptable sleep and aborts any
 // in-flight active fetch so opening a chat is responsive even mid-poll.
-//
-// Split panes: the active loop runs once per pane side (left, right), each
-// polling paneFocus(state, side) with its own sleeper, abort slot and
-// backoff. Without a split the right side idles. A pane switch changes
-// neither side's target, so it costs no fetch.
 
-import type { AccountStore, AccountView } from './accountStore'
+import type { AccountStore } from './accountStore'
 import type { GraphClient } from '../graph/client'
 import type { ChatMessage } from '../types'
 import { recordEvent } from '../log'
 import { type ConvKey, type Focus, focusKey } from './store'
-import { paneFocus, visibleConvKeys, type PaneSide } from './panes'
 import {
   ACTIVE_DEFAULT_MS,
   LIST_DEFAULT_MS,
@@ -45,7 +38,7 @@ import {
   isAbortError,
 } from './poller/intervals'
 import type { NotifyKind } from './poller/mentions'
-import { makeSleeper, type Sleeper } from './poller/sleeper'
+import { makeSleeper } from './poller/sleeper'
 import { makeActiveLoop } from './poller/activeLoop'
 import { makeListLoop } from './poller/listLoop'
 import { makePresenceLoop } from './poller/presenceLoop'
@@ -139,36 +132,15 @@ export function startPoller(opts: PollerOpts): PollerHandle {
   // re-notifying the same IDs when the user opens that chat.
   const seen = new Map<ConvKey, Set<string>>()
 
+  const activeSleeper = makeSleeper()
   const listSleeper = makeSleeper()
   const presenceSleeper = makeSleeper()
 
-  // One active loop per pane side. Each has its own sleeper and a
-  // per-iteration AbortController slot, so the target-change subscriber and
-  // stop() can cancel one side's in-flight fetch without touching the other.
-  type ActiveSide = { side: PaneSide; sleeper: Sleeper; abort: AbortController | null }
-  const sides: ActiveSide[] = (['left', 'right'] as const).map((side) => ({
-    side,
-    sleeper: makeSleeper(),
-    abort: null,
-  }))
-  const target = (side: PaneSide): Focus => paneFocus(store.get(), side)
-
-  // Conversations whose fetch returned 403: sticky for the session and
-  // shared by both sides, so moving a blocked conversation to the other pane
-  // does not retry it.
-  const blocked = new Set<ConvKey>()
-
-  // A channel and one of its threads in the two panes return the same
-  // replies under different keys. A reply new to one side is also recorded
-  // in the other side's seen set (when that set exists), so one message
-  // notifies once.
-  const overlapKeys = (side: PaneSide, focus: Focus): ConvKey[] => {
-    const other = target(side === 'left' ? 'right' : 'left')
-    if (focus.kind !== 'channel' && focus.kind !== 'thread') return []
-    if (other.kind !== 'channel' && other.kind !== 'thread') return []
-    if (other.teamId !== focus.teamId || other.channelId !== focus.channelId) return []
-    const key = focusKey(other)
-    return key && key !== focusKey(focus) ? [key] : []
+  // Per-iteration AbortController for the active loop, exposed so the
+  // focus-change subscriber and stop() can cancel the in-flight fetch.
+  let activeAbort: AbortController | null = null
+  const setActiveAbort = (c: AbortController | null): void => {
+    activeAbort = c
   }
 
   // Hot-stop signal for background member hydration started by the list
@@ -188,30 +160,15 @@ export function startPoller(opts: PollerOpts): PollerHandle {
   // stay stale across the explicit refresh the user just asked for).
   const memberHydrated = new Set<string>()
 
-  // Wake a side's loop and abort its in-flight fetch when its target
-  // changes; the other side keeps going. A side whose chat comes on screen
-  // (a hidden passive pane shown) is woken too, so its next poll marks it
-  // read.
-  const sideKey = (state: AccountView, side: PaneSide) => focusKey(paneFocus(state, side))
-  const isViewed = (state: AccountView, key: ConvKey | null) =>
-    key !== null && key.startsWith('chat:') && visibleConvKeys(state).includes(key)
-  const last = sides.map((x) => {
-    const key = sideKey(store.get(), x.side)
-    return { key, viewed: isViewed(store.get(), key) }
-  })
+  // Wake the active loop and abort its in-flight fetch when focus changes.
+  let lastFocusKey = focusKey(store.get().focus)
   const unsubscribe = store.subscribe((state) => {
-    sides.forEach((x, i) => {
-      const key = sideKey(state, x.side)
-      const viewed = isViewed(state, key)
-      const prev = last[i]!
-      if (key !== prev.key) {
-        x.abort?.abort()
-        x.sleeper.wake()
-      } else if (viewed && !prev.viewed) {
-        x.sleeper.wake()
-      }
-      last[i] = { key, viewed }
-    })
+    const k = focusKey(state.focus)
+    if (k !== lastFocusKey) {
+      lastFocusKey = k
+      activeAbort?.abort()
+      activeSleeper.wake()
+    }
   })
 
   function reportError(loop: PollerLoopName, err: unknown): void {
@@ -231,24 +188,17 @@ export function startPoller(opts: PollerOpts): PollerHandle {
 
   // --- Loop factories ---
 
-  const activeLoops = sides.map((x) =>
-    makeActiveLoop({
-      store,
-      target: () => target(x.side),
-      getClient,
-      sleeper: x.sleeper,
-      intervalMs: activeMs,
-      seen,
-      blocked,
-      overlapKeys: (focus) => overlapKeys(x.side, focus),
-      setActiveAbort: (c) => {
-        x.abort = c
-      },
-      isStopped,
-      onMention,
-      reportError: (err) => reportError('active', err),
-    }),
-  )
+  const runActiveLoop = makeActiveLoop({
+    store,
+    getClient,
+    sleeper: activeSleeper,
+    intervalMs: activeMs,
+    seen,
+    setActiveAbort,
+    isStopped,
+    onMention,
+    reportError: (err) => reportError('active', err),
+  })
 
   const runListLoop = makeListLoop({
     store,
@@ -277,11 +227,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
 
   // Kick off all loops; failures inside any loop are caught locally so
   // Promise.all does not need to short-circuit.
-  const loops = Promise.all([
-    ...activeLoops.map((run) => run()),
-    runListLoop(),
-    runPresenceLoop(),
-  ]).catch((err) => {
+  const loops = Promise.all([runActiveLoop(), runListLoop(), runPresenceLoop()]).catch((err) => {
     reportError('active', err)
   })
 
@@ -289,7 +235,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
     async stop() {
       stopped = true
       unsubscribe()
-      for (const x of sides) x.abort?.abort()
+      activeAbort?.abort()
       hydrateAbort.abort()
       sessionAbort.abort()
       // close() (not just wake()) latches each sleeper so any in-flight
@@ -297,21 +243,21 @@ export function startPoller(opts: PollerOpts): PollerHandle {
       // no-op. Without the latch, a loop whose previous sleep just
       // resolved on the timer (waker=null in that window) would start a
       // fresh backoff sleep nobody can wake.
-      for (const x of sides) x.sleeper.close()
+      activeSleeper.close()
       listSleeper.close()
       presenceSleeper.close()
       await loops
     },
     refresh() {
       recordEvent('poller', 'info', 'manual refresh requested')
-      for (const x of sides) x.sleeper.wake()
+      activeSleeper.wake()
       listSleeper.wake()
     },
     hardRefresh() {
       recordEvent('poller', 'info', 'hard refresh requested')
       seen.clear()
       memberHydrated.clear()
-      for (const x of sides) x.abort?.abort()
+      activeAbort?.abort()
       store.set({
         chats: [],
         teams: [],
@@ -321,7 +267,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
         unreadByChatId: {},
         conn: 'connecting',
       })
-      for (const x of sides) x.sleeper.wake()
+      activeSleeper.wake()
       listSleeper.wake()
       presenceSleeper.wake()
     },

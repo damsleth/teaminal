@@ -20,7 +20,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { test, expect } from '@microsoft/tui-test'
 
-function useConfig(config: Record<string, unknown>, columns = 100) {
+function useConfig(config: Record<string, unknown>) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'teaminal-tui-mouse-'))
   fs.mkdirSync(path.join(dir, 'teaminal'), { recursive: true })
   fs.writeFileSync(
@@ -31,7 +31,7 @@ function useConfig(config: Record<string, unknown>, columns = 100) {
     program: { file: 'bun', args: ['run', 'bin/teaminal.tsx'] },
     env: { TEAMINAL_SEED: 'fixtures', TZ: 'UTC', XDG_CONFIG_HOME: dir },
     rows: 30,
-    columns,
+    columns: 100,
   })
 }
 
@@ -282,89 +282,5 @@ test.describe('wheel', () => {
     expect(screen(terminal)).not.toContain('New chat')
     expect(screen(terminal)).not.toContain('[<')
     await expect(terminal.getByText('/ Kari')).toBeVisible()
-  })
-})
-
-// ---------------------------------------------------------------------------
-// Split panes: the wheel moves the message cursor only over the active pane.
-// At 100 columns the 28-column list leaves 72: two 36-column panes, the left
-// at columns 28-63, the right at 64-99. Ctrl+B gives them 50 each.
-// ---------------------------------------------------------------------------
-
-// Row of the focus marker in the pane whose border starts at column `from`.
-function markerIn(terminal: Terminal, from: number): number {
-  return lines(terminal).findIndex((l, y) => y < 25 && /^│ ?>/.test(l.slice(from)))
-}
-
-async function openSplit(terminal: Terminal) {
-  await expect(terminal.getByText('Design Sync')).toBeVisible()
-  // v opens Ada Byron (the first row) in the other pane, on the right; j, l
-  // opens Design Sync in the active pane, on the left.
-  terminal.write('v')
-  await pause()
-  terminal.write('j')
-  await pause()
-  terminal.write('l')
-  await expect(terminal.getByText('Two compact layout options')).toBeVisible()
-  await pause()
-}
-
-test.describe('wheel-split', () => {
-  useConfig({ mouse: true, chatListPreviewLines: 0, messageAvatars: 'off' })
-
-  test('mouse wheel-split: the passive pane ignores the wheel, on either side', async ({
-    terminal,
-  }) => {
-    await openSplit(terminal)
-    const left = markerIn(terminal, 28)
-    expect(left).toBeGreaterThan(0)
-    expect(markerIn(terminal, 64)).toBe(-1)
-    // Over the passive (right) pane: nothing moves.
-    await wheel(terminal, 'up', 80, 10)
-    expect(markerIn(terminal, 28)).toBe(left)
-    expect(markerIn(terminal, 64)).toBe(-1)
-    // Over the active (left) pane: its marker moves up.
-    await wheel(terminal, 'up', 45, 10)
-    expect(markerIn(terminal, 28)).toBeLessThan(left)
-
-    // w: the right pane is active now.
-    terminal.write('w')
-    await pause()
-    const right = markerIn(terminal, 64)
-    expect(right).toBeGreaterThan(0)
-    await wheel(terminal, 'up', 45, 10)
-    expect(markerIn(terminal, 64)).toBe(right)
-    await wheel(terminal, 'up', 80, 10)
-    expect(markerIn(terminal, 64)).toBeLessThan(right)
-
-    // Ctrl+B: two 50-column panes; the left (passive) still ignores it.
-    terminal.write('\x02')
-    await pause()
-    const collapsed = markerIn(terminal, 50)
-    expect(collapsed).toBeGreaterThan(0)
-    await wheel(terminal, 'down', 20, 10)
-    expect(markerIn(terminal, 50)).toBe(collapsed)
-    await wheel(terminal, 'down', 75, 10)
-    expect(markerIn(terminal, 50)).toBeGreaterThan(collapsed)
-  })
-})
-
-test.describe('wheel-split narrow', () => {
-  useConfig({ mouse: true, chatListPreviewLines: 0, messageAvatars: 'off' }, 80)
-
-  test('mouse wheel-split narrow: the one pane shown is the active one', async ({ terminal }) => {
-    await expect(terminal.getByText('Design Sync')).toBeVisible()
-    terminal.write('v')
-    await pause()
-    terminal.write('j')
-    await pause()
-    terminal.write('l')
-    await expect(terminal.getByText('Two compact layout options')).toBeVisible()
-    await pause()
-    // 80 columns: the 24-column list leaves 56, too narrow for two panes.
-    const at = markerIn(terminal, 24)
-    expect(at).toBeGreaterThan(0)
-    await wheel(terminal, 'up', 50, 10)
-    expect(markerIn(terminal, 24)).toBeLessThan(at)
   })
 })

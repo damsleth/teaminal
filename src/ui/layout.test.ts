@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { computeLayout, MIN_SPLIT_PANE_COLS, splitPaneWidths } from './layout'
+import { computeLayout } from './layout'
 
 describe('computeLayout', () => {
   describe('normal terminal (cols=120, rows=40)', () => {
@@ -153,42 +153,5 @@ describe('computeLayout', () => {
       // auto = clamp(1+2+2, 3, 8) = 5
       expect(composerHeight).toBe(5)
     })
-  })
-})
-
-describe('splitPaneWidths', () => {
-  test('two 36-column panes (border box) from 72 columns of pane area', () => {
-    expect(MIN_SPLIT_PANE_COLS).toBe(36)
-    expect(splitPaneWidths(72)).toEqual([36, 36])
-    expect(splitPaneWidths(71)).toBeNull()
-  })
-
-  test('odd widths: the left pane takes the odd column; the widths add up', () => {
-    expect(splitPaneWidths(73)).toEqual([37, 36])
-    expect(splitPaneWidths(87)).toEqual([44, 43])
-    for (const area of [72, 73, 100, 151]) {
-      const [l, r] = splitPaneWidths(area)!
-      expect(l + r).toBe(area)
-      expect(Math.min(l, r)).toBeGreaterThanOrEqual(MIN_SPLIT_PANE_COLS)
-    }
-  })
-
-  test('with the default list: 100 columns split, 80 only with the list hidden', () => {
-    const area = (cols: number) =>
-      cols -
-      computeLayout({
-        cols,
-        rows: 30,
-        draftLines: 1,
-        quoteRows: 0,
-        chatListWidth: null,
-        composerHeight: null,
-      }).chatListWidth
-    expect(area(100)).toBe(72)
-    expect(splitPaneWidths(area(100))).toEqual([36, 36])
-    expect(splitPaneWidths(area(80))).toBeNull()
-    expect(splitPaneWidths(80)).toEqual([40, 40])
-    expect(area(120)).toBe(86)
-    expect(splitPaneWidths(area(120))).toEqual([43, 43])
   })
 })

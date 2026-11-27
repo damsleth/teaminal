@@ -75,8 +75,6 @@ const RESET_UI = {
   messageSearchFocusedId: null,
   modal: null,
   editingMessageId: null,
-  split: null,
-  splitShown: false,
 } as const satisfies Partial<AppState>
 
 function without<V>(rec: Record<AccountId, V>, id: AccountId): Record<AccountId, V> {
@@ -278,8 +276,5 @@ export function setForeground(
     messageSearchFocusedId: null,
     editingMessageId: null,
     focusedAttachmentIndex: 0,
-    // Split panes belong to the foreground account: a swap closes them.
-    split: null,
-    splitShown: false,
   })
 }

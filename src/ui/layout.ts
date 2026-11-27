@@ -78,17 +78,3 @@ export const CHAT_LIST_WIDTH_MIN = CHAT_LIST_HARD_FLOOR
 export const CHAT_LIST_WIDTH_MAX = 60
 export const COMPOSER_HEIGHT_MIN = COMPOSER_HARD_FLOOR
 export const COMPOSER_HEIGHT_MAX = 10
-
-// Split panes: the narrowest a conversation pane may be, border included
-// (about 30 text columns). Two fit side by side from 72 columns of pane area.
-export const MIN_SPLIT_PANE_COLS = 36
-
-// Border-box widths of the left and right panes when the conversation area
-// (`area` columns, the width the single pane would have) splits 50/50, the
-// left taking the odd column; null when two panes don't fit. Each pane draws
-// its own border, so there is no separate divider column.
-export function splitPaneWidths(area: number): [number, number] | null {
-  if (area < 2 * MIN_SPLIT_PANE_COLS) return null
-  const right = Math.floor(area / 2)
-  return [area - right, right]
-}
