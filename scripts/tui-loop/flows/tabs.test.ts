@@ -7,7 +7,8 @@
  * closes a tab, and with two fixture accounts open each has its own tab.
  * Nothing is ever sent: the draft is left unsent.
  *
- * Each test gets its own config dir: Ctrl+T persists conversationMode.
+ * Each test has its own describe and config dir: Ctrl+T persists
+ * conversationMode, and a retry must start from the same mode.
  *
  * RUNNER: node node_modules/@microsoft/tui-test/index.js (not bun test).
  */
@@ -118,6 +119,10 @@ test.describe('tabs: one account', () => {
     expect(s).not.toContain('│ 2 Ada Byron')
     expect(s).toContain(ADA)
   })
+})
+
+test.describe('tabs: drafts and closing', () => {
+  useConfig({})
 
   test('tabs: a draft stays in its tab; Ctrl+W deletes a word in the composer, closes a tab outside it', async ({
     terminal,

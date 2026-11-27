@@ -327,3 +327,29 @@ test('an edit reports its own line count, so the pane grows for edit text too', 
   expect(store.get().draftsByConvo['chat:a']).toBeUndefined()
   app.unmount()
 })
+
+test('tabs mode: [ ] and digits type into the composer, Ctrl+W deletes a word there', async () => {
+  const { store, stdin, app } = mount({
+    focus: { kind: 'chat', chatId: 'a' },
+    inputZone: 'composer',
+  })
+  store.set((s) => ({
+    settings: { ...s.settings, conversationMode: 'tabs' },
+    tabs: [
+      { account: accountRef('test').id, focus: { kind: 'chat', chatId: 'a' } },
+      { account: accountRef('test').id, focus: { kind: 'chat', chatId: 'b' } },
+    ],
+  }))
+  await tick()
+  for (const ch of 'see [2] and 3 more') {
+    stdin.write(ch)
+    await tick(5)
+  }
+  stdin.write('\x17') // Ctrl+W
+  await tick()
+  expect(store.get().draftsByConvo['chat:a']).toBe('see [2] and 3 ')
+  // The tabs and the open conversation are untouched.
+  expect(store.get().focus).toEqual({ kind: 'chat', chatId: 'a' })
+  expect(store.get().tabs).toHaveLength(2)
+  app.unmount()
+})
