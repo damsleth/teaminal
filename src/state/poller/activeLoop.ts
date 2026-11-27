@@ -17,6 +17,7 @@ import { recordEvent, isDebugEnabled } from '../../log'
 import { logMessageImageShape } from './imageDebug'
 import type { ChatMessage } from '../../types'
 import { focusKey, type ConvKey, type Focus } from '../store'
+import { visibleConvKeys } from '../panes'
 import type { MentionEvent } from '../poller'
 import { backoff, isAbortError, jitter } from './intervals'
 import { notifyKind, type NotifyKind } from './mentions'
@@ -35,6 +36,14 @@ export type ActiveLoopDeps = {
   // seen-message-ID set, shared across loops (the cross-chat mention
   // pass also seeds it so a later active-loop open doesn't re-notify).
   seen: Map<ConvKey, Set<string>>
+  // Conversations whose fetch returned 403, skipped for the session. Pass one
+  // set to every loop of a session so a blocked conversation stays blocked
+  // in either pane. Default: this loop's own.
+  blocked?: Set<ConvKey>
+  // Other conversations whose seen sets hold this one's messages too (a
+  // channel and its thread in the two panes): a message new here is recorded
+  // there, and one already seen there is not notified again.
+  overlapKeys?: (focus: Focus) => ConvKey[]
   // Set/cleared per iteration so stop() and focus-change subscribers
   // can abort the in-flight fetch via abort().
   setActiveAbort: (c: AbortController | null) => void
@@ -81,7 +90,7 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
   // latched, we skip the fetch entirely until focus moves to a chat
   // that isn't blocked - re-focusing the blocked chat will not retry
   // automatically, since the scope state is sticky for the session.
-  const blocked = new Set<ConvKey>()
+  const blocked = deps.blocked ?? new Set<ConvKey>()
 
   return async function run(): Promise<void> {
     let consecutiveErrors = 0
@@ -109,8 +118,10 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
           durationMs: Date.now() - startedAt,
         })
         if (isStopped()) return
-        // Only apply if the target is still the same conversation.
-        const stillSame = focusKey(target()) === conv
+        // Only apply if the target is still the same conversation, and the
+        // fetch was not cancelled meanwhile (a close-and-reopen of the same
+        // conversation, a hard refresh).
+        const stillSame = !ctrl.signal.aborted && focusKey(target()) === conv
         if (stillSame) {
           const isFirst = !seen.has(conv)
           const seenSet = seen.get(conv) ?? new Set<string>()
@@ -121,18 +132,29 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
               ? s0.chats.find((c) => c.id === focus.chatId)?.chatType
               : undefined
           const toNotify: Array<{ msg: ChatMessage; kind: NotifyKind }> = []
+          const twins = isFirst
+            ? []
+            : (deps.overlapKeys?.(focus) ?? []).flatMap((k) => seen.get(k) ?? [])
           for (const msg of messages) {
             if (seenSet.has(msg.id)) continue
             seenSet.add(msg.id)
             if (isDebugEnabled()) logMessageImageShape(msg)
             if (isFirst || !myId) continue
+            let notifiedThere = false
+            for (const twin of twins) {
+              if (twin.has(msg.id)) notifiedThere = true
+              else twin.add(msg.id)
+            }
+            if (notifiedThere) continue
             const kind = notifyKind(msg, myId, chatType, s0.settings.notifyChatMessages)
             if (kind) toNotify.push({ msg, kind })
           }
           capSeen(seenSet)
           seen.set(conv, seenSet)
+          // A conversation not on screen (a hidden passive pane) is not
+          // marked read.
           store.set((s) => ({
-            ...mergeActivePagePatch(s, conv, page, focus),
+            ...mergeActivePagePatch(s, conv, page, focus, visibleConvKeys(s).includes(conv)),
           }))
           for (const { msg, kind } of toNotify) {
             onMention?.({ conv, message: msg, source: 'active', kind })

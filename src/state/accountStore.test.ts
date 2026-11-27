@@ -399,4 +399,35 @@ describe('account slots', () => {
     expect(b.isCurrent()).toBe(false)
     expect(accountStore(store).isForeground()).toBe(true)
   })
+
+  test('split panes belong to the foreground account: views and slot operations clear them', () => {
+    const { store, b } = twoSlots()
+    const split = { focus: { kind: 'chat' as const, chatId: 'c2' }, side: 'right' as const }
+    store.set({ focus: { kind: 'chat', chatId: 'c1' }, split, splitShown: true })
+    // A background session never sees the foreground's split.
+    expect(b.get().split).toBeNull()
+    expect(b.get().splitShown).toBe(false)
+    expect(store.get().split).toEqual(split)
+
+    setForeground(store, bob.id)
+    expect(store.get().split).toBeNull()
+    expect(store.get().splitShown).toBe(false)
+    // Swapping back does not bring it back (not saved per account in v1).
+    setForeground(store, alice.id)
+    expect(store.get().split).toBeNull()
+
+    store.set({ split })
+    openAccount(store, bob, { foreground: false })
+    expect(store.get().split).toEqual(split)
+    closeAccount(store, bob.id)
+    expect(store.get().split).toEqual(split)
+    closeAccount(store, alice.id)
+    expect(store.get().split).toBeNull()
+
+    openAccount(store, alice, { foreground: true })
+    store.set({ split })
+    closeAccount(store, alice.id)
+    openAccount(store, bob, { foreground: true })
+    expect(store.get().split).toBeNull()
+  })
 })

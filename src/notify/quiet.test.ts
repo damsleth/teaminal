@@ -152,3 +152,88 @@ describe('decideQuiet', () => {
     ).toBe('normal')
   })
 })
+
+// Split panes: visibleConvs lists the conversations on screen (the active
+// pane, and the passive pane while it is shown) and replaces state.focus.
+describe('decideQuiet with visibleConvs', () => {
+  const ACTIVE = 'chat:c1'
+  const PASSIVE_THREAD = 'thread:t1:ch1:r1'
+  const visible = (over: Parameters<typeof ctx>[0], visibleConvs: string[]) => ({
+    ...ctx({ focus: { kind: 'chat', chatId: 'c1' }, ...over }),
+    visibleConvs,
+  })
+
+  test('a mention in the passive pane (a thread) is bell-only under defaults', () => {
+    const c = visible({ conv: PASSIVE_THREAD, terminalFocused: true }, [ACTIVE, PASSIVE_THREAD])
+    expect(decideQuiet(c)).toBe('bell-only')
+    // ...and in the active pane.
+    expect(decideQuiet({ ...c, conv: ACTIVE })).toBe('bell-only')
+  })
+
+  test('a hidden passive pane is not on screen: banner as for any other chat', () => {
+    expect(decideQuiet(visible({ conv: PASSIVE_THREAD, terminalFocused: true }, [ACTIVE]))).toBe(
+      'normal',
+    )
+  })
+
+  test('visibleConvs replaces state.focus', () => {
+    // state.focus names c1, but nothing is on screen.
+    expect(decideQuiet(visible({ conv: ACTIVE, terminalFocused: true }, []))).toBe('normal')
+  })
+
+  test('active banner / bell overrides apply to the passive pane', () => {
+    const both = [ACTIVE, PASSIVE_THREAD]
+    expect(
+      decideQuiet(
+        visible(
+          { conv: PASSIVE_THREAD, terminalFocused: true, settings: { notifyActiveBanner: true } },
+          both,
+        ),
+      ),
+    ).toBe('normal')
+    expect(
+      decideQuiet(
+        visible(
+          { conv: PASSIVE_THREAD, terminalFocused: true, settings: { notifyActiveBell: false } },
+          both,
+        ),
+      ),
+    ).toBe('silent')
+  })
+
+  test('terminal blur keeps the normal path, then mute, presence and quiet hours apply', () => {
+    const both = [ACTIVE, PASSIVE_THREAD]
+    expect(decideQuiet(visible({ conv: PASSIVE_THREAD, terminalFocused: false }, both))).toBe(
+      'normal',
+    )
+    expect(
+      decideQuiet(
+        visible(
+          { conv: PASSIVE_THREAD, terminalFocused: true, settings: { notifyMuted: true } },
+          both,
+        ),
+      ),
+    ).toBe('bell-only')
+    expect(
+      decideQuiet(
+        visible(
+          { conv: PASSIVE_THREAD, terminalFocused: false, presenceActivity: 'DoNotDisturb' },
+          both,
+        ),
+      ),
+    ).toBe('bell-only')
+    expect(
+      decideQuiet(
+        visible(
+          {
+            conv: PASSIVE_THREAD,
+            terminalFocused: false,
+            now: new Date(2026, 4, 5, 23, 0),
+            settings: { quietHoursStart: '22:00', quietHoursEnd: '07:30' },
+          },
+          both,
+        ),
+      ),
+    ).toBe('bell-only')
+  })
+})
