@@ -443,6 +443,23 @@ export function App() {
       run: () => store.set({ inputZone: 'resize' }),
     },
   ]
+  // Split panes open: the pane keys.
+  if (split) {
+    paletteKeyActions.push(
+      {
+        id: 'switch-pane',
+        title: 'Switch pane',
+        keys: 'w',
+        run: () => store.set((s) => switchPane(s)),
+      },
+      {
+        id: 'close-other-pane',
+        title: 'Close other pane',
+        keys: 'o',
+        run: () => store.set((s) => closeOtherPane(s)),
+      },
+    )
+  }
 
   // The palette's favorite toggles for the row under the list cursor, built
   // only while the palette is open.

@@ -143,6 +143,18 @@ test.describe('wide', () => {
     expect(out).not.toContain(ADA_FIRST)
   })
 
+  test('split-palette: Close other pane from the command palette', async ({ terminal }) => {
+    await openSplit(terminal)
+    await press(terminal, '\x10')
+    terminal.write('close other pane')
+    await expect(terminal.getByText('Close other pane')).toBeVisible()
+    await press(terminal, '\r')
+    await pause()
+    const out = conversation(terminal)
+    expect(out).toContain(DESIGN_FIRST)
+    expect(out).not.toContain(ADA_FIRST)
+  })
+
   test('split-close-empty: h, then o keeps the other conversation', async ({ terminal }) => {
     await openSplit(terminal)
     await press(terminal, 'h')

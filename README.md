@@ -506,6 +506,10 @@ ring the bell, as in the open conversation).
 - `o` closes the other pane: the active one stays, or, when it is empty, the
   other pane's conversation becomes the single pane.
 
+While split, a row's context menu (`.`) also offers **Open in other pane**
+(`v`), and the command palette **Switch pane** (`w`) and **Close other
+pane** (`o`).
+
 A pane needs 36 columns, so two need 72 columns beside the chat list: 100
 columns with the default list width. On a narrower terminal only the active
 pane shows, its title names the other conversation (`⇆ Design Sync`) and `w`
