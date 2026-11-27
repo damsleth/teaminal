@@ -18,7 +18,7 @@ import { useAppState, useAppStore, useTheme } from './StoreContext'
 
 type Binding = { keys: string; when: string; action: string }
 
-const BINDINGS: Binding[] = [
+export const BINDINGS: Binding[] = [
   { keys: 'Ctrl+P', when: 'list / chat / composer', action: 'command palette' },
   { keys: '. / Ctrl+.', when: 'list / chat', action: 'context menu for the row / message' },
   { keys: 'j / ↓', when: 'list', action: 'cursor down' },
@@ -32,6 +32,10 @@ const BINDINGS: Binding[] = [
   { keys: 'Ctrl+F', when: 'list', action: 'same, in the cross-account Favorites' },
   { keys: 'Ctrl+D', when: 'list / chat', action: 'delete chat (confirm y/n)' },
   { keys: 'Ctrl+B', when: 'list / chat', action: 'hide / show chat list (single pane)' },
+  { keys: 'Ctrl+T', when: 'list / chat', action: 'conversation tabs on / off' },
+  { keys: '[ / ]', when: 'list / chat (tabs)', action: 'previous / next tab' },
+  { keys: '1-9', when: 'list / chat (tabs)', action: 'go to that tab' },
+  { keys: 'Ctrl+W', when: 'list / chat (tabs)', action: 'close the tab' },
   { keys: 'j / ↓', when: 'chat / channel', action: 'next message / attachment' },
   { keys: 'k / ↑', when: 'chat / channel', action: 'prev message / attachment / older' },
   { keys: 'Space', when: 'chat / channel', action: 'open focused image / link' },
@@ -65,7 +69,7 @@ const BINDINGS: Binding[] = [
   { keys: 'Enter', when: 'search', action: 'jump to most recent match' },
   { keys: 'Ctrl+A', when: 'list / chat', action: 'notifications (all open accounts)' },
   { keys: 'Space', when: 'Accounts', action: 'turn the focused account off / on' },
-  { keys: 'click', when: 'mouse on', action: 'open a row / collapse or expand a header' },
+  { keys: 'click', when: 'mouse on', action: 'open a row or tab / collapse or expand a header' },
   { keys: 'wheel', when: 'mouse on', action: 'move the list / message cursor' },
   { keys: '?', when: 'list', action: 'show this help' },
   { keys: 'r', when: 'list / channel', action: 'refresh now' },

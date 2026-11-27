@@ -6,6 +6,7 @@ import { updateSettings } from '../../config/index'
 import { warn } from '../../log'
 import { accountStoreFor } from '../../state/accountStore'
 import { favoriteId, favoritesKey, type SelectableItem } from '../../state/selectables'
+import { openTarget } from '../../state/tabs'
 import {
   toggleChatUnread,
   type AppState,
@@ -100,13 +101,16 @@ export type ToForeground = (alias: string) => void
 
 // Opening a row: its account comes to the foreground first when it is not
 // there, then focus moves, so focus only ever names a foreground resource.
+// In tabs mode a conversation with a tab opens as its tab shows it (a
+// channel's tab may be on a thread).
 export function openFocus(
   store: Store<AppState>,
   focus: Exclude<Focus, { kind: 'list' }>,
   alias?: string,
   toForeground?: ToForeground,
 ): void {
-  if (bringToFront(store, alias, toForeground)) store.set({ focus, inputZone: 'list' })
+  if (!bringToFront(store, alias, toForeground)) return
+  store.set((s) => ({ focus: openTarget(s, focus), inputZone: 'list' }))
 }
 
 // False when the swap put up the auth-expired modal (the account's sign-in

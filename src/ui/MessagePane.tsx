@@ -80,6 +80,7 @@ import { pickerAnchorCol } from './pickerAnchor'
 import type { InlineImageSlots } from './inlineImageLayout'
 import { localTime } from './localTime'
 import { fs, fsTall, textSizingSupported } from './textSizing'
+import { TabBar, useTabBarShown } from './TabBar'
 
 export { effectiveSenderName, isRenderableMessage } from './renderableMessage'
 
@@ -135,6 +136,8 @@ export function MessagePane(props: {
   const showOwnName = useAppState((s) => s.settings.showOwnNameInPane)
   const shortNames = useAppState((s) => s.settings.messagePaneShortNames)
   const showChatNameHeader = useAppState((s) => s.settings.showChatNameHeader)
+  // Tabs mode with a tab open: the tab bar takes the pane's top line.
+  const tabBarRows = useTabBarShown() ? 1 : 0
   const reactionDisplayMode = useAppState((s) => s.settings.showReactions)
   const inputZone = useAppState((s) => s.inputZone)
   const searchQuery = useAppState((s) => s.messageSearchQuery)
@@ -274,6 +277,7 @@ export function MessagePane(props: {
     MIN_VISIBLE_ROWS,
     terminalSize.rows -
       chromeRows -
+      tabBarRows -
       chatHeaderRows -
       reservedDynamic -
       tailRows -
@@ -470,7 +474,10 @@ export function MessagePane(props: {
     // plus the focused message's own sender-header line so the anchor lands on
     // the body rather than the name.
     const preludeRows =
-      chatHeaderRows + (searchActive ? 1 : 0) + (isLoadingOlder && !showingHistoryTop ? 1 : 0)
+      tabBarRows +
+      chatHeaderRows +
+      (searchActive ? 1 : 0) +
+      (isLoadingOlder && !showingHistoryTop ? 1 : 0)
     const row = 4 + 1 + preludeRows + rowsBefore + 1 + bodyPaddingY
     // Compute the column at the end of the focused message body's last wrapped
     // line. `messageBodyTerminalColumn` gives the 1-based terminal column where
@@ -494,9 +501,11 @@ export function MessagePane(props: {
     stdout.write(`\x1b[${row};${col}H`)
   })
 
+  const tabBar = tabBarRows > 0 && <TabBar width={paneColumns} />
   if (isListFocus) {
     return (
       <Box flexDirection="column" flexGrow={1} paddingX={0}>
+        {tabBar}
         <Text muted>Select a chat or channel · Enter to open · q to quit</Text>
       </Box>
     )
@@ -512,6 +521,7 @@ export function MessagePane(props: {
         overflow="hidden"
         paddingX={0}
       >
+        {tabBar}
         {showChatNameHeader && (
           <Box paddingLeft={bodyIndent} marginBottom={1} flexShrink={0}>
             <Text bold={theme.emphasis.sectionHeadingBold}>

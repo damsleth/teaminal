@@ -73,6 +73,28 @@ function under(node: DOMElement, ancestor: DOMElement): boolean {
   return false
 }
 
+// Conversation tabs (TabBar) register the same way, under their index.
+const tabs = new Map<DOMElement, number>()
+
+export function tabHitRef(index: number) {
+  return (node: DOMElement | null) => {
+    if (!node) return
+    tabs.set(node, index)
+    return () => {
+      if (tabs.get(node) === index) tabs.delete(node)
+    }
+  }
+}
+
+// The index of the tab drawn at the 0-based cell (x, y), or null. The bar is
+// one row that never scrolls, so a tab's box is what is visible.
+export function tabIndexAt(x: number, y: number): number | null {
+  for (const [node, index] of tabs) {
+    if (hitsElement(node, x, y)) return index
+  }
+  return null
+}
+
 // The selectable key of the row drawn at the 0-based cell (x, y), or null.
 export function listRowKeyAt(x: number, y: number): string | null {
   if (!clip) return null

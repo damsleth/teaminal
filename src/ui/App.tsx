@@ -29,6 +29,7 @@ import { accountStore } from '../state/accountStore'
 import { createOneOnOneChat, materializeChat, resolveFederatedChatId } from '../state/chatActions'
 import { indexNameFromDirectoryUser } from '../state/nameIndex'
 import { clampCursor, favoritesFor, selectableKey, unifiedSidebar } from '../state/selectables'
+import { followTabs, retargetChatTab, tabsOn } from '../state/tabs'
 import {
   focusKey,
   moveMessageCursor as nextMessageCursor,
@@ -73,6 +74,7 @@ import {
   toggleFavorite,
   type FavoriteList,
   type FavoriteTarget,
+  type ToForeground,
 } from './keybinds/itemActions'
 import {
   activateListRow,
@@ -85,8 +87,15 @@ import {
 } from './keybinds/listKeys'
 import { handleMessageSearchKeys } from './keybinds/messageSearchKeys'
 import { handleResizeKeys } from './keybinds/resizeKeys'
+import {
+  closeActiveTab,
+  handleTabKeys,
+  stepToTab,
+  switchToTab,
+  toggleConversationMode,
+} from './keybinds/tabKeys'
 import { computeLayout } from './layout'
-import { hitsElement, listRowKeyAt } from './listHits'
+import { hitsElement, listRowKeyAt, tabIndexAt } from './listHits'
 import { readMessagePageState, type LoadMoreState } from './messageRows'
 import { messagesForTimelineNavigation } from './renderableMessage'
 import { channelReplyCount, messageFocusables } from './messageFocusables'
@@ -199,12 +208,15 @@ export function App() {
   const favoritesByAccount = useAppState((s) => s.settings.favoritesByAccount)
   const crossAccountFavorites = useAppState((s) => s.settings.crossAccountFavorites)
   const account = useAppState((s) => s.account)
+  const conversationTabs = useAppState(tabsOn)
 
   const [newChatPrompt, setNewChatPrompt] = useState<string | null>(null)
   const federatedFocusCheckedRef = useRef<Set<string>>(new Set())
 
   // Side-effect hooks. These do not affect the render output directly;
   // they react to focus / message-list changes by updating the store.
+  // Tabs mode: the open conversation always has its tab.
+  useEffect(() => followTabs(store), [store])
   useHydrateMembers(focus, store)
   useClampMessageCursor(focus, messagesByConvo, store)
   // Reset attachment focus to the message body when the conversation changes.
@@ -233,6 +245,7 @@ export function App() {
         chats: [canonical, ...s.chats.filter((c) => c.id !== canonical.id)],
         focus: { kind: 'chat', chatId: canonical.id },
         inputZone: 'list',
+        tabs: retargetChatTab(s.tabs, s.account?.id, focus.chatId, canonical.id),
       }))
       pollerRef.current?.refresh()
     })()
@@ -399,6 +412,10 @@ export function App() {
     pollerRef.current?.refresh()
   }
 
+  // Brings an open account to the foreground, keeping the list cursor and
+  // filter: opening a row or a tab of another account.
+  const toForeground: ToForeground = (alias) => session.setForeground(alias, { restoreUi: false })
+
   // Key actions the command palette offers besides menu items and chats.
   const paletteKeyActions: { id: string; title: string; keys: string; run: () => void }[] = [
     {
@@ -433,7 +450,36 @@ export function App() {
       keys: 'Ctrl+X',
       run: () => store.set({ inputZone: 'resize' }),
     },
+    {
+      id: 'conversation-mode',
+      title: conversationTabs ? 'Single conversation (no tabs)' : 'Conversation tabs',
+      keys: 'Ctrl+T',
+      run: () => toggleConversationMode(store),
+    },
   ]
+  // Tabs mode: the tab keys.
+  if (conversationTabs) {
+    paletteKeyActions.push(
+      {
+        id: 'next-tab',
+        title: 'Next tab',
+        keys: ']',
+        run: () => stepToTab(store, 1, toForeground),
+      },
+      {
+        id: 'previous-tab',
+        title: 'Previous tab',
+        keys: '[',
+        run: () => stepToTab(store, -1, toForeground),
+      },
+      {
+        id: 'close-tab',
+        title: 'Close tab',
+        keys: 'Ctrl+W',
+        run: () => closeActiveTab(store, toForeground),
+      },
+    )
+  }
 
   // The palette's favorite toggles for the row under the list cursor, built
   // only while the palette is open.
@@ -495,7 +541,7 @@ export function App() {
     refresh,
     hardRefresh,
     openNewChatPrompt,
-    toForeground: (alias) => session.setForeground(alias, { restoreUi: false }),
+    toForeground,
   }
   paletteKeyActions.push(...favoriteKeyActions())
 
@@ -525,6 +571,12 @@ export function App() {
     if (zone !== 'list' && zone !== 'composer' && zone !== 'filter') return
     if (e.shift || e.meta || e.ctrl) return
     const overList = hitsElement(listPaneRef.current, e.x, e.y)
+    // A click on a conversation tab shows it.
+    const tab = e.kind === 'down' && e.button === 'left' ? tabIndexAt(e.x, e.y) : null
+    if (tab !== null && hitsElement(conversationRef.current, e.x, e.y)) {
+      switchToTab(store, tab, toForeground)
+      return
+    }
     if (e.kind === 'down' && e.button === 'left' && overList) {
       const key = listRowKeyAt(e.x, e.y)
       if (!key) return
@@ -574,6 +626,9 @@ export function App() {
         return
       }
       const raw = { input, key }
+      // Tab keys ([ ] 1-9 Ctrl+W Ctrl+T) before the chat and list keys,
+      // which read letters without their Ctrl.
+      if (handleTabKeys(raw, { store, toForeground }) === 'handled') return
       // Chat / channel zone first when we're focused on a conversation —
       // most chat-zone keys (j/k/l/u/d) overlap with list-zone single
       // letters and we want the chat-side meaning when a chat is open.

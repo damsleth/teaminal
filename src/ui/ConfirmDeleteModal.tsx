@@ -10,6 +10,7 @@ import { accountRef } from '../account'
 import { accountStore, accountStoreFor } from '../state/accountStore'
 import { deleteChatById, deleteChatMessageById } from '../state/chatActions'
 import { foregroundLabel, labelSuffix } from '../state/selectables'
+import { withoutChatTab } from '../state/tabs'
 import { useAppState, useAppStore, useTheme } from './StoreContext'
 import { useSessionApi } from './SessionContext'
 
@@ -41,16 +42,23 @@ export function ConfirmDeleteModal() {
           modal.kind === 'confirm-delete-chat' && modal.alias !== undefined
             ? accountRef(modal.alias)
             : null
-        const { focus, account } = store.get()
+        const { focus, account, tabs } = store.get()
         const deletingFocused =
           modal.kind === 'confirm-delete-chat' &&
           (!owner || owner.id === account?.id) &&
           focus.kind === 'chat' &&
           focus.chatId === modal.chatId
+        // The deleted chat's tab closes with it (in the same update as the
+        // focus, or tabs mode would give the open chat its tab back).
+        const nextTabs =
+          modal.kind === 'confirm-delete-chat'
+            ? withoutChatTab(tabs, (owner ?? account)?.id, modal.chatId)
+            : tabs
         store.set({
           modal: null,
           inputZone: 'list',
           ...(deletingFocused ? { focus: { kind: 'list' } } : {}),
+          ...(nextTabs !== tabs ? { tabs: nextTabs } : {}),
         })
         // Both actions log + roll back on failure; swallow the rejection so a
         // Graph error never escapes as an unhandled rejection and tears down

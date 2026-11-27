@@ -500,21 +500,15 @@ export function activateListRow(ctx: ListKeysCtx, key: string, opts: { enter: bo
     })
     return
   }
-  if (it.kind === 'chat' && it.alias !== undefined) {
+  if (it.kind === 'chat') {
     openFocus(store, { kind: 'chat', chatId: it.chat.id }, it.alias, ctx.toForeground)
-  } else if (it.kind === 'channel' && it.alias !== undefined) {
+  } else if (it.kind === 'channel') {
     openFocus(
       store,
       { kind: 'channel', teamId: it.team.id, channelId: it.channel.id },
       it.alias,
       ctx.toForeground,
     )
-  } else if (it.kind === 'chat') {
-    store.set({ focus: { kind: 'chat', chatId: it.chat.id } })
-  } else if (it.kind === 'channel') {
-    store.set({
-      focus: { kind: 'channel', teamId: it.team.id, channelId: it.channel.id },
-    })
   }
   // team selection is a no-op in v1 (no team-detail view yet)
 }
