@@ -3,8 +3,9 @@
 //
 // Three independent loops run concurrently:
 //
-//   - active   (~5s): re-fetches messages for the currently-focused chat
-//                     or channel. Seeds the seen-message-ID set on first
+//   - active   (~10s; 60s with push connected, 5min blurred): re-fetches
+//                     messages for the currently-focused chat or channel.
+//                     Seeds the seen-message-ID set on first
 //                     fetch (no notifications); subsequent fetches diff
 //                     against the set and fire onMention for newly-seen
 //                     mentions of `me` from non-self senders.
@@ -190,6 +191,7 @@ export function startPoller(opts: PollerOpts): PollerHandle {
 
   const runActiveLoop = makeActiveLoop({
     store,
+    target: () => store.get().focus,
     getClient,
     sleeper: activeSleeper,
     intervalMs: activeMs,

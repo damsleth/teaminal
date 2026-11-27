@@ -732,6 +732,8 @@ export function App() {
             <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
               <MessagePane
                 key={accountId}
+                focus={focus}
+                paneColumns={terminalCols - conversationListWidth - 2}
                 focusedMessageId={focusedMessageId}
                 focusIndicatorActive={focus.kind !== 'list' && inputZone === 'list'}
                 loadOlderState={loadOlderState}

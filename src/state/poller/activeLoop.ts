@@ -25,6 +25,9 @@ import type { Sleeper } from './sleeper'
 
 export type ActiveLoopDeps = {
   store: AccountStore
+  // The conversation this loop polls, read at the loop head and again by the
+  // stale-completion guard after the fetch.
+  target: () => Focus
   // Bound Graph client for this session's account.
   getClient: () => GraphClient
   sleeper: Sleeper
@@ -58,8 +61,17 @@ async function fetchActiveMessages(
 }
 
 export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
-  const { store, sleeper, intervalMs, seen, setActiveAbort, isStopped, onMention, reportError } =
-    deps
+  const {
+    store,
+    target,
+    sleeper,
+    intervalMs,
+    seen,
+    setActiveAbort,
+    isStopped,
+    onMention,
+    reportError,
+  } = deps
   const getIntervalMs = typeof intervalMs === 'function' ? intervalMs : () => intervalMs
 
   // Per-conv "this endpoint refuses us" latch. Meeting chats and other
@@ -74,7 +86,7 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
   return async function run(): Promise<void> {
     let consecutiveErrors = 0
     while (!isStopped()) {
-      const focus = store.get().focus
+      const focus = target()
       const conv = focusKey(focus)
       if (!conv) {
         await sleeper.sleep(jitter(getIntervalMs()))
@@ -97,8 +109,8 @@ export function makeActiveLoop(deps: ActiveLoopDeps): () => Promise<void> {
           durationMs: Date.now() - startedAt,
         })
         if (isStopped()) return
-        // Only apply if the focus is still on the same conversation.
-        const stillSame = focusKey(store.get().focus) === conv
+        // Only apply if the target is still the same conversation.
+        const stillSame = focusKey(target()) === conv
         if (stillSame) {
           const isFirst = !seen.has(conv)
           const seenSet = seen.get(conv) ?? new Set<string>()

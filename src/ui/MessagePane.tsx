@@ -11,7 +11,7 @@ import { Box, useStdout, type DOMElement } from 'ink'
 import { Text } from './Text'
 import { createContext, useContext, type ReactNode, useEffect, useRef, useState } from 'react'
 import { chatLabel, foregroundLabel, labelSuffix, shortName } from '../state/selectables'
-import { focusKey, type ReadReceipt, type TypingIndicator } from '../state/store'
+import { focusKey, type Focus, type ReadReceipt, type TypingIndicator } from '../state/store'
 import {
   groupChannelThreads,
   replyCountForRoot,
@@ -112,8 +112,25 @@ export function MessagePane(props: {
    * feeds the timeline row budget.
    */
   composerRows?: number
+  /** The conversation this pane shows. Default: the store's focus. */
+  focus?: Focus
+  /**
+   * Text columns inside the pane's border. Default: the terminal minus the
+   * chat list and this pane's border.
+   */
+  paneColumns?: number
+  /**
+   * The pane with the keys: search bar, attachment focus and the reaction
+   * picker anchor belong to it. Default true.
+   */
+  active?: boolean
+  /** Owner id in the shared kitty painter. Default 'messages'. */
+  paneId?: string
 }) {
-  const focus = useAppState((s) => s.focus)
+  const storeFocus = useAppState((s) => s.focus)
+  const focus = props.focus ?? storeFocus
+  const active = props.active ?? true
+  const paneId = props.paneId ?? 'messages'
   // Only the open conversation's slices: polls of other chats leave this
   // pane alone.
   const conv = focusKey(focus) ?? ''
@@ -136,7 +153,8 @@ export function MessagePane(props: {
   const shortNames = useAppState((s) => s.settings.messagePaneShortNames)
   const showChatNameHeader = useAppState((s) => s.settings.showChatNameHeader)
   const reactionDisplayMode = useAppState((s) => s.settings.showReactions)
-  const inputZone = useAppState((s) => s.inputZone)
+  // Search bar (S1), above the timeline: the active pane's only.
+  const searchActive = useAppState((s) => s.inputZone === 'message-search') && active
   const searchQuery = useAppState((s) => s.messageSearchQuery)
   const focusIndicatorVisible = useAppState((s) => s.settings.messageFocusIndicatorEnabled)
   const focusIndicatorChar = useAppState((s) => s.settings.messageFocusIndicatorChar)
@@ -146,7 +164,7 @@ export function MessagePane(props: {
   // True when no status bar occupies the bottom row (hidden, or moved to the
   // top): this frees a row in the timeline budget.
   const statusBarHidden = useAppState((s) => s.settings.statusBarPosition !== 'bottom')
-  const reactionPickerOpen = useAppState((s) => s.modal?.kind === 'reaction-picker')
+  const reactionPickerOpen = useAppState((s) => s.modal?.kind === 'reaction-picker') && active
   // Any open modal renders as a centred overlay on top of this pane. Kitty
   // images are written out-of-band at a positive z-index, so they composite
   // above all terminal text - including the overlay - and would paint over the
@@ -156,7 +174,8 @@ export function MessagePane(props: {
   // Which focusable (image / link) inside the focused message the per-message
   // focus ring currently points at, so the focused link/image can get the
   // strong highlight. 0 = the message body itself (no attachment focused).
-  const focusedAttachmentIndex = useAppState((s) => s.focusedAttachmentIndex)
+  const storeAttachmentIndex = useAppState((s) => s.focusedAttachmentIndex)
+  const focusedAttachmentIndex = active ? storeAttachmentIndex : 0
   const theme = useTheme()
   const session = useSessionApi()
   // Several accounts open: the title names the foreground account.
@@ -278,7 +297,7 @@ export function MessagePane(props: {
       reservedDynamic -
       tailRows -
       (composerRows - DEFAULT_COMPOSER_ROWS) -
-      (inputZone === 'message-search' ? 1 : 0),
+      (searchActive ? 1 : 0),
   )
   // Body wrap width estimate for the viewport budget: pane content (terminal
   // minus the chat-list pane and its border) minus the body indent. Bodies now
@@ -291,7 +310,7 @@ export function MessagePane(props: {
   // layout.messageMaxWidth narrows each message (not its sender line) to
   // that percent of the space beside the avatar column, centered: equal
   // margins left and right.
-  const paneColumns = terminalSize.columns - listPaneWidth - 2
+  const paneColumns = props.paneColumns ?? terminalSize.columns - listPaneWidth - 2
   const conversationColumns = Math.floor(
     ((paneColumns - avatarColumn) * theme.layout.messageMaxWidth) / 100,
   )
@@ -354,7 +373,6 @@ export function MessagePane(props: {
   // matching messages are highlighted at the row level via the existing
   // focused-message indicator (the keys handler updates messageCursor
   // on Enter / n), so the search bar itself is just an input echo.
-  const searchActive = inputZone === 'message-search'
   const hits = searchActive ? searchMessages(messages, searchQuery) : []
 
   // Trigger image fetches for the visible messages when that set (or an edit
@@ -417,7 +435,7 @@ export function MessagePane(props: {
   // The shared painter (kittyPainter) does the clearing and placing, so the
   // chat list's thumbnails and these images don't erase each other.
   useKittyOwner(
-    'messages',
+    paneId,
     isKittyCapable()
       ? {
           viewport: () => paneRef.current,
