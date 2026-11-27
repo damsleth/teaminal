@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-27
+
 ### Added
 
 - Conversation tabs (config key `conversationMode`: `single`, the default
@@ -18,6 +20,11 @@ adheres to [Semantic Versioning](https://semver.org/).
   and switching to one brings its account to the front. Only the open
   conversation is polled, as before. The command palette has Next tab,
   Previous tab and Close tab.
+
+### Changed
+
+- Ctrl+T in a conversation flips the conversation mode. It used to act like
+  plain `t` there.
 
 ## [0.28.0] - 2026-11-27
 
@@ -1925,7 +1932,8 @@ for the live-smoke matrix.
 - Typing indicators and a `^D` debug console are deferred (see
   `.plans/TODO.md`).
 
-[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.28.0...HEAD
+[Unreleased]: https://github.com/damsleth/teaminal/compare/v0.29.0...HEAD
+[0.29.0]: https://github.com/damsleth/teaminal/compare/v0.28.0...v0.29.0
 [0.28.0]: https://github.com/damsleth/teaminal/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/damsleth/teaminal/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/damsleth/teaminal/compare/v0.25.3...v0.26.0
