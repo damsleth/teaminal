@@ -28,6 +28,7 @@ import { useEffect, useRef, useState } from 'react'
 import { accountStore } from '../state/accountStore'
 import { createOneOnOneChat, materializeChat, resolveFederatedChatId } from '../state/chatActions'
 import { indexNameFromDirectoryUser } from '../state/nameIndex'
+import { activeSide, closeOtherPane, otherFocus, paneFocus, switchPane } from '../state/panes'
 import { clampCursor, favoritesFor, selectableKey, unifiedSidebar } from '../state/selectables'
 import {
   focusKey,
@@ -85,7 +86,7 @@ import {
 } from './keybinds/listKeys'
 import { handleMessageSearchKeys } from './keybinds/messageSearchKeys'
 import { handleResizeKeys } from './keybinds/resizeKeys'
-import { computeLayout } from './layout'
+import { computeLayout, splitPaneWidths } from './layout'
 import { hitsElement, listRowKeyAt } from './listHits'
 import { readMessagePageState, type LoadMoreState } from './messageRows'
 import { messagesForTimelineNavigation } from './renderableMessage'
@@ -199,13 +200,21 @@ export function App() {
   const favoritesByAccount = useAppState((s) => s.settings.favoritesByAccount)
   const crossAccountFavorites = useAppState((s) => s.settings.crossAccountFavorites)
   const account = useAppState((s) => s.account)
+  // Split panes: the passive pane (src/state/panes.ts). `other` is its
+  // conversation, or null when it is empty or hides a duplicate.
+  const split = useAppState((s) => s.split)
+  const other = useAppState(otherFocus)
+  // Per side, not per role: a pane switch changes neither.
+  const leftFocus = useAppState((s) => paneFocus(s, 'left'))
+  const rightFocus = useAppState((s) => paneFocus(s, 'right'))
 
   const [newChatPrompt, setNewChatPrompt] = useState<string | null>(null)
   const federatedFocusCheckedRef = useRef<Set<string>>(new Set())
 
   // Side-effect hooks. These do not affect the render output directly;
   // they react to focus / message-list changes by updating the store.
-  useHydrateMembers(focus, store)
+  useHydrateMembers(leftFocus, store)
+  useHydrateMembers(rightFocus, store)
   useClampMessageCursor(focus, messagesByConvo, store)
   // Reset attachment focus to the message body when the conversation changes.
   useEffect(() => {
@@ -434,6 +443,23 @@ export function App() {
       run: () => store.set({ inputZone: 'resize' }),
     },
   ]
+  // Split panes open: the pane keys.
+  if (split) {
+    paletteKeyActions.push(
+      {
+        id: 'switch-pane',
+        title: 'Switch pane',
+        keys: 'w',
+        run: () => store.set((s) => switchPane(s)),
+      },
+      {
+        id: 'close-other-pane',
+        title: 'Close other pane',
+        keys: 'o',
+        run: () => store.set((s) => closeOtherPane(s)),
+      },
+    )
+  }
 
   // The palette's favorite toggles for the row under the list cursor, built
   // only while the palette is open.
@@ -519,6 +545,15 @@ export function App() {
   // stay). Positions are those of the last painted frame.
   const listPaneRef = useRef<DOMElement>(null)
   const conversationRef = useRef<DOMElement>(null)
+  // Split panes: one box per side. The wheel moves the message cursor only
+  // over the active one; over the passive pane it does nothing (v1).
+  const leftPaneRef = useRef<DOMElement>(null)
+  const rightPaneRef = useRef<DOMElement>(null)
+  // The box the active conversation was painted in.
+  function activeConversationBox(): DOMElement | null {
+    if (!splitWidths) return conversationRef.current
+    return (activeSide(store.get()) === 'left' ? leftPaneRef : rightPaneRef).current
+  }
   useMouse((e) => {
     const { modal: openModal, inputZone: zone, focus: open } = store.get()
     if (openModal !== null || newChatPrompt !== null) return
@@ -537,7 +572,7 @@ export function App() {
     if (overList) {
       if (zone === 'composer') store.set({ inputZone: 'list' })
       stepListCursor(listCtxNow(listCtx), e.wheel)
-    } else if (open.kind !== 'list' && hitsElement(conversationRef.current, e.x, e.y)) {
+    } else if (open.kind !== 'list' && hitsElement(activeConversationBox(), e.x, e.y)) {
       // The pane follows the message cursor only in the list zone.
       if (zone === 'composer') store.set({ inputZone: 'list' })
       wheelMessages(e.wheel)
@@ -567,6 +602,16 @@ export function App() {
       }
       if (key.ctrl && input === 'b') {
         store.set((s) => ({ chatListCollapsed: !s.chatListCollapsed }))
+        return
+      }
+      // Split panes: w switches to the other pane, o keeps one pane.
+      const ch = input.toLowerCase()
+      if (split && !key.ctrl && !key.meta && ch === 'w') {
+        store.set((s) => switchPane(s))
+        return
+      }
+      if (split && !key.ctrl && !key.meta && ch === 'o') {
+        store.set((s) => closeOtherPane(s))
         return
       }
       if (key.tab && focus.kind !== 'list') {
@@ -695,6 +740,24 @@ export function App() {
   const showConversation = !chatListCollapsed || !showList
   const listWidth = chatListCollapsed ? terminalCols : resolvedChatListWidth
   const conversationListWidth = chatListCollapsed ? 0 : resolvedChatListWidth
+  // Split panes side by side when the conversation area fits two (else only
+  // the active pane shows, and w toggles). A prompt over the conversation
+  // area covers both panes.
+  const splitWidths =
+    split && newChatPrompt === null && !replaceModal
+      ? splitPaneWidths(terminalCols - conversationListWidth)
+      : null
+  const sideOfActive = activeSide({ split })
+  // Publish whether the passive pane is on screen: only then is its
+  // conversation viewed (marked read, quiet notifications).
+  const splitShown = splitWidths !== null && showConversation
+  useEffect(() => {
+    if (store.get().splitShown !== splitShown) store.set({ splitShown })
+  })
+  const panelBorder = {
+    borderStyle: inkBorder(theme.borders.panel),
+    borderColor: theme.border,
+  }
   return (
     <Box
       flexDirection="column"
@@ -717,7 +780,7 @@ export function App() {
           flexGrow={1}
           flexShrink={1}
           minWidth={0}
-          {...paneBorder('conversation')}
+          {...(splitWidths ? {} : paneBorder('conversation'))}
         >
           {newChatPrompt !== null ? (
             <NewChatPrompt
@@ -728,15 +791,51 @@ export function App() {
             />
           ) : replaceModal ? (
             <AuthExpiredModal />
+          ) : splitWidths ? (
+            (['left', 'right'] as const).map((side, i) => {
+              const isActive = side === sideOfActive
+              const width = splitWidths[i]!
+              return (
+                <Box
+                  key={side}
+                  ref={side === 'left' ? leftPaneRef : rightPaneRef}
+                  width={width}
+                  flexShrink={0}
+                  {...(isActive ? paneBorder('conversation') : panelBorder)}
+                >
+                  <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
+                    <MessagePane
+                      key={`${accountId}:${side}`}
+                      focus={side === 'left' ? leftFocus : rightFocus}
+                      paneColumns={width - 2}
+                      active={isActive}
+                      paneId={`messages:${side}`}
+                      split
+                      focusedMessageId={isActive ? focusedMessageId : null}
+                      focusIndicatorActive={
+                        isActive && focus.kind !== 'list' && inputZone === 'list'
+                      }
+                      loadOlderState={isActive ? loadOlderState : undefined}
+                      listPaneWidth={conversationListWidth}
+                      composerRows={resolvedComposerHeight}
+                    />
+                  </Box>
+                </Box>
+              )
+            })
           ) : (
             <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
               <MessagePane
                 key={accountId}
+                focus={focus}
+                paneColumns={terminalCols - conversationListWidth - 2}
                 focusedMessageId={focusedMessageId}
                 focusIndicatorActive={focus.kind !== 'list' && inputZone === 'list'}
                 loadOlderState={loadOlderState}
                 listPaneWidth={conversationListWidth}
                 composerRows={resolvedComposerHeight}
+                split={split !== null}
+                hiddenOther={split ? other : null}
               />
             </Box>
           )}

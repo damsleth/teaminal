@@ -41,16 +41,23 @@ export function ConfirmDeleteModal() {
           modal.kind === 'confirm-delete-chat' && modal.alias !== undefined
             ? accountRef(modal.alias)
             : null
-        const { focus, account } = store.get()
+        const { focus, account, split } = store.get()
         const deletingFocused =
           modal.kind === 'confirm-delete-chat' &&
           (!owner || owner.id === account?.id) &&
           focus.kind === 'chat' &&
           focus.chatId === modal.chatId
+        // The other pane's chat (split panes): the split closes.
+        const deletingOther =
+          modal.kind === 'confirm-delete-chat' &&
+          (!owner || owner.id === account?.id) &&
+          split?.focus.kind === 'chat' &&
+          split.focus.chatId === modal.chatId
         store.set({
           modal: null,
           inputZone: 'list',
           ...(deletingFocused ? { focus: { kind: 'list' } } : {}),
+          ...(deletingOther ? { split: null } : {}),
         })
         // Both actions log + roll back on failure; swallow the rejection so a
         // Graph error never escapes as an unhandled rejection and tears down

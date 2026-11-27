@@ -500,3 +500,39 @@ test('the search bar stays intact above an overflowing timeline', () => {
   expect(out.filter((l) => l.includes('hit(s)'))).toHaveLength(1)
   expect(out.filter((l) => l.trim() !== '').at(-1)).toContain('third day, newest message')
 })
+
+// Split panes, slice 1: the pane renders its `focus` prop, not the store's,
+// and sizes its row window from its `paneColumns` prop (the wrap estimate;
+// Yoga does the actual wrapping at the box width).
+test('the focus prop wins over the store focus; paneColumns drives the wrap estimate', () => {
+  const store = createAppStore()
+  const long = (n: number) => `message ${n} ` + 'lorem ipsum dolor sit amet '.repeat(5)
+  store.set({
+    focus: { kind: 'chat', chatId: 'chat-a' },
+    messagesByConvo: {
+      'chat:chat-a': [msg('a1', '2026-01-01T09:00:00Z', 'Alice', 'I will read them now.')],
+      'chat:design': [1, 2, 3, 4].map((n) =>
+        msg(`d${n}`, `2026-01-01T09:0${n}:00Z`, 'Bob', long(n)),
+      ),
+    },
+  })
+  const renderPane = (paneColumns?: number) =>
+    renderToString(
+      <StoreProvider store={store}>
+        <SessionProvider api={session}>
+          <Box flexDirection="column" height={40}>
+            <MessagePane focus={{ kind: 'chat', chatId: 'design' }} paneColumns={paneColumns} />
+          </Box>
+        </SessionProvider>
+      </StoreProvider>,
+      { columns: 80 },
+    )
+      // eslint-disable-next-line no-control-regex
+      .replace(/\x1b\[[0-9;]*m/g, '')
+  const wide = renderPane()
+  expect(wide).toContain('message 4')
+  expect(wide).not.toContain('I will read them now.')
+  // Budgeted for 20-column bodies, fewer messages fit the same rows.
+  const count = (out: string) => (out.match(/message \d/g) ?? []).length
+  expect(count(renderPane(24))).toBeLessThan(count(wide))
+})

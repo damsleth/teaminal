@@ -75,6 +75,20 @@ describe('resetAccountScopedState', () => {
   })
 })
 
+describe('split panes across an account reset', () => {
+  test('resetAccountScopedState closes the split', () => {
+    const store = createAppStore(accountRef('alice'))
+    store.set({
+      focus: { kind: 'chat', chatId: 'c1' },
+      split: { focus: { kind: 'chat', chatId: 'c2' }, side: 'right' },
+      splitShown: true,
+    })
+    resetAccountScopedState(store, accountRef('bob'))
+    expect(store.get().split).toBeNull()
+    expect(store.get().splitShown).toBe(false)
+  })
+})
+
 describe('getMessageCachePath profile scoping', () => {
   test('default profile uses the legacy path', () => {
     const path = getMessageCachePath({ HOME: '/tmp/home', XDG_CACHE_HOME: '/tmp/cache' }, null)

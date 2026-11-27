@@ -49,3 +49,27 @@ test('context-menu: chat row and message', async ({ terminal }) => {
   terminal.keyEscape()
   await expect(terminal.getByText('React…')).not.toBeVisible()
 })
+
+// Split panes: with a split open, a row's menu offers "Open in other pane"
+// (v). At 100 columns the 28-column list leaves two 36-column panes; the
+// right one is columns 64-99 (rows 3-25 hold the timelines).
+test('context-menu: Open in other pane (v) while split', async ({ terminal }) => {
+  await expect(terminal.getByText('Ada Byron')).toBeVisible()
+  await pause()
+  // v: Ada Byron opens in the other pane, on the right; the list keeps the keys.
+  terminal.write('v')
+  await expect(terminal.getByText('I will read them now.')).toBeVisible()
+  terminal.write('j')
+  await pause()
+  terminal.write('.')
+  await expect(terminal.getByText('Open in other pane')).toBeVisible()
+  terminal.write('v')
+  await expect(terminal.getByText('Open in other pane')).not.toBeVisible()
+  await pause()
+  const right = screen(terminal)
+    .slice(3, 26)
+    .map((r) => r.slice(64))
+    .join('\n')
+  expect(right).toContain('Two compact layout options')
+  expect(right).not.toContain('I will read them now.')
+})

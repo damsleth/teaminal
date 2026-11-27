@@ -21,6 +21,10 @@ export type QuietContext = {
   // this; we suppress banners (but keep the bell) when the user is
   // already at the terminal.
   terminalFocused: boolean
+  // The conversations on screen: the active pane, and the passive pane of a
+  // split while it is shown (src/state/panes.ts visibleConvKeys). Absent:
+  // the active conversation (state.focus) only.
+  visibleConvs?: readonly ConvKey[]
 }
 
 /**
@@ -60,10 +64,10 @@ export function decideQuiet(ctx: QuietContext): QuietDecision {
   // Manual mute kills banners; bell still rings (terminal level).
   if (settings.notifyMuted === true) return 'bell-only'
 
-  // Active conversation: bell is informative, the banner is noise.
+  // A conversation on screen: bell is informative, the banner is noise.
   // Configurable so the user can opt back in.
-  const focusKeyValue = focusToKey(state.focus)
-  if (focusKeyValue === conv && terminalFocused) {
+  const visible = ctx.visibleConvs ?? [focusToKey(state.focus)]
+  if (visible.includes(conv) && terminalFocused) {
     if (settings.notifyActiveBanner === true) return 'normal'
     if (settings.notifyActiveBell === false) return 'silent'
     return 'bell-only'
@@ -87,7 +91,7 @@ export function decideQuiet(ctx: QuietContext): QuietDecision {
 }
 
 // Local copy of focusKey so this module doesn't pull in the full store
-// surface just for one helper.
+// surface just for one helper (the fallback when visibleConvs is absent).
 function focusToKey(focus: AppState['focus']): ConvKey | null {
   if (focus.kind === 'chat') return `chat:${focus.chatId}`
   if (focus.kind === 'channel') return `channel:${focus.teamId}:${focus.channelId}`

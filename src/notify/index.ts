@@ -27,7 +27,7 @@ export type NotifyMentionInput = {
   labelled?: boolean
 }
 
-export type NotifyContext = Pick<QuietContext, 'state' | 'now' | 'terminalFocused'>
+export type NotifyContext = Pick<QuietContext, 'state' | 'now' | 'terminalFocused' | 'visibleConvs'>
 
 let coalescer: Coalescer | null = null
 
@@ -53,6 +53,7 @@ export function notifyMention(input: NotifyMentionInput, ctx: NotifyContext): vo
     now: ctx.now,
     state: ctx.state,
     terminalFocused: ctx.terminalFocused,
+    visibleConvs: ctx.visibleConvs,
   })
   if (decision !== 'silent') ringBell()
   recordEvent('notify', 'info', `mention ${decision}`, {

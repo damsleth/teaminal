@@ -11,7 +11,7 @@ import { Box, useStdout, type DOMElement } from 'ink'
 import { Text } from './Text'
 import { createContext, useContext, type ReactNode, useEffect, useRef, useState } from 'react'
 import { chatLabel, foregroundLabel, labelSuffix, shortName } from '../state/selectables'
-import { focusKey, type ReadReceipt, type TypingIndicator } from '../state/store'
+import { focusKey, type Focus, type ReadReceipt, type TypingIndicator } from '../state/store'
 import {
   groupChannelThreads,
   replyCountForRoot,
@@ -77,7 +77,7 @@ import type { AccountId } from '../account'
 import { messageFocusables } from './messageFocusables'
 import { splitBodyLinkSpans, type BodySpan } from './bodySpans'
 import { pickerAnchorCol } from './pickerAnchor'
-import type { InlineImageSlots } from './inlineImageLayout'
+import { elementRect, type InlineImageSlots } from './inlineImageLayout'
 import { localTime } from './localTime'
 import { fs, fsTall, textSizingSupported } from './textSizing'
 
@@ -112,8 +112,33 @@ export function MessagePane(props: {
    * feeds the timeline row budget.
    */
   composerRows?: number
+  /** The conversation this pane shows. Default: the store's focus. */
+  focus?: Focus
+  /**
+   * Text columns inside the pane's border. Default: the terminal minus the
+   * chat list and this pane's border.
+   */
+  paneColumns?: number
+  /**
+   * The pane with the keys: search bar, attachment focus and the reaction
+   * picker anchor belong to it. Default true.
+   */
+  active?: boolean
+  /** Owner id in the shared kitty painter. Default 'messages'. */
+  paneId?: string
+  /**
+   * Split panes are open: the chat-name header always shows (two panes must
+   * be told apart), an empty pane says how to fill it, and the reaction
+   * picker anchors on this pane's laid-out position.
+   */
+  split?: boolean
+  /** The passive pane's conversation while it is hidden (too narrow). */
+  hiddenOther?: Focus | null
 }) {
-  const focus = useAppState((s) => s.focus)
+  const storeFocus = useAppState((s) => s.focus)
+  const focus = props.focus ?? storeFocus
+  const active = props.active ?? true
+  const paneId = props.paneId ?? 'messages'
   // Only the open conversation's slices: polls of other chats leave this
   // pane alone.
   const conv = focusKey(focus) ?? ''
@@ -136,7 +161,8 @@ export function MessagePane(props: {
   const shortNames = useAppState((s) => s.settings.messagePaneShortNames)
   const showChatNameHeader = useAppState((s) => s.settings.showChatNameHeader)
   const reactionDisplayMode = useAppState((s) => s.settings.showReactions)
-  const inputZone = useAppState((s) => s.inputZone)
+  // Search bar (S1), above the timeline: the active pane's only.
+  const searchActive = useAppState((s) => s.inputZone === 'message-search') && active
   const searchQuery = useAppState((s) => s.messageSearchQuery)
   const focusIndicatorVisible = useAppState((s) => s.settings.messageFocusIndicatorEnabled)
   const focusIndicatorChar = useAppState((s) => s.settings.messageFocusIndicatorChar)
@@ -146,7 +172,7 @@ export function MessagePane(props: {
   // True when no status bar occupies the bottom row (hidden, or moved to the
   // top): this frees a row in the timeline budget.
   const statusBarHidden = useAppState((s) => s.settings.statusBarPosition !== 'bottom')
-  const reactionPickerOpen = useAppState((s) => s.modal?.kind === 'reaction-picker')
+  const reactionPickerOpen = useAppState((s) => s.modal?.kind === 'reaction-picker') && active
   // Any open modal renders as a centred overlay on top of this pane. Kitty
   // images are written out-of-band at a positive z-index, so they composite
   // above all terminal text - including the overlay - and would paint over the
@@ -156,7 +182,8 @@ export function MessagePane(props: {
   // Which focusable (image / link) inside the focused message the per-message
   // focus ring currently points at, so the focused link/image can get the
   // strong highlight. 0 = the message body itself (no attachment focused).
-  const focusedAttachmentIndex = useAppState((s) => s.focusedAttachmentIndex)
+  const storeAttachmentIndex = useAppState((s) => s.focusedAttachmentIndex)
+  const focusedAttachmentIndex = active ? storeAttachmentIndex : 0
   const theme = useTheme()
   const session = useSessionApi()
   // Several accounts open: the title names the foreground account.
@@ -245,16 +272,14 @@ export function MessagePane(props: {
   const headerRows = (m: ChatMessage): number =>
     showTimeFor(m) || showNameFor(m) ? (tallHeaders ? 2 : 1) : 0
   const cache = convCache
+  const title = (f: Exclude<Focus, { kind: 'list' }>) =>
+    headerForFocus(f, chats, teams, channelsByTeam, me?.id, nameByUserId)
+  const hiddenOther = props.hiddenOther?.kind === 'list' ? null : props.hiddenOther
   const headerLabel = isListFocus
     ? ''
-    : headerForFocus(
-        focus as Exclude<typeof focus, { kind: 'list' }>,
-        chats,
-        teams,
-        channelsByTeam,
-        me?.id,
-        nameByUserId,
-      ) + labelSuffix(accountLabel)
+    : title(focus as Exclude<typeof focus, { kind: 'list' }>) +
+      labelSuffix(accountLabel) +
+      (hiddenOther ? ` ⇆ ${title(hiddenOther)}` : '')
   const pageState = readMessagePageState(cache ?? messages)
   const loadMoreState =
     props.loadOlderState ??
@@ -266,7 +291,8 @@ export function MessagePane(props: {
           ? 'idle'
           : 'unavailable')
   const isLoadingOlder = loadMoreState === 'loading'
-  const chatHeaderRows = showChatNameHeader ? CHAT_HEADER_ROWS : 0
+  const showHeader = showChatNameHeader || props.split === true
+  const chatHeaderRows = showHeader ? CHAT_HEADER_ROWS : 0
   const typingActive = (convTyping ?? []).length > 0
   const reservedDynamic = (isLoadingOlder ? 1 : 0) + (typingActive ? 1 : 0)
   const chromeRows = CHROME_RESERVED_ROWS - (statusBarHidden ? 1 : 0)
@@ -278,7 +304,7 @@ export function MessagePane(props: {
       reservedDynamic -
       tailRows -
       (composerRows - DEFAULT_COMPOSER_ROWS) -
-      (inputZone === 'message-search' ? 1 : 0),
+      (searchActive ? 1 : 0),
   )
   // Body wrap width estimate for the viewport budget: pane content (terminal
   // minus the chat-list pane and its border) minus the body indent. Bodies now
@@ -291,7 +317,7 @@ export function MessagePane(props: {
   // layout.messageMaxWidth narrows each message (not its sender line) to
   // that percent of the space beside the avatar column, centered: equal
   // margins left and right.
-  const paneColumns = terminalSize.columns - listPaneWidth - 2
+  const paneColumns = props.paneColumns ?? terminalSize.columns - listPaneWidth - 2
   const conversationColumns = Math.floor(
     ((paneColumns - avatarColumn) * theme.layout.messageMaxWidth) / 100,
   )
@@ -354,7 +380,6 @@ export function MessagePane(props: {
   // matching messages are highlighted at the row level via the existing
   // focused-message indicator (the keys handler updates messageCursor
   // on Enter / n), so the search bar itself is just an input echo.
-  const searchActive = inputZone === 'message-search'
   const hits = searchActive ? searchMessages(messages, searchQuery) : []
 
   // Trigger image fetches for the visible messages when that set (or an edit
@@ -417,7 +442,7 @@ export function MessagePane(props: {
   // The shared painter (kittyPainter) does the clearing and placing, so the
   // chat list's thumbnails and these images don't erase each other.
   useKittyOwner(
-    'messages',
+    paneId,
     isKittyCapable()
       ? {
           viewport: () => paneRef.current,
@@ -471,7 +496,12 @@ export function MessagePane(props: {
     // the body rather than the name.
     const preludeRows =
       chatHeaderRows + (searchActive ? 1 : 0) + (isLoadingOlder && !showingHistoryTop ? 1 : 0)
-    const row = 4 + 1 + preludeRows + rowsBefore + 1 + bodyPaddingY
+    // Split panes: from where this pane's timeline was laid out (0-based)
+    // instead, since the pane may sit right of another one.
+    const rect = props.split && paneRef.current ? elementRect(paneRef.current) : null
+    const row = rect
+      ? rect.top + 1 + rowsBefore + 1 + bodyPaddingY
+      : 4 + 1 + preludeRows + rowsBefore + 1 + bodyPaddingY
     // Compute the column at the end of the focused message body's last wrapped
     // line. `messageBodyTerminalColumn` gives the 1-based terminal column where
     // the body text begins; `pickerAnchorCol` adds the display width of the
@@ -479,11 +509,13 @@ export function MessagePane(props: {
     const focusedRow = rows[idx]
     const focusedMsg = focusedRow?.kind === 'message' ? focusedRow.message : null
     const bodyText = focusedMsg ? messageBodyText(focusedMsg) : ''
-    const bodyStartCol = messageBodyTerminalColumn({
-      bodyIndent: bodyIndent + bgPadX,
-      listPaneWidth: listPaneWidth + conversationMargin + avatarColumn,
-    })
-    const fallbackCol = listPaneWidth + 3
+    const bodyStartCol = rect
+      ? rect.left + 1 + bodyIndent + bgPadX + conversationMargin + avatarColumn
+      : messageBodyTerminalColumn({
+          bodyIndent: bodyIndent + bgPadX,
+          listPaneWidth: listPaneWidth + conversationMargin + avatarColumn,
+        })
+    const fallbackCol = rect ? rect.left + 2 : listPaneWidth + 3
     const col = pickerAnchorCol({
       bodyText,
       bodyStartCol,
@@ -494,6 +526,17 @@ export function MessagePane(props: {
     stdout.write(`\x1b[${row};${col}H`)
   })
 
+  if (isListFocus && props.split) {
+    return (
+      <Box flexDirection="column" flexGrow={1} paddingX={0}>
+        <Text muted>
+          {active
+            ? `Select a chat · Enter opens here · w other pane${hiddenOther ? ` ⇆ ${title(hiddenOther)}` : ''}`
+            : 'Empty pane · w switches here · o closes'}
+        </Text>
+      </Box>
+    )
+  }
   if (isListFocus) {
     return (
       <Box flexDirection="column" flexGrow={1} paddingX={0}>
@@ -512,7 +555,7 @@ export function MessagePane(props: {
         overflow="hidden"
         paddingX={0}
       >
-        {showChatNameHeader && (
+        {showHeader && (
           <Box paddingLeft={bodyIndent} marginBottom={1} flexShrink={0}>
             <Text bold={theme.emphasis.sectionHeadingBold}>
               {fs(headerLabel, theme.fontSize.paneHeader, theme.fontSize.tightSpacing)}

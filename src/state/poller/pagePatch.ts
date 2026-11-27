@@ -27,13 +27,15 @@ export type MessagesPage = {
  *   - preserve older cached pages and pagination cursors when the cache
  *     already has older messages the new page does not include,
  *   - clamp the message cursor to the new bounds,
- *   - mark the chat read for `unreadByChatId` when the focus is a chat.
+ *   - mark the chat read for `unreadByChatId` when the focus is a chat and
+ *     `markRead` (the conversation is on screen; default true).
  */
 export function mergeActivePagePatch(
   state: AppState,
   conv: ConvKey,
   page: MessagesPage,
   focus: Focus,
+  markRead = true,
 ): Partial<AccountSlice> {
   const cache = state.messageCacheByConvo[conv]
   const legacyMessages = state.messagesByConvo[conv] ?? []
@@ -122,7 +124,7 @@ export function mergeActivePagePatch(
   const nextNames = indexNamesFromMessages(state.nameByUserId, merged)
   if (nextNames !== state.nameByUserId) patch.nameByUserId = nextNames
 
-  if (focus.kind === 'chat') {
+  if (focus.kind === 'chat' && markRead) {
     const nextUnread = markChatRead(state.unreadByChatId, focus.chatId, newestMessageId(merged))
     if (nextUnread !== state.unreadByChatId) patch.unreadByChatId = nextUnread
   }

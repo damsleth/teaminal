@@ -10,6 +10,7 @@ import {
   type FocusChannel,
   type FocusChat,
 } from '../state/store'
+import { openInOtherPane } from '../state/panes'
 import {
   confirmDeleteChat,
   confirmDeleteMessage,
@@ -74,6 +75,24 @@ export function contextMenuEntries(
       },
     ]
   }
+  // Split panes open: a foreground row not already in the other pane can be
+  // opened there (as `v` does).
+  const otherPaneEntry = (
+    alias: string | undefined,
+    focus: FocusChat | FocusChannel,
+  ): ContextMenuEntry[] => {
+    if (!state.split) return []
+    if (alias !== undefined && accountRef(alias).id !== state.account?.id) return []
+    if (focusKey(state.split.focus) === focusKey(focus)) return []
+    return [
+      {
+        id: 'open-other-pane',
+        label: 'Open in other pane',
+        key: 'v',
+        run: () => store.set((s) => openInOtherPane(s, focus)),
+      },
+    ]
+  }
   if (target.kind === 'channel') {
     const { alias, teamId, channelId } = target
     return [
@@ -84,6 +103,7 @@ export function contextMenuEntries(
         run: () =>
           openFocus(store, { kind: 'channel', teamId, channelId }, alias, deps.toForeground),
       },
+      ...otherPaneEntry(alias, { kind: 'channel', teamId, channelId }),
       ...favoriteEntries(alias, `channel:${teamId}/${channelId}`),
     ]
   }
@@ -101,6 +121,7 @@ export function contextMenuEntries(
         key: 'Enter',
         run: () => openChat(store, chat.id, alias, deps.toForeground),
       },
+      ...otherPaneEntry(alias, { kind: 'chat', chatId: chat.id }),
       {
         id: 'toggle-read',
         label: isUnread ? 'Mark as read' : 'Mark as unread',

@@ -488,6 +488,41 @@ before you share the file, for example
 (anchored, because `beta` is also a resource path segment).
 Share only these lines: the rest of the events log is not reviewed for sharing.
 
+## Split panes
+
+Two conversations of the same account side by side. The active pane has the
+keys, the message cursor, search and the composer (one composer, full
+width, which names its conversation: "Message Design Sync"). The passive
+pane stays live: it is polled like the active one, and while it is on
+screen it counts as read and its plain messages are silent (mentions only
+ring the bell, as in the open conversation).
+
+- `v` on a chat or channel row opens it in the other pane, on the right; the
+  list keeps the keys, so Enter then opens a row in the active pane.
+- `v` in a conversation sends it to the other pane and empties the active
+  one, to pick its conversation from the list.
+- `w` switches to the other pane. Nothing moves on screen; drafts stay with
+  their conversation.
+- `o` closes the other pane: the active one stays, or, when it is empty, the
+  other pane's conversation becomes the single pane.
+
+While split, a row's context menu (`.`) also offers **Open in other pane**
+(`v`), and the command palette **Switch pane** (`w`) and **Close other
+pane** (`o`).
+
+A pane needs 36 columns, so two need 72 columns beside the chat list: 100
+columns with the default list width. On a narrower terminal only the active
+pane shows, its title names the other conversation (`⇆ Design Sync`) and `w`
+toggles between the two; the hidden one keeps polling but stays unread and
+notifies like any other chat. Ctrl+B hides the chat list, so an 80-column
+terminal shows both panes while a conversation is active.
+
+The same conversation never shows in both panes, and opening the other
+pane's row from the list switches to that pane instead. A split closes with
+`o`, when its chat is deleted, and on any switch to another account. It is
+not saved across restarts, and both panes always belong to the account in
+front.
+
 ## Mouse
 
 Off by default. Turn it on with **Settings → Navigation & input → Mouse
@@ -502,7 +537,7 @@ support** (or `"mouse": true`), and then:
 - the wheel over the sidebar moves the list cursor (it opens nothing); over
   the conversation it moves the message cursor one message per step, and
   loads older messages at the top. Each report the terminal sends is one
-  step.
+  step. With [split panes](#split-panes), only over the active pane.
 
 Clicks and the wheel do nothing behind a modal or the new-chat prompt, or
 with Shift / Alt / Ctrl held. A click on a row, or the wheel, takes focus
@@ -582,6 +617,10 @@ Notes:
 | Ctrl+A                 | any                    | Open notifications (also in the Esc menu). With several accounts open it lists every account's, grouped by account; Enter switches to the item's account.                                                                                                                        |
 | Ctrl+X                 | list                   | Enter resize mode (h/l chat list, j/k composer, 0 reset, Esc done).                                                                                                                                                                                                              |
 | Ctrl+B                 | list / chat            | Hide/show the chat list; list and chat then share one pane (h / l).                                                                                                                                                                                                              |
+| `v`                    | list                   | Open the chat or channel row in the other pane ([split panes](#split-panes)).                                                                                                                                                                                                    |
+| `v`                    | chat / channel         | Send the conversation to the other pane and pick this pane's from the list.                                                                                                                                                                                                      |
+| `w`                    | list / chat (split)    | Switch to the other pane.                                                                                                                                                                                                                                                        |
+| `o`                    | list / chat (split)    | Close the other pane (keep one).                                                                                                                                                                                                                                                 |
 | `?`                    | list                   | Show keybindings.                                                                                                                                                                                                                                                                |
 | `r`                    | list, channel          | Refresh now (in a chat, `r` reacts to the focused message).                                                                                                                                                                                                                      |
 | `Shift+R`              | list, chat, channel    | Hard refresh: clear visible data and reload from Graph.                                                                                                                                                                                                                          |
