@@ -8,14 +8,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Split panes: two conversations side by side. `v` on a chat or channel in
-  the list opens it in a second pane; `v` inside a conversation sends it to the
-  other pane. `w` switches pane and `o` goes back to one. The composer follows
-  the active pane and names its target. Each pane needs 36 columns; in a
-  narrower terminal only the active pane shows and `w` toggles between the two.
-  Both conversations are polled, and both count as being viewed for read state
-  and notifications while they are on screen. Switching account closes the
-  split.
+- Conversation tabs (config key `conversationMode`: `single`, the default
+  and unchanged, or `tabs`; **Settings → Navigation & input → Conversations**,
+  or Ctrl+T to flip). In tabs mode every chat or channel you open gets a tab
+  in a bar on the message pane's top line and one conversation shows at a
+  time. `[` / `]` step through the tabs, `1`–`9` jump to one, Ctrl+W closes
+  the open one, and with mouse support on a click switches to a tab. A thread
+  opens inside its channel's tab. Tabs of every open account share the bar
+  and switching to one brings its account to the front. Only the open
+  conversation is polled, as before. The command palette has Next tab,
+  Previous tab and Close tab.
 
 ## [0.28.0] - 2026-11-27
 

@@ -133,6 +133,7 @@ warnings and fall back to defaults.
   "scrollOnNewMessages": true,
   "enterSends": false,
   "mouse": false,
+  "conversationMode": "single",
   "chatListSort": "recent",
   "chatListGroupByType": false,
   "chatListSectionCap": true,
@@ -190,6 +191,7 @@ warnings and fall back to defaults.
 | `scrollOnNewMessages`          | boolean              |  `true` | Jump to a new message when it arrives in the open conversation. `false` keeps the cursor where it is. Also in the menu as **Scroll on new messages**. |
 | `enterSends` | boolean | `false` | Flip the composer keys: Enter sends, Shift+Enter / Ctrl+Enter / Ctrl+J insert a newline. Only takes effect (and only shown in the menu, as **Enter sends**) in terminals with the kitty keyboard protocol, since elsewhere Shift+Enter is indistinguishable from Enter. |
 | `mouse` | boolean | `false` | Mouse support (see [Mouse](#mouse)): click a sidebar row to open it, a header to collapse / expand it; the wheel moves the list and message cursors. Off by default because it takes over the terminal's own text selection. Also in the menu as **Mouse support** (Navigation & input); takes effect at once. |
+| `conversationMode` | `single`, `tabs` | `single` | `single` opens one conversation at a time: opening another replaces it. `tabs` keeps every conversation you open as a tab above the message pane (see [Tabs](#tabs)). Ctrl+T flips it. Also in the menu as **Conversations** (Navigation & input). |
 | `inlineImages`                 | `auto`, `off`        |  `auto` | `auto` renders message images inline in Kitty-compatible terminals, bounded to `inlineImageMaxRows` tall and the width of the message pane, so an image never overlaps neighbouring messages. `off` — and any terminal without Kitty graphics — renders one focusable `[img] name` row per image instead, reserving no picture rows. Space opens the focused image either way. |
 | `inlineImageMaxRows`           | integer 1-50         |    `10` | Maximum terminal rows reserved for a single inline image.                                |
 | `statusBarPosition`            | `bottom`, `top`, `hidden` | `bottom` | Where the status bar renders: below the composer (`bottom`) or on the top row above the header (`top`). `hidden` suppresses it entirely, freeing one row of vertical space in the message pane. |
@@ -488,6 +490,37 @@ before you share the file, for example
 (anchored, because `beta` is also a resource path segment).
 Share only these lines: the rest of the events log is not reviewed for sharing.
 
+## Tabs
+
+With `"conversationMode": "tabs"` (Ctrl+T, or **Settings → Navigation &
+input → Conversations**) every chat or channel you open gets a tab in a bar
+on the message pane's top line, for example
+`1 Ada Byron │ 2 Design Sync ● │ 3 #launch`. One conversation shows at a
+time: the highlighted tab. `●` (or `@` for a mention) marks a chat with
+unread messages.
+
+- Enter (or `l`, or a click) on a chat or channel opens it in a new tab, or
+  switches to its tab when it has one. A new chat opens in a tab too.
+- `t` opens a thread inside its channel's tab; `h` goes back to the channel
+  in the same tab.
+- `[` / `]` step to the previous / next tab (wrapping), `1`–`9` jump to that
+  tab, Ctrl+W closes the open one (its left neighbour, else its right one,
+  takes over; closing the last tab leaves the list focused). These keys work
+  with the list or the conversation focused, never while typing. The command
+  palette has **Next tab**, **Previous tab** and **Close tab**.
+- Ctrl+D on a chat also closes its tab.
+- With several accounts open, tabs of every account share the bar and name
+  their account (`Ada Byron · beta`). Switching to another account's tab
+  brings that account to the front, as opening its row does. An account that
+  is closed, turned off or removed takes its tabs with it.
+- When the tabs don't fit, the bar keeps the open tab in view and shows `‹` /
+  `›` for the hidden ones.
+
+Only the open conversation is polled, read-marked and kept quiet for
+notifications, as in single mode; drafts and the message cursor stay with
+each conversation. Ctrl+T back to single mode hides the bar and keeps the
+tabs for the rest of the session. Tabs are not saved across restarts.
+
 ## Mouse
 
 Off by default. Turn it on with **Settings → Navigation & input → Mouse
@@ -496,6 +529,7 @@ support** (or `"mouse": true`), and then:
 - a click on a chat, channel or `… N more` row in the sidebar opens it, as
   Enter does, also while a conversation is open or the composer has focus
   (the draft is kept);
+- a click on a conversation tab (see [Tabs](#tabs)) shows it;
 - a click on a header (an account, a chat section, Teams, a team, Favorites)
   collapses it, or expands it when collapsed. A header of an account that
   failed opens the Accounts modal;
@@ -582,6 +616,10 @@ Notes:
 | Ctrl+A                 | any                    | Open notifications (also in the Esc menu). With several accounts open it lists every account's, grouped by account; Enter switches to the item's account.                                                                                                                        |
 | Ctrl+X                 | list                   | Enter resize mode (h/l chat list, j/k composer, 0 reset, Esc done).                                                                                                                                                                                                              |
 | Ctrl+B                 | list / chat            | Hide/show the chat list; list and chat then share one pane (h / l).                                                                                                                                                                                                              |
+| Ctrl+T                 | list / chat            | Conversation tabs on / off (`conversationMode`, see [Tabs](#tabs)).                                                                                                                                                                                                              |
+| `[` / `]`              | list / chat, tabs      | Previous / next tab, wrapping.                                                                                                                                                                                                                                                   |
+| `1`–`9`                | list / chat, tabs      | Go to that tab.                                                                                                                                                                                                                                                                  |
+| Ctrl+W                 | list / chat, tabs      | Close the open tab.                                                                                                                                                                                                                                                              |
 | `?`                    | list                   | Show keybindings.                                                                                                                                                                                                                                                                |
 | `r`                    | list, channel          | Refresh now (in a chat, `r` reacts to the focused message).                                                                                                                                                                                                                      |
 | `Shift+R`              | list, chat, channel    | Hard refresh: clear visible data and reload from Graph.                                                                                                                                                                                                                          |
